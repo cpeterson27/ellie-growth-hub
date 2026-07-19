@@ -1,0 +1,30 @@
+.dashboard-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.dashboard-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.dashboard-card__header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.dashboard-card__action {
+  display: flex;
+  align-items: center;
+}
+
+.dashboard-card__content {
+  display: block;
+  gap: 1.25rem;
+}

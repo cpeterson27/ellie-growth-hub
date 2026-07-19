@@ -1,0 +1,13 @@
+.loading-spinner {
+  display: inline-block;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-top-color: rgba(255, 255, 255, 1);
+  border-radius: 50%;
+  animation: spinner-rotate 0.85s linear infinite;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}

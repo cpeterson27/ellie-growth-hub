@@ -1,0 +1,22 @@
+.chart-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+}
+
+.chart-card h3 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.chart-card--compact {
+  min-height: 420px;
+}
+
+@media (max-width: 720px) {
+  .chart-card {
+    padding: 1.2rem;
+  }
+}

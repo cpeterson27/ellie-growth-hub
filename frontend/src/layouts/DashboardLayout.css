@@ -1,0 +1,42 @@
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  background: #eef0f8;
+  position: relative;
+}
+
+.dashboard-view {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-content {
+  flex: 1;
+  padding: 1.5rem 2rem 2rem;
+  width: 100%;
+}
+
+.dashboard-overlay {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-content {
+    padding: 1rem 1rem 2rem;
+  }
+
+  .dashboard-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 24, 69, 0.32);
+    z-index: 30;
+  }
+}
