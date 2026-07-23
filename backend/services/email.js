@@ -1,5 +1,4 @@
 const { Resend } = require("resend");
-const path = require("path");
 
 
 // ======================================
@@ -53,7 +52,6 @@ async function sendEmail(outreachItem) {
 
 
 
-
   const recipient =
     outreachItem.contactEmail ||
     process.env.TEST_EMAIL;
@@ -78,13 +76,8 @@ async function sendEmail(outreachItem) {
 
 
 
-
-  const flyerPath =
-    path.join(
-      __dirname,
-      "../assets/deal-to-close-flyer.png"
-    );
-
+  const flyerUrl =
+    outreachItem.flyerUrl || "";
 
 
 
@@ -103,12 +96,12 @@ ${String(outreachItem.emailDraft || "")
 
 
 
+${flyerUrl ? `
+
 <br><br>
 
-
-
 <img
-src="cid:dealToCloseFlyer"
+src="${flyerUrl}"
 alt="Deal to Close Multifamily Bootcamp"
 style="
 width:100%;
@@ -116,6 +109,8 @@ max-width:600px;
 border-radius:8px;
 "
 />
+
+` : ""}
 
 
 
@@ -147,105 +142,101 @@ Learn More & Register
 
 
 
-
 try {
 
 
-const response =
-await resend.emails.send({
+  const response =
+    await resend.emails.send({
 
-  from:
-    process.env.EMAIL_FROM ||
-    "Ellie AI <onboarding@resend.dev>",
-
-
-  to:
-    recipient,
+      from:
+        process.env.EMAIL_FROM ||
+        "Ellie AI <onboarding@resend.dev>",
 
 
-  subject:
-    outreachItem.subject ||
-    "Partner With Deal to Close Multifamily Bootcamp",
+      to:
+        recipient,
 
 
-
-  text:
-    outreachItem.emailDraft || "",
+      subject:
+        outreachItem.subject ||
+        "Partner With Deal to Close Multifamily Bootcamp",
 
 
 
-  html:
-    outreachItem.htmlBody ||
-    fallbackHtml,
+      text:
+        outreachItem.emailDraft || "",
 
 
 
-  attachments:[
-
-    {
-      filename:
-        "deal-to-close-flyer.png",
-
-      path:
-        flyerPath,
-
-      contentType:
-        "image/png",
-
-      content_id:
-        "dealToCloseFlyer",
-    }
-
-  ]
+      html:
+        outreachItem.htmlBody ||
+        fallbackHtml,
 
 
-});
+
+      attachments:
+        flyerUrl
+        ? [
+            {
+              filename:
+                "deal-to-close-flyer.png",
+
+              path:
+                flyerUrl,
+
+              contentType:
+                "image/png",
+            }
+          ]
+        : []
+
+    });
 
 
 
 
 
-if(response.error){
+  if(response.error){
 
-  console.error(
-    "RESEND ERROR:",
-    response.error
+    console.error(
+      "RESEND ERROR:",
+      response.error
+    );
+
+
+    return {
+
+      success:false,
+
+      message:
+        response.error.message,
+
+    };
+
+  }
+
+
+
+
+  console.log(
+    `✅ Email sent to ${recipient} (${response.data?.id})`
   );
+
+
+
 
 
   return {
 
-    success:false,
+    success:true,
 
     message:
-      response.error.message,
+      "Email sent successfully.",
+
+    id:
+      response.data?.id,
 
   };
-
-}
-
-
-
-
-console.log(
-  `✅ Email sent to ${recipient} (${response.data?.id})`
-);
-
-
-
-
-
-return {
-
-  success:true,
-
-  message:
-    "Email sent successfully.",
-
-  id:
-    response.data?.id,
-
-};
 
 
 
@@ -254,21 +245,21 @@ return {
 catch(error){
 
 
-console.error(
-  "SEND EMAIL ERROR:",
-  error
-);
+  console.error(
+    "SEND EMAIL ERROR:",
+    error
+  );
 
 
 
-return {
+  return {
 
-  success:false,
+    success:false,
 
-  message:
-    error.message,
+    message:
+      error.message,
 
-};
+  };
 
 
 }
