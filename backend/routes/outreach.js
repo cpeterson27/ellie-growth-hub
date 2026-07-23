@@ -230,21 +230,44 @@ router.post("/generate", async (req,res)=>{
 
       await Outreach.create({
 
-        ...draft,
+  campaignId: campaign._id,
 
-        campaignId:
-          campaign._id,
+  contactId: contact._id,
 
-        contactId:
-          contact._id,
+  organization:
+    draft.organization,
 
-        contactEmail:
-          email,
+  contactName:
+    draft.contactName,
 
-        status:
-          "pending"
+  contactEmail:
+    email,
 
-      });
+  contactRole:
+    draft.contactRole,
+
+  reason:
+    draft.reason,
+
+  subject:
+    draft.subject,
+
+  emailDraft:
+    draft.emailDraft,
+
+  htmlBody:
+    draft.htmlBody || "",
+
+  eventLink:
+    draft.eventLink || "",
+
+  flyerUrl:
+    draft.flyerUrl || "",
+
+  status:
+    "pending"
+
+});
 
 
 

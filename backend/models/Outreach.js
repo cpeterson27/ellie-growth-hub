@@ -4,9 +4,9 @@ const mongoose = require("mongoose");
 const outreachSchema = new mongoose.Schema(
   {
 
-    // -------------------------------------------------------------------------
-    // Campaign relationship
-    // -------------------------------------------------------------------------
+    // ======================================
+    // CAMPAIGN RELATIONSHIP
+    // ======================================
 
     campaignId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -16,9 +16,9 @@ const outreachSchema = new mongoose.Schema(
     },
 
 
-    // -------------------------------------------------------------------------
-    // Contact relationship
-    // -------------------------------------------------------------------------
+    // ======================================
+    // CONTACT RELATIONSHIP
+    // ======================================
 
     contactId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -28,11 +28,10 @@ const outreachSchema = new mongoose.Schema(
     },
 
 
-    // -------------------------------------------------------------------------
-    // Contact snapshot
-    // Stored so outreach history remains intact
-    // even if contact data changes later.
-    // -------------------------------------------------------------------------
+    // ======================================
+    // CONTACT SNAPSHOT
+    // Keeps outreach history intact
+    // ======================================
 
     organization: {
       type: String,
@@ -53,6 +52,7 @@ const outreachSchema = new mongoose.Schema(
       default: "",
       lowercase: true,
       trim: true,
+      index: true,
     },
 
 
@@ -63,19 +63,38 @@ const outreachSchema = new mongoose.Schema(
     },
 
 
-    // -------------------------------------------------------------------------
-    // AI / generation metadata
-    // -------------------------------------------------------------------------
+    // ======================================
+    // GENERATED OUTREACH CONTENT
+    // ======================================
 
     reason: {
       type: String,
-      required: true,
+      default: "",
+      trim: true,
     },
 
 
     emailDraft: {
       type: String,
-      required: true,
+      default: "",
+    },
+
+
+    htmlBody: {
+      type: String,
+      default: "",
+    },
+
+
+    eventLink: {
+      type: String,
+      default: "",
+    },
+
+
+    flyerUrl: {
+      type: String,
+      default: "",
     },
 
 
@@ -86,15 +105,15 @@ const outreachSchema = new mongoose.Schema(
     },
 
 
-    // -------------------------------------------------------------------------
-    // Outreach lifecycle
+    // ======================================
+    // OUTREACH LIFECYCLE
     //
-    // pending  -> Generated waiting for approval
-    // approved -> Approved and ready to send
-    // sent     -> Successfully delivered
-    // replied  -> Contact responded
-    // failed   -> Sending failed
-    // -------------------------------------------------------------------------
+    // pending  = Generated waiting approval
+    // approved = Ready to send
+    // sent     = Successfully delivered
+    // replied  = Contact responded
+    // failed   = Sending failed
+    // ======================================
 
     status: {
       type: String,
@@ -110,9 +129,9 @@ const outreachSchema = new mongoose.Schema(
     },
 
 
-    // -------------------------------------------------------------------------
-    // Email tracking
-    // -------------------------------------------------------------------------
+    // ======================================
+    // EMAIL TRACKING
+    // ======================================
 
     sentAt: {
       type: Date,
@@ -127,9 +146,9 @@ const outreachSchema = new mongoose.Schema(
     },
 
 
-    // -------------------------------------------------------------------------
-    // Reply tracking
-    // -------------------------------------------------------------------------
+    // ======================================
+    // REPLY TRACKING
+    // ======================================
 
     repliedAt: {
       type: Date,
@@ -143,16 +162,15 @@ const outreachSchema = new mongoose.Schema(
     },
 
 
-    // AI generated reply suggestion
     aiReplyDraft: {
       type: String,
       default: "",
     },
 
 
-    // -------------------------------------------------------------------------
-    // Errors
-    // -------------------------------------------------------------------------
+    // ======================================
+    // ERROR HANDLING
+    // ======================================
 
     errorMessage: {
       type: String,
@@ -168,13 +186,13 @@ const outreachSchema = new mongoose.Schema(
 
 
 
-// -----------------------------------------------------------------------------
-// Indexes
-// -----------------------------------------------------------------------------
+// ======================================
+// INDEXES
+// ======================================
 
 
 // Prevent duplicate outreach
-// Same campaign + same person
+// Same campaign + same email
 outreachSchema.index(
   {
     campaignId: 1,
@@ -186,14 +204,14 @@ outreachSchema.index(
 );
 
 
-// Campaign filtering
+// Campaign dashboard filtering
 outreachSchema.index({
   campaignId: 1,
   status: 1,
 });
 
 
-// Sent history
+// Sent history sorting
 outreachSchema.index({
   status: 1,
   sentAt: -1,
@@ -216,6 +234,7 @@ outreachSchema.index({
   status: 1,
   repliedAt: -1,
 });
+
 
 
 module.exports = mongoose.model(
