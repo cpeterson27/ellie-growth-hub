@@ -5,7 +5,6 @@ import {
   FiMail,
   FiCheckCircle,
   FiEye,
-  FiSearch,
 } from "react-icons/fi";
 
 import DashboardCard from "../components/DashboardCard.jsx";
@@ -22,6 +21,7 @@ import {
 
 
 export default function Outreach() {
+
 
   const [searchParams] = useSearchParams();
 
@@ -155,11 +155,9 @@ export default function Outreach() {
 
 
 
-  useEffect(() => {
-
-    loadCampaigns();
-
-  }, [loadCampaigns]);
+useEffect(() => {
+  loadCampaigns();
+}, [loadCampaigns]);
 
 
 
@@ -528,7 +526,55 @@ export default function Outreach() {
         </DashboardCard>
 
 
+<div
+  style={{
+    display:"flex",
+    gap:"12px",
+    marginBottom:"20px"
+  }}
+>
 
+<input
+  className="select-input"
+  placeholder="Search organizations, contacts, emails..."
+  value={search}
+  onChange={(e)=>setSearch(e.target.value)}
+/>
+
+
+<select
+  className="select-input"
+  value={filter}
+  onChange={(e)=>setFilter(e.target.value)}
+>
+
+<option value="all">
+All
+</option>
+
+<option value="pending">
+Pending
+</option>
+
+<option value="approved">
+Approved
+</option>
+
+<option value="sent">
+Sent
+</option>
+
+<option value="replied">
+Replied
+</option>
+
+<option value="failed">
+Failed
+</option>
+
+</select>
+
+</div>
 
 
         <DashboardCard title="Outreach Items">
@@ -550,7 +596,7 @@ export default function Outreach() {
 
           ) : (
 
-            outreach.map(item => (
+            filteredOutreach.map(item => (
 
               <div
                 key={item._id}
