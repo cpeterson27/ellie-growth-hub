@@ -3,19 +3,24 @@ import {
   FiActivity,
   FiFolder,
   FiUsers,
+  FiMail,
   FiZap,
   FiBarChart2,
   FiTrendingUp,
   FiSettings,
+  FiCpu,
 } from "react-icons/fi";
 import "./Sidebar.css";
 
 const navItems = [
   { label: "Dashboard", path: "/dashboard", icon: <FiActivity /> },
-  { label: "Campaigns", path: "/campaigns", icon: <FiFolder /> },
-  { label: "Partners", path: "/partners", icon: <FiUsers /> },
+  { label: "Events", path: "/events", icon: <FiFolder /> },
   { label: "Marketing", path: "/marketing", icon: <FiTrendingUp /> },
+  { label: "Campaigns", path: "/campaigns", icon: <FiZap /> },
+  { label: "Outreach", path: "/outreach", icon: <FiMail /> },
+  { label: "Partners", path: "/partners", icon: <FiUsers /> },
   { label: "AI Content", path: "/content", icon: <FiZap /> },
+  { label: "Jarvis", path: "/jarvis", icon: <FiCpu /> },
   { label: "Analytics", path: "/analytics", icon: <FiBarChart2 /> },
   { label: "Settings", path: "/settings", icon: <FiSettings /> },
 ];

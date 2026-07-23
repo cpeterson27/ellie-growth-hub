@@ -1,63 +1,155 @@
-import { FiCalendar, FiDollarSign, FiTrendingUp, FiUsers } from 'react-icons/fi'
-import StatCard from '../components/StatCard.jsx'
-import DashboardCard from '../components/DashboardCard.jsx'
-import { TicketSalesChart, RevenueBarChart } from '../components/Charts.jsx'
-
-const stats = [
-  {
-    title: 'Tickets Sold',
-    value: '32 / 50',
-    subtitle: 'Seats reserved for the next event',
-    icon: <FiCalendar />, 
-    trend: '+12% this week',
-  },
-  {
-    title: 'Revenue',
-    value: '$15,904',
-    subtitle: 'Estimated earnings from paid tickets',
-    icon: <FiDollarSign />,
-    trend: '+18% month over month',
-  },
-  {
-    title: 'Conversion Rate',
-    value: '8.4%',
-    subtitle: 'Lead-to-sale percentage for the campaign',
-    icon: <FiTrendingUp />,
-    trend: '+1.2% compared to last week',
-  },
-  {
-    title: 'Partners Active',
-    value: '14',
-    subtitle: 'Creators and affiliates working with this event',
-    icon: <FiUsers />,
-    trend: '+4 partners onboarded',
-  },
-]
-
-const salesData = [
-  { date: 'Aug 12', tickets: 6 },
-  { date: 'Aug 13', tickets: 8 },
-  { date: 'Aug 14', tickets: 10 },
-  { date: 'Aug 15', tickets: 9 },
-  { date: 'Aug 16', tickets: 12 },
-  { date: 'Aug 17', tickets: 14 },
-  { date: 'Aug 18', tickets: 16 },
-]
-
-const revenueData = [
-  { campaign: 'Launch', revenue: 5600 },
-  { campaign: 'Partnership', revenue: 7200 },
-  { campaign: 'Email', revenue: 3100 },
-]
+import { useEffect, useState } from "react";
+import {
+  FiCalendar,
+  FiDollarSign,
+  FiTrendingUp,
+  FiUsers,
+} from "react-icons/fi";
+import StatCard from "../components/StatCard.jsx";
+import DashboardCard from "../components/DashboardCard.jsx";
+import { TicketSalesChart, RevenueBarChart } from "../components/Charts.jsx";
+import {
+  fetchEvents,
+  fetchOutreach,
+  getGrowthOperatorHistory,
+} from "../services/api.js";
 
 export default function Dashboard() {
+  const [event, setEvent] = useState(null);
+  const [outreach, setOutreach] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [growthHistory, setGrowthHistory] = useState([]);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const events = await fetchEvents();
+        const activeEvent = events[0] || null;
+        setEvent(activeEvent);
+        if (activeEvent) {
+          const outreachItems = await fetchOutreach(activeEvent._id);
+          setOutreach(outreachItems);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="page-dashboard">
+        <p>Loading dashboard...</p>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="page-dashboard">
+        <div className="page-header">
+          <div>
+            <p className="page-subtitle">Event</p>
+            <h1 className="page-title">No Event Connected</h1>
+            <p className="page-subtitle">
+              Connect Eventbrite to import your event data.
+            </p>
+          </div>
+        </div>
+
+        <DashboardCard title="Event Connection">
+          <p>
+            No event has been connected yet. Connect Eventbrite to sync event
+            details, ticket sales, revenue, and attendee information.
+          </p>
+        </DashboardCard>
+      </div>
+    );
+  }
+
+  const ticketsSold = event.ticketsSold || 0;
+  const ticketsGoal = event.ticketGoal || 0;
+  const revenue = ticketsSold * (event.ticketPrice || 0);
+  const conversionRate =
+    ticketsGoal > 0 ? ((ticketsSold / ticketsGoal) * 100).toFixed(1) : "0.0";
+  const successRate =
+    ticketsGoal > 0
+      ? `${Math.min(100, ((ticketsSold / ticketsGoal) * 100).toFixed(0))}% complete`
+      : "0% complete";
+
+  const stats = [
+    {
+      title: "Tickets Sold",
+      value: `${ticketsSold} / ${ticketsGoal}`,
+      subtitle: "Seats reserved for the event",
+      icon: <FiCalendar />,
+      trend: ticketsGoal > 0 ? successRate : "",
+    },
+    {
+      title: "Revenue",
+      value: `$${revenue}`,
+      subtitle: "Event ticket revenue so far",
+      icon: <FiDollarSign />,
+      trend:
+        ticketsSold > 0 ? "Revenue is tracking with sales" : "No revenue yet",
+    },
+    {
+      title: "Conversion Rate",
+      value: `${conversionRate}%`,
+      subtitle: "Booked tickets vs goal",
+      icon: <FiTrendingUp />,
+      trend: ticketsGoal > 0 ? "Based on current event progress" : "",
+    },
+    {
+      title: "Outreach Opportunities",
+      value: `${outreach.length}`,
+      subtitle: "Suggested outreach targets for the event",
+      icon: <FiUsers />,
+      trend:
+        outreach.length > 0
+          ? "Awaiting review"
+          : "Generate outreach suggestions",
+    },
+  ];
+
+  const salesData = [
+    {
+      date: event.startDate
+        ? new Date(event.startDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })
+        : "Event",
+      tickets: ticketsSold,
+    },
+  ];
+
+  const revenueData = [
+    {
+      campaign: event.name,
+      revenue,
+    },
+  ];
+
   return (
     <div className="page-dashboard">
       <div className="page-header">
         <div>
           <p className="page-subtitle">Event</p>
-          <h1 className="page-title">Deal To Close Bootcamp</h1>
-          <p className="page-subtitle">August 22, 2026 · Ticket Price $497</p>
+          <h1 className="page-title">{event.name}</h1>
+          <p className="page-subtitle">
+            {new Date(event.startDate).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}{" "}
+            · Ticket Price ${event.ticketPrice}
+          </p>
         </div>
       </div>
 
@@ -74,35 +166,46 @@ export default function Dashboard() {
         ))}
       </section>
 
-      <section className="section-grid" style={{ marginTop: '1.5rem' }}>
+      <section className="section-grid" style={{ marginTop: "1.5rem" }}>
         <DashboardCard
-          title="Campaign Progress"
-          action={<span className="label-pill">64% complete</span>}
+          title="Event Progress"
+          action={<span className="label-pill">{successRate}</span>}
         >
-          <p>Launch workflows and creative briefs are currently ahead of schedule for the next event.</p>
+          <p>Current ticket sales show event momentum and event performance.</p>
           <div className="progress-bar">
-            <div className="progress-bar__fill" style={{ width: '64%' }} />
+            <div
+              className="progress-bar__fill"
+              style={{
+                width: `${Math.min(100, (ticketsSold / Math.max(1, ticketsGoal)) * 100)}%`,
+              }}
+            />
           </div>
         </DashboardCard>
 
         <DashboardCard title="Upcoming Event">
           <div className="upcoming-card">
             <div>
-              <p className="stat-card__title">Deal To Close Bootcamp</p>
-              <p className="page-subtitle">Accelerate ticket sales, outreach, and partner success.</p>
+              <p className="stat-card__title">{event.name}</p>
+              <p className="page-subtitle">{event.audience?.join(", ")}</p>
             </div>
             <div className="event-meta">
-              <span>Aug 22, 2026</span>
-              <span>Live workshop · Hybrid</span>
+              <span>
+                {new Date(event.startDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+              <span>Ticket goal: {event.ticketGoal}</span>
             </div>
           </div>
         </DashboardCard>
       </section>
 
-      <section className="section-grid" style={{ marginTop: '1.5rem' }}>
+      <section className="section-grid" style={{ marginTop: "1.5rem" }}>
         <TicketSalesChart data={salesData} />
         <RevenueBarChart data={revenueData} />
       </section>
     </div>
-  )
+  );
 }
