@@ -780,7 +780,13 @@ Failed
             <hr />
 
             <p>
-              {selectedEmail.emailDraft}
+             <div
+  dangerouslySetInnerHTML={{
+    __html:
+      selectedEmail.htmlBody ||
+      selectedEmail.emailDraft
+  }}
+/>
             </p>
           </>
 
