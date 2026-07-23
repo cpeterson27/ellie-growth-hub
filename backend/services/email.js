@@ -29,7 +29,6 @@ async function sendEmail(outreachItem) {
   const resend = getResendClient();
 
 
-
   if (!resend) {
 
     return {
@@ -72,7 +71,7 @@ async function sendEmail(outreachItem) {
 
   const eventLink =
     outreachItem.eventLink ||
-    "https://www.eventbrite.com/e/deal-to-close-multifamily-bootcamp-tickets-1994515277887?aff=ebdssbdestsearch";
+    "https://www.eventbrite.com/e/deal-to-close-multifamily-bootcamp-tickets-1994515277887";
 
 
 
@@ -82,23 +81,39 @@ async function sendEmail(outreachItem) {
 
 
 
-  const fallbackHtml = `
 
-<div style="
+  const html = `
+
+<!DOCTYPE html>
+
+<html>
+
+<body style="
 font-family:Arial,sans-serif;
 line-height:1.6;
 color:#333;
 ">
 
 
-${String(outreachItem.emailDraft || "")
-.replace(/\n/g,"<br>")}
+<p>
+Hi ${outreachItem.contactName || "there"},
+</p>
+
+
+<p>
+I wanted to reach out about a potential collaboration opportunity.
+</p>
+
+
+<p>
+Ellie's Coaching is hosting 
+<strong>Deal to Close: Multifamily Bootcamp</strong>,
+a one-day virtual event for real estate investors.
+</p>
 
 
 
 ${flyerUrl ? `
-
-<br><br>
 
 <img
 src="${flyerUrl}"
@@ -114,7 +129,21 @@ border-radius:8px;
 
 
 
-<br><br>
+<h3>
+Event Details
+</h3>
+
+
+<p>
+<strong>
+Deal to Close: Multifamily Bootcamp
+</strong>
+<br>
+Saturday, August 22, 2026
+<br>
+8:00 AM - 4:00 PM PST
+</p>
+
 
 
 
@@ -130,14 +159,31 @@ border-radius:6px;
 font-weight:bold;
 "
 >
-Learn More & Register
+Learn More
 </a>
 
 
 
-</div>
+
+<p>
+Would this be something your audience would find valuable?
+</p>
+
+
+<p>
+Thank you,
+<br>
+Ellie's Coaching
+</p>
+
+
+
+</body>
+
+</html>
 
 `;
+
 
 
 
@@ -145,99 +191,74 @@ Learn More & Register
 try {
 
 
-  const response =
-    await resend.emails.send({
+const response =
+await resend.emails.send({
 
-      from:
-        process.env.EMAIL_FROM ||
-        "Ellie AI <onboarding@resend.dev>",
-
-
-      to:
-        recipient,
+from:
+process.env.EMAIL_FROM ||
+"Ellie AI <onboarding@resend.dev>",
 
 
-      subject:
-        outreachItem.subject ||
-        "Partner With Deal to Close Multifamily Bootcamp",
+to:
+recipient,
 
 
-
-      text:
-        outreachItem.emailDraft || "",
-
+subject:
+"Quick question about your audience",
 
 
-      html:
-        outreachItem.htmlBody ||
-        fallbackHtml,
+text:
+outreachItem.emailDraft || "",
 
 
+html
 
-      attachments:
-        flyerUrl
-        ? [
-            {
-              filename:
-                "deal-to-close-flyer.png",
-
-              path:
-                flyerUrl,
-
-              contentType:
-                "image/png",
-            }
-          ]
-        : []
-
-    });
+});
 
 
 
 
 
-  if(response.error){
+if(response.error){
 
-    console.error(
-      "RESEND ERROR:",
-      response.error
-    );
-
-
-    return {
-
-      success:false,
-
-      message:
-        response.error.message,
-
-    };
-
-  }
+console.error(
+"RESEND ERROR:",
+response.error
+);
 
 
+return {
 
+success:false,
 
-  console.log(
-    `✅ Email sent to ${recipient} (${response.data?.id})`
-  );
+message:
+response.error.message
+
+};
+
+}
 
 
 
 
 
-  return {
+console.log(
+`✅ Email sent to ${recipient} (${response.data?.id})`
+);
 
-    success:true,
 
-    message:
-      "Email sent successfully.",
 
-    id:
-      response.data?.id,
+return {
 
-  };
+success:true,
 
+message:
+"Email sent successfully.",
+
+id:
+response.data?.id
+
+};
 
 
 
@@ -245,21 +266,21 @@ try {
 catch(error){
 
 
-  console.error(
-    "SEND EMAIL ERROR:",
-    error
-  );
+console.error(
+"SEND EMAIL ERROR:",
+error
+);
 
 
 
-  return {
+return {
 
-    success:false,
+success:false,
 
-    message:
-      error.message,
+message:
+error.message
 
-  };
+};
 
 
 }
