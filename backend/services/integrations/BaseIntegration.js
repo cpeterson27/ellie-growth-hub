@@ -1,0 +1,93 @@
+/**
+ * Base Integration Adapter
+ * All integration adapters extend this class to provide a consistent interface
+ */
+
+class BaseIntegration {
+  constructor(name, type, config = {}) {
+    this.name = name;
+    this.type = type; // 'email' | 'events' | 'social'
+    this.config = config;
+    this.authenticated = false;
+    this.lastError = null;
+  }
+
+  /**
+   * Get integration status
+   * @returns {Object} { name, type, authenticated, lastChecked, version, capabilities }
+   */
+  async getStatus() {
+    return {
+      name: this.name,
+      type: this.type,
+      authenticated: this.authenticated,
+      lastChecked: new Date(),
+      version: this.getVersion(),
+      capabilities: this.getCapabilities(),
+      config: this.getSafeConfig(), // Only return non-sensitive config
+    };
+  }
+
+  /**
+   * Get version info
+   * @returns {String} Semantic version
+   */
+  getVersion() {
+    return "1.0.0";
+  }
+
+  /**
+   * Get available capabilities
+   * @returns {Array} List of operations this integration can perform
+   */
+  getCapabilities() {
+    return [];
+  }
+
+  /**
+   * Get safe config (non-sensitive)
+   * @returns {Object} Config without credentials
+   */
+  getSafeConfig() {
+    const safe = { ...this.config };
+    delete safe.apiKey;
+    delete safe.apiSecret;
+    delete safe.accessToken;
+    delete safe.refreshToken;
+    delete safe.password;
+    return safe;
+  }
+
+  /**
+   * Verify connection
+   * Override in subclasses
+   */
+  async verify() {
+    throw new Error("verify() must be implemented by subclass");
+  }
+
+  /**
+   * Disconnect
+   * Override in subclasses if needed
+   */
+  async disconnect() {
+    this.authenticated = false;
+  }
+
+  /**
+   * Set error state
+   */
+  setError(error) {
+    this.lastError = error;
+    this.authenticated = false;
+  }
+
+  /**
+   * Clear error state
+   */
+  clearError() {
+    this.lastError = null;
+  }
+}
+
+module.exports = BaseIntegration;
