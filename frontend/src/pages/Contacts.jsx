@@ -23,7 +23,7 @@ const columns = [
   { header: "Name", accessor: "name" },
   { header: "Company", accessor: "company" },
   { header: "Title", accessor: "title" },
-  { header: "Email", accessor: "email" }, { header: "Phone", accessor: "phone" },
+  { header: "Email", accessor: "email" }, { header: "Phone", accessor: "phone" }, { header: "Campaign", render: (row) => row.campaignIds?.length ? "Associated" : "—" },
   { header: "Monday Sync", accessor: "mondaySyncStatus" },
   { header: "Status", accessor: "status" },
 ];
@@ -68,13 +68,14 @@ export default function Contacts() {
   const [previewStats, setPreviewStats] = useState(null);
   const [detailContact, setDetailContact] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const tableColumns = [...columns, { header: "Actions", render: (contact) => <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}><button className="crm-overflow" onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>⋮</button>{actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View Contact</button><button onClick={() => setEditingContact({ ...contact })}>Edit</button>{contact.mondaySyncStatus === "failed" ? <button onClick={() => retryMondaySync(contact._id).then(loadContacts)}>Retry Monday Sync</button> : null}<button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete</button></div> : null}</div> }];
 
   async function loadContacts() {
     try {
       setLoading(true);
       const response = await fetchContacts(contactTab === "archived" ? { status: "archived" } : {});
-      setContacts((response.data || []).filter((contact) => contactTab !== "needsSync" || contact.mondaySyncStatus === "failed"));
+      setContacts((response.data || []).filter((contact) => (contactTab !== "needsSync" || contact.mondaySyncStatus === "failed") && (!campaignId || contact.campaignIds?.some((id) => String(id) === campaignId)) && (!searchTerm || [contact.name, contact.company, contact.email].join(" ").toLowerCase().includes(searchTerm.toLowerCase()))));
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load contacts");
     } finally {
@@ -86,9 +87,9 @@ export default function Contacts() {
     loadContacts();
     fetchCampaigns().then((items) => {
       setCampaigns(items);
-      setCampaignId(items[0]?._id || "");
+      setCampaignId("");
     }).catch(() => setError("Unable to load campaigns"));
-  }, [contactTab]);
+  }, [contactTab, campaignId, searchTerm]);
 
   function openImportConfirmation(source) {
     setError("");
@@ -199,6 +200,7 @@ export default function Contacts() {
       <DashboardCard title="Contacts">
         {error ? <p className="form-error">{error}</p> : null}
         {importSummary ? <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated. Monday CRM: {importSummary.mondayCreated} created, {importSummary.mondayUpdated} updated, {importSummary.mondayFailed} failed.</p> : null}
+        <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
         <div className="crm-tabs">{[["all", "All"], ["active", "Active"], ["archived", "Archived"], ["needsSync", "Needs Sync"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
         <Table
           columns={tableColumns}
@@ -209,8 +211,8 @@ export default function Contacts() {
         />
       </DashboardCard>
 
-      <DashboardCard title="Find Leads">
-        <div className="apollo-locked"><p>🔒 Apollo prospect search requires a paid Apollo plan.</p><Button variant="outline" onClick={() => setUploadOpen(true)}>Import Apollo CSV</Button><Button variant="outline" onClick={() => setError("Organization discovery is available from the audience workflow.")}>Organization Discovery</Button></div>
+      <DashboardCard title="Add Contacts from Apollo">
+        <div className="apollo-locked"><p>Apollo prospect search requires a paid Apollo plan. Export your contacts from Apollo and import the CSV here.</p><Button onClick={() => setUploadOpen(true)}>Import Apollo CSV</Button><Button variant="outline" onClick={() => setError("Organization discovery is available from the audience workflow.")}>Open Organization Discovery</Button><small>Direct Apollo people search can be enabled later when the account has API access.</small></div>
         <div style={{ display: "none" }}>
           <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)} className="select-input">
             <option value="">Select campaign</option>
