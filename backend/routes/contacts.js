@@ -6,6 +6,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const contactService = require("../services/contactService");
+const mondaySyncService = require("../services/mondaySyncService");
+const { searchContacts } = require("../services/apollo");
 const Contact = require("../models/Contact");
 
 const router = express.Router();
@@ -265,6 +267,63 @@ router.post("/sync", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/contacts/import/monday
+ * Import contacts from Monday CRM.
+ */
+router.post("/import/monday", async (req, res) => {
+  try {
+    const result = await mondaySyncService.syncMondayContacts();
+
+    res.json({
+      success: true,
+      data: result,
+      message: result.message,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to import contacts from Monday CRM",
+    });
+  }
+});
+
+/**
+ * POST /api/contacts/import/apollo
+ * Import the first page of Apollo contact-search results.
+ */
+router.post("/import/apollo", async (req, res) => {
+  try {
+    const result = await searchContacts({ perPage: 25 });
+
+    if (!result.success) {
+      return res.status(502).json({
+        success: false,
+        message: result.message || "Failed to import contacts from Apollo",
+      });
+    }
+
+    const syncResult = await contactService.syncContactsFromSource(
+      "apollo",
+      result.contacts.map((contact) => ({
+        ...contact,
+        externalId: contact.apolloPersonId,
+      })),
+    );
+
+    res.json({
+      success: true,
+      data: syncResult,
+      message: `Imported Apollo contacts: ${syncResult.created} created, ${syncResult.updated} updated`,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to import contacts from Apollo",
+    });
   }
 });
 
