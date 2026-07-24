@@ -28,6 +28,7 @@ export default function JarvisChat() {
   const [voiceName, setVoiceName] = useState("");
   const [speakingId, setSpeakingId] = useState(null);
   const [speechError, setSpeechError] = useState("");
+  const speechStartTimerRef = useRef(null);
   const [listening, setListening] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -74,27 +75,42 @@ export default function JarvisChat() {
       return;
     }
     setSpeechError("");
+    if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voices.find((voice) => voice.name === voiceName) || null;
     utterance.rate = profile?.voiceRate || 1;
     utterance.pitch = profile?.voicePitch || 1;
-    utterance.onstart = () => setSpeakingId(id);
-    utterance.onend = () => setSpeakingId(null);
+    utterance.onstart = () => {
+      if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
+      setSpeakingId(id);
+    };
+    utterance.onend = () => {
+      if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
+      setSpeakingId(null);
+    };
     utterance.onerror = (event) => {
+      if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
       setSpeakingId(null);
       if (event.error !== "canceled" && event.error !== "interrupted") {
         setSpeechError("Browser voice playback was blocked. Click Test voice once, then ask Jarvis again.");
       }
     };
-    setSpeakingId(id);
     window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
+    speechStartTimerRef.current = window.setTimeout(() => {
+      setSpeechError("Your browser did not start voice playback. Check macOS Sound output, then try Test voice in Chrome.");
+    }, 1500);
   };
 
   const testVoice = () => {
     speakText(`Hi, I am ${profile?.name || "Jarvis"}. Voice playback is ready.`, "voice-test");
   };
+
+  useEffect(() => () => {
+    if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  }, []);
 
   const submitPrompt = async (prompt) => {
     if (!prompt.trim() || loading) return;
