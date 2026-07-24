@@ -14,6 +14,7 @@ const providers = [
     description: "Lead import",
     capabilities: ["createContacts", "normalizeContacts"],
     environmentKeys: [],
+    builtIn: true,
   },
   {
     id: "monday",

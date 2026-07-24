@@ -35,6 +35,35 @@ router.get("/", async (req, res) => {
 });
 
 // ==================================
+// CAMPAIGN DELETION PREVIEW
+// ==================================
+router.get("/:id/deletion-preview", async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id).select("eventId name").lean();
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+
+    const outreachCount = await Outreach.countDocuments({ campaignId: campaign._id });
+    const linkedCampaignCount = campaign.eventId
+      ? await Campaign.countDocuments({ eventId: campaign.eventId })
+      : 0;
+
+    return res.json({
+      campaignId: campaign._id,
+      campaignName: campaign.name,
+      outreachCount,
+      event: campaign.eventId
+        ? { id: campaign.eventId, canDelete: linkedCampaignCount === 1 }
+        : null,
+    });
+  } catch (error) {
+    console.error("CAMPAIGN DELETION PREVIEW ERROR:", error);
+    return res.status(500).json({ error: "Unable to prepare campaign deletion" });
+  }
+});
+
+// ==================================
 // GET SINGLE CAMPAIGN
 // ==================================
 router.get("/:id", async (req, res) => {
@@ -217,7 +246,7 @@ router.post("/", async (req, res) => {
       channels,
       campaignKind = "event",
       programName = "",
-      templateKey = "event_invite",
+      templateKey = "event_investor",
       contentBriefId = null,
     } = req.body;
 
@@ -364,6 +393,56 @@ router.post("/", async (req, res) => {
 
   }
 
+});
+
+// ==================================
+// DELETE CAMPAIGN SAFELY
+// ==================================
+router.delete("/:id", async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+
+    const deleteOutreach = req.body?.deleteOutreach === true;
+    const deleteEvent = req.body?.deleteEvent === true;
+    const outreachCount = await Outreach.countDocuments({ campaignId: campaign._id });
+
+    if (outreachCount && !deleteOutreach) {
+      return res.status(409).json({
+        error: "This campaign has outreach history. Choose whether to delete its outreach drafts before deleting the campaign.",
+        outreachCount,
+      });
+    }
+
+    let eventIdToDelete = null;
+    if (deleteEvent && campaign.eventId) {
+      const linkedCampaignCount = await Campaign.countDocuments({ eventId: campaign.eventId });
+      if (linkedCampaignCount > 1) {
+        return res.status(409).json({
+          error: "The linked event is used by another campaign and cannot be deleted here.",
+        });
+      }
+      eventIdToDelete = campaign.eventId;
+    }
+
+    if (deleteOutreach) {
+      await Outreach.deleteMany({ campaignId: campaign._id });
+    }
+    await Campaign.deleteOne({ _id: campaign._id });
+    if (eventIdToDelete) {
+      await Event.deleteOne({ _id: eventIdToDelete });
+    }
+
+    return res.json({
+      message: "Campaign deleted",
+      deleted: { campaign: 1, outreach: deleteOutreach ? outreachCount : 0, event: eventIdToDelete ? 1 : 0 },
+    });
+  } catch (error) {
+    console.error("DELETE CAMPAIGN ERROR:", error);
+    return res.status(500).json({ error: "Unable to delete campaign" });
+  }
 });
 
 

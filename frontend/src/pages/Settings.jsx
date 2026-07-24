@@ -1,4 +1,35 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-export default function Settings() { const [settings, setSettings] = useState({ workspaceName:"Ellie AI Growth Operator", defaultCampaignKind:"event", campaignAlerts:true, outreachAlerts:true }); const [saved,setSaved]=useState(false); useEffect(()=>{const stored=localStorage.getItem("ellie-settings");if(stored)setSettings(JSON.parse(stored));},[]); const save=()=>{localStorage.setItem("ellie-settings",JSON.stringify(settings));setSaved(true);}; return <div className="page-dashboard"><div className="page-header"><div><h1 className="page-title">Settings</h1><p className="page-subtitle">Workspace defaults and notification preferences.</p></div><Button onClick={save}>Save changes</Button></div>{saved?<p className="discovery-notice">Settings saved in this browser.</p>:null}<section className="section-grid"><DashboardCard title="Workspace"><label>Workspace name<input className="select-input" value={settings.workspaceName} onChange={e=>setSettings({...settings,workspaceName:e.target.value})}/></label><label>Default campaign type<select className="select-input" value={settings.defaultCampaignKind} onChange={e=>setSettings({...settings,defaultCampaignKind:e.target.value})}><option value="event">Event</option><option value="program">Skool program</option></select></label></DashboardCard><DashboardCard title="Notifications"><label><input type="checkbox" checked={settings.campaignAlerts} onChange={e=>setSettings({...settings,campaignAlerts:e.target.checked})}/> Campaign activity</label><label><input type="checkbox" checked={settings.outreachAlerts} onChange={e=>setSettings({...settings,outreachAlerts:e.target.checked})}/> Outreach approvals and delivery failures</label></DashboardCard></section></div>; }
+import { getWorkspaceSettings, saveWorkspaceSettings } from "../utils/workspaceSettings.js";
+
+export default function Settings() {
+  const [settings, setSettings] = useState(getWorkspaceSettings);
+  const [saved, setSaved] = useState(false);
+
+  const save = () => {
+    saveWorkspaceSettings(settings);
+    setSaved(true);
+  };
+
+  return <div className="page-dashboard">
+    <div className="page-header">
+      <div>
+        <h1 className="page-title">Workspace settings</h1>
+        <p className="page-subtitle">These preferences are saved in this browser and apply to your Ellie workspace.</p>
+      </div>
+      <Button onClick={save}>Save changes</Button>
+    </div>
+    {saved ? <p className="discovery-notice">Saved. Your workspace name now appears in the top bar, and your campaign type is preselected when you create a campaign.</p> : null}
+    <section className="section-grid">
+      <DashboardCard title="Workspace">
+        <label className="form-field"><span>Workspace name</span><input className="select-input" value={settings.workspaceName} onChange={(event) => setSettings({ ...settings, workspaceName: event.target.value })} /></label>
+        <label className="form-field"><span>Default campaign type</span><select className="select-input" value={settings.defaultCampaignKind} onChange={(event) => setSettings({ ...settings, defaultCampaignKind: event.target.value })}><option value="event">Event</option><option value="program">Skool program</option></select></label>
+      </DashboardCard>
+      <DashboardCard title="What Ellie notifies you about">
+        <p>There are no automatic browser or email notifications configured yet. Delivery failures and approval status are visible directly on the Outreach page.</p>
+        <p>When notifications are connected, this page will control them. Until then, it does not pretend to send alerts.</p>
+      </DashboardCard>
+    </section>
+  </div>;
+}

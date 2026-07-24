@@ -1,9 +1,18 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiSearch, FiMenu } from "react-icons/fi";
+import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import "./Navbar.css";
 
 export default function Navbar({ onMenuClick }) {
   const navigate = useNavigate();
+  const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
+
+  useEffect(() => {
+    const refresh = () => setWorkspaceName(getWorkspaceSettings().workspaceName);
+    window.addEventListener("ellie-settings-changed", refresh);
+    return () => window.removeEventListener("ellie-settings-changed", refresh);
+  }, []);
 
 
   return (
@@ -18,7 +27,7 @@ export default function Navbar({ onMenuClick }) {
           <FiMenu />
         </button>
         <div>
-          <p className="navbar__eyebrow">Ellie AI Growth Operator</p>
+          <p className="navbar__eyebrow">{workspaceName}</p>
           <h1 className="navbar__title">Event marketing made simple.</h1>
         </div>
       </div>

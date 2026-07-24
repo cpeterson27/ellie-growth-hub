@@ -36,6 +36,12 @@ export const createCampaign = (campaignData) =>
     .post("/campaigns", campaignData)
     .then((res) => res.data);
 
+export const fetchCampaignDeletionPreview = (campaignId) =>
+  api.get(`/campaigns/${campaignId}/deletion-preview`).then((res) => res.data);
+
+export const deleteCampaign = (campaignId, options = {}) =>
+  api.delete(`/campaigns/${campaignId}`, { data: options }).then((res) => res.data);
+
 
 
 export const createCampaignFromEvent = (eventId) =>

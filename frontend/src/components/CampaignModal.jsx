@@ -23,17 +23,17 @@ const PROGRAM_AUDIENCES = [
   "Affiliate and referral partners",
 ];
 
-const emptyForm = {
+const createEmptyForm = (campaignKind = "event") => ({
   name: "",
-  campaignKind: "event",
+  campaignKind,
   programName: "",
   startDate: "",
   ticketPrice: "",
   ticketGoal: "",
   audience: [],
   description: "",
-  templateKey: EVENT_TEMPLATES[0].key,
-};
+  templateKey: campaignKind === "program" ? PROGRAM_TEMPLATES[0].key : EVENT_TEMPLATES[0].key,
+});
 
 export default function CampaignModal({
   isOpen,
@@ -42,8 +42,9 @@ export default function CampaignModal({
   audienceOptions = [],
   initialData = null,
   submitting = false,
+  defaultCampaignKind = "event",
 }) {
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => createEmptyForm(defaultCampaignKind));
   const [error, setError] = useState("");
   const [savedTemplates, setSavedTemplates] = useState([]);
 
@@ -73,10 +74,10 @@ export default function CampaignModal({
         templateKey: initialData.templateKey || choices[0].key,
       });
     } else {
-      setForm(emptyForm);
+      setForm(createEmptyForm(defaultCampaignKind));
     }
     setError("");
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, defaultCampaignKind]);
 
   useEffect(() => {
     if (!isOpen) return;

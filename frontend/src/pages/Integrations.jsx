@@ -5,6 +5,7 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import { fetchIntegrationHub } from "../services/api.js";
 
 const statusLabels = {
+  ready: "Ready to use",
   connected: "Connected",
   disconnected: "Disconnected",
   configuration_required: "Configuration required",
@@ -46,6 +47,7 @@ export default function Integrations() {
               <p><strong>{provider.category.replaceAll("_", " ")}</strong></p>
               <p><span className="label-pill">{statusLabels[provider.status] || provider.status}</span></p>
               <p>Capabilities: {provider.capabilities?.join(", ") || "Not reported"}</p>
+              {provider.id === "csv" ? <p>Built into Ellie. Import Apollo exports and standard CSV files from Contacts → Import; no API connection is required.</p> : null}
               {provider.id === "apollo" ? <p>People Search requires a paid Apollo API plan. CSV and supported organization capabilities remain available.</p> : null}
             </DashboardCard>
           ))}

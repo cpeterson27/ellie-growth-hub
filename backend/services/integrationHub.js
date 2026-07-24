@@ -113,10 +113,10 @@ class IntegrationHub {
       const hasEnvironmentConfiguration = provider.environmentKeys.some(
         (key) => Boolean(process.env[key]),
       );
-      const isConnected = connection?.status === "connected" ||
+      const isConnected = provider.builtIn || connection?.status === "connected" ||
         (!connection && hasEnvironmentConfiguration);
       const status = isConnected
-        ? "connected"
+        ? (provider.builtIn ? "ready" : "connected")
         : connection?.status === "configured"
           ? "configuration_required"
           : "disconnected";

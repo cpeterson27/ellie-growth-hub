@@ -24,7 +24,7 @@ const campaignSchema = new mongoose.Schema(
   },
   campaignKind: { type: String, enum: ["event", "program"], default: "event", index: true },
   programName: { type: String, default: "" },
-  templateKey: { type: String, default: "event_invite" },
+  templateKey: { type: String, default: "event_investor" },
 
 
   audience: [
