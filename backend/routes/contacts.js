@@ -7,7 +7,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const contactService = require("../services/contactService");
 const mondaySyncService = require("../services/mondaySyncService");
-const { searchContacts } = require("../services/apollo");
+const integrationHub = require("../services/integrationHub");
+const { importApolloLeads } = require("../services/apolloLeadService");
 const Contact = require("../models/Contact");
 
 const router = express.Router();
@@ -295,35 +296,41 @@ router.post("/import/monday", async (req, res) => {
  * POST /api/contacts/import/apollo
  * Import the first page of Apollo contact-search results.
  */
-router.post("/import/apollo", async (req, res) => {
+router.post("/apollo/search", async (req, res) => {
   try {
-    const result = await searchContacts({ perPage: 25 });
+    const { campaignId, titles = [], locations = [], keywords = [], page = 1, perPage = 25 } = req.body;
+    if (!campaignId || !mongoose.Types.ObjectId.isValid(campaignId)) {
+      return res.status(400).json({ success: false, message: "A valid campaignId is required" });
+    }
+    const result = await integrationHub.execute("apollo", "searchLeads", {
+      titles: Array.isArray(titles) ? titles.slice(0, 10) : [],
+      locations: Array.isArray(locations) ? locations.slice(0, 10) : [],
+      keywords: Array.isArray(keywords) ? keywords.slice(0, 10) : [],
+      page: Math.max(1, Number(page) || 1),
+      perPage: Math.min(100, Math.max(1, Number(perPage) || 25)),
+    });
 
     if (!result.success) {
       return res.status(502).json({
         success: false,
-        message: result.message || "Failed to import contacts from Apollo",
+        message: "Apollo search failed",
       });
     }
-
-    const syncResult = await contactService.syncContactsFromSource(
-      "apollo",
-      result.contacts.map((contact) => ({
-        ...contact,
-        externalId: contact.apolloPersonId,
-      })),
-    );
-
-    res.json({
-      success: true,
-      data: syncResult,
-      message: `Imported Apollo contacts: ${syncResult.created} created, ${syncResult.updated} updated`,
-    });
+    return res.json({ success: true, data: { results: result.contacts, total: result.total, page: result.page } });
   } catch (err) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: err.message || "Failed to import contacts from Apollo",
+      message: "Unable to search Apollo leads",
     });
+  }
+});
+
+router.post("/import/apollo", async (req, res) => {
+  try {
+    const result = await importApolloLeads(req.body);
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message || "Unable to import Apollo leads" });
   }
 });
 

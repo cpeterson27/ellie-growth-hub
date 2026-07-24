@@ -1,21 +1,4 @@
-const { Resend } = require("resend");
-
-
-// ======================================
-// RESEND CLIENT
-// ======================================
-
-function getResendClient() {
-
-  const apiKey = process.env.RESEND_API_KEY;
-
-  if (!apiKey) {
-    return null;
-  }
-
-  return new Resend(apiKey);
-
-}
+const integrationHub = require("./integrationHub");
 
 
 
@@ -24,20 +7,6 @@ function getResendClient() {
 // ======================================
 
 async function sendEmail(outreachItem) {
-
-
-  const resend = getResendClient();
-
-
-  if (!resend) {
-
-    return {
-      success:false,
-      message:"Resend API key missing.",
-    };
-
-  }
-
 
 
   if (!outreachItem) {
@@ -191,60 +160,19 @@ Ellie's Coaching
 try {
 
 
-const response =
-await resend.emails.send({
-
-from:
-process.env.EMAIL_FROM ||
-"Ellie AI <onboarding@resend.dev>",
-
-
-to:
-recipient,
-
-
-subject:
-"Quick question about your audience",
-
-
-text:
-outreachItem.emailDraft || "",
-
-
-html
-
+const response = await integrationHub.execute("resend", "sendEmail", {
+  from: process.env.EMAIL_FROM || "Ellie AI <onboarding@resend.dev>",
+  to: recipient,
+  subject: "Quick question about your audience",
+  text: outreachItem.emailDraft || "",
+  html,
 });
 
 
 
 
 
-if(response.error){
-
-console.error(
-"RESEND ERROR:",
-response.error
-);
-
-
-return {
-
-success:false,
-
-message:
-response.error.message
-
-};
-
-}
-
-
-
-
-
-console.log(
-`✅ Email sent to ${recipient} (${response.data?.id})`
-);
+console.log("✅ Email sent via Resend");
 
 
 
@@ -256,7 +184,7 @@ message:
 "Email sent successfully.",
 
 id:
-response.data?.id
+response.messageId
 
 };
 
@@ -266,10 +194,7 @@ response.data?.id
 catch(error){
 
 
-console.error(
-"SEND EMAIL ERROR:",
-error
-);
+console.error("SEND EMAIL ERROR");
 
 
 

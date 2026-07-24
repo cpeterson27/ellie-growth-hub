@@ -3,7 +3,7 @@
  * Orchestrates syncing contacts from Monday.com CRM
  */
 
-const MondayAdapter = require("./integrations/MondayAdapter");
+const integrationHub = require("./integrationHub");
 const IntegrationConnection = require("../models/IntegrationConnection");
 const MondaySyncHistory = require("../models/MondaySyncHistory");
 const contactService = require("./contactService");
@@ -28,17 +28,22 @@ class MondaySyncService {
         throw new Error("Monday API credentials not configured");
       }
 
-      // Create adapter instance
-      const adapter = new MondayAdapter();
-
       // Validate connection
-      const isValid = await adapter.validateConnection(credentials);
+      const isValid = await integrationHub.execute(
+        "monday",
+        "validateConnection",
+        credentials,
+      );
       if (!isValid) {
         throw new Error("Monday API connection failed - check credentials");
       }
 
       // Sync contacts from Monday
-      const mondayContacts = await adapter.syncContacts(credentials);
+      const mondayContacts = await integrationHub.execute(
+        "monday",
+        "syncContacts",
+        credentials,
+      );
 
       if (!Array.isArray(mondayContacts) || mondayContacts.length === 0) {
         syncResult = {
@@ -149,8 +154,11 @@ class MondaySyncService {
         };
       }
 
-      const adapter = new MondayAdapter();
-      const isValid = await adapter.validateConnection(credentials);
+      const isValid = await integrationHub.execute(
+        "monday",
+        "validateConnection",
+        credentials,
+      );
 
       if (!isValid) {
         return {
@@ -161,7 +169,11 @@ class MondaySyncService {
       }
 
       // Get user info for confirmation
-      const userInfo = await adapter.fetchUserInfo(credentials);
+      const userInfo = await integrationHub.execute(
+        "monday",
+        "fetchUserInfo",
+        credentials,
+      );
 
       return {
         connected: true,

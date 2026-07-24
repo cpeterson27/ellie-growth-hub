@@ -99,6 +99,40 @@ const contactSchema = new mongoose.Schema(
       default: {},
     },
 
+    sourceProvider: {
+      type: String,
+      index: true,
+    },
+
+    providerContactId: {
+      type: String,
+      index: true,
+    },
+
+    providerRecordId: {
+      type: String,
+    },
+
+    linkedin: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    title: { type: String, default: "", trim: true },
+    industry: { type: String, default: "", trim: true },
+    city: { type: String, default: "", trim: true },
+    state: { type: String, default: "", trim: true },
+    country: { type: String, default: "", trim: true },
+    employeeCount: { type: Number, default: null },
+    importedAt: { type: Date, default: null },
+
+    campaignIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Campaign",
+      index: true,
+    }],
+
 
     // -------------------------------------------------------------------------
     // CRM lifecycle
@@ -205,6 +239,16 @@ contactSchema.index({
   type: 1,
   status: 1,
 });
+
+contactSchema.index(
+  { sourceProvider: 1, providerContactId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { providerContactId: { $type: "string" } },
+  },
+);
+
+contactSchema.index({ linkedin: 1 }, { sparse: true });
 
 
 // Recent contacts

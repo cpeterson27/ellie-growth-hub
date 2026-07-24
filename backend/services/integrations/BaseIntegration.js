@@ -28,6 +28,50 @@ class BaseIntegration {
     };
   }
 
+  // Provider contract. Adapters override only the capabilities they support.
+  async connect() {
+    return this.authenticate();
+  }
+
+  async authenticate() {
+    return this.verify();
+  }
+
+  async status() {
+    const configured = Object.values(this.config || {}).some(Boolean);
+
+    return {
+      connected: this.authenticated,
+      configured,
+      missingRequirements: configured ? [] : ["configuration"],
+      availableOperations: this.getCapabilities(),
+    };
+  }
+
+  async search() {
+    throw new Error(`${this.name} does not support search()`);
+  }
+
+  async create() {
+    throw new Error(`${this.name} does not support create()`);
+  }
+
+  async update() {
+    throw new Error(`${this.name} does not support update()`);
+  }
+
+  async delete() {
+    throw new Error(`${this.name} does not support delete()`);
+  }
+
+  async sync() {
+    throw new Error(`${this.name} does not support sync()`);
+  }
+
+  normalize(record) {
+    return record;
+  }
+
   /**
    * Get version info
    * @returns {String} Semantic version

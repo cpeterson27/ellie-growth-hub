@@ -3,7 +3,7 @@
  * Orchestrates syncing attendees from Eventbrite events into contacts
  */
 
-const EventbriteAdapter = require("./integrations/EventbriteAdapter");
+const integrationHub = require("./integrationHub");
 const IntegrationConnection = require("../models/IntegrationConnection");
 const EventbriteSyncHistory = require("../models/EventbriteSyncHistory");
 const contactService = require("./contactService");
@@ -27,11 +27,12 @@ class EventbriteSyncService {
         throw new Error("Eventbrite API credentials not configured");
       }
 
-      // Create adapter instance
-      const adapter = new EventbriteAdapter();
-
       // Validate connection
-      const isValid = await adapter.validateConnection(credentials);
+      const isValid = await integrationHub.execute(
+        "eventbrite",
+        "validateConnection",
+        credentials,
+      );
       if (!isValid) {
         throw new Error(
           "Eventbrite API connection failed - check credentials or event IDs",
@@ -39,7 +40,11 @@ class EventbriteSyncService {
       }
 
       // Fetch attendees from Eventbrite
-      const eventbriteAttendees = await adapter.syncAttendees(credentials);
+      const eventbriteAttendees = await integrationHub.execute(
+        "eventbrite",
+        "syncAttendees",
+        credentials,
+      );
 
       if (
         !Array.isArray(eventbriteAttendees) ||
@@ -154,8 +159,11 @@ class EventbriteSyncService {
         };
       }
 
-      const adapter = new EventbriteAdapter();
-      const isValid = await adapter.validateConnection(credentials);
+      const isValid = await integrationHub.execute(
+        "eventbrite",
+        "validateConnection",
+        credentials,
+      );
 
       if (!isValid) {
         return {
@@ -166,7 +174,11 @@ class EventbriteSyncService {
       }
 
       // Get user info for confirmation
-      const userInfo = await adapter.fetchUserInfo(credentials);
+      const userInfo = await integrationHub.execute(
+        "eventbrite",
+        "fetchUserInfo",
+        credentials,
+      );
 
       return {
         connected: true,

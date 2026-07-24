@@ -1,7 +1,58 @@
 const express = require("express");
 const integrationRegistry = require("../services/integrations");
+const integrationHub = require("../services/integrationHub");
 
 const router = express.Router();
+
+/**
+ * GET /api/integrations/hub
+ * Read-only provider metadata and connection visibility for the Integration Hub.
+ */
+router.get("/hub", async (req, res) => {
+  try {
+    const providers = await integrationHub.listProviders();
+    return res.json({ success: true, data: { providers } });
+  } catch (error) {
+    console.error("GET /integrations/hub error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to retrieve Integration Hub providers",
+    });
+  }
+});
+
+/**
+ * GET /api/integrations/health
+ * Read-only health snapshot for all registered providers.
+ */
+router.get("/health", async (req, res) => {
+  try {
+    const providers = await integrationHub.getHealth();
+    return res.json({ providers });
+  } catch (error) {
+    console.error("GET /integrations/health error:", error);
+    return res.status(500).json({
+      error: "Failed to retrieve Integration Hub health",
+    });
+  }
+});
+
+/**
+ * GET /api/integrations/hub/:provider/capabilities
+ * Discover operations exposed by a registered provider.
+ */
+router.get("/hub/:provider/capabilities", (req, res) => {
+  const capabilities = integrationHub.getCapabilities(req.params.provider);
+
+  if (!capabilities) {
+    return res.status(404).json({
+      success: false,
+      error: `Provider "${req.params.provider}" not found`,
+    });
+  }
+
+  return res.json({ success: true, data: capabilities });
+});
 
 /**
  * GET /api/integrations/status

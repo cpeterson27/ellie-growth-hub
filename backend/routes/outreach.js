@@ -96,17 +96,6 @@ router.post("/generate", async (req,res)=>{
 
 
 
-    console.log(
-      "========== GENERATE OUTREACH =========="
-    );
-
-    console.log(
-      "Campaign ID:",
-      campaignId
-    );
-
-
-
     if(!campaignId){
 
       return res.status(400).json({
@@ -136,11 +125,15 @@ router.post("/generate", async (req,res)=>{
 
     const contacts =
       await Contact.find({
-
-        type:"lead",
-
-        status:"active"
-
+        type: "lead",
+        status: "active",
+        // Imported Apollo leads are campaign-scoped. Legacy leads without a
+        // campaign association retain the previous behavior.
+        $or: [
+          { campaignIds: campaign._id },
+          { campaignIds: { $exists: false } },
+          { campaignIds: { $size: 0 } },
+        ],
       });
 
 

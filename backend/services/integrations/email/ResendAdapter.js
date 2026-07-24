@@ -58,36 +58,34 @@ class ResendAdapter extends BaseIntegration {
    * @param {Object} params { to, subject, html, from }
    * @returns {Promise<Object>}
    */
-  async sendEmail(params) {
+  async sendEmail(params, credentialContext = null) {
     try {
-      if (!this.config.apiKey) {
-        throw new Error("Resend not configured");
+      const apiKey = credentialContext?.credentials?.apiKey ||
+        this.config.apiKey ||
+        process.env.RESEND_API_KEY;
+
+      if (!apiKey) {
+        throw new Error("Resend API key missing.");
       }
 
-      const { to, subject, html, from } = params;
+      const { to, subject, text, html, from } = params;
 
       if (!to || !subject || !html || !from) {
         throw new Error("Missing required email fields");
       }
 
-      // Debug logging
-      console.log("[ResendAdapter] Sending email:");
-      console.log(`  From: ${from}`);
-      console.log(`  To: ${to}`);
-      console.log(`  Subject: ${subject}`);
-      console.log(`  Has HTML: ${!!html}`);
-
       // Call Resend API
       const response = await fetch(`${this.baseUrl}/emails`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.config.apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           from,
           to,
           subject,
+          text,
           html,
         }),
       });

@@ -4,7 +4,9 @@
  */
 
 const ResendAdapter = require("./email/ResendAdapter");
-const EventbriteAdapter = require("./events/EventbriteAdapter");
+const EventbriteAdapter = require("./EventbriteAdapter");
+const MondayAdapter = require("./MondayAdapter");
+const ApolloAdapter = require("./ApolloAdapter");
 const MeetupAdapter = require("./events/MeetupAdapter");
 const LinkedInAdapter = require("./social/LinkedInAdapter");
 const FacebookAdapter = require("./social/FacebookAdapter");
@@ -33,10 +35,11 @@ class IntegrationRegistry {
     // Event integrations
     this.register(
       "eventbrite",
-      new EventbriteAdapter({
-        apiKey: process.env.EVENTBRITE_API_KEY || null,
-      }),
+      new EventbriteAdapter(),
     );
+
+    this.register("monday", new MondayAdapter());
+    this.register("apollo", new ApolloAdapter());
 
     this.register(
       "meetup",

@@ -38,6 +38,10 @@ class MondayAdapter extends BaseIntegration {
 
   }
 
+  getCapabilities() {
+    return ["createContact", "updateContact", "syncContacts"];
+  }
+
 
 
 

@@ -11,6 +11,10 @@ class EventbriteAdapter extends BaseIntegration {
     this.endpoint = "https://www.eventbriteapi.com/v3";
   }
 
+  getCapabilities() {
+    return ["syncAttendees", "normalizeContacts"];
+  }
+
   /**
    * Sync attendees from Eventbrite events
    * @param {Object} credentials - { apiKey, eventIds }

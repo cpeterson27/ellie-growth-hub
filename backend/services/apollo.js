@@ -392,10 +392,7 @@ async function searchContacts({
 
     return { success: true, total, page, contacts };
   } catch (error) {
-    console.error(
-      "[Apollo] searchContacts error:",
-      error.response?.data ?? error.message,
-    );
+    console.error("[Apollo] searchContacts failed");
     return { ...formatError(error), contacts: [] };
   }
 }

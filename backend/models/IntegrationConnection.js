@@ -73,6 +73,57 @@ const IntegrationConnectionSchema = new mongoose.Schema(
       default: {},
     },
 
+    // New non-secret provider configuration. `config` remains during the
+    // credential migration for backwards compatibility.
+    settings: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
+    // Phase 2 encrypted credential envelope. This is intentionally separate
+    // from the legacy plaintext `credentials` field until each provider is
+    // migrated and verified.
+    credentialsEncrypted: {
+      type: mongoose.Schema.Types.Mixed,
+      required: false,
+      select: false,
+    },
+
+    credentialFingerprint: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    credentialMigratedAt: {
+      type: Date,
+      default: null,
+    },
+
+    credentialRotationDueAt: {
+      type: Date,
+      default: null,
+    },
+
+    oauth: {
+      scopes: {
+        type: [String],
+        default: [],
+      },
+      expiresAt: {
+        type: Date,
+        default: null,
+      },
+      refreshFailureAt: {
+        type: Date,
+        default: null,
+      },
+      providerAccountId: {
+        type: String,
+        default: "",
+      },
+    },
+
     /**
      * Error message if connection failed
      */
