@@ -14,6 +14,7 @@ import Contacts from "./pages/Contacts.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Settings from "./pages/Settings.jsx";
 import Jarvis from "./pages/Jarvis.jsx";
+import Integrations from "./pages/Integrations.jsx";
 
 
 function App() {
@@ -98,6 +99,11 @@ function App() {
           <Route
             path="/settings"
             element={<Settings />}
+          />
+
+          <Route
+            path="/integrations"
+            element={<Integrations />}
           />
 
 

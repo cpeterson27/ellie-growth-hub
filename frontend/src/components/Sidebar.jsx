@@ -24,6 +24,7 @@ const navItems = [
   { label: "Jarvis", path: "/jarvis", icon: <FiCpu /> },
   { label: "Analytics", path: "/analytics", icon: <FiBarChart2 /> },
   { label: "Settings", path: "/settings", icon: <FiSettings /> },
+  { label: "Integrations", path: "/integrations", icon: <FiSettings /> },
 ];
 
 export default function Sidebar({ isOpen, onClose }) {

@@ -123,15 +123,24 @@ export const fetchContacts = () =>
     .then((res) => res.data);
 
 
+export const fetchIntegrationHub = () =>
+  api
+    .get("/integrations/hub")
+    .then((res) => res.data);
+
+
 export const importContactsFromMonday = () =>
   api
     .post("/contacts/import/monday")
     .then((res) => res.data);
 
 
-export const importContactsFromApollo = () =>
+export const searchApolloLeads = (payload) =>
+  api.post("/contacts/apollo/search", payload).then((res) => res.data);
+
+export const importContactsFromApollo = (payload) =>
   api
-    .post("/contacts/import/apollo")
+    .post("/contacts/import/apollo", payload)
     .then((res) => res.data);
 
 
