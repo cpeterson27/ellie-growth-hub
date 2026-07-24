@@ -10,6 +10,7 @@ import Outreach from "./pages/Outreach.jsx";
 import Partners from "./pages/Partners.jsx";
 import Marketing from "./pages/Marketing.jsx";
 import Content from "./pages/Content.jsx";
+import Contacts from "./pages/Contacts.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Settings from "./pages/Settings.jsx";
 import Jarvis from "./pages/Jarvis.jsx";
@@ -68,6 +69,11 @@ function App() {
           <Route
             path="/outreach"
             element={<Outreach />}
+          />
+
+          <Route
+            path="/contacts"
+            element={<Contacts />}
           />
 
 

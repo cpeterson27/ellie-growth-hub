@@ -18,6 +18,7 @@ const navItems = [
   { label: "Marketing", path: "/marketing", icon: <FiTrendingUp /> },
   { label: "Campaigns", path: "/campaigns", icon: <FiZap /> },
   { label: "Outreach", path: "/outreach", icon: <FiMail /> },
+  { label: "Contacts", path: "/contacts", icon: <FiUsers /> },
   { label: "Partners", path: "/partners", icon: <FiUsers /> },
   { label: "AI Content", path: "/content", icon: <FiZap /> },
   { label: "Jarvis", path: "/jarvis", icon: <FiCpu /> },

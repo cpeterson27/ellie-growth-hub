@@ -117,6 +117,24 @@ export const fetchOutreach = (campaignId) =>
     .then((res) => res.data);
 
 
+export const fetchContacts = () =>
+  api
+    .get("/contacts")
+    .then((res) => res.data);
+
+
+export const importContactsFromMonday = () =>
+  api
+    .post("/contacts/import/monday")
+    .then((res) => res.data);
+
+
+export const importContactsFromApollo = () =>
+  api
+    .post("/contacts/import/apollo")
+    .then((res) => res.data);
+
+
 
 export const generateOutreach = (campaignId) =>
   api
