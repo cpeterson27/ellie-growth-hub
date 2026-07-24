@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import Papa from "papaparse";
+import { readFileSync } from "node:fs";
+
+const csv = "\uFEFFFirst Name,Last Name,Title,City,Notes,ICP Fit 8478 0723201923\r\nAda,Lovelace,\"Real Estate Investor, Developer\",\"Los Angeles, California\",\"He said \"\"hello\"\"\",\"\"\r\nGrace,Hopper,,,\"\",custom\r\n\r\n";
+const parsed = Papa.parse(csv, { header: true, skipEmptyLines: "greedy", transformHeader: (header) => header.replace(/^\uFEFF/, "").trim() });
+assert.equal(parsed.errors.length, 0);
+assert.equal(parsed.data.length, 2);
+assert.equal(parsed.meta.fields[0], "First Name");
+assert.equal(parsed.data[0].Title, "Real Estate Investor, Developer");
+assert.equal(parsed.data[0].City, "Los Angeles, California");
+assert.equal(parsed.data[0].Notes, 'He said "hello"');
+assert.equal(parsed.data[0]["ICP Fit 8478 0723201923"], "");
+assert.equal(parsed.data[1].Title, "");
+assert.equal(parsed.data[1].Notes, "");
+assert.equal(parsed.data[1]["ICP Fit 8478 0723201923"], "custom");
+const page = readFileSync(new URL("./src/pages/Contacts.jsx", import.meta.url), "utf8");
+assert.match(page, /import Papa from "papaparse"/);
+assert.match(page, /Papa\.parse/);
+assert.doesNotMatch(page, /function parseDelimitedText/);
+console.log("CSV quote-edge-case tests passed");

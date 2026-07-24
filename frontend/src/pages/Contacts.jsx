@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Papa from "papaparse";
 
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
@@ -10,6 +11,9 @@ import {
   importContactsFromApollo,
   importContactsFromMonday,
   ingestContacts,
+  archiveContact,
+  deleteContact,
+  retryMondaySync,
   searchApolloLeads,
 } from "../services/api.js";
 
@@ -53,11 +57,15 @@ export default function Contacts() {
   const [importHeaders, setImportHeaders] = useState([]);
   const [importCampaignId, setImportCampaignId] = useState("");
   const [savingContact, setSavingContact] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [previewStats, setPreviewStats] = useState(null);
+  const tableColumns = [...columns, { header: "Actions", render: (contact) => <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}><Button variant="outline" onClick={async () => { await archiveContact(contact._id); await loadContacts(); }}>Archive</Button><Button variant="outline" onClick={() => setDeleteTarget(contact)}>Delete permanently</Button>{contact.mondaySyncStatus === "failed" ? <Button variant="outline" onClick={async () => { await retryMondaySync(contact._id); await loadContacts(); }}>Retry Monday</Button> : null}</div> }];
 
   async function loadContacts() {
     try {
       setLoading(true);
-      const response = await fetchContacts();
+      const response = await fetchContacts(showArchived ? { status: "archived" } : {});
       setContacts(response.data || []);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load contacts");
@@ -72,7 +80,7 @@ export default function Contacts() {
       setCampaigns(items);
       setCampaignId(items[0]?._id || "");
     }).catch(() => setError("Unable to load campaigns"));
-  }, []);
+  }, [showArchived]);
 
   function openImportConfirmation(source) {
     setError("");
@@ -138,30 +146,13 @@ export default function Contacts() {
       : [...current, lead]);
   }
 
-  function parseDelimitedText(text) {
-    const lines = String(text || "").split(/\r?\n/).filter((line) => line.trim());
-    if (lines.length < 2) throw new Error("Include a header row and at least one contact row.");
-    const delimiter = lines[0].includes("\t") ? "\t" : ",";
-    const readLine = (line) => {
-      const result = []; let value = ""; let quoted = false;
-      for (let i = 0; i < line.length; i += 1) {
-        const char = line[i];
-        if (char === '"' && line[i + 1] === '"') { value += '"'; i += 1; }
-        else if (char === '"') quoted = !quoted;
-        else if (char === delimiter && !quoted) { result.push(value.trim()); value = ""; }
-        else value += char;
-      }
-      return [...result, value.trim()];
-    };
-    const headers = readLine(lines[0]);
-    return { headers, rows: lines.slice(1).map(readLine).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] || ""]))) };
-  }
-
   function prepareImport(text) {
-    try {
-      const parsed = parseDelimitedText(text);
-      setImportHeaders(parsed.headers); setImportRows(parsed.rows); setError(""); setUploadOpen(true);
-    } catch (err) { setError(err.message); }
+    Papa.parse(String(text || ""), { header: true, skipEmptyLines: "greedy", delimiter: String(text || "").includes("\t") ? "\t" : "", transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(), complete: ({ data, meta, errors }) => {
+      const rows = data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, String(value ?? "").trim()])));
+      const valid = rows.filter((row) => row.Name || row["First Name"] || row["Last Name"]).length;
+      const emails = rows.filter((row) => !row.Email).length;
+      setImportHeaders(meta.fields || []); setImportRows(rows); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setError(errors.length ? "Some rows have malformed column counts." : ""); setUploadOpen(true);
+    }, error: () => setError("Unable to parse contact file.") });
   }
 
   async function saveIngestion(contactsToSave, source, selectedCampaignId) {
@@ -208,12 +199,13 @@ export default function Contacts() {
         {error ? <p className="form-error">{error}</p> : null}
         {importSummary ? <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated. Monday CRM: {importSummary.mondayCreated} created, {importSummary.mondayUpdated} updated, {importSummary.mondayFailed} failed.</p> : null}
         <Table
-          columns={columns}
+          columns={tableColumns}
           data={contacts}
           loading={loading}
           emptyMessage="No contacts found yet."
         />
       </DashboardCard>
+      <Button variant="outline" onClick={() => setShowArchived(!showArchived)}>{showArchived ? "Show active contacts" : "Show archived contacts"}</Button>
 
       <DashboardCard title="Find Leads">
         <p>Apollo prospect search requires a paid Apollo plan. You can still import an Apollo CSV or use organization discovery.</p>
@@ -283,6 +275,7 @@ export default function Contacts() {
         footer={<><Button variant="outline" disabled={savingContact} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length} onClick={saveUploadedContacts}>Confirm Import</Button></>}
       >
         {!importRows.length ? <><p>Upload a CSV or paste comma- or tab-separated data. Excel files are not supported in this build.</p><input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} /><textarea className="select-input" style={{ width: "100%", marginTop: "0.75rem", minHeight: "130px" }} placeholder="Paste header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) prepareImport(event.target.value); }} /></> : <>
+          <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p><p>Duplicate candidates are checked by the shared ingestion service during import.</p>
           <p>Detected headers: {importHeaders.join(", ")}</p>
           <p>Recognized: {importHeaders.filter((header) => ["First Name", "Last Name", "Title", "Company Name", "Email", "Work Direct Phone", "Person Linkedin Url", "City", "State", "Country", "# Employees", "Industry", "Apollo Contact Id", "Apollo Record Id"].includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !["First Name", "Last Name", "Title", "Company Name", "Email", "Work Direct Phone", "Person Linkedin Url", "City", "State", "Country", "# Employees", "Industry", "Apollo Contact Id", "Apollo Record Id"].includes(header)).join(", ") || "none"}</p>
@@ -291,6 +284,7 @@ export default function Contacts() {
           <p>{importRows.length} rows ready. Rows with no usable name will be rejected; all recognized fields are retained.</p>
         </>}
       </Modal>
+      <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; Monday sync: {deleteTarget.mondaySyncStatus || "pending"}; Monday item: {deleteTarget.mondayItemId ? "linked" : "not linked"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
     </div>
   );
 }

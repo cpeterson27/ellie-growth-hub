@@ -117,9 +117,9 @@ export const fetchOutreach = (campaignId) =>
     .then((res) => res.data);
 
 
-export const fetchContacts = () =>
+export const fetchContacts = (params = {}) =>
   api
-    .get("/contacts")
+    .get("/contacts", { params })
     .then((res) => res.data);
 
 
@@ -148,6 +148,9 @@ export const ingestContacts = (payload) =>
 
 export const retryMondaySync = (contactId) =>
   api.post(`/contacts/${contactId}/retry-monday`).then((res) => res.data);
+
+export const archiveContact = (contactId) => api.post(`/contacts/${contactId}/archive`).then((res) => res.data);
+export const deleteContact = (contactId, confirmCascade = false) => api.delete(`/contacts/${contactId}`, { data: { confirmCascade } }).then((res) => res.data);
 
 
 
