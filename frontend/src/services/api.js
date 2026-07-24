@@ -292,6 +292,9 @@ export const getGrowthOperatorActions = (operatorId) =>
     .get(`/growth-operators/${operatorId}/actions`)
     .then((res) => res.data.data.actions);
 
+export const fetchMarketingFeed = () =>
+  api.get("/growth-operators/marketing/feed").then((res) => res.data.data);
+
 
 
 export const executeGrowthOperatorAction = (

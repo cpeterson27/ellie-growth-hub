@@ -68,6 +68,50 @@ router.post("/analyze/:audienceId", async (req, res) => {
 });
 
 /**
+ * GET /api/growth-operators/marketing/feed
+ * A truthful, workspace-wide marketing feed. This avoids pinning the UI to a
+ * seed Growth Operator and remains empty until a real analysis creates items.
+ */
+router.get("/marketing/feed", async (req, res) => {
+  try {
+    const [recommendations, activity] = await Promise.all([
+      GrowthOpportunity.find({ status: "identified" })
+        .populate("organizationId", "name")
+        .sort({ priorityScore: -1, createdAt: -1 })
+        .limit(12)
+        .lean(),
+      GrowthOpportunity.find({ status: "actioned" })
+        .populate("organizationId", "name")
+        .sort({ "actionTaken.timestamp": -1, updatedAt: -1 })
+        .limit(12)
+        .lean(),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        actions: recommendations.map((item) => ({
+          opportunityId: item._id,
+          organizationName: item.organizationId?.name || "Organization",
+          priority: item.priorityScore,
+          recommendedAction: item.suggestedAction?.replaceAll("_", " ") || "Review opportunity",
+          reasons: item.reasons || [],
+        })),
+        history: activity.map((item) => ({
+          opportunityId: item._id,
+          organizationName: item.organizationId?.name || "Organization",
+          recommendedAction: item.suggestedAction?.replaceAll("_", " ") || "Activity recorded",
+          timestamp: item.actionTaken?.timestamp || item.updatedAt,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("GET /marketing/feed error:", error);
+    return res.status(500).json({ success: false, error: "Failed to retrieve marketing feed" });
+  }
+});
+
+/**
  * GET /api/growth-operators/:operatorId
  * Get operator status and metrics
  */
