@@ -143,6 +143,12 @@ export const importContactsFromApollo = (payload) =>
     .post("/contacts/import/apollo", payload)
     .then((res) => res.data);
 
+export const ingestContacts = (payload) =>
+  api.post("/contacts/ingest", payload).then((res) => res.data);
+
+export const retryMondaySync = (contactId) =>
+  api.post(`/contacts/${contactId}/retry-monday`).then((res) => res.data);
+
 
 
 export const generateOutreach = (campaignId) =>
