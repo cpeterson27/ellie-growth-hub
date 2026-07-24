@@ -22,16 +22,18 @@ const canonicalFieldMap = Object.fromEntries([
   ["Email Bounced", "emailBounced"], ["Replied", "replied"], ["Demoed", "demoed"],
   ["Number of Retail Locations", "retailLocations"],
   ["Primary Email Source", "primaryEmailSource"], ["Primary Email Verification Source", "primaryEmailVerificationSource"], ["Email Confidence", "emailConfidence"],
+  ["Primary Email Catch-all Status", "primaryEmailCatchAllStatus"], ["Primary Email Last Verified At", "primaryEmailLastVerifiedAt"], ["Subsidiary Of", "subsidiaryOf"], ["Subsidiary Organization ID", "subsidiaryOrganizationId"], ["Email Sent", "emailSent"],
   ["Contact Owner", "contactOwner"], ["Other Phone", "otherPhone"], ["Account Owner", "accountOwner"],
   ["Company LinkedIn URL", "companyLinkedinUrl"], ["Facebook URL", "facebookUrl"], ["Twitter URL", "twitterUrl"],
   ["Company Address", "companyAddress"], ["Company City", "companyCity"], ["Company State", "companyState"], ["Company Country", "companyCountry"], ["Company Phone", "companyPhone"],
   ["Latest Funding", "latestFunding"], ["Apollo Account ID", "apolloAccountId"], ["Secondary Email Status", "secondaryEmailStatus"], ["Tertiary Email Status", "tertiaryEmailStatus"], ["Qualify Contact", "qualifyContact"],
+  ["Apollo Contact ID", "apolloContactId"], ["Apollo Record ID", "apolloRecordId"], ["Secondary Email Source", "secondaryEmailSource"], ["Secondary Email Verification Source", "secondaryEmailVerificationSource"], ["Tertiary Email Source", "tertiaryEmailSource"], ["Tertiary Email Verification Source", "tertiaryEmailVerificationSource"],
 ]);
 
 const arrayFields = new Set(["departments", "subDepartments", "lists", "keywords", "technologies", "sicCodes", "naicsCodes"]);
-const booleanFields = new Set(["doNotCall", "emailOpen", "emailBounced", "replied", "demoed"]);
+const booleanFields = new Set(["doNotCall", "emailSent", "emailOpen", "emailBounced", "replied", "demoed", "qualifyContact"]);
 const numberFields = new Set(["employeeCount", "annualRevenue", "totalFunding", "latestFundingAmount", "retailLocations"]);
-const dateFields = new Set(["lastRaisedAt", "lastContacted"]);
+const dateFields = new Set(["lastRaisedAt", "lastContacted", "primaryEmailLastVerifiedAt"]);
 
 function normalizeUrl(value = "") { return String(value).trim().toLowerCase().replace(/\/$/, ""); }
 function truthy(value) { return ["true", "yes", "1"].includes(String(value).trim().toLowerCase()); }
@@ -39,12 +41,13 @@ function split(value) { return Array.isArray(value) ? value : String(value || ""
 
 function normalizeIncoming(row, source = "manual") {
   const mapped = {};
-  const apolloFields = {};
+  const additionalFields = {};
   for (const [key, value] of Object.entries(row || {})) {
     const cleanKey = String(key).replace(/^\uFEFF/, "").trim();
-    const field = canonicalFieldMap[cleanKey] || cleanKey;
+    const known = canonicalFieldMap[cleanKey];
+    const field = known || cleanKey;
     mapped[field] = value;
-    apolloFields[field] = value;
+    if (!known && !["name", "email", "phone", "company", "title", "linkedin", "tags", "sourceProvider", "mondayItemId"].includes(field)) additionalFields[cleanKey] = value;
   }
   for (const field of arrayFields) if (mapped[field] !== undefined) mapped[field] = split(mapped[field]);
   for (const field of booleanFields) if (mapped[field] !== undefined) mapped[field] = truthy(mapped[field]);
@@ -56,7 +59,7 @@ function normalizeIncoming(row, source = "manual") {
   mapped.sourceProvider = source === "apollo" ? "apollo" : mapped.sourceProvider || source;
   mapped.providerContactId = String(mapped.apolloContactId || mapped.apolloPersonId || mapped.providerContactId || "").trim() || undefined;
   mapped.providerRecordId = String(mapped.apolloRecordId || mapped.providerRecordId || "").trim() || undefined;
-  mapped.apolloFields = { ...(mapped.apolloFields || {}), ...apolloFields, ...Object.fromEntries(Object.entries(mapped).filter(([key]) => !["apolloFields", "name"].includes(key))) };
+  mapped.additionalFields = { ...(mapped.additionalFields || {}), ...additionalFields };
   return mapped;
 }
 

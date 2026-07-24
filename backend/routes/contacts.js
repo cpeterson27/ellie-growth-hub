@@ -147,6 +147,9 @@ router.patch("/:id", async (req, res) => {
     }
 
     const contact = await contactService.updateContact(req.params.id, req.body);
+    if (contact.mondayItemId) {
+      try { await retryMondaySync(contact._id); } catch (_) { /* MongoDB remains the source of truth; sync status is recorded */ }
+    }
     res.json({ success: true, data: contact, message: "Contact updated" });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
