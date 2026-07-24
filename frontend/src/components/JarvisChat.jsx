@@ -27,6 +27,7 @@ export default function JarvisChat() {
   const [voices, setVoices] = useState([]);
   const [voiceName, setVoiceName] = useState("");
   const [speakingId, setSpeakingId] = useState(null);
+  const [speechError, setSpeechError] = useState("");
   const [listening, setListening] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -68,16 +69,31 @@ export default function JarvisChat() {
   }, [messages]);
 
   const speakText = (text, id) => {
-    if (!("speechSynthesis" in window) || !text) return;
+    if (!("speechSynthesis" in window) || !text) {
+      setSpeechError("Voice playback is not available in this browser.");
+      return;
+    }
+    setSpeechError("");
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voices.find((voice) => voice.name === voiceName) || null;
     utterance.rate = profile?.voiceRate || 1;
     utterance.pitch = profile?.voicePitch || 1;
+    utterance.onstart = () => setSpeakingId(id);
     utterance.onend = () => setSpeakingId(null);
-    utterance.onerror = () => setSpeakingId(null);
+    utterance.onerror = (event) => {
+      setSpeakingId(null);
+      if (event.error !== "canceled" && event.error !== "interrupted") {
+        setSpeechError("Browser voice playback was blocked. Click Test voice once, then ask Jarvis again.");
+      }
+    };
     setSpeakingId(id);
+    window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
+  };
+
+  const testVoice = () => {
+    speakText(`Hi, I am ${profile?.name || "Jarvis"}. Voice playback is ready.`, "voice-test");
   };
 
   const submitPrompt = async (prompt) => {
@@ -120,6 +136,7 @@ export default function JarvisChat() {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
+    if ("speechSynthesis" in window) window.speechSynthesis.resume();
     const prompt = input;
     setInput("");
     submitPrompt(prompt);
@@ -279,7 +296,7 @@ export default function JarvisChat() {
       <div className="jarvis-header">
         <div>
           <p className="jarvis-eyebrow">Ellie AI operator</p>
-          <div className="jarvis-title-row"><span className={`jarvis-orb ${loading ? "is-working" : ""}`} aria-hidden="true"><i /><i /><i /></span><div><h1>{profile?.name || "Jarvis"}</h1><p>{profile?.greeting || "Your workspace assistant for lead research, campaign planning, and follow-through."}</p></div></div>
+          <div className="jarvis-title-row"><span className={`jarvis-orb ${loading || speakingId ? "is-working" : ""} ${speakingId ? "is-speaking" : ""}`} aria-label={speakingId ? "Jarvis is speaking" : loading ? "Jarvis is thinking" : "Jarvis is ready"}><i /><i /><i /></span><div><h1>{profile?.name || "Jarvis"}</h1><p>{profile?.greeting || "Your workspace assistant for lead research, campaign planning, and follow-through."}</p></div></div>
         </div>
         <div className="jarvis-statuses" aria-label="Jarvis connection status">
           <span className={status?.openai?.enabled ? "is-ready" : ""}>OpenAI {status?.openai?.enabled ? "ready" : "not enabled"}</span>
@@ -372,7 +389,7 @@ export default function JarvisChat() {
           {voiceInputSupported ? <button type="button" className="jarvis-mic-btn" onClick={startListening} disabled={loading || listening}>{listening ? "Listening…" : "Talk"}</button> : null}
         </div>
 
-        {voices.length ? <div className="jarvis-voice-controls"><label className="jarvis-voice-picker">Jarvis voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{voices.map((voice) => <option key={`${voice.name}-${voice.lang}`} value={voice.name}>{voice.name} ({voice.lang})</option>)}</select></label><label className="jarvis-auto-speak"><input type="checkbox" checked={autoSpeak} onChange={(event) => setAutoSpeak(event.target.checked)} /> Speak replies automatically</label></div> : <p className="jarvis-input-note">Voice playback is not available in this browser.</p>}
+        {voices.length ? <div className="jarvis-voice-controls"><label className="jarvis-voice-picker">Jarvis voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{voices.map((voice) => <option key={`${voice.name}-${voice.lang}`} value={voice.name}>{voice.name} ({voice.lang})</option>)}</select></label><button type="button" className="jarvis-voice-test" onClick={testVoice} disabled={Boolean(speakingId)}>{speakingId ? "Speaking…" : "Test voice"}</button><label className="jarvis-auto-speak"><input type="checkbox" checked={autoSpeak} onChange={(event) => setAutoSpeak(event.target.checked)} /> Speak replies automatically</label></div> : <p className="jarvis-input-note">Voice playback is not available in this browser.</p>}
 
         {selectedCampaignId && (
           <div className="jarvis-test-email-group">
@@ -387,6 +404,7 @@ export default function JarvisChat() {
         )}
 
         <p className="jarvis-input-note">Press ⌘J while Ellie is open to start a voice turn. Talk records one request and sends it to Jarvis. Jarvis never sends outreach or changes records without a confirmed action.</p>
+        {speechError ? <div className="jarvis-error">{speechError}</div> : null}
         {error && <div className="jarvis-error">{error}</div>}
       </form>
     </div>

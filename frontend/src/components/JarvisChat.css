@@ -38,3 +38,8 @@
 .jarvis-messages::-webkit-scrollbar { width: 8px; }
 .jarvis-messages::-webkit-scrollbar-thumb { background: #b8cbc4; border-radius: 99px; }
 @media (max-width: 720px) { .jarvis-chat-container { min-height: calc(100vh - 4rem); border-radius: 0; border-inline: 0; } .jarvis-header { flex-direction: column; padding: 1.2rem; } .jarvis-statuses { justify-content: flex-start; } .jarvis-persona-panel{grid-template-columns:1fr}.jarvis-messages { min-height: 360px; padding: 1rem; } .jarvis-message-content { max-width: 90%; } .jarvis-input-group { flex-direction: column; } .jarvis-send-btn { width: 100%; } }
+
+.jarvis-orb.is-speaking { animation: jarvis-speaking 0.78s ease-in-out infinite; }
+.jarvis-voice-test { padding: .4rem .6rem; border: 1px solid #b8cbc4; border-radius: 8px; background: #f4f7f5; color: #17463e; font: inherit; font-size: .76rem; font-weight: 750; cursor: pointer; }
+.jarvis-voice-test:disabled { opacity: .55; cursor: not-allowed; }
+@keyframes jarvis-speaking { 50% { transform: scale(1.14); box-shadow: 0 0 0 16px rgba(216,183,108,.13), 0 0 50px rgba(216,183,108,.82); } }
