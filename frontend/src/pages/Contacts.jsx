@@ -14,13 +14,22 @@ import {
   archiveContact,
   deleteContact,
   retryMondaySync,
+  updateContact,
   searchApolloLeads,
 } from "../services/api.js";
 
 const columns = [
   { header: "Name", accessor: "name" },
   { header: "Email", accessor: "email" },
+  { header: "Phone", accessor: "phone" },
   { header: "Company", accessor: "company" },
+  { header: "Title", accessor: "title" },
+  { header: "Industry", accessor: "industry" },
+  { header: "City", accessor: "city" },
+  { header: "State", accessor: "state" },
+  { header: "Source", render: (row) => row.sourceProvider || row.sources?.join(", ") },
+  { header: "Campaign", render: (row) => row.campaignIds?.length ? "Associated" : "—" },
+  { header: "Monday Sync", accessor: "mondaySyncStatus" },
   { header: "Status", accessor: "status" },
 ];
 
@@ -60,7 +69,9 @@ export default function Contacts() {
   const [showArchived, setShowArchived] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [previewStats, setPreviewStats] = useState(null);
-  const tableColumns = [...columns, { header: "Actions", render: (contact) => <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}><Button variant="outline" onClick={async () => { await archiveContact(contact._id); await loadContacts(); }}>Archive</Button><Button variant="outline" onClick={() => setDeleteTarget(contact)}>Delete permanently</Button>{contact.mondaySyncStatus === "failed" ? <Button variant="outline" onClick={async () => { await retryMondaySync(contact._id); await loadContacts(); }}>Retry Monday</Button> : null}</div> }];
+  const [detailContact, setDetailContact] = useState(null);
+  const [editingContact, setEditingContact] = useState(null);
+  const tableColumns = [...columns, { header: "Actions", render: (contact) => <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}><Button variant="outline" onClick={() => setDetailContact(contact)}>View</Button><Button variant="outline" onClick={() => setEditingContact({ ...contact })}>Edit</Button><Button variant="outline" onClick={async () => { await archiveContact(contact._id); await loadContacts(); }}>Archive</Button><Button variant="outline" onClick={() => setDeleteTarget(contact)}>Delete permanently</Button>{contact.mondaySyncStatus === "failed" ? <Button variant="outline" onClick={async () => { await retryMondaySync(contact._id); await loadContacts(); }}>Retry Monday</Button> : null}</div> }];
 
   async function loadContacts() {
     try {
@@ -285,6 +296,8 @@ export default function Contacts() {
         </>}
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; Monday sync: {deleteTarget.mondaySyncStatus || "pending"}; Monday item: {deleteTarget.mondayItemId ? "linked" : "not linked"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
+      <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments", "lists"]], ["Marketing", ["stage", "keywords", "lastContacted", "notes"]], ["Monday", ["mondaySyncStatus", "mondayItemId", "mondaySyncedAt"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
+      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Edit Contact" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { await updateContact(editingContact._id, editingContact); setEditingContact(null); await loadContacts(); }}>Save and Sync</Button></>}>{editingContact ? <div style={{ display: "grid", gap: "0.5rem" }}>{["name", "email", "phone", "company", "title", "industry", "city", "state", "notes"].map((field) => <input key={field} className="select-input" placeholder={field} value={editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} />)}</div> : null}</Modal>
     </div>
   );
 }
