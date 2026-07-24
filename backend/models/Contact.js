@@ -193,6 +193,8 @@ const contactSchema = new mongoose.Schema(
       type: String,
       enum: [
         "active",
+        "prospect",
+        "rejected",
         "inactive",
         "unsubscribed",
         "invalid",

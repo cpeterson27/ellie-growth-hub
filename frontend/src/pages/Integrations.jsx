@@ -15,18 +15,13 @@ export default function Integrations() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    async function loadProviders() {
-      try {
-        const response = await fetchIntegrationHub();
-        setProviders(response.data?.providers || []);
-      } catch (err) {
-        setError(err.response?.data?.error || "Unable to load integrations");
-      } finally {
-        setLoading(false);
-      }
-    }
+  const loadProviders = async () => {
+    try { setLoading(true); const response = await fetchIntegrationHub(); setProviders(response.data?.providers || []); setError(""); }
+    catch (err) { setError(err.response?.data?.error || "Unable to load integrations"); }
+    finally { setLoading(false); }
+  };
 
+  useEffect(() => {
     loadProviders();
   }, []);
 
@@ -39,6 +34,7 @@ export default function Integrations() {
             Connect and manage the providers that power Ellie AI.
           </p>
         </div>
+        <Button variant="outline" onClick={loadProviders}>Refresh status</Button>
       </div>
 
       {error ? <p className="form-error">{error}</p> : null}
@@ -48,10 +44,9 @@ export default function Integrations() {
             <DashboardCard key={provider.id} title={provider.name}>
               <p>{provider.description}</p>
               <p><strong>{provider.category.replaceAll("_", " ")}</strong></p>
-              <p>Status: {statusLabels[provider.status]}</p>
-              <Button variant="outline" disabled>
-                Manage
-              </Button>
+              <p><span className="label-pill">{statusLabels[provider.status] || provider.status}</span></p>
+              <p>Capabilities: {provider.capabilities?.join(", ") || "Not reported"}</p>
+              {provider.id === "apollo" ? <p>People Search requires a paid Apollo API plan. CSV and supported organization capabilities remain available.</p> : null}
             </DashboardCard>
           ))}
         </section>

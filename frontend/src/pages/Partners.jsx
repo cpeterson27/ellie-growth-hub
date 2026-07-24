@@ -1,131 +1,16 @@
 import { useEffect, useState } from "react";
-
+import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
+import Modal from "../components/Modal.jsx";
 import Table from "../components/Table.jsx";
+import { createPartner, fetchPartners, updatePartner } from "../services/api.js";
 
-import api from "../services/api.js";
-
-
-const columns = [
-  {
-    header: "Name",
-    accessor: "name",
-  },
-  {
-    header: "Company",
-    accessor: "company",
-  },
-  {
-    header: "Status",
-    accessor: "status",
-  },
-  {
-    header: "Relationship",
-    accessor: "relationship",
-  },
-  {
-    header: "Revenue",
-    accessor: "revenue",
-  },
-];
-
-
+const blank = { name: "", company: "", email: "", phone: "", type: "affiliate", referralCode: "", referralLink: "", commissionRate: "", notes: "" };
 export default function Partners() {
-
-  const [partners, setPartners] = useState([]);
-
-  const [loading, setLoading] = useState(true);
-
-
-  useEffect(() => {
-
-    async function loadPartners() {
-
-      try {
-
-        const response =
-          await api.get("/partners");
-
-
-        setPartners(response.data);
-
-
-      } catch(error) {
-
-        console.error(
-          "Failed loading partners:",
-          error
-        );
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
-    }
-
-
-    loadPartners();
-
-
-  }, []);
-
-
-
-  return (
-
-    <div className="page-dashboard">
-
-
-      <div className="page-header">
-
-        <div>
-
-          <h1 className="page-title">
-            Partners
-          </h1>
-
-
-          <p className="page-subtitle">
-            Manage investor, referral, and strategic partner relationships.
-          </p>
-
-
-        </div>
-
-      </div>
-
-
-
-      <DashboardCard title="Partner Network">
-
-
-        {loading ? (
-
-          <p>
-            Loading partners...
-          </p>
-
-
-        ) : (
-
-
-          <Table
-            columns={columns}
-            data={partners}
-            emptyMessage="No partners found yet."
-          />
-
-
-        )}
-
-
-      </DashboardCard>
-
-
-    </div>
-
-  );
-
+  const [partners, setPartners] = useState([]); const [form, setForm] = useState(null); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
+  const load = () => fetchPartners().then((items) => setPartners(Array.isArray(items) ? items : [])).catch(() => setError("Unable to load partners"));
+  useEffect(() => { load(); }, []);
+  const save = async () => { try { setSaving(true); setError(""); if (!form.name.trim()) { setError("Partner name is required."); return; } if (form._id) await updatePartner(form._id, form); else await createPartner(form); setForm(null); await load(); } catch (err) { setError(err.response?.data?.message || "Unable to save partner"); } finally { setSaving(false); } };
+  const columns = [{ header: "Partner", accessor: "name" }, { header: "Type", accessor: "type" }, { header: "Company", accessor: "company" }, { header: "Affiliate Code", accessor: "referralCode" }, { header: "Commission", render: (row) => `${row.commissionRate || 0}%` }, { header: "Tickets", accessor: "ticketsSold" }, { header: "Revenue", accessor: "revenue" }, { header: "Actions", render: (row) => <Button variant="outline" onClick={() => setForm({ ...row })}>Edit</Button> }];
+  return <div className="page-dashboard"><div className="page-header"><div><h1 className="page-title">Partners</h1><p className="page-subtitle">Manage affiliates, referral partners, sponsors, speakers, and promotion partners.</p></div><Button onClick={() => setForm({ ...blank })}>+ New Partner</Button></div>{error ? <p className="form-error">{error}</p> : null}<DashboardCard title="Partner Network"><Table columns={columns} data={partners} emptyMessage="Add your first affiliate or partner." /></DashboardCard><Modal isOpen={Boolean(form)} onClose={() => setForm(null)} title={form?._id ? "Edit Partner" : "New Partner"} footer={<><Button variant="outline" onClick={() => setForm(null)}>Cancel</Button><Button onClick={save} loading={saving}>Save Partner</Button></>}>{form ? <div className="campaign-form-grid">{[["name", "Name"], ["company", "Company"], ["email", "Email"], ["phone", "Phone"], ["referralCode", "Affiliate / referral code"], ["referralLink", "Referral link"], ["commissionRate", "Commission %"], ["notes", "Notes"]].map(([key, label]) => <div className={key === "notes" ? "form-field span-2" : "form-field"} key={key}><label>{label}</label><input className="select-input" value={form[key] || ""} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></div>)}<div className="form-field span-2"><label>Partner type</label><select className="select-input" value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{["affiliate", "speaker", "sponsor", "referral_partner", "organization", "community", "podcast", "influencer"].map((type) => <option key={type}>{type.replaceAll("_", " ")}</option>)}</select></div></div> : null}</Modal></div>;
 }

@@ -6,7 +6,7 @@ const campaignSchema = new mongoose.Schema(
   eventId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Event",
-    required: true,
+    required: function() { return this.campaignKind !== "program"; },
     index: true,
   },
 
@@ -22,6 +22,9 @@ const campaignSchema = new mongoose.Schema(
     type: String,
     default: "event",
   },
+  campaignKind: { type: String, enum: ["event", "program"], default: "event", index: true },
+  programName: { type: String, default: "" },
+  templateKey: { type: String, default: "event_invite" },
 
 
   audience: [

@@ -19,6 +19,8 @@ const audienceOptions = [
   "House flippers",
   "Property management companies",
   "Multifamily investors",
+  "Experienced real-estate operators",
+  "Affiliate and referral partners",
 ];
 
 
@@ -92,16 +94,13 @@ export default function Campaigns() {
       accessor: "startDate",
 
       render: (item) =>
-        new Date(
-          item.startDate
-        ).toLocaleDateString(
-          "en-US",
-          {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          }
-        ),
+        item.startDate
+          ? new Date(item.startDate).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : item.campaignKind === "program" ? "Evergreen program" : "—",
     },
 
 
@@ -110,7 +109,7 @@ export default function Campaigns() {
       accessor: "ticketPrice",
 
       render: (item) =>
-        `$${item.ticketPrice}`,
+        item.campaignKind === "program" ? "Program" : `$${item.ticketPrice}`,
     },
 
 

@@ -3,8 +3,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 1.25rem;
-  padding: 1.25rem 1.5rem;
-  background: transparent;
+  padding: 1.5rem 2.5rem 1.25rem;
+  background: #f4f3ef;
+  border-bottom: 1px solid #dfddd4;
 }
 
 .navbar__left {
@@ -32,7 +33,8 @@
 
 .navbar__title {
   margin: 0.2rem 0 0;
-  font-size: 1.35rem;
+  font-size: 1.15rem;
+  letter-spacing: -.02em;
 }
 
 .navbar__actions {
@@ -44,7 +46,7 @@
 .navbar__icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: 9px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -56,7 +58,7 @@
 
 @media (max-width: 900px) {
   .navbar {
-    padding: 1rem 1rem 0;
+    padding: 1rem 1rem .75rem;
   }
 
   .navbar__menu {

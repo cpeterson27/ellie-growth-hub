@@ -1,71 +1,8 @@
-import { useState } from "react";
-import { FiEdit2 } from "react-icons/fi";
-import DashboardCard from "../components/DashboardCard.jsx";
+import { useEffect, useState } from "react";
 import Button from "../components/Button.jsx";
+import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
+import { createContentBrief, fetchContentBriefs, updateContentBrief } from "../services/api.js";
 
-const briefs = [
-  {
-    title: "Email drip campaign",
-    detail: "Target pre-launch attendees with onboarding copy.",
-  },
-  {
-    title: "Social post series",
-    detail: "Share event highlights and partner shoutouts.",
-  },
-  {
-    title: "Landing page update",
-    detail: "Refresh hero messaging for conversions.",
-  },
-];
-
-export default function Content() {
-  const [isOpen, setOpen] = useState(false);
-
-  return (
-    <div className="page-dashboard">
-      <div
-        className="page-header"
-        style={{ justifyContent: "space-between", alignItems: "center" }}
-      >
-        <div>
-          <h1 className="page-title">AI Content</h1>
-          <p className="page-subtitle">
-            Generate marketing copy, emails, and event assets faster.
-          </p>
-        </div>
-        <Button variant="primary" onClick={() => setOpen(true)}>
-          Create AI Brief
-        </Button>
-      </div>
-
-      <section className="section-grid" style={{ marginTop: "1.5rem" }}>
-        {briefs.map((item) => (
-          <DashboardCard
-            key={item.title}
-            title={item.title}
-            action={<FiEdit2 />}
-          >
-            <p>{item.detail}</p>
-          </DashboardCard>
-        ))}
-      </section>
-
-      <Modal
-        isOpen={isOpen}
-        onClose={() => setOpen(false)}
-        title="Create Campaign Brief"
-        footer={
-          <Button variant="primary" onClick={() => setOpen(false)}>
-            Save brief
-          </Button>
-        }
-      >
-        <p>
-          Use Ellie's AI engine to generate email sequences, social copy, and
-          follow-up templates.
-        </p>
-      </Modal>
-    </div>
-  );
-}
+const emptyDraft = { title: "", type: "email", body: "", subject: "", callToAction: "" };
+export default function Content(){const [items,setItems]=useState([]);const [draft,setDraft]=useState(emptyDraft);const [open,setOpen]=useState(false);const [editing,setEditing]=useState(null);const [saving,setSaving]=useState(false);const [error,setError]=useState("");const load=async()=>{try{const response=await fetchContentBriefs();setItems(response.data||[])}catch{setError("Unable to load AI Content drafts.")}};useEffect(()=>{load()},[]);const save=async()=>{const payload=editing?draft:{...draft,source:"manual"};if(!payload.title.trim()||!payload.body.trim())return setError("Add a title and draft content.");try{setSaving(true);if(editing)await updateContentBrief(editing._id,payload);else await createContentBrief(payload);setOpen(false);setEditing(null);setDraft(emptyDraft);await load()}catch(err){setError(err.response?.data?.error||"Unable to save content draft.")}finally{setSaving(false)}};const typeLabel={email:"Email draft",email_template:"Reusable email template",social:"Social draft",landing_page:"Landing page",ad:"Ad",brief:"Brief"};return <div className="page-dashboard"><div className="page-header"><div><h1 className="page-title">AI Content</h1><p className="page-subtitle">Draft, review, and approve reusable campaign content. Nothing is sent or published from this page.</p></div><Button onClick={()=>{setDraft(emptyDraft);setEditing(null);setOpen(true)}}>Create content draft</Button></div>{error?<p className="form-error">{error}</p>:null}<DashboardCard title="Content library">{items.length?<div className="section-grid">{items.map(item=><DashboardCard key={item._id} title={item.title} action={<span className="label-pill">{typeLabel[item.type]||item.type}</span>}><p>{item.subject?`Subject: ${item.subject}`:item.body.slice(0,180)}</p><p><small>{item.source==="jarvis"?"Drafted with Jarvis":"Created manually"} · {item.status}</small></p><Button variant="outline" size="sm" onClick={()=>{setEditing(item);setDraft({title:item.title,type:item.type,body:item.body,subject:item.subject||"",callToAction:item.callToAction||""});setOpen(true)}}>Edit draft</Button></DashboardCard>)}</div>:<div className="table-state table-state--empty">Ask Jarvis to draft content, or create your first content brief here.</div>}</DashboardCard><Modal isOpen={open} onClose={()=>setOpen(false)} title={editing?"Edit content draft":"Create content draft"} footer={<><Button variant="outline" onClick={()=>setOpen(false)}>Cancel</Button><Button loading={saving} onClick={save}>Save draft</Button></>}><div className="campaign-form-grid"><label className="form-field span-2"><span>Title</span><input className="select-input" value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/></label><label className="form-field"><span>Type</span><select className="select-input" value={draft.type} onChange={e=>setDraft({...draft,type:e.target.value})}><option value="email">Email draft</option><option value="email_template">Reusable email template</option><option value="social">Social draft</option><option value="landing_page">Landing page</option><option value="ad">Ad</option></select></label><label className="form-field"><span>Call to action</span><input className="select-input" value={draft.callToAction} onChange={e=>setDraft({...draft,callToAction:e.target.value})}/></label>{["email","email_template"].includes(draft.type)?<label className="form-field span-2"><span>Email subject</span><input className="select-input" value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})}/></label>:null}<label className="form-field span-2"><span>Draft content</span><textarea className="select-input" value={draft.body} onChange={e=>setDraft({...draft,body:e.target.value})} placeholder="Audience, offer, tone, proof, and CTA…"/></label></div></Modal></div>}

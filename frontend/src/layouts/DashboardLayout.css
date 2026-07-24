@@ -1,8 +1,8 @@
 .dashboard-shell {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 280px 1fr;
   min-height: 100vh;
-  background: #eef0f8;
+  background: #f4f3ef;
   position: relative;
 }
 
@@ -16,7 +16,7 @@
 
 .dashboard-content {
   flex: 1;
-  padding: 1.5rem 2rem 2rem;
+  padding: 2rem 2.5rem 3rem;
   width: 100%;
 }
 
@@ -30,7 +30,7 @@
   }
 
   .dashboard-content {
-    padding: 1rem 1rem 2rem;
+    padding: 1.25rem 1rem 2rem;
   }
 
   .dashboard-overlay {

@@ -135,6 +135,17 @@ export function useJarvis() {
     }
   }, []);
 
+  const getStatus = useCallback(async () => {
+    try {
+      const response = await api.jarvisStatus();
+      if (!response.success) throw new Error(response.error || "Failed to retrieve Jarvis status");
+      return response.data;
+    } catch (err) {
+      setError(err.message || "Unable to retrieve Jarvis status");
+      return null;
+    }
+  }, []);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -148,6 +159,7 @@ export function useJarvis() {
     prepareRecipients,
     sendTestEmail,
     getCampaignStatus,
+    getStatus,
     clearError,
   };
 }

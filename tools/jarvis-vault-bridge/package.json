@@ -1,0 +1,9 @@
+{
+  "name": "ellie-jarvis-vault-bridge",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "sync": "node sync.js",
+    "watch": "node sync.js --watch"
+  }
+}

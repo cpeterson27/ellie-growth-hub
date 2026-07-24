@@ -89,7 +89,7 @@ router.get("/", async (req, res) => {
       skip = 0,
     } = req.query;
 
-    const query = status ? { status } : { status: { $ne: "archived" } };
+    const query = status ? { status } : { $or: [{ status: "active" }, { status: { $exists: false } }, { status: null }] };
     if (email) query.email = email;
     if (externalId) query.externalId = externalId;
     if (source) query.source = source;

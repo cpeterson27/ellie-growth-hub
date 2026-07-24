@@ -16,6 +16,7 @@ import {
 
 export default function Dashboard() {
   const [event, setEvent] = useState(null);
+  const [events, setEvents] = useState([]);
   const [outreach, setOutreach] = useState([]);
   const [loading, setLoading] = useState(true);
   const [growthHistory, setGrowthHistory] = useState([]);
@@ -26,6 +27,7 @@ export default function Dashboard() {
       try {
         const events = await fetchEvents();
         const activeEvent = events[0] || null;
+        setEvents(Array.isArray(events) ? events : []);
         setEvent(activeEvent);
         if (activeEvent) {
           const outreachItems = await fetchOutreach(activeEvent._id);
@@ -40,6 +42,18 @@ export default function Dashboard() {
 
     load();
   }, []);
+
+  const selectEvent = async (eventId) => {
+    const nextEvent = events.find((item) => item._id === eventId) || null;
+    setEvent(nextEvent);
+    if (!nextEvent) return setOutreach([]);
+    try {
+      const items = await fetchOutreach(nextEvent._id);
+      setOutreach(Array.isArray(items) ? items : items.outreach || []);
+    } catch {
+      setOutreach([]);
+    }
+  };
 
   if (loading) {
     return (
@@ -150,6 +164,14 @@ export default function Dashboard() {
             })}{" "}
             · Ticket Price ${event.ticketPrice}
           </p>
+          {events.length > 1 ? (
+            <label className="dashboard-event-picker">
+              Dashboard event
+              <select value={event._id} onChange={(entry) => selectEvent(entry.target.value)}>
+                {events.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+              </select>
+            </label>
+          ) : null}
         </div>
       </div>
 

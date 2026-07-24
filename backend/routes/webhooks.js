@@ -16,14 +16,7 @@ router.post("/resend", async (req, res) => {
     const event = req.body;
 
 
-    console.log(
-      "=== RESEND WEBHOOK EVENT ==="
-    );
-
-
-    console.log(
-      JSON.stringify(event, null, 2)
-    );
+    console.log("[Resend webhook] received", { type: event.type || "unknown" });
 
 
 
@@ -55,9 +48,7 @@ router.post("/resend", async (req, res) => {
 
     if (!senderEmail) {
 
-      console.log(
-        "No sender email found"
-      );
+      console.warn("[Resend webhook] received message missing sender");
 
       return res.json({
         received: true,
@@ -80,10 +71,7 @@ router.post("/resend", async (req, res) => {
 
     if (!outreach) {
 
-      console.log(
-        "No matching sent outreach found for:",
-        senderEmail
-      );
+      console.log("[Resend webhook] no matching sent outreach");
 
 
       return res.json({
@@ -116,16 +104,7 @@ router.post("/resend", async (req, res) => {
 
 
 
-    console.log(
-      "✅ Outreach reply saved:",
-      outreach._id
-    );
-
-
-    console.log(
-      "Reply text:",
-      outreach.replyText
-    );
+    console.log("[Resend webhook] outreach reply recorded");
 
 
 

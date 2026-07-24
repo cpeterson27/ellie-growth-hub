@@ -1,239 +1,65 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-
-import DashboardCard from "../components/DashboardCard.jsx";
+import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
+import DashboardCard from "../components/DashboardCard.jsx";
+import { fetchCampaign } from "../services/api.js";
+import "./CampaignWorkspace.css";
 
-import { fetchMarketingCampaign } from "../services/api.js";
-
-
+const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Evergreen";
+const formatMoney = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export default function CampaignWorkspace() {
   const { id } = useParams();
   const navigate = useNavigate();
-
   const [campaign, setCampaign] = useState(null);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-
   useEffect(() => {
-    if (!id) {
-      setError("Campaign ID missing.");
-      setLoading(false);
-      return;
-    }
-
-
-    async function loadCampaign() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await fetchMarketingCampaign(id);
-
-        console.log(
-          "CAMPAIGN RESPONSE:",
-          response
-        );
-
-
-        setCampaign(response);
-
-
-      } catch (err) {
-        console.error(
-          "LOAD CAMPAIGN ERROR:",
-          err.response?.data || err.message
-        );
-
-
-        setError(
-          err.response?.data?.error ||
-          "Unable to load campaign."
-        );
-
-
-      } finally {
-        setLoading(false);
-      }
-    }
-
-
-    loadCampaign();
-
+    if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
+    fetchCampaign(id)
+      .then(setCampaign)
+      .catch((err) => setError(err.response?.data?.error || "Unable to load campaign."))
+      .finally(() => setLoading(false));
   }, [id]);
 
+  if (loading) return <div className="page-dashboard"><p>Loading campaign…</p></div>;
+  if (error || !campaign) return <div className="page-dashboard"><p className="form-error">{error || "Campaign not found."}</p><Button variant="outline" onClick={() => navigate("/campaigns")}>Back to Campaigns</Button></div>;
 
-
-  if (loading) {
-    return (
-      <div className="page-dashboard">
-        <p>Loading campaign...</p>
-      </div>
-    );
-  }
-
-
-
-  if (error || !campaign) {
-    return (
-      <div className="page-dashboard">
-
-        <p className="form-error">
-          {error || "Campaign not found."}
-        </p>
-
-
-        <Button
-          variant="outline"
-          onClick={() => navigate("/marketing")}
-        >
-          Back to Growth Operator
-        </Button>
-
-      </div>
-    );
-  }
-
-
+  const isProgram = campaign.campaignKind === "program";
+  const metrics = campaign.metrics || {};
+  const overview = isProgram
+    ? [["Offer", campaign.programName || "Premium program"], ["Audience", campaign.audience?.join(", ") || "Not specified"], ["Campaign type", "Program enrollment"]]
+    : [["Event date", formatDate(campaign.startDate)], ["Ticket price", formatMoney(campaign.ticketPrice)], ["Registration goal", campaign.ticketGoal || "Not specified"], ["Audience", campaign.audience?.join(", ") || "Not specified"]];
 
   return (
-    <div className="page-dashboard">
-
-
-      <div className="page-header">
-
+    <div className="page-dashboard campaign-workspace">
+      <header className="campaign-workspace__header">
         <div>
-
-          <h1 className="page-title">
-            {campaign.name}
-          </h1>
-
-
-          <p className="page-subtitle">
-            AI Generated Marketing Campaign
-          </p>
-
+          <button className="campaign-workspace__back" onClick={() => navigate("/campaigns")}>← All campaigns</button>
+          <p className="campaign-workspace__eyebrow">{isProgram ? "Program campaign" : "Event campaign"}</p>
+          <h1 className="page-title">{campaign.name}</h1>
+          <div className="campaign-workspace__meta"><span className={`campaign-status campaign-status--${campaign.status}`}>{campaign.status}</span><span>{isProgram ? "Evergreen campaign" : formatDate(campaign.startDate)}</span></div>
         </div>
+        <div className="campaign-workspace__actions"><Button variant="outline" onClick={() => navigate("/contacts")}>Manage contacts</Button><Button onClick={() => navigate(`/outreach?campaignId=${campaign._id}`)}>Open outreach</Button></div>
+      </header>
 
+      <section className="campaign-workspace__metrics" aria-label="Campaign metrics">
+        {[['Sent', metrics.sent], ['Delivered', metrics.delivered], ['Opened', metrics.opened], ['Converted', metrics.converted]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value || 0}</strong></div>)}
+      </section>
 
-        <Button
-          variant="outline"
-          onClick={() => navigate("/marketing")}
-        >
-          Back
-        </Button>
+      <section className="campaign-workspace__grid">
+        <DashboardCard title="Campaign brief">
+          <div className="campaign-overview-list">{overview.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
+          {campaign.description ? <p className="campaign-workspace__description">{campaign.description}</p> : <p className="campaign-workspace__empty">Add a campaign brief to guide your messaging and team.</p>}
+        </DashboardCard>
 
-      </div>
-
-
-
-      <DashboardCard title="Campaign Overview">
-
-
-        <p>
-          <strong>Name:</strong>{" "}
-          {campaign.name}
-        </p>
-
-
-        <p>
-          <strong>Type:</strong>{" "}
-          Event Marketing
-        </p>
-
-
-        <p>
-          <strong>Status:</strong>{" "}
-          {campaign.status}
-        </p>
-
-
-        <p>
-          <strong>Audience:</strong>{" "}
-          {campaign.audience?.join(", ") || "Unknown"}
-        </p>
-
-
-        <p>
-          <strong>Event Date:</strong>{" "}
-          {
-            campaign.startDate
-              ? new Date(campaign.startDate).toLocaleString()
-              : "Unknown"
-          }
-        </p>
-
-
-        <p>
-          <strong>Ticket Price:</strong>{" "}
-          ${campaign.ticketPrice}
-        </p>
-
-
-        <p>
-          <strong>Ticket Goal:</strong>{" "}
-          {campaign.ticketGoal}
-        </p>
-
-
-        <p>
-          <strong>Tickets Sold:</strong>{" "}
-          {campaign.ticketsSold}
-        </p>
-
-
-      </DashboardCard>
-
-
-
-      <DashboardCard title="Campaign Metrics">
-
-
-        <p>
-          Outreach Generated: 0
-        </p>
-
-
-        <p>
-          Emails Sent: 0
-        </p>
-
-
-        <p>
-          Replies: 0
-        </p>
-
-
-        <p>
-          Conversions: 0
-        </p>
-
-
-      </DashboardCard>
-
-
-
-      <DashboardCard title="Marketing Actions">
-
-
-        <Button
-          variant="primary"
-          onClick={() =>
-            navigate(
-              `/outreach?campaignId=${campaign._id}`
-            )
-          }
-        >
-          View Outreach
-        </Button>
-
-
-      </DashboardCard>
-
-
+        <DashboardCard title="Email starting point">
+          <p className="campaign-template-name">{campaign.templateKey?.replaceAll("_", " ") || "Campaign template"}</p>
+          <p><strong>Subject</strong><br />{campaign.content?.subject || "No subject set yet."}</p>
+          <p className="campaign-workspace__body-preview">{campaign.content?.body || "Your outreach draft will appear here after it is prepared."}</p>
+        </DashboardCard>
+      </section>
     </div>
   );
 }

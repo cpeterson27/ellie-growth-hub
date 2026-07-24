@@ -5,6 +5,9 @@
 
 const express = require("express");
 const jarvisService = require("../services/jarvisService");
+const llmService = require("../services/llmService");
+const jarvisMemoryService = require("../services/jarvisMemoryService");
+const jarvisProfileService = require("../services/jarvisProfileService");
 
 const router = express.Router();
 
@@ -37,6 +40,57 @@ router.post("/chat", async (req, res) => {
       success: false,
       error: error.message || "Failed to process query",
     });
+  }
+});
+
+// Configuration-only status. This intentionally exposes no vault path or credentials.
+router.get("/status", async (req, res) => {
+  try {
+    const memory = await jarvisMemoryService.getStatus();
+    res.json({
+      success: true,
+      data: {
+        openai: llmService.getStatus(),
+        obsidian: memory,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Failed to retrieve Jarvis configuration status" });
+  }
+});
+
+router.get("/profile", async (req, res) => {
+  try {
+    res.json({ success: true, data: await jarvisProfileService.getProfile() });
+  } catch {
+    res.status(500).json({ success: false, error: "Failed to retrieve Jarvis profile" });
+  }
+});
+
+router.put("/profile", async (req, res) => {
+  try {
+    res.json({ success: true, data: await jarvisProfileService.updateProfile(req.body) });
+  } catch (error) {
+    res.status(400).json({ success: false, error: "Jarvis profile settings are invalid" });
+  }
+});
+
+function hasValidMemorySyncSecret(req) {
+  const provided = String(req.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const expected = process.env.JARVIS_MEMORY_SYNC_SECRET || "";
+  if (!provided || !expected || provided.length !== expected.length) return false;
+  return require("crypto").timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
+
+// This endpoint accepts only approved Markdown notes from the user's local vault bridge.
+// It never returns note content and never accepts provider credentials.
+router.post("/memory/sync", async (req, res) => {
+  if (!hasValidMemorySyncSecret(req)) return res.status(401).json({ success: false, error: "Unauthorized vault bridge" });
+  try {
+    const result = await jarvisMemoryService.syncCloudNotes(req.body?.notes);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ success: false, error: error.statusCode ? error.message : "Vault sync failed" });
   }
 });
 

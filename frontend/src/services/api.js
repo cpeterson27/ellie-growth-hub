@@ -18,6 +18,8 @@ export const fetchCampaigns = (eventId) =>
     })
     .then((res) => res.data);
 
+export const fetchCampaign = (campaignId) => api.get(`/campaigns/${campaignId}`).then((res) => res.data);
+
 
 
 export const fetchMarketingCampaign = async (campaignId) => {
@@ -153,6 +155,14 @@ export const archiveContact = (contactId) => api.post(`/contacts/${contactId}/ar
 export const deleteContact = (contactId, confirmCascade = false) => api.delete(`/contacts/${contactId}`, { data: { confirmCascade } }).then((res) => res.data);
 export const updateContact = (contactId, data) => api.patch(`/contacts/${contactId}`, data).then((res) => res.data);
 
+export const fetchPartners = () => api.get("/partners").then((res) => res.data);
+export const createPartner = (data) => api.post("/partners", data).then((res) => res.data);
+export const updatePartner = (partnerId, data) => api.patch(`/partners/${partnerId}`, data).then((res) => res.data);
+
+export const fetchContentBriefs = (type) => api.get("/content", { params: type ? { type } : {} }).then((res) => res.data);
+export const createContentBrief = (data) => api.post("/content", data).then((res) => res.data);
+export const updateContentBrief = (id, data) => api.patch(`/content/${id}`, data).then((res) => res.data);
+
 
 
 export const generateOutreach = (campaignId) =>
@@ -200,6 +210,21 @@ export const jarvisChat = (message) =>
 export const jarvisSummary = () =>
   api
     .get("/jarvis/summary")
+    .then((res) => res.data);
+
+export const jarvisStatus = () =>
+  api
+    .get("/jarvis/status")
+    .then((res) => res.data);
+
+export const fetchJarvisProfile = () =>
+  api
+    .get("/jarvis/profile")
+    .then((res) => res.data);
+
+export const updateJarvisProfile = (profile) =>
+  api
+    .put("/jarvis/profile", profile)
     .then((res) => res.data);
 
 

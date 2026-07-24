@@ -3,6 +3,8 @@ const Campaign = require("../models/Campaign");
 const Event = require("../models/Event");
 const Outreach = require("../models/Outreach");
 const { generateOutreachSuggestions } = require("../utils/outreachGenerator");
+const { getCampaignTemplate } = require("../services/campaignTemplates");
+const ContentBrief = require("../models/ContentBrief");
 
 const router = express.Router();
 
@@ -111,6 +113,10 @@ router.post("/from-event/:eventId", async (req, res) => {
 
 
 
+    const content = getCampaignTemplate("event_investor", {
+      campaignName: event.name,
+    });
+
     const campaign =
       await Campaign.create({
 
@@ -129,6 +135,8 @@ router.post("/from-event/:eventId", async (req, res) => {
 
         audience:
           event.audience,
+
+        content,
 
         status:
           "active",
@@ -207,15 +215,17 @@ router.post("/", async (req, res) => {
       audience,
       description,
       channels,
+      campaignKind = "event",
+      programName = "",
+      templateKey = "event_invite",
+      contentBriefId = null,
     } = req.body;
 
 
 
     if (
       !name ||
-      !startDate ||
-      !ticketPrice ||
-      !ticketGoal ||
+      (campaignKind !== "program" && (!startDate || !ticketPrice || !ticketGoal)) ||
       !audience ||
       audience.length === 0
     ) {
@@ -231,8 +241,7 @@ router.post("/", async (req, res) => {
 
 
 
-    const event =
-      await Event.create({
+    const event = campaignKind === "program" ? null : await Event.create({
 
         name,
 
@@ -260,29 +269,43 @@ router.post("/", async (req, res) => {
 
 
 
+    const savedTemplate = contentBriefId
+      ? await ContentBrief.findOne({ _id: contentBriefId, type: "email_template", status: { $ne: "archived" } })
+      : null;
+    const content = savedTemplate ? {
+      subject: savedTemplate.subject || savedTemplate.title,
+      body: savedTemplate.body,
+      callToAction: savedTemplate.callToAction || "Learn more",
+      callToActionUrl: "",
+    } : getCampaignTemplate(templateKey, { campaignName: name, programName });
+
     const campaign =
       await Campaign.create({
 
-        eventId:
-          event._id,
+        eventId: event?._id || null,
+        campaignKind,
+        programName,
+        templateKey: savedTemplate ? `content:${savedTemplate._id}` : templateKey,
 
         name:
-          event.name,
+          event?.name || name,
 
         startDate:
-          event.startDate,
+          event?.startDate || (startDate ? new Date(startDate) : null),
 
         ticketPrice:
-          event.ticketPrice,
+          event?.ticketPrice || Number(ticketPrice || 0),
 
         ticketGoal:
-          event.ticketGoal,
+          event?.ticketGoal || Number(ticketGoal || 0),
 
         ticketsSold:
           0,
 
         audience:
-          event.audience,
+          event?.audience || audience,
+
+        content,
 
         status:
           "active",

@@ -13,6 +13,9 @@ const Event = require("../models/Event");
 const contactService = require("./contactService");
 const bootcampMarketingWorkflow = require("./bootcampMarketingWorkflow");
 const marketingCampaignExecution = require("./marketingCampaignExecution");
+const llmService = require("./llmService");
+const jarvisMemoryService = require("./jarvisMemoryService");
+const jarvisProfileService = require("./jarvisProfileService");
 
 class JarvisService {
   /**
@@ -25,6 +28,10 @@ class JarvisService {
       throw new Error("Message is required");
     }
 
+    const activity = [{ label: "Checking Ellie workspace data", status: "complete" }];
+    const profile = await jarvisProfileService.getProfile();
+    const memory = await jarvisMemoryService.retrieveRelevantNotes(message);
+    if (memory.available) activity.push({ label: memory.sources.length ? `Consulted ${memory.sources.length} relevant vault note${memory.sources.length === 1 ? "" : "s"}` : "No matching vault notes found", status: "complete", sources: memory.sources });
     const lowerMessage = message.toLowerCase();
     let result = null;
 
@@ -65,7 +72,32 @@ class JarvisService {
       result = await this.handleGeneralQuery(message);
     }
 
-    return result;
+    if (llmService.isEnabled()) {
+      try {
+        activity.push({ label: "Drafting a response with OpenAI", status: "complete" });
+        const answer = await llmService.chat({
+          message,
+          context: [result.answer, memory.context].filter(Boolean).join("\n\n"),
+          profile,
+        });
+        result = { ...result, answer, aiAssisted: true };
+      } catch (error) {
+        console.warn("[Jarvis] OpenAI response unavailable; using verified workspace summary", { code: error.code || "OPENAI_REQUEST_FAILED" });
+      }
+    }
+
+    try {
+      const memory = await jarvisMemoryService.recordConversation({
+        userMessage: message,
+        assistantMessage: result.answer,
+      });
+      result.memory = memory;
+    } catch (error) {
+      console.warn("[Jarvis] Obsidian memory write skipped", { code: "MEMORY_WRITE_FAILED" });
+      result.memory = { recorded: false, reason: "memory_write_failed" };
+    }
+
+    return { ...result, activity, memorySources: memory.sources };
   }
 
   /**

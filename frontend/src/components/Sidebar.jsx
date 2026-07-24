@@ -15,16 +15,17 @@ import "./Sidebar.css";
 const navItems = [
   { label: "Dashboard", path: "/dashboard", icon: <FiActivity /> },
   { label: "Events", path: "/events", icon: <FiFolder /> },
-  { label: "Marketing", path: "/marketing", icon: <FiTrendingUp /> },
   { label: "Campaigns", path: "/campaigns", icon: <FiZap /> },
-  { label: "Outreach", path: "/outreach", icon: <FiMail /> },
+  { label: "Discovery", path: "/discovery", icon: <FiTrendingUp /> },
   { label: "Contacts", path: "/contacts", icon: <FiUsers /> },
+  { label: "Outreach", path: "/outreach", icon: <FiMail /> },
+  { label: "Marketing", path: "/marketing", icon: <FiTrendingUp /> },
   { label: "Partners", path: "/partners", icon: <FiUsers /> },
   { label: "AI Content", path: "/content", icon: <FiZap /> },
   { label: "Jarvis", path: "/jarvis", icon: <FiCpu /> },
   { label: "Analytics", path: "/analytics", icon: <FiBarChart2 /> },
-  { label: "Settings", path: "/settings", icon: <FiSettings /> },
   { label: "Integrations", path: "/integrations", icon: <FiSettings /> },
+  { label: "Settings", path: "/settings", icon: <FiSettings /> },
 ];
 
 export default function Sidebar({ isOpen, onClose }) {

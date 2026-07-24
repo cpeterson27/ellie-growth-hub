@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import "./Contacts.css";
 
@@ -23,7 +24,7 @@ const columns = [
   { header: "Name", accessor: "name" },
   { header: "Company", accessor: "company" },
   { header: "Title", accessor: "title" },
-  { header: "Email", accessor: "email" }, { header: "Phone", accessor: "phone" }, { header: "Campaign", render: (row) => row.campaignIds?.length ? "Associated" : "—" },
+  { header: "Email", accessor: "email" }, { header: "Phone", accessor: "phone" },
   { header: "Monday Sync", accessor: "mondaySyncStatus" },
   { header: "Status", accessor: "status" },
 ];
@@ -40,6 +41,7 @@ const importCopy = {
 };
 
 export default function Contacts() {
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
@@ -193,7 +195,11 @@ export default function Contacts() {
         </div>
         <div className="crm-header-actions">
           <Button onClick={() => { setError(""); setContactFormOpen(true); }}>+ New Contact</Button>
-          <div className="crm-menu-wrap"><Button variant="outline" onClick={() => setImportMenuOpen(!importMenuOpen)}>Import ▾</Button>{importMenuOpen ? <div className="crm-menu"><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Apollo CSV</button><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>CSV</button><button onClick={() => openImportConfirmation("monday")}>Monday CRM</button><button onClick={() => setError("Organization discovery is available from the audience workflow.")}>Organization Discovery</button></div> : null}</div>
+          <div className="crm-menu-wrap">
+            <Button variant="outline" onClick={() => setImportMenuOpen((open) => !open)}>Import ▾</Button>
+            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Apollo CSV</button><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Standard CSV</button><button onClick={() => { openImportConfirmation("monday"); setImportMenuOpen(false); }}>Monday CRM</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
+          </div>
+          <Button variant="outline" onClick={() => navigate("/discovery")}>Discover New Prospects</Button>
         </div>
       </div>
 
@@ -211,8 +217,8 @@ export default function Contacts() {
         />
       </DashboardCard>
 
-      <DashboardCard title="Add Contacts from Apollo">
-        <div className="apollo-locked"><p>Apollo prospect search requires a paid Apollo plan. Export your contacts from Apollo and import the CSV here.</p><Button onClick={() => setUploadOpen(true)}>Import Apollo CSV</Button><Button variant="outline" onClick={() => setError("Organization discovery is available from the audience workflow.")}>Open Organization Discovery</Button><small>Direct Apollo people search can be enabled later when the account has API access.</small></div>
+      {false ? <DashboardCard title="Find Leads">
+        <div className="apollo-locked"><p>🔒 Apollo prospect search requires a paid Apollo plan. Export your contacts from Apollo and import the CSV here.</p><p><small>Apollo connection: configured · Plan: Free · People search: unavailable · Credits: no people-search API access.</small></p><Button onClick={() => setUploadOpen(true)}>Import Apollo CSV</Button><Button variant="outline" onClick={() => navigate("/marketing")}>Open Organization Discovery</Button><small>Direct Apollo people search can be enabled later when the account has API access.</small></div>
         <div style={{ display: "none" }}>
           <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)} className="select-input">
             <option value="">Select campaign</option>
@@ -234,7 +240,7 @@ export default function Contacts() {
           }}>Import to Ellie AI{campaignId ? " and Add to Selected Campaign" : ""}</Button>
         </> : <p>Search Apollo to review leads before importing.</p>}
         {importSummary ? <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated; Monday: {importSummary.mondayCreated} created, {importSummary.mondayUpdated} updated, {importSummary.mondayFailed} failed.</p> : null}
-      </DashboardCard>
+      </DashboardCard> : null}
 
       <Modal
         isOpen={isConfirmOpen}
@@ -264,12 +270,12 @@ export default function Contacts() {
         title="New Contact"
         footer={<><Button variant="outline" disabled={savingContact} onClick={() => setContactFormOpen(false)}>Cancel</Button><Button loading={savingContact} onClick={saveManualContact}>Save Contact</Button></>}
       >
-        <p>Only a name is required. Saving also updates Monday CRM when it is configured.</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
-          {[["name", "Name *"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"]].map(([key, label]) => <input key={key} className="select-input" placeholder={label} value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} />)}
-          <select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select>
+        <p className="contact-modal-intro">Only a usable name is required. Saving updates MongoDB first and then synchronizes Monday CRM when it is configured.</p>
+        <div className="contact-form-grid">
+          {[["name", "Name *"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /></label>)}
+          <label className="form-field"><span>Campaign</span><select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
         </div>
-        <textarea className="select-input" style={{ width: "100%", marginTop: "0.75rem", minHeight: "90px" }} placeholder="Notes" value={manualContact.notes} onChange={(event) => setManualContact({ ...manualContact, notes: event.target.value })} />
+        <label className="form-field contact-notes"><span>Notes</span><textarea className="select-input" value={manualContact.notes} onChange={(event) => setManualContact({ ...manualContact, notes: event.target.value })} /></label>
       </Modal>
 
       <Modal
@@ -290,7 +296,7 @@ export default function Contacts() {
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; Monday sync: {deleteTarget.mondaySyncStatus || "pending"}; Monday item: {deleteTarget.mondayItemId ? "linked" : "not linked"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
       <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments", "lists"]], ["Marketing", ["stage", "keywords", "lastContacted", "notes"]], ["Monday", ["mondaySyncStatus", "mondayItemId", "mondaySyncedAt"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
-      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Edit Contact" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { await updateContact(editingContact._id, editingContact); setEditingContact(null); await loadContacts(); }}>Save and Sync</Button></>}>{editingContact ? <div style={{ display: "grid", gap: "0.5rem" }}>{["name", "email", "phone", "company", "title", "industry", "city", "state", "notes"].map((field) => <input key={field} className="select-input" placeholder={field} value={editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} />)}</div> : null}</Modal>
+      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Edit Contact" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { await updateContact(editingContact._id, editingContact); setEditingContact(null); await loadContacts(); }}>Save and Sync</Button></>}>{editingContact ? <div className="contact-form-grid">{["name", "email", "phone", "company", "title", "industry", "city", "state", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}</div> : null}</Modal>
     </div>
   );
 }

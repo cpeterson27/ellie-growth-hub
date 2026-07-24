@@ -4,8 +4,8 @@
   justify-content: center;
   gap: 0.75rem;
   border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 0.9rem 1.25rem;
+  border-radius: 9px;
+  padding: 0.78rem 1.05rem;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -23,22 +23,22 @@
 }
 
 .btn--primary {
-  background: var(--accent);
+  background: #1f5c50;
   color: #fff;
-  box-shadow: 0 12px 30px rgba(91, 75, 255, 0.18);
+  box-shadow: 0 8px 18px rgba(31, 92, 80, 0.18);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: #4535d7;
+  background: #17483e;
 }
 
 .btn--secondary {
-  background: #eef1ff;
-  color: #2d3178;
+  background: #e7efe9;
+  color: #17483e;
 }
 
 .btn--secondary:hover:not(:disabled) {
-  background: #e0e4ff;
+  background: #d7e5dc;
 }
 
 .btn--danger {
@@ -58,7 +58,7 @@
 }
 
 .btn--outline:hover:not(:disabled) {
-  background: #f6f7fb;
+  background: #f2f3ed;
 }
 
 .btn--ghost {

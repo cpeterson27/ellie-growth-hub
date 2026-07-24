@@ -85,7 +85,7 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null, 
       if (!contact.sources.includes(source)) contact.sources.push(source);
       summary.mongoUpdated += 1;
     }
-    else { contact = new Contact({ ...data, sources: [source], tags: [source], type: "lead", status: "active", importedAt: new Date() }); summary.mongoCreated += 1; }
+    else { contact = new Contact({ ...data, sources: [source], tags: [source], type: "lead", status: source === "manual" ? "active" : "prospect", importedAt: new Date() }); summary.mongoCreated += 1; }
     if (campaign && !contact.campaignIds.some((id) => String(id) === String(campaign._id))) { contact.campaignIds.push(campaign._id); summary.campaignAssociated += 1; }
     await contact.save();
     if (!syncMonday || source === "monday") { summary.mondaySkipped += 1; continue; }

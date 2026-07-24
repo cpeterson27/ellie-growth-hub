@@ -15,6 +15,7 @@ import Analytics from "./pages/Analytics.jsx";
 import Settings from "./pages/Settings.jsx";
 import Jarvis from "./pages/Jarvis.jsx";
 import Integrations from "./pages/Integrations.jsx";
+import Discovery from "./pages/Discovery.jsx";
 
 
 function App() {
@@ -76,6 +77,7 @@ function App() {
             path="/contacts"
             element={<Contacts />}
           />
+          <Route path="/discovery" element={<Discovery />} />
 
 
           <Route
