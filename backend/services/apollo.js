@@ -45,6 +45,40 @@ function formatError(error) {
     errorCode: code,
     status: status ?? null,
     results: [],
+    message: error.response?.data?.message || error.response?.data?.error || null,
+  };
+}
+
+function nonBlankStrings(values) {
+  return Array.isArray(values)
+    ? values.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+}
+
+function buildContactSearchBody({ titles = [], keywords = [], domains = [], locations = [], page = 1, perPage = 25 } = {}) {
+  const body = { page: Math.max(1, Number(page) || 1), per_page: Math.min(100, Math.max(1, Number(perPage) || 25)) };
+  const cleanedTitles = nonBlankStrings(titles);
+  const cleanedKeywords = nonBlankStrings(keywords);
+  const cleanedDomains = nonBlankStrings(domains);
+  const cleanedLocations = nonBlankStrings(locations);
+  if (cleanedTitles.length) body.q_person_titles = cleanedTitles;
+  if (cleanedKeywords.length) body.q_keywords = cleanedKeywords.join(" ");
+  if (cleanedDomains.length) body.q_organization_domains = cleanedDomains;
+  if (cleanedLocations.length) body.person_locations = cleanedLocations;
+  return body;
+}
+
+function contactSearchDiagnostic({ status, data }) {
+  const payload = data && typeof data === "object" ? data : {};
+  const firstError = Array.isArray(payload.errors) ? payload.errors[0] : payload.error;
+  return {
+    endpoint: "/v1/contacts/search",
+    status,
+    topLevelKeys: Object.keys(payload),
+    resultCount: Array.isArray(payload.contacts) ? payload.contacts.length : 0,
+    apolloCode: payload.code || payload.error_code || firstError?.code || null,
+    apolloMessage: payload.message || (typeof payload.error === "string" ? payload.error : firstError?.message) || null,
+    pagination: payload.pagination ? { page: payload.pagination.page, perPage: payload.pagination.per_page, totalEntries: payload.pagination.total_entries, totalPages: payload.pagination.total_pages } : null,
   };
 }
 
@@ -320,6 +354,8 @@ module.exports = {
   enrichOrganization,
   getOrganizationTopPeople,
   searchContacts,
+  buildContactSearchBody,
+  contactSearchDiagnostic,
 };
 
 // ---------------------------------------------------------------------------
@@ -370,19 +406,30 @@ async function searchContacts({
   try {
     const key = getApiKey();
 
-    const body = { page, per_page: perPage };
-
-    if (titles.length > 0) body.q_person_titles = titles;
-    if (keywords.length > 0) body.q_keywords = keywords.join(" ");
-    if (domains.length > 0) body.q_organization_domains = domains;
-    if (locations.length > 0) body.person_locations = locations;
+    const body = buildContactSearchBody({ titles, keywords, domains, locations, page, perPage });
 
     const response = await apolloClient().post("/contacts/search", body, {
       headers: { "x-api-key": key },
     });
 
+    const diagnostic = contactSearchDiagnostic({ status: response.status, data: response.data });
+    console.info("[Apollo] search diagnostic", diagnostic);
     const raw = response.data?.contacts ?? [];
     const total = response.data?.pagination?.total_entries ?? raw.length;
+
+    // /contacts/search queries contacts already saved in Apollo, not the
+    // prospect-database people-search product. Do not call an empty workspace
+    // contact response a successful lead discovery.
+    if (raw.length === 0 && total === 0) {
+      return {
+        success: false,
+        error: "people_search_unavailable",
+        errorCode: "people_search_unavailable",
+        status: response.status,
+        contacts: [],
+        message: "Apollo people search is unavailable on the connected plan or is not configured. Use organization discovery or CSV import.",
+      };
+    }
 
     const contacts = raw.map((person) => ({
       apolloPersonId: person.id ?? null,
@@ -401,7 +448,7 @@ async function searchContacts({
 
     return { success: true, total, page, contacts };
   } catch (error) {
-    console.error("[Apollo] searchContacts failed");
+    console.info("[Apollo] search diagnostic", contactSearchDiagnostic({ status: error.response?.status || null, data: error.response?.data }));
     return { ...formatError(error), contacts: [] };
   }
 }

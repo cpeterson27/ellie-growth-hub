@@ -316,11 +316,13 @@ router.post("/apollo/search", async (req, res) => {
         ? result.status
         : result.errorCode === "timeout" ? 504
           : result.errorCode === "unsupported_endpoint" ? 501
+            : result.errorCode === "people_search_unavailable" ? 422
             : 502;
       const messages = {
         unauthorized: "Apollo rejected the configured API key.",
         forbidden: "The configured Apollo account is not permitted to use this search endpoint.",
         unsupported_endpoint: "The configured Apollo account does not support this search endpoint.",
+        people_search_unavailable: "Apollo people search is unavailable on the connected plan or is not configured. Use organization discovery or CSV import.",
         timeout: "Apollo search timed out. Please try again.",
         provider_error: "Apollo search failed. Please try again.",
       };
