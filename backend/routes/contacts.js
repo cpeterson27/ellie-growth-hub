@@ -11,6 +11,7 @@ const integrationHub = require("../services/integrationHub");
 const { importApolloLeads } = require("../services/apolloLeadService");
 const { ingestContacts, canonicalFieldMap, retryMondaySync } = require("../services/contactIngestionService");
 const Contact = require("../models/Contact");
+const Outreach = require("../models/Outreach");
 
 const router = express.Router();
 
@@ -88,7 +89,7 @@ router.get("/", async (req, res) => {
       skip = 0,
     } = req.query;
 
-    const query = {};
+    const query = status ? { status } : { status: { $ne: "archived" } };
     if (email) query.email = email;
     if (externalId) query.externalId = externalId;
     if (source) query.source = source;
@@ -156,6 +157,17 @@ router.patch("/:id", async (req, res) => {
  * DELETE /api/contacts/:id
  * Delete contact
  */
+router.post("/:id/archive", async (req, res) => {
+  try {
+    const contact = await Contact.findById(req.params.id);
+    if (!contact) return res.status(404).json({ success: false, message: "Contact not found" });
+    contact.status = "archived";
+    await contact.save();
+    try { await retryMondaySync(contact._id); } catch (_) { /* archive remains local if Monday is unavailable */ }
+    return res.json({ success: true, data: contact, message: "Contact archived" });
+  } catch (err) { return res.status(400).json({ success: false, message: "Unable to archive contact" }); }
+});
+
 router.delete("/:id", async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -164,6 +176,13 @@ router.delete("/:id", async (req, res) => {
         .json({ success: false, message: "Invalid contact ID" });
     }
 
+    const outreachCount = await Outreach.countDocuments({ contactId: req.params.id });
+    if (outreachCount && !req.body?.confirmCascade) return res.status(409).json({ success: false, message: `Cannot permanently delete: ${outreachCount} outreach record(s) depend on this contact.`, outreachCount });
+    const contact = await Contact.findById(req.params.id);
+    if (contact?.mondayItemId) {
+      const credentials = await mondaySyncService.getMondayCredentials();
+      if (credentials?.apiKey) await integrationHub.execute("monday", "archiveContact", credentials, contact.toObject());
+    }
     await contactService.deleteContact(req.params.id);
     res.json({ success: true, message: "Contact deleted" });
   } catch (err) {

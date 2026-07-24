@@ -192,6 +192,7 @@ const contactSchema = new mongoose.Schema(
         "inactive",
         "unsubscribed",
         "invalid",
+        "archived",
       ],
       default: "active",
       index: true,

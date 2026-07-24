@@ -21,6 +21,11 @@ const canonicalFieldMap = Object.fromEntries([
   ["Tertiary Email", "tertiaryEmail"], ["Email Open", "emailOpen"],
   ["Email Bounced", "emailBounced"], ["Replied", "replied"], ["Demoed", "demoed"],
   ["Number of Retail Locations", "retailLocations"],
+  ["Primary Email Source", "primaryEmailSource"], ["Primary Email Verification Source", "primaryEmailVerificationSource"], ["Email Confidence", "emailConfidence"],
+  ["Contact Owner", "contactOwner"], ["Other Phone", "otherPhone"], ["Account Owner", "accountOwner"],
+  ["Company LinkedIn URL", "companyLinkedinUrl"], ["Facebook URL", "facebookUrl"], ["Twitter URL", "twitterUrl"],
+  ["Company Address", "companyAddress"], ["Company City", "companyCity"], ["Company State", "companyState"], ["Company Country", "companyCountry"], ["Company Phone", "companyPhone"],
+  ["Latest Funding", "latestFunding"], ["Apollo Account ID", "apolloAccountId"], ["Secondary Email Status", "secondaryEmailStatus"], ["Tertiary Email Status", "tertiaryEmailStatus"], ["Qualify Contact", "qualifyContact"],
 ]);
 
 const arrayFields = new Set(["departments", "subDepartments", "lists", "keywords", "technologies", "sicCodes", "naicsCodes"]);
@@ -36,9 +41,10 @@ function normalizeIncoming(row, source = "manual") {
   const mapped = {};
   const apolloFields = {};
   for (const [key, value] of Object.entries(row || {})) {
-    const field = canonicalFieldMap[key] || key;
+    const cleanKey = String(key).replace(/^\uFEFF/, "").trim();
+    const field = canonicalFieldMap[cleanKey] || cleanKey;
     mapped[field] = value;
-    if (canonicalFieldMap[key]) apolloFields[field] = value;
+    apolloFields[field] = value;
   }
   for (const field of arrayFields) if (mapped[field] !== undefined) mapped[field] = split(mapped[field]);
   for (const field of booleanFields) if (mapped[field] !== undefined) mapped[field] = truthy(mapped[field]);

@@ -39,7 +39,7 @@ class MondayAdapter extends BaseIntegration {
   }
 
   getCapabilities() {
-    return ["createContact", "updateContact", "findExistingContact", "syncContacts"];
+    return ["createContact", "updateContact", "archiveContact", "findExistingContact", "syncContacts"];
   }
 
   getBoardId(credentials) {
@@ -58,7 +58,7 @@ class MondayAdapter extends BaseIntegration {
       if (field === "campaign") return contact.campaignName || "";
       if (field === "status") {
         if (contact.stage) return contact.stage;
-        return contact.status === "inactive" ? "Unqualified" : "New Lead";
+        return ["inactive", "archived"].includes(contact.status) ? "Unqualified" : "New Lead";
       }
       if (field === "apolloContactId") return contact.providerContactId || contact.apolloFields?.apolloContactId || "";
       if (field === "apolloRecordId") return contact.providerRecordId || contact.apolloFields?.apolloRecordId || "";
@@ -143,6 +143,12 @@ class MondayAdapter extends BaseIntegration {
     const mutation = `mutation { change_multiple_column_values(board_id: ${boardId}, item_id: ${contact.mondayItemId}, column_values: ${JSON.stringify(JSON.stringify(values))}) { id } }`;
     const data = await this.request(credentials, mutation);
     return { ...data.change_multiple_column_values, missingMappings };
+  }
+
+  async archiveContact(credentials, contact) {
+    if (!credentials?.apiKey || !contact.mondayItemId) return null;
+    const data = await this.request(credentials, `mutation { archive_item(item_id: ${contact.mondayItemId}) { id } }`);
+    return data.archive_item;
   }
 
   async findExistingContact(credentials, contact) {
