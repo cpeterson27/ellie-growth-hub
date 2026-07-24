@@ -216,6 +216,7 @@ export default function Contacts() {
       </DashboardCard>
 
       <DashboardCard title="Find Leads">
+        <p>Apollo prospect search requires a paid Apollo plan. You can still import an Apollo CSV or use organization discovery.</p>
         <div style={{ display: "grid", gap: "0.75rem" }}>
           <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)} className="select-input">
             <option value="">Select campaign</option>
