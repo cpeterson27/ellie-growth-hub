@@ -1,6 +1,6 @@
 import './Table.css'
 
-export default function Table({ columns, data, loading, emptyMessage = 'No results found.' }) {
+export default function Table({ columns, data, loading, emptyMessage = 'No results found.', onRowClick }) {
   if (loading) {
     return <div className="table-state">Loading data…</div>
   }
@@ -21,7 +21,7 @@ export default function Table({ columns, data, loading, emptyMessage = 'No resul
         </thead>
         <tbody>
           {data.map((row, rowIndex) => (
-            <tr key={rowIndex}>
+          <tr key={rowIndex} onClick={() => onRowClick?.(row)} style={onRowClick ? { cursor: 'pointer' } : undefined}>
               {columns.map((column) => (
                 <td key={column.header} data-label={column.header}>
                   {column.render ? column.render(row) : row[column.accessor]}
