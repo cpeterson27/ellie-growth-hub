@@ -31,13 +31,21 @@ function apolloClient() {
  */
 function formatError(error) {
   const status = error.response?.status;
-  const detail =
-    error.response?.data?.message ||
-    error.response?.data?.error ||
-    error.message ||
-    "Unknown Apollo error";
+  const timeout = error.code === "ECONNABORTED" || error.code === "ETIMEDOUT";
+  const code = timeout
+    ? "timeout"
+    : status === 401 ? "unauthorized"
+      : status === 403 ? "forbidden"
+        : status === 404 || status === 405 ? "unsupported_endpoint"
+          : "provider_error";
 
-  return { success: false, error: detail, status: status ?? null, results: [] };
+  return {
+    success: false,
+    error: code,
+    errorCode: code,
+    status: status ?? null,
+    results: [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +314,7 @@ async function getOrganizationTopPeople({ organizationId, limit = 10 } = {}) {
 }
 
 module.exports = {
+  formatError,
   verifyAuth,
   searchOrganizations,
   enrichOrganization,

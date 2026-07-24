@@ -9,6 +9,7 @@ const contactService = require("../services/contactService");
 const mondaySyncService = require("../services/mondaySyncService");
 const integrationHub = require("../services/integrationHub");
 const { importApolloLeads } = require("../services/apolloLeadService");
+const { ingestContacts, canonicalFieldMap, retryMondaySync } = require("../services/contactIngestionService");
 const Contact = require("../models/Contact");
 
 const router = express.Router();
@@ -298,9 +299,9 @@ router.post("/import/monday", async (req, res) => {
  */
 router.post("/apollo/search", async (req, res) => {
   try {
-    const { campaignId, titles = [], locations = [], keywords = [], page = 1, perPage = 25 } = req.body;
-    if (!campaignId || !mongoose.Types.ObjectId.isValid(campaignId)) {
-      return res.status(400).json({ success: false, message: "A valid campaignId is required" });
+    const { titles = [], locations = [], keywords = [], page = 1, perPage = 25 } = req.body;
+    if (!Array.isArray(titles) || !Array.isArray(locations) || !Array.isArray(keywords)) {
+      return res.status(400).json({ success: false, code: "invalid_request", message: "Apollo search filters must be arrays" });
     }
     const result = await integrationHub.execute("apollo", "searchLeads", {
       titles: Array.isArray(titles) ? titles.slice(0, 10) : [],
@@ -311,15 +312,45 @@ router.post("/apollo/search", async (req, res) => {
     });
 
     if (!result.success) {
-      return res.status(502).json({
+      const status = result.status === 401 || result.status === 403
+        ? result.status
+        : result.errorCode === "timeout" ? 504
+          : result.errorCode === "unsupported_endpoint" ? 501
+            : 502;
+      const messages = {
+        unauthorized: "Apollo rejected the configured API key.",
+        forbidden: "The configured Apollo account is not permitted to use this search endpoint.",
+        unsupported_endpoint: "The configured Apollo account does not support this search endpoint.",
+        timeout: "Apollo search timed out. Please try again.",
+        provider_error: "Apollo search failed. Please try again.",
+      };
+      console.warn("[Apollo search]", {
+        provider: "apollo",
+        status: result.status || status,
+        code: result.errorCode || "provider_error",
+        route: "/api/contacts/apollo/search",
+      });
+      return res.status(status).json({
         success: false,
-        message: "Apollo search failed",
+        code: result.errorCode || "provider_error",
+        message: messages[result.errorCode] || messages.provider_error,
       });
     }
-    return res.json({ success: true, data: { results: result.contacts, total: result.total, page: result.page } });
+    return res.json({
+      success: true,
+      data: { results: result.contacts, total: result.total, page: result.page },
+      message: result.contacts.length ? "Apollo leads found" : "No Apollo leads matched these filters.",
+    });
   } catch (err) {
+    console.error("[Apollo search]", {
+      provider: "apollo",
+      status: 500,
+      code: "backend_error",
+      route: "/api/contacts/apollo/search",
+    });
     return res.status(500).json({
       success: false,
+      code: "backend_error",
       message: "Unable to search Apollo leads",
     });
   }
@@ -333,5 +364,22 @@ router.post("/import/apollo", async (req, res) => {
     return res.status(400).json({ success: false, message: err.message || "Unable to import Apollo leads" });
   }
 });
+
+router.post("/ingest", async (req, res) => {
+  try { return res.json({ success: true, data: await ingestContacts(req.body) }); }
+  catch (err) { return res.status(400).json({ success: false, message: err.message || "Unable to import contacts" }); }
+});
+
+router.post("/:id/retry-monday", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ success: false, message: "Invalid contact ID" });
+    const result = await retryMondaySync(req.params.id);
+    return res.json({ success: true, data: result, message: "Monday CRM sync completed" });
+  } catch (err) {
+    return res.status(502).json({ success: false, message: "Monday CRM sync failed" });
+  }
+});
+
+router.get("/import/field-map", (req, res) => res.json({ success: true, data: canonicalFieldMap }));
 
 module.exports = router;

@@ -39,7 +39,48 @@ class MondayAdapter extends BaseIntegration {
   }
 
   getCapabilities() {
-    return ["createContact", "updateContact", "syncContacts"];
+    return ["createContact", "updateContact", "findExistingContact", "syncContacts"];
+  }
+
+  getBoardId(credentials) {
+    return credentials.boardId || process.env.MONDAY_CONTACTS_BOARD_ID;
+  }
+
+  buildColumnValues(credentials, contact) {
+    const configured = credentials.columnIds || {};
+    const defaults = { email: "lead_email", company: "lead_company" };
+    const columns = { ...defaults, ...configured };
+    const values = {};
+    const missingMappings = [];
+    const fields = ["firstName", "lastName", "email", "phone", "company", "title", "industry", "employeeCount", "city", "state", "country", "linkedin", "website", "source", "status", "stage", "apolloContactId", "apolloRecordId", "notes", "campaign"];
+    const valueFor = (field) => {
+      if (field === "source") return contact.sourceProvider || contact.sources?.[0] || "";
+      if (field === "campaign") return contact.campaignName || "";
+      if (field === "status") {
+        if (contact.stage) return contact.stage;
+        return contact.status === "inactive" ? "Unqualified" : "New Lead";
+      }
+      if (field === "apolloContactId") return contact.providerContactId || contact.apolloFields?.apolloContactId || "";
+      if (field === "apolloRecordId") return contact.providerRecordId || contact.apolloFields?.apolloRecordId || "";
+      return contact[field] ?? contact.apolloFields?.[field] ?? "";
+    };
+    fields.forEach((field) => {
+      const value = valueFor(field);
+      if (!value) return;
+      const columnId = columns[field];
+      if (!columnId) { missingMappings.push(field); return; }
+      if (field === "email") values[columnId] = { email: value, text: value };
+      else if (["linkedin", "website"].includes(field)) values[columnId] = { url: String(value), text: String(value) };
+      else values[columnId] = String(value);
+    });
+    return { values, missingMappings };
+  }
+
+  async request(credentials, query) {
+    const response = await fetch(this.endpoint, { method: "POST", headers: { "Content-Type": "application/json", Authorization: credentials.apiKey }, body: JSON.stringify({ query }) });
+    const data = await response.json();
+    if (data.errors) throw new Error(data.errors[0].message);
+    return data.data;
   }
 
 
@@ -55,9 +96,7 @@ class MondayAdapter extends BaseIntegration {
 
 
 
-    const boardId =
-      credentials.boardId ||
-      process.env.MONDAY_CONTACTS_BOARD_ID;
+    const boardId = this.getBoardId(credentials);
 
 
 
@@ -67,17 +106,7 @@ class MondayAdapter extends BaseIntegration {
 
 
 
-    const columnValues = {
-
-      lead_email: {
-        email: contact.email,
-        text: contact.email,
-      },
-
-      lead_company:
-        contact.company || "",
-
-    };
+    const { values: columnValues, missingMappings } = this.buildColumnValues(credentials, contact);
 
 
 
@@ -100,43 +129,42 @@ class MondayAdapter extends BaseIntegration {
 
 
 
-    const response =
-      await fetch(
-        this.endpoint,
-        {
-          method:"POST",
-
-          headers:{
-            "Content-Type":"application/json",
-            Authorization:credentials.apiKey,
-          },
-
-          body:JSON.stringify({
-            query:mutation,
-          }),
-        }
-      );
+    const data = await this.request(credentials, mutation);
+    return { ...data.create_item, missingMappings };
 
 
+  }
 
-    const data =
-      await response.json();
+  async updateContact(credentials, contact) {
+    if (!credentials?.apiKey) throw new Error("Monday API key required");
+    const boardId = this.getBoardId(credentials);
+    if (!boardId || !contact.mondayItemId) throw new Error("Monday board ID and item ID required");
+    const { values, missingMappings } = this.buildColumnValues(credentials, contact);
+    const mutation = `mutation { change_multiple_column_values(board_id: ${boardId}, item_id: ${contact.mondayItemId}, column_values: ${JSON.stringify(JSON.stringify(values))}) { id } }`;
+    const data = await this.request(credentials, mutation);
+    return { ...data.change_multiple_column_values, missingMappings };
+  }
 
-
-
-    if(data.errors){
-
-      throw new Error(
-        data.errors[0].message
-      );
-
-    }
-
-
-
-    return data.data.create_item;
-
-
+  async findExistingContact(credentials, contact) {
+    if (!credentials?.apiKey) throw new Error("Monday API key required");
+    const boardId = this.getBoardId(credentials);
+    if (!boardId) throw new Error("Monday board ID required");
+    const configured = { email: "lead_email", company: "lead_company", ...(credentials.columnIds || {}) };
+    const query = `query { boards(ids:[${boardId}]) { items_page(limit:500) { items { id name column_values { id text } } } } }`;
+    const data = await this.request(credentials, query);
+    const items = data.boards?.[0]?.items_page?.items || [];
+    const value = (item, columnId) => item.column_values?.find((column) => column.id === columnId)?.text?.trim() || "";
+    const candidates = items.filter((item) => {
+      const apolloContact = contact.providerContactId || contact.apolloFields?.apolloContactId;
+      const apolloRecord = contact.providerRecordId || contact.apolloFields?.apolloRecordId;
+      if (apolloContact && configured.apolloContactId && value(item, configured.apolloContactId) === String(apolloContact)) return true;
+      if (apolloRecord && configured.apolloRecordId && value(item, configured.apolloRecordId) === String(apolloRecord)) return true;
+      if (contact.email && value(item, configured.email).toLowerCase() === contact.email.toLowerCase()) return true;
+      if (contact.linkedin && configured.linkedin && value(item, configured.linkedin).replace(/\/$/, "").toLowerCase() === contact.linkedin.replace(/\/$/, "").toLowerCase()) return true;
+      if (contact.phone && configured.phone && value(item, configured.phone).replace(/\D/g, "") === String(contact.phone).replace(/\D/g, "")) return true;
+      return Boolean(contact.company && cleanName(item.name).toLowerCase() === cleanName(contact.name).toLowerCase() && value(item, configured.company).toLowerCase() === contact.company.toLowerCase());
+    });
+    return candidates[0] || null;
   }
 
 

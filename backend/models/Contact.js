@@ -44,9 +44,9 @@ const contactSchema = new mongoose.Schema(
 
     email: {
       type: String,
-      required: true,
       lowercase: true,
       trim: true,
+      sparse: true,
     },
 
 
@@ -55,6 +55,14 @@ const contactSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+
+    phone: { type: String, default: "", trim: true },
+    notes: { type: String, default: "" },
+    mondayItemId: { type: String, default: "", index: true },
+    mondaySyncStatus: { type: String, default: "pending" },
+    mondaySyncedAt: { type: Date, default: null },
+    mondaySyncError: { type: String, default: "" },
+    apolloFields: { type: mongoose.Schema.Types.Mixed, default: {} },
 
 
     // -------------------------------------------------------------------------
@@ -211,6 +219,7 @@ contactSchema.index(
   },
   {
     unique: true,
+    sparse: true,
   }
 );
 

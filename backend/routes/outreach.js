@@ -131,8 +131,6 @@ router.post("/generate", async (req,res)=>{
         // campaign association retain the previous behavior.
         $or: [
           { campaignIds: campaign._id },
-          { campaignIds: { $exists: false } },
-          { campaignIds: { $size: 0 } },
         ],
       });
 
