@@ -178,6 +178,7 @@ export default function Contacts() {
     Papa.parse(String(text || ""), { header: true, skipEmptyLines: "greedy", delimiter: String(text || "").includes("\t") ? "\t" : "", transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(), complete: ({ data, meta, errors }) => {
       const rows = data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => {
         const cleaned = String(value ?? "").trim();
+        if (key === "Title" && /^[+()\d\s.-]{7,}$/.test(cleaned) && cleaned.replace(/\D/g, "").length >= 7) return [key, ""];
         if (cleaned.toLowerCase() !== "stage = needs research") return [key, cleaned];
         if (key === "Stage") return [key, "Needs Research"];
         if (key === "Qualify Contact") return [key, "no"];

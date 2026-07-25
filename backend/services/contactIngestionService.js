@@ -41,7 +41,9 @@ function normalizeUrl(value = "") { return String(value).trim().toLowerCase().re
 function truthy(value) { return ["true", "yes", "1"].includes(String(value).trim().toLowerCase()); }
 function split(value) { return Array.isArray(value) ? value : String(value || "").split(/[;,|]/).map((item) => item.trim()).filter(Boolean); }
 function cleanPlaceholder(field, value) {
-  if (String(value || "").trim().toLowerCase() !== "stage = needs research") return value;
+  const text = String(value || "").trim();
+  if (field === "title" && /^[+()\d\s.-]{7,}$/.test(text) && text.replace(/\D/g, "").length >= 7) return "";
+  if (text.toLowerCase() !== "stage = needs research") return value;
   if (field === "stage") return "Needs Research";
   if (field === "qualifyContact") return false;
   if (field === "tags") return ["needs-research"];
@@ -64,6 +66,7 @@ function normalizeIncoming(row, source = "manual") {
   for (const field of dateFields) if (mapped[field]) mapped[field] = new Date(mapped[field]);
   mapped.email = String(mapped.email || "").trim().toLowerCase();
   mapped.linkedin = normalizeUrl(mapped.linkedin || mapped.linkedinUrl);
+  if (!mapped.title && mapped.seniority && !/^[+()\d\s.-]{7,}$/.test(String(mapped.seniority))) mapped.title = mapped.seniority;
   mapped.name = String(mapped.name || `${mapped.firstName || ""} ${mapped.lastName || ""}`).trim();
   mapped.sourceProvider = source === "apollo" ? "apollo" : mapped.sourceProvider || source;
   mapped.providerContactId = String(mapped.apolloContactId || mapped.apolloPersonId || mapped.providerContactId || "").trim() || undefined;

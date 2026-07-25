@@ -47,4 +47,6 @@ assert.strictEqual(placeholders.industry, "");
 assert.strictEqual(placeholders.stage, "Needs Research");
 assert.strictEqual(placeholders.qualifyContact, false);
 assert.deepStrictEqual(placeholders.tags, ["needs-research"]);
+const misplacedTitle = normalizeIncoming({ Name: "Investor", Title: "+1 972-532-7355", Seniority: "Real Estate Investor / Developer" }, "csv");
+assert.strictEqual(misplacedTitle.title, "Real Estate Investor / Developer");
 console.log("Contact ingestion normalization tests passed");
