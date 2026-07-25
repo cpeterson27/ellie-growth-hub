@@ -39,7 +39,18 @@ cd frontend
 npm run build
 ```
 
-## Notes
+## Deployed Jarvis and Obsidian memory
 
-- The backend folder is present but not wired into the frontend yet.
-- The dashboard UI is fully scaffolded with responsive navigation, reusable components, table and chart layouts.
+The deployed frontend and backend run on Render. Jarvis reads a cloud mirror of
+approved Obsidian notes; the browser never reads the local vault directly.
+
+- The client can use deployed Jarvis at any time after the initial sync.
+- Run `npm run sync` from `tools/jarvis-vault-bridge` after important note
+  changes.
+- `npm run watch` is optional and mirrors changes every minute while it remains
+  running.
+- OpenAI cannot start the local bridge by chat or voice command.
+
+See [docs/JARVIS_DEPLOYED_SETUP.md](docs/JARVIS_DEPLOYED_SETUP.md) for deployment
+configuration and [tools/jarvis-vault-bridge/README.md](tools/jarvis-vault-bridge/README.md)
+for the exact sync workflow.

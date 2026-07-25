@@ -56,6 +56,24 @@ minute. No local Ellie backend is involved.
 The bridge mirrors only the explicitly approved operational folders. It does
 not upload `01 Inbox`, `09 Archive`, attachments, or credentials.
 
+## Daily operation
+
+- The client only opens the deployed Ellie frontend and speaks or types to
+  Jarvis. She does not run a sync command.
+- The last synchronized notes remain available from MongoDB while the
+  developer's Mac is off.
+- Run `npm run sync` after making note changes that Jarvis needs to know.
+- Run `npm run watch` only while actively editing notes and wanting changes
+  copied automatically every minute. It does not need to follow the client's
+  session.
+- Stop watch mode with `Control + C`.
+- OpenAI cannot execute the bridge or access the local vault. Jarvis must not
+  claim that a spoken "sync" request updated the vault.
+
+Cloud mode is a one-way knowledge mirror. Client conversations are not written
+back to Obsidian. If continuous unattended synchronization is required, run the
+bridge as a macOS LaunchAgent on the vault owner's Mac.
+
 ## Voice and hotkeys
 
 - In Ellie: press `Command + J` while the page is focused to start a voice turn.
