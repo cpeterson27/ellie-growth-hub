@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { FiMaximize2, FiMinimize2 } from "react-icons/fi";
 import { useJarvis } from "../hooks/useJarvis";
 import { createContentBrief, fetchJarvisProfile, updateJarvisProfile } from "../services/api.js";
 import "./JarvisChat.css";
@@ -29,6 +30,7 @@ const prepareTextForSpeech = (text = "") =>
  * Minimal Jarvis assistant chat interface
  */
 export default function JarvisChat() {
+  const containerRef = useRef(null);
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -56,6 +58,7 @@ export default function JarvisChat() {
   const [profile, setProfile] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     getStatus().then(setStatus);
@@ -135,6 +138,29 @@ export default function JarvisChat() {
     if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (isFullscreen) {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        setIsFullscreen(false);
+      } else {
+        await containerRef.current?.requestFullscreen();
+        setIsFullscreen(true);
+      }
+    } catch {
+      // Keep a full-viewport fallback for browsers that block the native API.
+      setIsFullscreen((current) => !current);
+    }
+  };
 
   const submitPrompt = async (prompt) => {
     if (!prompt.trim() || loading) return;
@@ -361,7 +387,7 @@ export default function JarvisChat() {
   const visualLabel = { idle: "Systems ready", listening: "Listening", thinking: "Analyzing workspace", speaking: "Responding" }[visualState];
 
   return (
-    <div className={`jarvis-chat-container jarvis-chat-container--${profile?.theme || "executive"}`}>
+    <div ref={containerRef} className={`jarvis-chat-container jarvis-chat-container--${profile?.theme || "executive"} ${isFullscreen ? "jarvis-chat-container--fullscreen" : ""}`}>
       <div className={`jarvis-header jarvis-header--${visualState}`}>
         <div className="jarvis-circuit-field" aria-hidden="true">
           <svg viewBox="0 0 1200 360" preserveAspectRatio="none">
@@ -403,6 +429,7 @@ export default function JarvisChat() {
           <span className={status?.openai?.enabled ? "is-ready" : ""}>OpenAI {status?.openai?.enabled ? "ready" : "not enabled"}</span>
           <span className={status?.obsidian?.enabled && status?.obsidian?.writable ? "is-ready" : ""}>Memory {status?.obsidian?.enabled && status?.obsidian?.writable ? "connected" : "not connected"}</span>
           <button type="button" className="jarvis-persona-button" onClick={() => setProfileOpen((value) => !value)}>Personalize</button>
+          <button type="button" className="jarvis-fullscreen-button" onClick={toggleFullscreen}>{isFullscreen ? <FiMinimize2 /> : <FiMaximize2 />}<span>{isFullscreen ? "Exit" : "Full screen"}</span></button>
         </div>
       </div>
 

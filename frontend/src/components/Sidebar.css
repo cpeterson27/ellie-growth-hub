@@ -4,11 +4,14 @@
   width: 280px;
   height: 100vh;
   padding: 1.75rem 1rem;
-  background: #162421;
-  border-right: 0;
+  background:
+    radial-gradient(circle at 12% 4%,rgba(102,84,255,.13),transparent 25%),
+    radial-gradient(circle at 90% 92%,rgba(35,220,179,.08),transparent 28%),
+    #0b1119;
+  border-right: 1px solid rgba(255,255,255,.06);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.65rem;
   z-index: 40;
   transition: transform 0.25s ease;
   overflow-y: auto;
@@ -26,8 +29,9 @@
   border-radius: 15px;
   display: grid;
   place-items: center;
-  background: #c69d43;
-  color: #fff;
+  background: linear-gradient(145deg,#caa84f,#8f6d25);
+  color: #fffdf4;
+  box-shadow: 0 10px 28px rgba(198,157,67,.22), inset 0 1px rgba(255,255,255,.24);
   font-weight: 700;
   font-size: 1.1rem;
 }
@@ -39,7 +43,7 @@
 }
 
 .sidebar__brand small {
-  color: #aeb9b1;
+  color: #8f9b99;
 }
 
 .sidebar__nav {
@@ -52,8 +56,9 @@
   align-items: center;
   gap: 0.85rem;
   padding: 0.78rem .9rem;
-  border-radius: 8px;
-  color: #bac4bd;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #aeb9b8;
   transition:
     background 0.2s ease,
     color 0.2s ease;
@@ -61,12 +66,16 @@
 
 .sidebar__link:hover,
 .sidebar__link--active {
-  background: rgba(255,254,250,.1);
-  color: #fffefa;
+  background: rgba(255,255,255,.065);
+  border-color: rgba(255,255,255,.07);
+  color: #f7fffc;
 }
 
 .sidebar__link--active {
   font-weight: 700;
+  background: linear-gradient(135deg,rgba(112,91,255,.16),rgba(47,220,180,.1));
+  border-color: rgba(126,255,224,.12);
+  box-shadow: inset 3px 0 #65e5c1, 0 10px 28px rgba(0,0,0,.12);
 }
 
 .sidebar__icon {
@@ -79,7 +88,7 @@
 .sidebar__footer {
   margin-top: 1rem;
   padding-top: 1rem;
-  color: #aeb9b1;
+  color: #8f9b99;
   font-size: 0.92rem;
   line-height: 1.55;
 }
