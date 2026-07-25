@@ -83,7 +83,8 @@ export default function JarvisChat() {
   }, [voiceName]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const messagePanel = messagesEndRef.current?.parentElement;
+    messagePanel?.scrollTo({ top: messagePanel.scrollHeight, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -339,13 +340,38 @@ export default function JarvisChat() {
   };
 
   const voiceInputSupported = typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const visualState = listening ? "listening" : speakingId ? "speaking" : loading ? "thinking" : "idle";
+  const visualLabel = { idle: "Systems ready", listening: "Listening", thinking: "Analyzing workspace", speaking: "Responding" }[visualState];
 
   return (
     <div className={`jarvis-chat-container jarvis-chat-container--${profile?.theme || "executive"}`}>
-      <div className="jarvis-header">
-        <div>
-          <p className="jarvis-eyebrow">Ellie AI operator</p>
-          <div className="jarvis-title-row"><span className={`jarvis-orb ${loading || speakingId ? "is-working" : ""} ${speakingId ? "is-speaking" : ""}`} aria-label={speakingId ? "Jarvis is speaking" : loading ? "Jarvis is thinking" : "Jarvis is ready"}><i /><i /><i /></span><div><h1>{profile?.name || "Jarvis"}</h1><p>{profile?.greeting || "Your workspace assistant for lead research, campaign planning, and follow-through."}</p></div></div>
+      <div className={`jarvis-header jarvis-header--${visualState}`}>
+        <div className="jarvis-circuit-field" aria-hidden="true">
+          <svg viewBox="0 0 1200 360" preserveAspectRatio="none">
+            <path d="M0 65h155l42 42h178l40-40h135" />
+            <path d="M0 294h210l45-46h147l48 48h153" />
+            <path d="M1200 54h-170l-45 47H820l-53-53H650" />
+            <path d="M1200 300H990l-35-38H805l-55 55H610" />
+            <path d="M120 0v35l55 55v96l-44 44v130" />
+            <path d="M1080 0v70l-42 42v92l52 52v104" />
+            <path d="M0 177h270l40-40h100" />
+            <path d="M1200 182H940l-40-40H790" />
+          </svg>
+          <i className="jarvis-signal jarvis-signal--one" />
+          <i className="jarvis-signal jarvis-signal--two" />
+          <i className="jarvis-signal jarvis-signal--three" />
+          <i className="jarvis-signal jarvis-signal--four" />
+        </div>
+        <div className="jarvis-visualizer">
+          <div className="jarvis-core" aria-label={`${profile?.name || "Jarvis"} is ${visualLabel.toLowerCase()}`}>
+            <span className="jarvis-core-ring jarvis-core-ring--outer" />
+            <span className="jarvis-core-ring jarvis-core-ring--middle" />
+            <span className="jarvis-core-ring jarvis-core-ring--inner" />
+            <span className="jarvis-core-light" />
+            <span className="jarvis-core-name">{profile?.name || "Jarvis"}</span>
+          </div>
+          <p className="jarvis-visual-state"><span />{visualLabel}</p>
+          <p className="jarvis-visual-greeting">{profile?.greeting || "Your workspace assistant for lead research, campaign planning, and follow-through."}</p>
         </div>
         <div className="jarvis-statuses" aria-label="Jarvis connection status">
           <span className={status?.openai?.enabled ? "is-ready" : ""}>OpenAI {status?.openai?.enabled ? "ready" : "not enabled"}</span>
