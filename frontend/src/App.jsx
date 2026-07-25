@@ -16,6 +16,7 @@ import Settings from "./pages/Settings.jsx";
 import Jarvis from "./pages/Jarvis.jsx";
 import Integrations from "./pages/Integrations.jsx";
 import Discovery from "./pages/Discovery.jsx";
+import DevelopmentRequests from "./pages/DevelopmentRequests.jsx";
 
 
 function App() {
@@ -113,6 +114,8 @@ function App() {
             path="/jarvis"
             element={<Jarvis />}
           />
+
+          <Route path="/development-requests" element={<DevelopmentRequests />} />
 
 
           <Route

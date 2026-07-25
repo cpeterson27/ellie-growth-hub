@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { FiMaximize2, FiMinimize2 } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
 import { useJarvis } from "../hooks/useJarvis";
 import { createContentBrief, fetchJarvisProfile, updateJarvisProfile } from "../services/api.js";
 import "./JarvisChat.css";
@@ -30,6 +31,7 @@ const prepareTextForSpeech = (text = "") =>
  * Minimal Jarvis assistant chat interface
  */
 export default function JarvisChat() {
+  const navigate = useNavigate();
   const containerRef = useRef(null);
   const [messages, setMessages] = useState([
     {
@@ -210,7 +212,9 @@ export default function JarvisChat() {
 
   const handleAction = async (action) => {
     try {
-      if (action === "create_campaign") {
+      if (action === "view_development_requests") {
+        navigate("/development-requests");
+      } else if (action === "create_campaign") {
         // Create a campaign draft and add result to chat
         const result = await recommendCampaign({ templateType: "announcement" });
 
@@ -300,6 +304,7 @@ export default function JarvisChat() {
       create_audience: "➕ Create Audience",
       view_analytics: "📈 View Analytics",
       launch_campaign: "🚀 Launch Campaign",
+      view_development_requests: "Review Development Request",
     };
     return labels[action] || action;
   };

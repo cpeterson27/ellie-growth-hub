@@ -279,6 +279,15 @@ export const jarvisCampaignStatus = (campaignId) =>
     .get(`/jarvis/actions/campaign-status/${campaignId}`)
     .then((res) => res.data);
 
+export const fetchDevelopmentRequests = (secret) =>
+  api.get("/development-requests", { headers: { "x-development-approval-secret": secret } }).then((res) => res.data);
+
+export const approveDevelopmentRequest = (id, secret, note = "") =>
+  api.patch(`/development-requests/${id}/approve`, { note }, { headers: { "x-development-approval-secret": secret } }).then((res) => res.data);
+
+export const rejectDevelopmentRequest = (id, secret, note = "") =>
+  api.patch(`/development-requests/${id}/reject`, { note }, { headers: { "x-development-approval-secret": secret } }).then((res) => res.data);
+
 
 
 

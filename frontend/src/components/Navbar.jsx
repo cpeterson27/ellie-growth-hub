@@ -20,6 +20,7 @@ export default function Navbar({ onMenuClick }) {
     partners: ["Partners", "Grow through aligned operators and affiliates."],
     content: ["AI Content", "Create polished campaign assets with confidence."],
     jarvis: ["Jarvis", "Your voice-first growth intelligence workspace."],
+    "development-requests": ["Development requests", "Approve and hand software changes to Codex safely."],
     analytics: ["Analytics", "See what is working and where to focus next."],
     integrations: ["Integrations", "Connect the systems behind Ellie’s growth engine."],
     settings: ["Settings", "Personalize the workspace and operating rules."],

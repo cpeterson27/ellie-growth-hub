@@ -54,6 +54,23 @@ Without this rule, navigation works inside Ellie but directly opening or hard
 refreshing `/jarvis`, `/discovery`, or another nested route returns Render's
 black `Not Found` page before React can load.
 
+## Development request approval queue
+
+Jarvis can recognize explicit software-change requests and place them in the
+Development Requests queue. Jarvis never edits code or deploys from a normal
+conversation.
+
+1. Generate a long random secret with `openssl rand -hex 32`.
+2. Add it to the backend environment as `DEVELOPMENT_APPROVAL_SECRET`.
+3. Add the same variable to the Render backend service.
+4. Open **Development Requests** in Ellie and enter the secret.
+5. Approve a request, then use **Copy for Codex** to hand the approved brief to
+   a Codex task attached to this repository.
+
+The secret is retained only in browser `sessionStorage`, so closing the browser
+session clears it. Approval creates a structured handoff; it does not
+automatically execute, commit, push, or deploy code.
+
 ## Vault Bridge setup on the Mac
 
 ```bash

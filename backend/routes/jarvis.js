@@ -8,6 +8,7 @@ const jarvisService = require("../services/jarvisService");
 const llmService = require("../services/llmService");
 const jarvisMemoryService = require("../services/jarvisMemoryService");
 const jarvisProfileService = require("../services/jarvisProfileService");
+const developmentRequestService = require("../services/developmentRequestService");
 
 const router = express.Router();
 
@@ -25,6 +26,23 @@ router.post("/chat", async (req, res) => {
       return res.status(400).json({
         success: false,
         error: "Message is required and must be a string",
+      });
+    }
+
+    if (developmentRequestService.isDevelopmentRequest(message)) {
+      const request = await developmentRequestService.createFromJarvis(message);
+      return res.json({
+        success: true,
+        data: {
+          answer: `I drafted development request "${request.title}" for developer review. I cannot change code or deploy it myself. The request must be approved in Development Requests before it can be handed to Codex.`,
+          data: { developmentRequestId: request._id, status: request.status },
+          actionsAvailable: ["view_development_requests"],
+          activity: [
+            { status: "complete", label: "Captured the requested software change" },
+            { status: "complete", label: "Placed it in the developer approval queue" },
+          ],
+          memorySources: [],
+        },
       });
     }
 

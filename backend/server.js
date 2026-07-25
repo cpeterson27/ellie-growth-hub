@@ -21,6 +21,7 @@ const jarvisRouter = require("./routes/jarvis");
 const webhooksRouter = require("./routes/webhooks");
 const partnersRouter = require("./routes/partners");
 const contentRouter = require("./routes/content");
+const developmentRequestsRouter = require("./routes/developmentRequests");
 
 const app = express();
 
@@ -59,6 +60,7 @@ connectDatabase(mongoUri)
     app.use("/api/webhooks", webhooksRouter);
     app.use("/api/partners", partnersRouter);
     app.use("/api/content", contentRouter);
+    app.use("/api/development-requests", developmentRequestsRouter);
 
     app.get("/api/health", (req, res) => {
       res.json({
