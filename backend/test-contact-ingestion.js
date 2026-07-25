@@ -32,4 +32,19 @@ const complete = applyResearchClassification({ company: "Example Co", title: "Ow
 assert.strictEqual(complete.researchStatus, "ready_for_review");
 assert.strictEqual(complete.stage, "Ready for Review");
 assert(!complete.tags.includes("needs-research"));
+const placeholders = normalizeIncoming({
+  "First Name": "Derek",
+  "Company Name": "Stage = Needs Research",
+  Title: "Stage = Needs Research",
+  Industry: "Stage = Needs Research",
+  Stage: "Stage = Needs Research",
+  "Qualify Contact": "Stage = Needs Research",
+  Tags: "Stage = Needs Research",
+}, "csv");
+assert.strictEqual(placeholders.company, "");
+assert.strictEqual(placeholders.title, "");
+assert.strictEqual(placeholders.industry, "");
+assert.strictEqual(placeholders.stage, "Needs Research");
+assert.strictEqual(placeholders.qualifyContact, false);
+assert.deepStrictEqual(placeholders.tags, ["needs-research"]);
 console.log("Contact ingestion normalization tests passed");

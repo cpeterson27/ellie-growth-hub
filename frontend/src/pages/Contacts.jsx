@@ -176,7 +176,14 @@ export default function Contacts() {
 
   function prepareImport(text) {
     Papa.parse(String(text || ""), { header: true, skipEmptyLines: "greedy", delimiter: String(text || "").includes("\t") ? "\t" : "", transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(), complete: ({ data, meta, errors }) => {
-      const rows = data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, String(value ?? "").trim()])));
+      const rows = data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => {
+        const cleaned = String(value ?? "").trim();
+        if (cleaned.toLowerCase() !== "stage = needs research") return [key, cleaned];
+        if (key === "Stage") return [key, "Needs Research"];
+        if (key === "Qualify Contact") return [key, "no"];
+        if (key === "Tags") return [key, "needs-research"];
+        return [key, ""];
+      })));
       const valid = rows.filter((row) => row.Name || row["First Name"] || row["Last Name"]).length;
       const emails = rows.filter((row) => !row.Email).length;
       setImportHeaders(meta.fields || []); setImportRows(rows); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setError(errors.length ? "Some rows have malformed column counts." : ""); setUploadOpen(true);
@@ -233,9 +240,19 @@ export default function Contacts() {
     try {
       setVerifyingEmails(true);
       setError("");
-      setVerificationResults({});
+      const plausibleEmails = emailsToVerify.filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+      const invalidResults = Object.fromEntries(
+        emailsToVerify
+          .filter((email) => !plausibleEmails.includes(email))
+          .map((email) => [email, { email, state: "undeliverable", reason: "invalid_format" }]),
+      );
+      setVerificationResults(invalidResults);
       setVerificationProgress({ processed: 0, total: emailsToVerify.length });
-      const created = await createEmailVerificationBatch(emailsToVerify);
+      if (!plausibleEmails.length) {
+        setVerificationProgress({ processed: emailsToVerify.length, total: emailsToVerify.length });
+        return;
+      }
+      const created = await createEmailVerificationBatch(plausibleEmails);
       const batchId = created.data?.id;
       if (!batchId) throw new Error("Emailable did not return a batch ID");
 
@@ -243,9 +260,9 @@ export default function Contacts() {
         if (attempt) await new Promise((resolve) => setTimeout(resolve, 2000));
         const response = await fetchEmailVerificationBatch(batchId);
         const batch = response.data || {};
-        setVerificationProgress({ processed: batch.processed || 0, total: batch.total || emailsToVerify.length });
+        setVerificationProgress({ processed: (batch.processed || 0) + Object.keys(invalidResults).length, total: emailsToVerify.length });
         if (Array.isArray(batch.results) && batch.results.length) {
-          setVerificationResults(Object.fromEntries(batch.results.map((result) => [result.email, result])));
+          setVerificationResults({ ...invalidResults, ...Object.fromEntries(batch.results.map((result) => [result.email, result])) });
         }
         if (batch.complete) return;
       }

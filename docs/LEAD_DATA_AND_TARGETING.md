@@ -47,6 +47,25 @@ Use the **Qualified** tab as the safe pool when associating people with targeted
 campaigns. `Lists` preserve the original event or source group, while `Tags`
 remain reusable audience labels.
 
+### Automatic campaign matching
+
+Campaign audience labels now match against confirmed contact titles, industries,
+seniority, companies, tags, keywords, lists, and notes. Ellie automatically
+associates matches when a campaign is created, and the campaign workspace has a
+**Refresh and assign safe matches** action for contacts qualified later.
+
+A contact must pass every safety gate before matching:
+
+- `researchStatus = qualified`;
+- `Qualify Contact = yes`, approved by a person;
+- `Email Status = verified`;
+- a nonblank email;
+- at least one audience keyword match;
+- not archived, unsubscribed, invalid, or rejected.
+
+Needs Research and Ready for Review contacts are counted in the campaign
+workspace but are never silently added to targeted outreach.
+
 ## CSV fields
 
 Only a usable name is required. Email is strongly recommended because it is the

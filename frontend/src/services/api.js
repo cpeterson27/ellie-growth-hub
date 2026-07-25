@@ -20,6 +20,12 @@ export const fetchCampaigns = (eventId) =>
 
 export const fetchCampaign = (campaignId) => api.get(`/campaigns/${campaignId}`).then((res) => res.data);
 
+export const previewCampaignAudience = (campaignId) =>
+  api.get(`/campaigns/${campaignId}/audience-match`).then((res) => res.data);
+
+export const assignCampaignAudience = (campaignId) =>
+  api.post(`/campaigns/${campaignId}/audience-match`).then((res) => res.data);
+
 
 
 export const fetchMarketingCampaign = async (campaignId) => {

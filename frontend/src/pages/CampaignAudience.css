@@ -1,0 +1,44 @@
+.campaign-audience-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.campaign-audience-counts > div {
+  padding: 0.8rem;
+  border-radius: 10px;
+  background: var(--surface-strong);
+}
+
+.campaign-audience-counts strong,
+.campaign-audience-counts span {
+  display: block;
+}
+
+.campaign-audience-counts strong {
+  font-size: 1.35rem;
+}
+
+.campaign-audience-counts span,
+.campaign-match-list span,
+.campaign-match-list small {
+  color: var(--text-muted);
+}
+
+.campaign-audience-counts span {
+  font-size: 0.76rem;
+}
+
+.campaign-match-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.campaign-match-list > div {
+  display: grid;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}

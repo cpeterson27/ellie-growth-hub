@@ -5,6 +5,7 @@ const Outreach = require("../models/Outreach");
 const { generateOutreachSuggestions } = require("../utils/outreachGenerator");
 const { getCampaignTemplate } = require("../services/campaignTemplates");
 const ContentBrief = require("../models/ContentBrief");
+const { assignCampaignMatches, getCampaignMatches } = require("../services/campaignAudienceService");
 
 const router = express.Router();
 
@@ -60,6 +61,34 @@ router.get("/:id/deletion-preview", async (req, res) => {
   } catch (error) {
     console.error("CAMPAIGN DELETION PREVIEW ERROR:", error);
     return res.status(500).json({ error: "Unable to prepare campaign deletion" });
+  }
+});
+
+router.get("/:id/audience-match", async (req, res) => {
+  try {
+    const result = await getCampaignMatches(req.params.id);
+    return res.json({
+      campaignId: result.campaign._id,
+      audiences: result.campaign.audience,
+      ...result.counts,
+      contacts: result.matches.slice(0, 25).map(({ contact, reasons }) => ({
+        _id: contact._id,
+        name: contact.name,
+        email: contact.email,
+        company: contact.company,
+        reasons,
+      })),
+    });
+  } catch (error) {
+    return res.status(error.message === "Campaign not found" ? 404 : 500).json({ error: error.message || "Unable to preview audience matches" });
+  }
+});
+
+router.post("/:id/audience-match", async (req, res) => {
+  try {
+    return res.json(await assignCampaignMatches(req.params.id));
+  } catch (error) {
+    return res.status(error.message === "Campaign not found" ? 404 : 500).json({ error: error.message || "Unable to assign audience matches" });
   }
 });
 
@@ -126,15 +155,15 @@ router.post("/from-event/:eventId", async (req, res) => {
         eventId: event._id,
       });
 
-
-
     if (existingCampaign) {
+      const audienceMatch = await assignCampaignMatches(existingCampaign._id);
 
       return res.json({
 
         message: "Campaign already exists",
 
         campaign: existingCampaign,
+        audienceMatch,
 
       });
 
@@ -172,6 +201,8 @@ router.post("/from-event/:eventId", async (req, res) => {
 
       });
 
+    const audienceMatch = await assignCampaignMatches(campaign._id);
+
 
 
     const outreachItems =
@@ -202,6 +233,7 @@ router.post("/from-event/:eventId", async (req, res) => {
 
       outreachCreated:
         outreachItems.length,
+      audienceMatch,
 
     });
 
@@ -341,7 +373,7 @@ router.post("/", async (req, res) => {
 
       });
 
-
+    const audienceMatch = await assignCampaignMatches(campaign._id);
 
     const outreachItems =
       generateOutreachSuggestions(
@@ -371,6 +403,7 @@ router.post("/", async (req, res) => {
 
       outreachCreated:
         outreachItems.length,
+      audienceMatch,
 
     });
 

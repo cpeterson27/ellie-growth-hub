@@ -40,6 +40,13 @@ const dateFields = new Set(["lastRaisedAt", "lastContacted", "primaryEmailLastVe
 function normalizeUrl(value = "") { return String(value).trim().toLowerCase().replace(/\/$/, ""); }
 function truthy(value) { return ["true", "yes", "1"].includes(String(value).trim().toLowerCase()); }
 function split(value) { return Array.isArray(value) ? value : String(value || "").split(/[;,|]/).map((item) => item.trim()).filter(Boolean); }
+function cleanPlaceholder(field, value) {
+  if (String(value || "").trim().toLowerCase() !== "stage = needs research") return value;
+  if (field === "stage") return "Needs Research";
+  if (field === "qualifyContact") return false;
+  if (field === "tags") return ["needs-research"];
+  return "";
+}
 
 function normalizeIncoming(row, source = "manual") {
   const mapped = {};
@@ -48,7 +55,7 @@ function normalizeIncoming(row, source = "manual") {
     const cleanKey = String(key).replace(/^\uFEFF/, "").trim();
     const known = canonicalFieldMap[cleanKey];
     const field = known || cleanKey;
-    mapped[field] = value;
+    mapped[field] = cleanPlaceholder(field, value);
     if (!known && !["name", "email", "phone", "company", "title", "linkedin", "tags", "sourceProvider", "mondayItemId"].includes(field)) additionalFields[cleanKey] = value;
   }
   for (const field of arrayFields) if (mapped[field] !== undefined) mapped[field] = split(mapped[field]);

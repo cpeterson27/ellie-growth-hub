@@ -32,6 +32,10 @@ const campaignSchema = new mongoose.Schema(
       type: String,
     },
   ],
+  audienceMatch: {
+    matchedCount: { type: Number, default: 0 },
+    lastMatchedAt: { type: Date, default: null },
+  },
 
 
   content: {
