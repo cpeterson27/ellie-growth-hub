@@ -384,11 +384,15 @@ export default function JarvisChat() {
             <span className="jarvis-core-ring jarvis-core-ring--outer" />
             <span className="jarvis-core-ring jarvis-core-ring--middle" />
             <span className="jarvis-core-ring jarvis-core-ring--inner" />
+            <span className="jarvis-core-ring jarvis-core-ring--pulse" />
+            <span className="jarvis-reticle jarvis-reticle--one" />
+            <span className="jarvis-reticle jarvis-reticle--two" />
             <span className="jarvis-core-light" />
             <span className="jarvis-orbit jarvis-orbit--one"><i /></span>
             <span className="jarvis-orbit jarvis-orbit--two"><i /></span>
+            <span className="jarvis-orbit jarvis-orbit--three"><i /></span>
             <span className="jarvis-core-name">{profile?.name || "Jarvis"}</span>
-            <span className="jarvis-waveform" aria-hidden="true">{Array.from({ length: 14 }, (_, index) => <i key={index} />)}</span>
+            <span className="jarvis-waveform" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}</span>
           </button>
           <p className="jarvis-visual-state"><span />{visualLabel}</p>
           <p className="jarvis-visual-greeting">{profile?.greeting || "Your workspace assistant for lead research, campaign planning, and follow-through."}</p>

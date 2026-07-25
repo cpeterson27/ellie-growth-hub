@@ -25,6 +25,7 @@ export default function Navbar({ onMenuClick }) {
           aria-label="Open sidebar"
         >
           <FiMenu />
+          <span className="navbar__menu-label">Menu</span>
         </button>
         <div>
           <p className="navbar__eyebrow">{workspaceName}</p>
