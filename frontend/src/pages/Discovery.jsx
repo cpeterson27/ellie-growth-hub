@@ -5,12 +5,25 @@ import Modal from "../components/Modal.jsx";
 import Table from "../components/Table.jsx";
 import {
   deleteContact,
+  createAudienceDefinition,
+  discoverAudienceOrganizations,
   fetchCampaigns,
   fetchContacts,
   importContactsFromMonday,
+  searchApolloLeads,
   updateContact,
 } from "../services/api.js";
 import "./Discovery.css";
+import "./DiscoveryTargeting.css";
+
+const TARGET_PRESETS = {
+  custom: { name: "Custom search", titles: "", industries: "", keywords: "", locations: "", employeeMin: "", employeeMax: "" },
+  real_estate: { name: "Real estate decision-makers", titles: "Owner, Founder, Principal, Managing Partner, Director of Acquisitions", industries: "Real Estate", keywords: "real estate, multifamily, property investment", locations: "United States", employeeMin: "1", employeeMax: "500" },
+  short_term_rental: { name: "Airbnb and short-term rental investors", titles: "Owner, Founder, Investor, Property Manager, Portfolio Manager", industries: "Real Estate, Hospitality", keywords: "Airbnb, short-term rental, vacation rental, STR investor", locations: "United States", employeeMin: "1", employeeMax: "200" },
+  program_15k: { name: "$15K program prospects", titles: "Owner, Founder, CEO, Managing Partner, Real Estate Investor", industries: "Real Estate, Investment Management", keywords: "multifamily investor, real estate entrepreneur, portfolio growth, acquisitions", locations: "United States", employeeMin: "1", employeeMax: "100" },
+};
+
+const splitFilters = (value) => String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
 
 export default function Discovery() {
   const [prospects, setProspects] = useState([]);
@@ -21,6 +34,10 @@ export default function Discovery() {
   const [importOpen, setImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [notice, setNotice] = useState("");
+  const [searchMode, setSearchMode] = useState("organizations");
+  const [targetPreset, setTargetPreset] = useState("real_estate");
+  const [target, setTarget] = useState(TARGET_PRESETS.real_estate);
+  const [searchingApollo, setSearchingApollo] = useState(false);
 
   const loadProspects = async () => {
     const response = await fetchContacts({ status: "prospect" });
@@ -55,6 +72,50 @@ export default function Discovery() {
     setNotice("Prospect deleted permanently.");
   };
 
+  const selectPreset = (value) => {
+    setTargetPreset(value);
+    setTarget({ ...TARGET_PRESETS[value] });
+  };
+
+  const runApolloSearch = async () => {
+    setSearchingApollo(true);
+    setNotice("");
+    try {
+      if (searchMode === "people") {
+        const response = await searchApolloLeads({
+          titles: splitFilters(target.titles),
+          keywords: splitFilters(target.keywords),
+          locations: splitFilters(target.locations),
+          perPage: 25,
+        });
+        setNotice(`${response.data?.total || response.data?.results?.length || 0} people matched. Review and import paid-plan people results from Contacts.`);
+        return;
+      }
+      const created = await createAudienceDefinition({
+        name: `${target.name} — ${new Date().toLocaleDateString()}`,
+        description: `Apollo organization discovery created from the ${target.name} targeting profile.`,
+        source: "manual",
+        criteria: {
+          keywords: splitFilters(target.keywords),
+          industries: splitFilters(target.industries),
+          locations: splitFilters(target.locations),
+          employeeRange: {
+            min: target.employeeMin === "" ? null : Number(target.employeeMin),
+            max: target.employeeMax === "" ? null : Number(target.employeeMax),
+          },
+          minimumScore: 0,
+          targetTier: null,
+        },
+      });
+      const result = await discoverAudienceOrganizations(created.audience._id);
+      setNotice(`${result.organizationsFound || 0} organizations found for “${target.name}”; ${result.organizationsCreated || 0} added and ${result.organizationsUpdated || 0} updated.`);
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.response?.data?.error || "Apollo search could not be completed.");
+    } finally {
+      setSearchingApollo(false);
+    }
+  };
+
   const columns = [
     { header: "Name", accessor: "name" },
     { header: "Title", accessor: "title" },
@@ -85,14 +146,23 @@ export default function Discovery() {
         <Button onClick={() => setImportOpen(true)}>Import prospects</Button>
       </header>
 
-      <DashboardCard title="Apollo search">
-        <div className="apollo-search-grid">
-          <label>Search mode<select defaultValue="people"><option value="people">People</option><option value="organizations">Organizations</option></select></label>
-          <label>Search<input disabled placeholder="People Search requires API access" /></label>
-          <Button disabled>Search Apollo</Button>
+      <DashboardCard title="Apollo targeting">
+        <p className="apollo-note">Choose who this search is for, then adjust the filters. Organization discovery works on the connected plan; People Search requires Apollo API access.</p>
+        <div className="apollo-target-topline">
+          <label>Target profile<select value={targetPreset} onChange={(event) => selectPreset(event.target.value)}><option value="real_estate">Real estate decision-makers</option><option value="short_term_rental">Airbnb / short-term rental investors</option><option value="program_15k">$15K program prospects</option><option value="custom">Custom search</option></select></label>
+          <label>Search mode<select value={searchMode} onChange={(event) => setSearchMode(event.target.value)}><option value="organizations">Organizations</option><option value="people">People</option></select></label>
         </div>
+        <div className="apollo-target-grid">
+          <label>Titles<input value={target.titles} onChange={(event) => setTarget({ ...target, titles: event.target.value })} placeholder="Owner, Founder, Investor" /></label>
+          <label>Industries<input value={target.industries} onChange={(event) => setTarget({ ...target, industries: event.target.value })} placeholder="Real Estate, Hospitality" /></label>
+          <label>Keywords<input value={target.keywords} onChange={(event) => setTarget({ ...target, keywords: event.target.value })} placeholder="multifamily, Airbnb, acquisitions" /></label>
+          <label>Locations<input value={target.locations} onChange={(event) => setTarget({ ...target, locations: event.target.value })} placeholder="United States, Texas" /></label>
+          <label>Minimum employees<input type="number" min="0" value={target.employeeMin} onChange={(event) => setTarget({ ...target, employeeMin: event.target.value })} /></label>
+          <label>Maximum employees<input type="number" min="0" value={target.employeeMax} onChange={(event) => setTarget({ ...target, employeeMax: event.target.value })} /></label>
+        </div>
+        <div className="apollo-search-actions"><Button loading={searchingApollo} disabled={searchMode === "people"} onClick={runApolloSearch}>{searchMode === "people" ? "People Search requires paid Apollo" : "Find matching organizations"}</Button></div>
         <div className="apollo-status"><span className="status-dot" />Connected · Free plan · People Search unavailable · Organization Search available</div>
-        <p className="apollo-note">People Search requires an Apollo plan with API access. It will be available here automatically after your upgrade.</p>
+        <p className="apollo-note">Profiles are starting points, not permanent rules. Ellie can switch profiles for each offer or campaign.</p>
       </DashboardCard>
 
       <section className="discovery-stats">

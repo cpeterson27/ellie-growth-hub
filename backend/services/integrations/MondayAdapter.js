@@ -271,7 +271,7 @@ class MondayAdapter extends BaseIntegration {
 
 
 
-    return this.mapMondayContacts(items);
+    return this.mapMondayContacts(items, credentials);
 
 
   }
@@ -282,7 +282,7 @@ class MondayAdapter extends BaseIntegration {
 
 
 
-  mapMondayContacts(items){
+  mapMondayContacts(items, credentials = {}){
 
 
     if(!Array.isArray(items)){
@@ -311,11 +311,14 @@ class MondayAdapter extends BaseIntegration {
 
 
 
-        const email =
-          columns.lead_email ||
-          columns.email ||
-          columns.Email ||
-          columns.contact_email;
+        const configured = credentials.columnIds || {};
+        const read = (field, fallbacks = []) => {
+          const configuredId = configured[field];
+          if (configuredId && columns[configuredId]) return columns[configuredId];
+          for (const id of fallbacks) if (columns[id]) return columns[id];
+          return "";
+        };
+        const email = read("email", ["lead_email", "email", "Email", "contact_email"]);
 
 
 
@@ -343,12 +346,19 @@ class MondayAdapter extends BaseIntegration {
 
 
 
-          company:
-            cleanName(
-              columns.lead_company ||
-              columns.company ||
-              ""
-            ),
+          company: cleanName(read("company", ["lead_company", "company"])),
+          firstName: cleanName(read("firstName")),
+          lastName: cleanName(read("lastName")),
+          title: cleanName(read("title", ["title", "job_title"])),
+          phone: read("phone", ["phone", "lead_phone"]),
+          industry: cleanName(read("industry", ["industry"])),
+          city: cleanName(read("city", ["city"])),
+          state: cleanName(read("state", ["state"])),
+          country: cleanName(read("country", ["country"])),
+          linkedin: read("linkedin", ["linkedin", "linkedin_url"]),
+          website: read("website", ["website"]),
+          stage: cleanName(read("stage", ["stage", "lead_stage"])),
+          notes: read("notes", ["notes"]),
 
 
 

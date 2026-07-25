@@ -146,6 +146,12 @@ export const importContactsFromMonday = () =>
 export const searchApolloLeads = (payload) =>
   api.post("/contacts/apollo/search", payload).then((res) => res.data);
 
+export const createAudienceDefinition = (payload) =>
+  api.post("/audience", payload).then((res) => res.data);
+
+export const discoverAudienceOrganizations = (audienceId) =>
+  api.post(`/audience/${audienceId}/discover`).then((res) => res.data);
+
 export const importContactsFromApollo = (payload) =>
   api
     .post("/contacts/import/apollo", payload)

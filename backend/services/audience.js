@@ -436,6 +436,35 @@ async function discoverOrganizationsForAudience(audienceId) {
           }
         }
 
+        // Apply the audience's operational filters after enrichment, when Apollo
+        // has supplied the most complete location and employee data available.
+        if (locations.length > 0) {
+          const organizationLocation = String(enriched.location || "").toLowerCase();
+          const matchesLocation = locations.some((location) =>
+            organizationLocation.includes(String(location).trim().toLowerCase()),
+          );
+          if (!matchesLocation) {
+            continue;
+          }
+        }
+
+        const hasEmployeeMinimum =
+          employeeRange.min !== null && employeeRange.min !== undefined;
+        const hasEmployeeMaximum =
+          employeeRange.max !== null && employeeRange.max !== undefined;
+        if (hasEmployeeMinimum || hasEmployeeMaximum) {
+          const employeeCount = Number(enriched.employeeCount);
+          if (!Number.isFinite(employeeCount)) {
+            continue;
+          }
+          if (hasEmployeeMinimum && employeeCount < Number(employeeRange.min)) {
+            continue;
+          }
+          if (hasEmployeeMaximum && employeeCount > Number(employeeRange.max)) {
+            continue;
+          }
+        }
+
         // Score
         const { score, tier, reasons } = scoreOrganization(enriched);
 

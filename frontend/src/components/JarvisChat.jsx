@@ -50,6 +50,7 @@ export default function JarvisChat() {
   const [speakingId, setSpeakingId] = useState(null);
   const [speechError, setSpeechError] = useState("");
   const speechStartTimerRef = useRef(null);
+  const recognitionRef = useRef(null);
   const [listening, setListening] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -297,19 +298,35 @@ export default function JarvisChat() {
 
   const startListening = () => {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) return;
+    if (!Recognition || listening || loading) return;
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    setSpeakingId(null);
     const recognition = new Recognition();
+    recognitionRef.current = recognition;
     recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+    recognition.onend = () => { recognitionRef.current = null; setListening(false); };
+    recognition.onerror = () => { recognitionRef.current = null; setListening(false); };
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setInput("");
       submitPrompt(transcript);
     };
     recognition.start();
+  };
+
+  const handleVoiceCore = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    if (speakingId) {
+      window.speechSynthesis?.cancel();
+      setSpeakingId(null);
+      return;
+    }
+    startListening();
   };
 
   useEffect(() => {
@@ -363,15 +380,20 @@ export default function JarvisChat() {
           <i className="jarvis-signal jarvis-signal--four" />
         </div>
         <div className="jarvis-visualizer">
-          <div className="jarvis-core" aria-label={`${profile?.name || "Jarvis"} is ${visualLabel.toLowerCase()}`}>
+          <button type="button" className="jarvis-core" onClick={handleVoiceCore} disabled={!voiceInputSupported || loading} aria-label={listening ? "Stop listening" : speakingId ? "Stop speaking" : "Talk to Jarvis"}>
             <span className="jarvis-core-ring jarvis-core-ring--outer" />
             <span className="jarvis-core-ring jarvis-core-ring--middle" />
             <span className="jarvis-core-ring jarvis-core-ring--inner" />
             <span className="jarvis-core-light" />
+            <span className="jarvis-orbit jarvis-orbit--one"><i /></span>
+            <span className="jarvis-orbit jarvis-orbit--two"><i /></span>
             <span className="jarvis-core-name">{profile?.name || "Jarvis"}</span>
-          </div>
+            <span className="jarvis-waveform" aria-hidden="true">{Array.from({ length: 14 }, (_, index) => <i key={index} />)}</span>
+          </button>
           <p className="jarvis-visual-state"><span />{visualLabel}</p>
           <p className="jarvis-visual-greeting">{profile?.greeting || "Your workspace assistant for lead research, campaign planning, and follow-through."}</p>
+          {voiceInputSupported ? <button type="button" className="jarvis-primary-talk" onClick={handleVoiceCore} disabled={loading}>{listening ? "Stop listening" : speakingId ? "Stop speaking" : "Talk to Jarvis"}</button> : null}
+          <p className="jarvis-voice-hint">{listening ? "Speak naturally. Jarvis will respond when you pause." : "Tap the core or press Command + J to begin."}</p>
         </div>
         <div className="jarvis-statuses" aria-label="Jarvis connection status">
           <span className={status?.openai?.enabled ? "is-ready" : ""}>OpenAI {status?.openai?.enabled ? "ready" : "not enabled"}</span>

@@ -15,6 +15,7 @@
 const Contact = require("../models/Contact");
 const MarketingCampaign = require("../models/MarketingCampaign");
 
+const integrationContactFields = ["phone", "title", "industry", "city", "state", "country", "linkedin", "website", "stage", "notes"];
 
 
 // =====================================
@@ -118,6 +119,10 @@ class ContactService {
         contact.company =
           contactData.company.trim();
 
+      }
+
+      for (const field of integrationContactFields) {
+        if (contactData[field] !== undefined && contactData[field] !== "") contact[field] = contactData[field];
       }
 
 
@@ -269,6 +274,10 @@ class ContactService {
 
         status:
           contactData.status || "active",
+
+        ...Object.fromEntries(integrationContactFields
+          .filter((field) => contactData[field] !== undefined && contactData[field] !== "")
+          .map((field) => [field, contactData[field]])),
 
       });
 
@@ -642,6 +651,10 @@ class ContactService {
 
           company:
             externalContact.company || "",
+
+          ...Object.fromEntries(integrationContactFields
+            .filter((field) => externalContact[field] !== undefined && externalContact[field] !== "")
+            .map((field) => [field, externalContact[field]])),
 
 
           source,

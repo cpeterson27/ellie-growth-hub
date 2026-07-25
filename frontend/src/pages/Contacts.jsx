@@ -29,6 +29,8 @@ const columns = [
   { header: "Status", accessor: "status" },
 ];
 
+const recognizedImportHeaders = ["Name", "First Name", "Last Name", "Title", "Company Name", "Email", "Phone", "Work Direct Phone", "Person Linkedin Url", "Website", "City", "State", "Country", "# Employees", "Industry", "Seniority", "Departments", "Keywords", "Lists", "Stage", "Qualify Contact", "Tags", "Notes", "Apollo Contact Id", "Apollo Record Id"];
+
 const importCopy = {
   monday: {
     title: "Import Contacts from Monday CRM?",
@@ -287,8 +289,8 @@ export default function Contacts() {
         {!importRows.length ? <><p>Upload a CSV or paste comma- or tab-separated data. Excel files are not supported in this build.</p><input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} /><textarea className="select-input" style={{ width: "100%", marginTop: "0.75rem", minHeight: "130px" }} placeholder="Paste header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) prepareImport(event.target.value); }} /></> : <>
           <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p><p>Duplicate candidates are checked by the shared ingestion service during import.</p>
           <p>Detected headers: {importHeaders.join(", ")}</p>
-          <p>Recognized: {importHeaders.filter((header) => ["First Name", "Last Name", "Title", "Company Name", "Email", "Work Direct Phone", "Person Linkedin Url", "City", "State", "Country", "# Employees", "Industry", "Apollo Contact Id", "Apollo Record Id"].includes(header)).join(", ") || "none"}</p>
-          <p>Unrecognized columns: {importHeaders.filter((header) => !["First Name", "Last Name", "Title", "Company Name", "Email", "Work Direct Phone", "Person Linkedin Url", "City", "State", "Country", "# Employees", "Industry", "Apollo Contact Id", "Apollo Record Id"].includes(header)).join(", ") || "none"}</p>
+          <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
+          <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select>
           <div style={{ overflowX: "auto", marginTop: "0.75rem" }}><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source", "Campaign"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email}</td><td>{row["Work Direct Phone"] || row.Phone}</td><td>{row["Company Name"] || row.Company}</td><td>{row.Title}</td><td>{[row.City, row.State].filter(Boolean).join(", ")}</td><td>CSV import</td><td>{campaigns.find((campaign) => campaign._id === importCampaignId)?.name || "—"}</td></tr>)}</tbody></table></div>
           <p>{importRows.length} rows ready. Rows with no usable name will be rejected; all recognized fields are retained.</p>

@@ -27,10 +27,11 @@ const canonicalFieldMap = Object.fromEntries([
   ["Company LinkedIn URL", "companyLinkedinUrl"], ["Facebook URL", "facebookUrl"], ["Twitter URL", "twitterUrl"],
   ["Company Address", "companyAddress"], ["Company City", "companyCity"], ["Company State", "companyState"], ["Company Country", "companyCountry"], ["Company Phone", "companyPhone"],
   ["Latest Funding", "latestFunding"], ["Apollo Account ID", "apolloAccountId"], ["Secondary Email Status", "secondaryEmailStatus"], ["Tertiary Email Status", "tertiaryEmailStatus"], ["Qualify Contact", "qualifyContact"],
+  ["Name", "name"], ["Phone", "phone"], ["LinkedIn", "linkedin"], ["Notes", "notes"], ["Tags", "tags"],
   ["Apollo Contact ID", "apolloContactId"], ["Apollo Record ID", "apolloRecordId"], ["Secondary Email Source", "secondaryEmailSource"], ["Secondary Email Verification Source", "secondaryEmailVerificationSource"], ["Tertiary Email Source", "tertiaryEmailSource"], ["Tertiary Email Verification Source", "tertiaryEmailVerificationSource"],
 ]);
 
-const arrayFields = new Set(["departments", "subDepartments", "lists", "keywords", "technologies", "sicCodes", "naicsCodes"]);
+const arrayFields = new Set(["departments", "subDepartments", "lists", "keywords", "technologies", "sicCodes", "naicsCodes", "tags"]);
 const booleanFields = new Set(["doNotCall", "emailSent", "emailOpen", "emailBounced", "replied", "demoed", "qualifyContact"]);
 const numberFields = new Set(["employeeCount", "annualRevenue", "totalFunding", "latestFundingAmount", "retailLocations"]);
 const dateFields = new Set(["lastRaisedAt", "lastContacted", "primaryEmailLastVerifiedAt"]);

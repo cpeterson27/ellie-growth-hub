@@ -41,6 +41,19 @@ Set the result in Render and in the Vault Bridge `.env`; it must match exactly.
 4. Open Jarvis. Its Memory badge will say connected after the first successful
    bridge sync.
 
+## Frontend SPA routing on Render
+
+The frontend uses React Router. In the Render **frontend Static Site**, open
+**Redirects/Rewrites** and add:
+
+| Source | Destination | Action |
+| --- | --- | --- |
+| `/*` | `/index.html` | `Rewrite` |
+
+Without this rule, navigation works inside Ellie but directly opening or hard
+refreshing `/jarvis`, `/discovery`, or another nested route returns Render's
+black `Not Found` page before React can load.
+
 ## Vault Bridge setup on the Mac
 
 ```bash

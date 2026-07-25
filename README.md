@@ -54,3 +54,6 @@ approved Obsidian notes; the browser never reads the local vault directly.
 See [docs/JARVIS_DEPLOYED_SETUP.md](docs/JARVIS_DEPLOYED_SETUP.md) for deployment
 configuration and [tools/jarvis-vault-bridge/README.md](tools/jarvis-vault-bridge/README.md)
 for the exact sync workflow.
+
+See [docs/LEAD_DATA_AND_TARGETING.md](docs/LEAD_DATA_AND_TARGETING.md) for the
+canonical CSV fields, Monday board mapping, and Apollo audience workflow.

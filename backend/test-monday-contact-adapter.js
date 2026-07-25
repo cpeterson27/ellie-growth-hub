@@ -10,6 +10,18 @@ assert.strictEqual(mapping.values.apollo_id, "apollo-1");
 assert.deepStrictEqual(mapping.values.linkedin, { url: "https://linkedin.com/in/ada", text: "https://linkedin.com/in/ada" });
 assert.strictEqual(mapping.values.lead_status, "New Lead");
 assert(mapping.missingMappings.includes("title"));
+const imported = adapter.mapMondayContacts([{
+  id: "monday-2",
+  name: "Grace Hopper",
+  column_values: [
+    { id: "lead_email", text: "grace@example.com" },
+    { id: "lead_company", text: "Computing Co" },
+    { id: "job_title", text: "Founder" },
+    { id: "lead_stage", text: "Qualified" },
+  ],
+}], { columnIds: { title: "job_title", stage: "lead_stage" } });
+assert.strictEqual(imported[0].title, "Founder");
+assert.strictEqual(imported[0].stage, "Qualified");
 
 const originalFetch = global.fetch;
 global.fetch = async () => ({ json: async () => ({ data: { change_multiple_column_values: { id: "monday-1" } } }) });
