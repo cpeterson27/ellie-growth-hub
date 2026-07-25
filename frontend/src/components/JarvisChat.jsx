@@ -1,7 +1,28 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useJarvis } from "../hooks/useJarvis";
 import { createContentBrief, fetchJarvisProfile, updateJarvisProfile } from "../services/api.js";
 import "./JarvisChat.css";
+
+// Speech synthesis handles plain prose much better than rendered Markdown.
+// Keep the visual response intact, but remove formatting and add natural pauses
+// before handing a reply to the browser voice.
+const prepareTextForSpeech = (text = "") =>
+  text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, "link")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*•]\s+/gm, "")
+    .replace(/\*\*|__|[*_~]/g, "")
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+    .replace(/^\s*(.+?):\s*$/gm, "$1. ")
+    .replace(/^\s*(.+?):\s*(.+)$/gm, "$1: $2. ")
+    .replace(/\n+/g, " ")
+    .replace(/\s+([,.!?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 
 /**
  * JarvisChat Component
@@ -70,14 +91,15 @@ export default function JarvisChat() {
   }, [messages]);
 
   const speakText = (text, id) => {
-    if (!("speechSynthesis" in window) || !text) {
+    const spokenText = prepareTextForSpeech(text);
+    if (!("speechSynthesis" in window) || !spokenText) {
       setSpeechError("Voice playback is not available in this browser.");
       return;
     }
     setSpeechError("");
     if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new SpeechSynthesisUtterance(spokenText);
     utterance.voice = voices.find((voice) => voice.name === voiceName) || null;
     utterance.rate = profile?.voiceRate || 1;
     utterance.pitch = profile?.voicePitch || 1;
@@ -158,7 +180,7 @@ export default function JarvisChat() {
     submitPrompt(prompt);
   };
 
-  const handleAction = async (action, assistantMessageId) => {
+  const handleAction = async (action) => {
     try {
       if (action === "create_campaign") {
         // Create a campaign draft and add result to chat
@@ -237,7 +259,18 @@ export default function JarvisChat() {
       prepare_recipients: "👥 Prepare Recipients",
       send_test_email: "✉️ Send Test Email",
       review_organization: "🏢 Review Organization",
+      view_audience: "👥 View Audience",
+      start_campaign: "📧 Start Campaign",
+      view_organization: "🏢 View Organization",
+      add_audience: "👥 Add to Audience",
+      filter_by_source: "🔎 Filter by Source",
+      export_contacts: "📤 Export Contacts",
       view_contacts: "👤 View Contacts",
+      view_dashboard: "📊 View Dashboard",
+      start_outreach: "📣 Start Outreach",
+      view_audiences: "👥 View Audiences",
+      create_audience: "➕ Create Audience",
+      view_analytics: "📈 View Analytics",
       launch_campaign: "🚀 Launch Campaign",
     };
     return labels[action] || action;
@@ -342,7 +375,7 @@ export default function JarvisChat() {
 
               {msg.type === "assistant" ? <div className="jarvis-response-tools"><button onClick={() => speakMessage(msg)} disabled={speakingId === msg.id}>{speakingId === msg.id ? "Speaking…" : "Speak"}</button></div> : null}
 
-              {msg.activity?.length ? <div className="jarvis-activity"><p>Jarvis completed</p>{msg.activity.map((step, index) => <div key={`${msg.id}-${index}`}><span>✓</span>{step.label}</div>)}</div> : null}
+              {msg.activity?.length ? <div className="jarvis-activity"><p>Jarvis completed</p>{msg.activity.map((step, index) => <div key={`${msg.id}-${index}`}><span>{step.status === "warning" ? "!" : "✓"}</span>{step.label}</div>)}</div> : null}
               {msg.memorySources?.length ? <div className="jarvis-memory-sources"><strong>Vault notes consulted</strong>{msg.memorySources.map((source) => <span key={source}>{source}</span>)}</div> : null}
 
               {msg.actions && msg.actions.length > 0 && (
@@ -353,7 +386,7 @@ export default function JarvisChat() {
                       <button
                         key={action}
                         className="jarvis-action-btn"
-                        onClick={() => handleAction(action, msg.id)}
+                        onClick={() => handleAction(action)}
                         disabled={loading}
                       >
                         {getActionLabel(action)}

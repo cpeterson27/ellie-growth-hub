@@ -38,6 +38,7 @@ class JarvisService {
     // Route to appropriate handler based on keywords
     if (
       lowerMessage.includes("priority") ||
+      lowerMessage.includes("priorities") ||
       lowerMessage.includes("focus") ||
       lowerMessage.includes("important")
     ) {
@@ -74,15 +75,16 @@ class JarvisService {
 
     if (llmService.isEnabled()) {
       try {
-        activity.push({ label: "Drafting a response with OpenAI", status: "complete" });
         const answer = await llmService.chat({
           message,
           context: [result.answer, memory.context].filter(Boolean).join("\n\n"),
           profile,
         });
+        activity.push({ label: "Drafted a response with OpenAI", status: "complete" });
         result = { ...result, answer, aiAssisted: true };
       } catch (error) {
         console.warn("[Jarvis] OpenAI response unavailable; using verified workspace summary", { code: error.code || "OPENAI_REQUEST_FAILED" });
+        activity.push({ label: "OpenAI unavailable; used the workspace summary", status: "warning" });
       }
     }
 
