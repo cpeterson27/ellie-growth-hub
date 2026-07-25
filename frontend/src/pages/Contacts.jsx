@@ -18,6 +18,8 @@ import {
   retryMondaySync,
   updateContact,
   searchApolloLeads,
+  createEmailVerificationBatch,
+  fetchEmailVerificationBatch,
 } from "../services/api.js";
 
 const columns = [
@@ -29,7 +31,7 @@ const columns = [
   { header: "Status", accessor: "status" },
 ];
 
-const recognizedImportHeaders = ["Name", "First Name", "Last Name", "Title", "Company Name", "Email", "Phone", "Work Direct Phone", "Person Linkedin Url", "Website", "City", "State", "Country", "# Employees", "Industry", "Seniority", "Departments", "Keywords", "Lists", "Stage", "Qualify Contact", "Tags", "Notes", "Apollo Contact Id", "Apollo Record Id"];
+const recognizedImportHeaders = ["Name", "First Name", "Last Name", "Title", "Company Name", "Email", "Email Status", "Phone", "Work Direct Phone", "Person Linkedin Url", "Website", "City", "State", "Country", "# Employees", "Industry", "Seniority", "Departments", "Keywords", "Lists", "Stage", "Qualify Contact", "Tags", "Notes", "Apollo Contact Id", "Apollo Record Id"];
 
 const importCopy = {
   monday: {
@@ -73,6 +75,9 @@ export default function Contacts() {
   const [detailContact, setDetailContact] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [verifyingEmails, setVerifyingEmails] = useState(false);
+  const [verificationProgress, setVerificationProgress] = useState(null);
+  const [verificationResults, setVerificationResults] = useState({});
   const tableColumns = [...columns, { header: "Actions", render: (contact) => <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}><button className="crm-overflow" onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>⋮</button>{actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View Contact</button><button onClick={() => setEditingContact({ ...contact })}>Edit</button>{contact.mondaySyncStatus === "failed" ? <button onClick={() => retryMondaySync(contact._id).then(loadContacts)}>Retry Monday Sync</button> : null}<button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete</button></div> : null}</div> }];
 
   async function loadContacts() {
@@ -164,7 +169,7 @@ export default function Contacts() {
       const rows = data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, String(value ?? "").trim()])));
       const valid = rows.filter((row) => row.Name || row["First Name"] || row["Last Name"]).length;
       const emails = rows.filter((row) => !row.Email).length;
-      setImportHeaders(meta.fields || []); setImportRows(rows); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setError(errors.length ? "Some rows have malformed column counts." : ""); setUploadOpen(true);
+      setImportHeaders(meta.fields || []); setImportRows(rows); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setError(errors.length ? "Some rows have malformed column counts." : ""); setUploadOpen(true);
     }, error: () => setError("Unable to parse contact file.") });
   }
 
@@ -184,8 +189,62 @@ export default function Contacts() {
   }
 
   async function saveUploadedContacts() {
-    const saved = await saveIngestion(importRows, "csv", importCampaignId);
-    if (saved) { setUploadOpen(false); setImportRows([]); setImportHeaders([]); }
+    const pending = importRows.some((row) => row.Email && !verificationResults[row.Email.toLowerCase()]);
+    if (pending) { setError("Verify the email addresses before importing."); return; }
+    const sanitizedRows = importRows.map((row) => {
+      const email = String(row.Email || "").trim();
+      if (!email) return row;
+      const result = verificationResults[email.toLowerCase()];
+      if (result?.state === "deliverable") {
+        return { ...row, Email: email, "Email Status": "verified" };
+      }
+      const tags = [...new Set(
+        [String(row.Tags || "").split(","), ["needs-email-verification"]]
+          .flat()
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      )].join(",");
+      return { ...row, Email: "", "Email Status": result?.state || "unverified", Tags: tags };
+    });
+    const saved = await saveIngestion(sanitizedRows, "csv", importCampaignId);
+    if (saved) { setUploadOpen(false); setImportRows([]); setImportHeaders([]); setVerificationResults({}); setVerificationProgress(null); }
+  }
+
+  const emailsToVerify = [...new Set(importRows.map((row) => String(row.Email || "").trim().toLowerCase()).filter(Boolean))];
+  const pendingEmailCount = emailsToVerify.filter((email) => !verificationResults[email]).length;
+  const verificationCounts = Object.values(verificationResults).reduce((counts, result) => {
+    const state = result.state || "unknown";
+    counts[state] = (counts[state] || 0) + 1;
+    return counts;
+  }, {});
+
+  async function verifyImportedEmails() {
+    if (!emailsToVerify.length) return;
+    try {
+      setVerifyingEmails(true);
+      setError("");
+      setVerificationResults({});
+      setVerificationProgress({ processed: 0, total: emailsToVerify.length });
+      const created = await createEmailVerificationBatch(emailsToVerify);
+      const batchId = created.data?.id;
+      if (!batchId) throw new Error("Emailable did not return a batch ID");
+
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        if (attempt) await new Promise((resolve) => setTimeout(resolve, 2000));
+        const response = await fetchEmailVerificationBatch(batchId);
+        const batch = response.data || {};
+        setVerificationProgress({ processed: batch.processed || 0, total: batch.total || emailsToVerify.length });
+        if (Array.isArray(batch.results) && batch.results.length) {
+          setVerificationResults(Object.fromEntries(batch.results.map((result) => [result.email, result])));
+        }
+        if (batch.complete) return;
+      }
+      throw new Error("Email verification is taking longer than expected. Try again shortly.");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Unable to verify emails");
+    } finally {
+      setVerifyingEmails(false);
+    }
   }
 
   return (
@@ -282,9 +341,9 @@ export default function Contacts() {
 
       <Modal
         isOpen={isUploadOpen}
-        onClose={() => !savingContact && setUploadOpen(false)}
+        onClose={() => !savingContact && !verifyingEmails && setUploadOpen(false)}
         title="Import Contacts"
-        footer={<><Button variant="outline" disabled={savingContact} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length} onClick={saveUploadedContacts}>Confirm Import</Button></>}
+        footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import safe contacts</Button></>}
       >
         {!importRows.length ? <><p>Upload a CSV or paste comma- or tab-separated data. Excel files are not supported in this build.</p><input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} /><textarea className="select-input" style={{ width: "100%", marginTop: "0.75rem", minHeight: "130px" }} placeholder="Paste header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) prepareImport(event.target.value); }} /></> : <>
           <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p><p>Duplicate candidates are checked by the shared ingestion service during import.</p>
@@ -292,8 +351,23 @@ export default function Contacts() {
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select>
-          <div style={{ overflowX: "auto", marginTop: "0.75rem" }}><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source", "Campaign"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email}</td><td>{row["Work Direct Phone"] || row.Phone}</td><td>{row["Company Name"] || row.Company}</td><td>{row.Title}</td><td>{[row.City, row.State].filter(Boolean).join(", ")}</td><td>CSV import</td><td>{campaigns.find((campaign) => campaign._id === importCampaignId)?.name || "—"}</td></tr>)}</tbody></table></div>
-          <p>{importRows.length} rows ready. Rows with no usable name will be rejected; all recognized fields are retained.</p>
+          {emailsToVerify.length ? <div className="email-verification-panel">
+            <div>
+              <strong>Email safety check</strong>
+              <p>Verify {emailsToVerify.length} unique email{emailsToVerify.length === 1 ? "" : "s"} with Emailable before import. This uses live credits only when you click the button.</p>
+            </div>
+            <Button variant="outline" loading={verifyingEmails} disabled={verifyingEmails} onClick={verifyImportedEmails}>
+              {pendingEmailCount ? `Verify ${emailsToVerify.length} emails` : "Verify again"}
+            </Button>
+            {verificationProgress ? <div className="verification-progress">
+              <span style={{ width: `${Math.min(100, Math.round((verificationProgress.processed / Math.max(1, verificationProgress.total)) * 100))}%` }} />
+            </div> : null}
+            {Object.keys(verificationResults).length ? <p className="verification-summary">
+              Deliverable: {verificationCounts.deliverable || 0} · Risky: {verificationCounts.risky || 0} · Undeliverable: {verificationCounts.undeliverable || 0} · Unknown: {verificationCounts.unknown || 0}
+            </p> : null}
+          </div> : null}
+          <div style={{ overflowX: "auto", marginTop: "0.75rem" }}><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source", "Campaign"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => { const result = verificationResults[String(row.Email || "").toLowerCase()]; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{row["Work Direct Phone"] || row.Phone}</td><td>{row["Company Name"] || row.Company}</td><td>{row.Title}</td><td>{[row.City, row.State].filter(Boolean).join(", ")}</td><td>CSV import</td><td>{campaigns.find((campaign) => campaign._id === importCampaignId)?.name || "—"}</td></tr>; })}</tbody></table></div>
+          <p>{importRows.length} rows ready. Deliverable emails are saved. Risky, unknown, and undeliverable addresses are removed while the contact is retained and tagged for review.</p>
         </>}
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; Monday sync: {deleteTarget.mondaySyncStatus || "pending"}; Monday item: {deleteTarget.mondayItemId ? "linked" : "not linked"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>

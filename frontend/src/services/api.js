@@ -160,6 +160,12 @@ export const importContactsFromApollo = (payload) =>
 export const ingestContacts = (payload) =>
   api.post("/contacts/ingest", payload).then((res) => res.data);
 
+export const createEmailVerificationBatch = (emails) =>
+  api.post("/contacts/email-verification/batches", { emails }).then((res) => res.data);
+
+export const fetchEmailVerificationBatch = (batchId) =>
+  api.get(`/contacts/email-verification/batches/${batchId}`).then((res) => res.data);
+
 export const retryMondaySync = (contactId) =>
   api.post(`/contacts/${contactId}/retry-monday`).then((res) => res.data);
 

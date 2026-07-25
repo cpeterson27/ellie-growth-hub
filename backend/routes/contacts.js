@@ -10,6 +10,7 @@ const mondaySyncService = require("../services/mondaySyncService");
 const integrationHub = require("../services/integrationHub");
 const { importApolloLeads } = require("../services/apolloLeadService");
 const { ingestContacts, canonicalFieldMap, retryMondaySync } = require("../services/contactIngestionService");
+const emailVerificationService = require("../services/emailVerificationService");
 const Contact = require("../models/Contact");
 const Outreach = require("../models/Outreach");
 
@@ -112,6 +113,39 @@ router.get("/", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post("/email-verification/batches", async (req, res) => {
+  try {
+    const data = await emailVerificationService.createBatch(req.body?.emails);
+    return res.status(202).json({ success: true, data });
+  } catch (err) {
+    const providerStatus = err.response?.status;
+    const status = err.code === "email_verification_not_configured"
+      ? 503
+      : providerStatus === 401 || providerStatus === 403
+        ? 502
+        : 400;
+    return res.status(status).json({
+      success: false,
+      message: providerStatus
+        ? "Emailable could not start email verification. Check the API key and credit balance."
+        : err.message || "Unable to start email verification",
+    });
+  }
+});
+
+router.get("/email-verification/batches/:batchId", async (req, res) => {
+  try {
+    const data = await emailVerificationService.getBatch(req.params.batchId);
+    return res.json({ success: true, data });
+  } catch (err) {
+    const status = err.code === "email_verification_not_configured" ? 503 : 502;
+    return res.status(status).json({
+      success: false,
+      message: "Unable to retrieve email verification results",
+    });
   }
 });
 

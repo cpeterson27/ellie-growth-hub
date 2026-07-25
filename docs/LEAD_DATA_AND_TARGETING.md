@@ -10,6 +10,24 @@ contact records in Ellie.
 CSV is currently the richest initial import path. Monday becomes equally useful
 after its board column IDs are mapped in the Monday integration credentials.
 
+## Email verification during CSV import
+
+CSV email addresses are not saved immediately. After uploading the file:
+
+1. Review the preview and click **Verify emails**.
+2. Ellie sends only the unique email addresses to Emailable. A live Emailable
+   credit is normally used for each verification.
+3. Deliverable addresses are saved with `Email Status` set to `verified`.
+4. Risky, unknown, and undeliverable addresses are removed before the contact
+   reaches MongoDB. The contact is still imported without an email and receives
+   the `needs-email-verification` tag for later review.
+5. A suggested correction is displayed in the preview but is never applied
+   automatically.
+
+Keep `EMAILABLE_API_KEY` private in the backend environment. The deployed Render
+backend also needs this environment variable; setting it only in `backend/.env`
+configures local development.
+
 ## CSV fields
 
 Only a usable name is required. Email is strongly recommended because it is the
