@@ -14,6 +14,7 @@
 
 const Contact = require("../models/Contact");
 const MarketingCampaign = require("../models/MarketingCampaign");
+const { applyResearchClassification } = require("./contactResearchService");
 
 const integrationContactFields = ["phone", "title", "industry", "city", "state", "country", "linkedin", "website", "stage", "notes"];
 
@@ -531,8 +532,7 @@ class ContactService {
       updates
     );
 
-
-
+    applyResearchClassification(contact);
     await contact.save();
 
 

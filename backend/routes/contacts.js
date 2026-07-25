@@ -88,9 +88,12 @@ router.get("/", async (req, res) => {
       tags,
       limit = 50,
       skip = 0,
+      researchStatus,
+      qualifyContact,
+      emailStatus,
     } = req.query;
 
-    const query = status ? { status } : { $or: [{ status: "active" }, { status: { $exists: false } }, { status: null }] };
+    const query = status ? { status } : { status: { $ne: "archived" } };
     if (email) query.email = email;
     if (externalId) query.externalId = externalId;
     if (source) query.source = source;
@@ -99,6 +102,9 @@ router.get("/", async (req, res) => {
     }
     if (status) query.status = status;
     if (tags) query.tags = { $in: typeof tags === "string" ? [tags] : tags };
+    if (researchStatus) query.researchStatus = researchStatus;
+    if (qualifyContact !== undefined) query.qualifyContact = String(qualifyContact) === "true";
+    if (emailStatus) query.emailStatus = emailStatus;
 
     const total = await Contact.countDocuments(query);
     const contacts = await Contact.find(query)

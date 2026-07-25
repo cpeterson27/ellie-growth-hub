@@ -28,6 +28,25 @@ Keep `EMAILABLE_API_KEY` private in the backend environment. The deployed Render
 backend also needs this environment variable; setting it only in `backend/.env`
 configures local development.
 
+## Progressive contact research
+
+Ellie never guesses unreadable signup-sheet data. On CSV import, it checks
+`Company Name`, `Title`, and `Industry`, because those are the minimum useful
+targeting fields:
+
+- if any are blank, the contact enters **Needs Research**, receives the
+  `needs-research` tag, and cannot be marked qualified;
+- when all three are filled, the contact moves to **Ready for Review**;
+- a person becomes **Qualified** only after Ellie checks the qualification box;
+- verified email status remains a separate safety requirement for email
+  outreach.
+
+Use **Contacts → Needs Research → Edit** to fill confirmed information over
+time. The detail view shows exactly which targeting fields are still missing.
+Use the **Qualified** tab as the safe pool when associating people with targeted
+campaigns. `Lists` preserve the original event or source group, while `Tags`
+remain reusable audience labels.
+
 ## CSV fields
 
 Only a usable name is required. Email is strongly recommended because it is the

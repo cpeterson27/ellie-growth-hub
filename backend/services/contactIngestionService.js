@@ -2,6 +2,7 @@ const Contact = require("../models/Contact");
 const Campaign = require("../models/Campaign");
 const integrationHub = require("./integrationHub");
 const mondaySyncService = require("./mondaySyncService");
+const { applyResearchClassification } = require("./contactResearchService");
 
 const canonicalFieldMap = Object.fromEntries([
   ["First Name", "firstName"], ["Last Name", "lastName"], ["Title", "title"],
@@ -81,12 +82,24 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null, 
     if (contact) {
       Object.entries(data).forEach(([key, value]) => {
         if (key === "apolloFields") contact.apolloFields = { ...(contact.apolloFields || {}), ...(value || {}) };
+        else if (arrayFields.has(key) && Array.isArray(value)) contact[key] = [...new Set([...(contact[key] || []), ...value])];
         else if (value !== undefined && value !== "" && value !== null) contact[key] = value;
       });
       if (!contact.sources.includes(source)) contact.sources.push(source);
       summary.mongoUpdated += 1;
     }
-    else { contact = new Contact({ ...data, sources: [source], tags: [source], type: "lead", status: source === "manual" ? "active" : "prospect", importedAt: new Date() }); summary.mongoCreated += 1; }
+    else {
+      contact = new Contact({
+        ...data,
+        sources: [source],
+        tags: [...new Set([source, ...(data.tags || [])])],
+        type: "lead",
+        status: source === "manual" ? "active" : "prospect",
+        importedAt: new Date(),
+      });
+      summary.mongoCreated += 1;
+    }
+    applyResearchClassification(contact);
     if (campaign && !contact.campaignIds.some((id) => String(id) === String(campaign._id))) { contact.campaignIds.push(campaign._id); summary.campaignAssociated += 1; }
     await contact.save();
     if (!syncMonday || source === "monday") { summary.mondaySkipped += 1; continue; }

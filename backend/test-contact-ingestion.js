@@ -1,5 +1,6 @@
 const assert = require("assert");
 const { canonicalFieldMap, normalizeIncoming } = require("./services/contactIngestionService");
+const { applyResearchClassification, getMissingTargetingFields } = require("./services/contactResearchService");
 
 assert.strictEqual(canonicalFieldMap["Apollo Contact Id"], "apolloContactId");
 const contact = normalizeIncoming({
@@ -22,4 +23,13 @@ assert.strictEqual(normalizeIncoming({ name: "Name Only" }).email, "");
 const segmented = normalizeIncoming({ Name: "Jane Doe", Tags: "15k-program, multifamily", Notes: "Warm referral" }, "csv");
 assert.deepStrictEqual(segmented.tags, ["15k-program", "multifamily"]);
 assert.strictEqual(segmented.notes, "Warm referral");
+const incomplete = applyResearchClassification({ company: "", title: "Owner", industry: "", tags: ["event"] });
+assert.deepStrictEqual(getMissingTargetingFields(incomplete), ["company", "industry"]);
+assert.strictEqual(incomplete.researchStatus, "needs_research");
+assert.strictEqual(incomplete.qualifyContact, false);
+assert(incomplete.tags.includes("needs-research"));
+const complete = applyResearchClassification({ company: "Example Co", title: "Owner", industry: "Real Estate", tags: ["event"], qualifyContact: false, stage: "Needs Research" });
+assert.strictEqual(complete.researchStatus, "ready_for_review");
+assert.strictEqual(complete.stage, "Ready for Review");
+assert(!complete.tags.includes("needs-research"));
 console.log("Contact ingestion normalization tests passed");
