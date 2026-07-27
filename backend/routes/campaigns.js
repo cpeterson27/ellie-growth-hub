@@ -170,10 +170,15 @@ router.patch("/:id/registration-links", async (req, res) => {
     await campaign.save();
 
     if (campaign.eventId) {
+      const event = await Event.findById(campaign.eventId).select("channels");
+      const otherChannels = (event?.channels || []).filter(
+        (channel) => !["eventbrite", "meetup"].includes(String(channel).toLowerCase()),
+      );
       const activeChannels = [
-        eventbriteUrl ? "eventbrite" : "",
-        meetupUrl ? "meetup" : "",
-      ].filter(Boolean);
+        ...otherChannels,
+        ...(eventbriteUrl ? ["Eventbrite"] : []),
+        ...(meetupUrl ? ["Meetup"] : []),
+      ];
 
       await Event.findByIdAndUpdate(campaign.eventId, {
         "integrations.eventbrite.enabled": Boolean(eventbriteUrl),
@@ -181,7 +186,7 @@ router.patch("/:id/registration-links", async (req, res) => {
         "integrations.meetup.enabled": Boolean(meetupUrl),
         "integrations.meetup.url": meetupUrl,
         "integrations.meetup.eventId": meetupEventId,
-        ...(activeChannels.length ? { $addToSet: { channels: { $each: activeChannels } } } : {}),
+        channels: activeChannels,
       });
     }
 
