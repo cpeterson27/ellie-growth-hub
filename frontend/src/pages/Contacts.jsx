@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import "./Contacts.css";
+import "./ContactVerification.css";
 
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
@@ -73,6 +74,7 @@ export default function Contacts() {
   const [verificationProgress, setVerificationProgress] = useState(null);
   const [verificationResults, setVerificationResults] = useState({});
   const [importError, setImportError] = useState("");
+  const [existingBatchId, setExistingBatchId] = useState(() => localStorage.getItem("ellie-email-verification-batch") || "");
   const tableColumns = [...columns, { header: "Actions", render: (contact) => <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}><button className="crm-overflow" onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>⋮</button>{actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View Contact</button><button onClick={() => setEditingContact({ ...contact })}>Edit</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete</button></div> : null}</div> }];
 
   async function loadContacts() {
@@ -226,17 +228,52 @@ export default function Contacts() {
     return counts;
   }, {});
 
+  function getLocalInvalidResults() {
+    return Object.fromEntries(
+      emailsToVerify
+        .filter((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        .map((email) => [email, { email, state: "undeliverable", reason: "invalid_format" }]),
+    );
+  }
+
+  async function pollEmailVerificationBatch(batchId, invalidResults) {
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      if (attempt) await new Promise((resolve) => setTimeout(resolve, 2000));
+      const response = await fetchEmailVerificationBatch(batchId);
+      const batch = response.data || {};
+      setVerificationProgress({ processed: (batch.processed || 0) + Object.keys(invalidResults).length, total: emailsToVerify.length });
+      const returnedResults = Array.isArray(batch.results)
+        ? Object.fromEntries(batch.results.map((result) => [result.email, result]))
+        : {};
+      if (Array.isArray(batch.results) && batch.results.length) {
+        setVerificationResults({ ...invalidResults, ...returnedResults });
+      }
+      if (batch.complete) {
+        const completedResults = { ...invalidResults, ...returnedResults };
+        emailsToVerify.forEach((email) => {
+          if (!completedResults[email]) {
+            completedResults[email] = {
+              email,
+              state: "unknown",
+              reason: "provider_result_missing",
+            };
+          }
+        });
+        setVerificationResults(completedResults);
+        setVerificationProgress({ processed: emailsToVerify.length, total: emailsToVerify.length });
+        return;
+      }
+    }
+    throw new Error("Email verification is taking longer than expected. Resume this batch again shortly.");
+  }
+
   async function verifyImportedEmails() {
     if (!emailsToVerify.length) return;
     try {
       setVerifyingEmails(true);
       setImportError("");
       const plausibleEmails = emailsToVerify.filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
-      const invalidResults = Object.fromEntries(
-        emailsToVerify
-          .filter((email) => !plausibleEmails.includes(email))
-          .map((email) => [email, { email, state: "undeliverable", reason: "invalid_format" }]),
-      );
+      const invalidResults = getLocalInvalidResults();
       setVerificationResults(invalidResults);
       setVerificationProgress({ processed: 0, total: emailsToVerify.length });
       if (!plausibleEmails.length) {
@@ -246,21 +283,34 @@ export default function Contacts() {
       const created = await createEmailVerificationBatch(plausibleEmails);
       const batchId = created.data?.id;
       if (!batchId) throw new Error("Emailable did not return a batch ID");
-
-      for (let attempt = 0; attempt < 90; attempt += 1) {
-        if (attempt) await new Promise((resolve) => setTimeout(resolve, 2000));
-        const response = await fetchEmailVerificationBatch(batchId);
-        const batch = response.data || {};
-        setVerificationProgress({ processed: (batch.processed || 0) + Object.keys(invalidResults).length, total: emailsToVerify.length });
-        if (Array.isArray(batch.results) && batch.results.length) {
-          setVerificationResults({ ...invalidResults, ...Object.fromEntries(batch.results.map((result) => [result.email, result])) });
-        }
-        if (batch.complete) return;
-      }
-      throw new Error("Email verification is taking longer than expected. Try again shortly.");
+      setExistingBatchId(batchId);
+      localStorage.setItem("ellie-email-verification-batch", batchId);
+      await pollEmailVerificationBatch(batchId, invalidResults);
     } catch (err) {
       setVerificationProgress(null);
       setImportError(err.response?.data?.message || err.message || "Unable to verify emails");
+    } finally {
+      setVerifyingEmails(false);
+    }
+  }
+
+  async function resumeImportedEmailVerification() {
+    const batchId = existingBatchId.trim();
+    if (!batchId) {
+      setImportError("Paste the batch ID from the original verification request.");
+      return;
+    }
+    try {
+      setVerifyingEmails(true);
+      setImportError("");
+      localStorage.setItem("ellie-email-verification-batch", batchId);
+      const invalidResults = getLocalInvalidResults();
+      setVerificationResults(invalidResults);
+      setVerificationProgress({ processed: 0, total: emailsToVerify.length });
+      await pollEmailVerificationBatch(batchId, invalidResults);
+    } catch (err) {
+      setVerificationProgress(null);
+      setImportError(err.response?.data?.message || err.message || "Unable to resume this verification batch.");
     } finally {
       setVerifyingEmails(false);
     }
@@ -379,13 +429,19 @@ export default function Contacts() {
             <Button variant="outline" loading={verifyingEmails} disabled={verifyingEmails} onClick={verifyImportedEmails}>
               {pendingEmailCount ? `Verify ${emailsToVerify.length} emails` : "Verify again"}
             </Button>
+            <div className="verification-resume">
+              <input className="select-input" value={existingBatchId} onChange={(event) => setExistingBatchId(event.target.value)} placeholder="Existing Emailable batch ID" />
+              <Button variant="outline" disabled={verifyingEmails || !existingBatchId.trim()} onClick={resumeImportedEmailVerification}>Resume paid batch</Button>
+              <small>This retrieves existing results and does not start a new paid verification.</small>
+            </div>
             {verificationProgress ? <div className="verification-progress">
               <span style={{ width: `${Math.min(100, Math.round((verificationProgress.processed / Math.max(1, verificationProgress.total)) * 100))}%` }} />
             </div> : null}
             {Object.keys(verificationResults).length ? <p className="verification-summary">
-              Deliverable: {verificationCounts.deliverable || 0} · Risky: {verificationCounts.risky || 0} · Undeliverable: {verificationCounts.undeliverable || 0} · Unknown: {verificationCounts.unknown || 0}
+              Deliverable: {verificationCounts.deliverable || 0} · Risky: {verificationCounts.risky || 0} · Undeliverable: {verificationCounts.undeliverable || 0} · Unknown: {verificationCounts.unknown || 0} · Pending: {pendingEmailCount}
             </p> : null}
           </div> : null}
+          <p className="contact-modal-intro">Showing the first {Math.min(5, importRows.length)} rows as a preview. Verification applies to all {importRows.length} rows.</p>
           <div style={{ overflowX: "auto", marginTop: "0.75rem" }}><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => { const result = verificationResults[String(row.Email || "").toLowerCase()]; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{row["Work Direct Phone"] || row.Phone}</td><td>{row["Company Name"] || row.Company}</td><td>{row.Title}</td><td>{[row.City, row.State].filter(Boolean).join(", ")}</td><td>CSV import</td></tr>; })}</tbody></table></div>
           <p>{importRows.length} rows ready. Deliverable emails are saved. Risky, unknown, and undeliverable addresses are removed while the contact is retained and tagged for review.</p>
         </>}

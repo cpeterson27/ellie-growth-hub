@@ -1,0 +1,24 @@
+.verification-resume {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(18, 114, 93, 0.14);
+}
+
+.verification-resume small {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .verification-resume {
+    grid-template-columns: 1fr;
+  }
+
+  .verification-resume small {
+    grid-column: auto;
+  }
+}
