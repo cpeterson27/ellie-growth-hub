@@ -288,6 +288,71 @@
   font-size: 0.88rem;
   line-height: 1.45;
 }
+
+.contact-decision-step {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.85rem;
+  border: 1px solid #d6e4df;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.contact-decision-step > input {
+  width: 20px;
+  height: 20px;
+  margin: 0.2rem 0 0 0.3rem;
+  accent-color: #176655;
+}
+
+.contact-decision-step strong,
+.contact-decision-step small {
+  display: block;
+}
+
+.contact-decision-step small {
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.contact-decision-step .form-field {
+  width: 100%;
+}
+
+.contact-decision-step__number {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: #176655;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.contact-decision-guidance,
+.contact-decision-success {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.contact-decision-guidance {
+  background: #eef2f0;
+  color: var(--text-muted);
+}
+
+.contact-decision-success {
+  background: #dff5eb;
+  color: #105c49;
+  font-weight: 750;
+}
 .contact-bulk-actions {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 0.8fr) auto;

@@ -564,32 +564,49 @@ export default function Contacts() {
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
       <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Research", ["researchStatus", "missingFields", "qualifyContact", "stage", "tags", "lists"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments"]], ["Marketing", ["keywords", "lastContacted", "notes"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : typeof detailContact[field] === "boolean" ? (detailContact[field] ? "Yes" : "No") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
-      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Research, Qualify & Assign" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>Save Contact Decision</Button></>}>{editingContact ? <>
-        <p className="contact-modal-intro"><strong>Name and a verified email are enough to qualify someone.</strong> Company, title, and industry improve targeting but are optional and can be completed later.</p>
+      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Prepare Contact for a Campaign" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? <>
+        <p className="contact-modal-intro"><strong>A name and a confirmed email are enough to add someone to a campaign.</strong> Company, title, and industry are optional and can be completed later.</p>
         <div className="contact-form-grid">
           {["name", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}
-          {editingContact.emailStatus !== "verified" && editingContact.email ? <label className="contact-qualify-choice span-2">
-            <input type="checkbox" checked={Boolean(editingContact.confirmEmailManually)} onChange={(event) => setEditingContact({ ...editingContact, confirmEmailManually: event.target.checked })} />
-            <span><strong>I personally confirmed this email address</strong><small>Marks the address as owner-confirmed with a timestamp, so Angela can become Campaign Ready without paying to verify it again.</small></span>
-          </label> : null}
           <fieldset className="contact-decision-panel span-2">
-            <legend>Campaign decision</legend>
-            <label className="contact-qualify-choice">
-              <input type="checkbox" checked={Boolean(editingContact.qualifyContact)} onChange={(event) => setEditingContact({ ...editingContact, qualifyContact: event.target.checked })} />
-              <span><strong>This person is a good fit</strong><small>Move them to Campaign Ready now when their name and email are verified.</small></span>
-            </label>
-            <label className="form-field">
-              <span>Assign to campaign</span>
-              <select className="select-input" value={String(editingContact.campaignIds?.[0] || "")} onChange={(event) => setEditingContact({ ...editingContact, campaignIds: event.target.value ? [event.target.value] : [] })}>
-                <option value="">No campaign assigned</option>
-                {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
-              </select>
-            </label>
-            {editingContact.emailStatus !== "verified"
-              ? <p className="contact-decision-warning">A verified email is required before this person can become Campaign Ready.</p>
-              : (!editingContact.company || !editingContact.title || !editingContact.industry)
-                ? <p className="contact-decision-warning">Optional targeting information is still missing. You may qualify and campaign to this person now, then enrich the record later.</p>
-                : null}
+            <legend>Three steps to add this contact</legend>
+            <div className="contact-decision-step">
+              <span className="contact-decision-step__number">1</span>
+              {editingContact.emailStatus === "verified"
+                ? <div><strong>Email confirmed</strong><small>This address is ready for outreach.</small></div>
+                : editingContact.email
+                  ? <label className="contact-qualify-choice">
+                    <input type="checkbox" checked={Boolean(editingContact.confirmEmailManually)} onChange={(event) => setEditingContact({ ...editingContact, confirmEmailManually: event.target.checked })} />
+                    <span><strong>I know this email address is correct</strong><small>Use this when the person gave you the address or you already confirmed it yourself. No verification credit will be used.</small></span>
+                  </label>
+                  : <div><strong>Add an email address</strong><small>An email is required before this contact can receive a campaign.</small></div>}
+            </div>
+            <div className="contact-decision-step">
+              <span className="contact-decision-step__number">2</span>
+              <label className="contact-qualify-choice">
+                <input type="checkbox" checked={Boolean(editingContact.qualifyContact)} onChange={(event) => setEditingContact({ ...editingContact, qualifyContact: event.target.checked })} />
+                <span><strong>This person is a good fit</strong><small>Include this contact in the audience for the selected campaign.</small></span>
+              </label>
+            </div>
+            <div className="contact-decision-step">
+              <span className="contact-decision-step__number">3</span>
+              <label className="form-field">
+                <span>Choose the campaign</span>
+                <select className="select-input" value={String(editingContact.campaignIds?.[0] || "")} onChange={(event) => setEditingContact({ ...editingContact, campaignIds: event.target.value ? [event.target.value] : [] })}>
+                  <option value="">Select a campaign</option>
+                  {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
+                </select>
+              </label>
+            </div>
+            {!editingContact.email
+              ? <p className="contact-decision-warning">Add an email address to continue.</p>
+              : editingContact.emailStatus !== "verified" && !editingContact.confirmEmailManually
+                ? <p className="contact-decision-warning">Check “I know this email address is correct” to continue without using a verification credit.</p>
+                : !editingContact.qualifyContact
+                  ? <p className="contact-decision-guidance">Check “This person is a good fit” if you want to include them.</p>
+                  : !editingContact.campaignIds?.length
+                    ? <p className="contact-decision-guidance">Choose which campaign should receive this contact.</p>
+                    : <p className="contact-decision-success">Ready to save. This contact will be added to the selected campaign. No email will be sent yet.</p>}
           </fieldset>
         </div>
       </> : null}</Modal>
