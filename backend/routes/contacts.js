@@ -127,16 +127,30 @@ router.post("/email-verification/batches", async (req, res) => {
     return res.status(202).json({ success: true, data });
   } catch (err) {
     const providerStatus = err.response?.status;
+    const providerMessage = String(
+      err.response?.data?.message ||
+      err.response?.data?.error ||
+      "",
+    ).trim();
     const status = err.code === "email_verification_not_configured"
       ? 503
-      : providerStatus === 401 || providerStatus === 403
+      : providerStatus
         ? 502
         : 400;
+    const message = err.code === "email_verification_not_configured"
+      ? "Email verification is not configured on the server."
+      : providerStatus === 401 || providerStatus === 403
+        ? "Emailable rejected the API key. Confirm the live private key in Render."
+        : providerStatus === 402
+          ? "Emailable does not have enough credits for this batch. Add credits or verify a smaller file."
+          : providerStatus === 400
+            ? providerMessage || "Emailable rejected the batch details."
+            : providerStatus
+              ? providerMessage || "Emailable could not start email verification."
+              : err.message || "Unable to start email verification";
     return res.status(status).json({
       success: false,
-      message: providerStatus
-        ? "Emailable could not start email verification. Check the API key and credit balance."
-        : err.message || "Unable to start email verification",
+      message,
     });
   }
 });

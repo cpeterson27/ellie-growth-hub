@@ -64,7 +64,7 @@ async function createBatch(emails) {
 
   const response = await emailable.post(
     "/batch",
-    { emails: cleaned.join(","), retries: 1 },
+    { emails: cleaned.join(","), retries: true },
     { headers: { Authorization: `Bearer ${requireApiKey()}` } },
   );
   return { id: String(response.data?.id || ""), total: cleaned.length };

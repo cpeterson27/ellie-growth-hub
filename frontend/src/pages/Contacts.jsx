@@ -72,6 +72,7 @@ export default function Contacts() {
   const [verifyingEmails, setVerifyingEmails] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(null);
   const [verificationResults, setVerificationResults] = useState({});
+  const [importError, setImportError] = useState("");
   const tableColumns = [...columns, { header: "Actions", render: (contact) => <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}><button className="crm-overflow" onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>⋮</button>{actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View Contact</button><button onClick={() => setEditingContact({ ...contact })}>Edit</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete</button></div> : null}</div> }];
 
   async function loadContacts() {
@@ -176,8 +177,8 @@ export default function Contacts() {
       })));
       const valid = rows.filter((row) => row.Name || row["First Name"] || row["Last Name"]).length;
       const emails = rows.filter((row) => !row.Email).length;
-      setImportHeaders(meta.fields || []); setImportRows(rows); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setError(errors.length ? "Some rows have malformed column counts." : ""); setUploadOpen(true);
-    }, error: () => setError("Unable to parse contact file.") });
+      setImportHeaders(meta.fields || []); setImportRows(rows); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setImportError(errors.length ? "Some rows have malformed column counts." : ""); setError(""); setUploadOpen(true);
+    }, error: () => setImportError("Unable to parse contact file.") });
   }
 
   async function saveIngestion(contactsToSave, source, selectedCampaignId) {
@@ -229,7 +230,7 @@ export default function Contacts() {
     if (!emailsToVerify.length) return;
     try {
       setVerifyingEmails(true);
-      setError("");
+      setImportError("");
       const plausibleEmails = emailsToVerify.filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
       const invalidResults = Object.fromEntries(
         emailsToVerify
@@ -258,7 +259,8 @@ export default function Contacts() {
       }
       throw new Error("Email verification is taking longer than expected. Try again shortly.");
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Unable to verify emails");
+      setVerificationProgress(null);
+      setImportError(err.response?.data?.message || err.message || "Unable to verify emails");
     } finally {
       setVerifyingEmails(false);
     }
@@ -362,6 +364,7 @@ export default function Contacts() {
         title="Import Contacts"
         footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import safe contacts</Button></>}
       >
+        {importError ? <p className="form-error" role="alert">{importError}</p> : null}
         {!importRows.length ? <><p>Upload a CSV or paste comma- or tab-separated data. Excel files are not supported in this build.</p><input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} /><textarea className="select-input" style={{ width: "100%", marginTop: "0.75rem", minHeight: "130px" }} placeholder="Paste header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) prepareImport(event.target.value); }} /></> : <>
           <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p><p>Duplicate candidates are checked by the shared ingestion service during import.</p>
           <p>Detected headers: {importHeaders.join(", ")}</p>
