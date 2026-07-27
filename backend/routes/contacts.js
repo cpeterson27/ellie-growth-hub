@@ -224,6 +224,54 @@ router.get("/email-verification/batches/:batchId", async (req, res) => {
   }
 });
 
+router.get("/overview", async (req, res) => {
+  try {
+    const active = { status: { $ne: "archived" } };
+    const [
+      total,
+      verified,
+      risky,
+      undeliverable,
+      withoutEmail,
+      needsResearch,
+      readyForReview,
+      qualified,
+      missingFields,
+    ] = await Promise.all([
+      Contact.countDocuments(active),
+      Contact.countDocuments({ ...active, emailStatus: "verified", email: { $type: "string", $ne: "" } }),
+      Contact.countDocuments({ ...active, emailStatus: "risky" }),
+      Contact.countDocuments({ ...active, emailStatus: "undeliverable" }),
+      Contact.countDocuments({ ...active, $or: [{ email: { $exists: false } }, { email: "" }, { email: null }] }),
+      Contact.countDocuments({ ...active, researchStatus: "needs_research" }),
+      Contact.countDocuments({ ...active, researchStatus: "ready_for_review" }),
+      Contact.countDocuments({ ...active, researchStatus: "qualified", qualifyContact: true }),
+      Contact.aggregate([
+        { $match: active },
+        { $unwind: "$missingFields" },
+        { $group: { _id: "$missingFields", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
+    return res.json({
+      success: true,
+      data: {
+        total,
+        verified,
+        risky,
+        undeliverable,
+        withoutEmail,
+        needsResearch,
+        readyForReview,
+        qualified,
+        missingFields: Object.fromEntries(missingFields.map((item) => [item._id, item.count])),
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: "Unable to summarize contacts" });
+  }
+});
+
 /**
  * GET /api/contacts/:id
  * Get single contact

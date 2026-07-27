@@ -1,0 +1,142 @@
+.contact-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.contact-overview button {
+  display: grid;
+  gap: 0.2rem;
+  min-height: 118px;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-strong);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.contact-overview button:hover {
+  border-color: #91b5aa;
+  box-shadow: 0 8px 22px rgba(20, 48, 42, 0.08);
+}
+
+.contact-overview button.is-safe {
+  background: #edf9f4;
+}
+
+.contact-overview button.is-warning {
+  background: #fff8e8;
+}
+
+.contact-overview span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.contact-overview strong {
+  font-size: 1.8rem;
+}
+
+.contact-overview small,
+.contact-guidance {
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.contact-guidance {
+  padding: 0.9rem 1rem;
+  border-left: 4px solid var(--primary);
+  border-radius: 0 10px 10px 0;
+  background: var(--background);
+}
+
+.contact-status-badge {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0.26rem 0.5rem;
+  border-radius: 999px;
+  background: #eceae4;
+  color: #665f55;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: normal;
+}
+
+.contact-status-badge--verified {
+  background: #d9f4e9;
+  color: #12634f;
+}
+
+.contact-status-badge--risky {
+  background: #fff0c9;
+  color: #7b5700;
+}
+
+.contact-status-badge--undeliverable {
+  background: #fee4e2;
+  color: #a1241c;
+}
+
+.contacts-page .table-wrap {
+  overflow-x: auto !important;
+}
+
+.contacts-page .table {
+  min-width: 1280px !important;
+  table-layout: auto !important;
+}
+
+.contacts-page .table th,
+.contacts-page .table td {
+  width: auto !important;
+  min-width: 120px;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  vertical-align: top;
+}
+
+.contacts-page .table th {
+  white-space: nowrap !important;
+}
+
+.contacts-page .table th:first-child,
+.contacts-page .table td:first-child {
+  min-width: 170px;
+}
+
+.contacts-page .table th:nth-child(4),
+.contacts-page .table td:nth-child(4) {
+  min-width: 220px;
+}
+
+.contacts-page .table th:last-child,
+.contacts-page .table td:last-child {
+  min-width: 70px;
+}
+
+@media (max-width: 900px) {
+  .contact-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .contact-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .contacts-page .table {
+    min-width: 0 !important;
+  }
+
+  .contacts-page .table td {
+    min-width: 0;
+  }
+}

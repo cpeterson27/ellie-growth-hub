@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import "./Contacts.css";
 import "./ContactVerification.css";
+import "./ContactDashboard.css";
 
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
@@ -10,6 +11,7 @@ import Modal from "../components/Modal.jsx";
 import Table from "../components/Table.jsx";
 import {
   fetchContacts,
+  fetchContactOverview,
   fetchCampaigns,
   importContactsFromApollo,
   ingestContacts,
@@ -25,9 +27,11 @@ const columns = [
   { header: "Name", accessor: "name" },
   { header: "Company", accessor: "company" },
   { header: "Title", accessor: "title" },
-  { header: "Email", accessor: "email" }, { header: "Phone", accessor: "phone" },
-  { header: "Research", accessor: "researchStatus", render: (contact) => String(contact.researchStatus || "needs_research").replaceAll("_", " ") },
-  { header: "Status", accessor: "status" },
+  { header: "Email", accessor: "email", render: (contact) => contact.email || "Withheld" },
+  { header: "Email safety", accessor: "emailStatus", render: (contact) => <span className={`contact-status-badge contact-status-badge--${contact.emailStatus || "missing"}`}>{contact.emailStatus === "verified" ? "Verified" : contact.emailStatus === "risky" ? "Risky — withheld" : contact.emailStatus === "undeliverable" ? "Undeliverable — withheld" : "No verified email"}</span> },
+  { header: "Phone", accessor: "phone" },
+  { header: "Research status", accessor: "researchStatus", render: (contact) => String(contact.researchStatus || "needs_research").replaceAll("_", " ") },
+  { header: "Missing information", accessor: "missingFields", render: (contact) => contact.missingFields?.length ? contact.missingFields.join(", ") : "Complete" },
 ];
 
 const recognizedImportHeaders = ["Name", "First Name", "Last Name", "Title", "Company Name", "Email", "Email Status", "Phone", "Work Direct Phone", "Person Linkedin Url", "Website", "City", "State", "Country", "# Employees", "Industry", "Seniority", "Departments", "Keywords", "Lists", "Stage", "Qualify Contact", "Tags", "Notes", "Apollo Contact Id", "Apollo Record Id"];
@@ -42,6 +46,7 @@ const importCopy = {
 export default function Contacts() {
   const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
+  const [contactOverview, setContactOverview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [selectedSource, setSelectedSource] = useState(null);
@@ -80,17 +85,29 @@ export default function Contacts() {
   async function loadContacts() {
     try {
       setLoading(true);
-      const query = contactTab === "archived"
-        ? { status: "archived" }
-        : contactTab === "research"
-          ? { researchStatus: "needs_research" }
-          : contactTab === "qualified"
-            ? { researchStatus: "qualified", qualifyContact: true }
-            : contactTab === "active"
-              ? { status: "active" }
-            : {};
+      const query = { limit: 500, ...(contactTab === "archived" ? { status: "archived" } : {}) };
       const response = await fetchContacts(query);
-      setContacts((response.data || []).filter((contact) => (!campaignId || contact.campaignIds?.some((id) => String(id) === campaignId)) && (!searchTerm || [contact.name, contact.company, contact.email].join(" ").toLowerCase().includes(searchTerm.toLowerCase()))));
+      const items = (response.data || []).filter((contact) => {
+        const tabMatches = contactTab === "verified"
+          ? contact.emailStatus === "verified"
+          : contactTab === "email_review"
+            ? contact.emailStatus !== "verified"
+            : contactTab === "research"
+              ? contact.researchStatus === "needs_research"
+              : contactTab === "ready"
+                ? contact.researchStatus === "ready_for_review"
+                : contactTab === "qualified"
+                  ? contact.researchStatus === "qualified" && contact.qualifyContact
+                  : true;
+        return tabMatches &&
+          (!campaignId || contact.campaignIds?.some((id) => String(id) === campaignId)) &&
+          (!searchTerm || [contact.name, contact.company, contact.email, contact.title].join(" ").toLowerCase().includes(searchTerm.toLowerCase()));
+      });
+      setContacts(items);
+      if (contactTab !== "archived") {
+        const overview = await fetchContactOverview();
+        setContactOverview(overview.data);
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load contacts");
     } finally {
@@ -344,7 +361,7 @@ export default function Contacts() {
   }
 
   return (
-    <div className="page-dashboard">
+    <div className="page-dashboard contacts-page">
       <div className="page-header">
         <div>
           <h1 className="page-title">Contacts</h1>
@@ -366,8 +383,19 @@ export default function Contacts() {
           <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated, {importSummary.failed || 0} failed.</p>
           {importSummary.failed && importSummary.errors?.[0]?.message ? <p>First failure: {importSummary.errors[0].message}</p> : null}
         </div> : null}
+        {contactOverview ? <section className="contact-overview" aria-label="Contact status overview">
+          <button onClick={() => setContactTab("all")}><span>Total contacts</span><strong>{contactOverview.total}</strong><small>Unique people in MongoDB</small></button>
+          <button className="is-safe" onClick={() => setContactTab("verified")}><span>Verified emails</span><strong>{contactOverview.verified}</strong><small>Safe for reviewed outreach</small></button>
+          <button className="is-warning" onClick={() => setContactTab("email_review")}><span>Email review</span><strong>{contactOverview.withoutEmail}</strong><small>{contactOverview.risky} risky · {contactOverview.undeliverable} undeliverable</small></button>
+          <button onClick={() => setContactTab("research")}><span>Needs research</span><strong>{contactOverview.needsResearch}</strong><small>Missing company, title, or industry</small></button>
+          <button onClick={() => setContactTab("ready")}><span>Ready for review</span><strong>{contactOverview.readyForReview}</strong><small>Research complete; needs a decision</small></button>
+          <button onClick={() => setContactTab("qualified")}><span>Qualified</span><strong>{contactOverview.qualified}</strong><small>Approved for targeted campaigns</small></button>
+        </section> : null}
+        {contactOverview ? <p className="contact-guidance">
+          <strong>What to do next:</strong> Start with Needs Research. Missing fields across the database: company {contactOverview.missingFields?.company || 0}, title {contactOverview.missingFields?.title || 0}, industry {contactOverview.missingFields?.industry || 0}. Email Review contains contacts whose address was withheld because it was risky, undeliverable, or absent.
+        </p> : null}
         <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
-        <div className="crm-tabs">{[["all", "All"], ["research", "Needs Research"], ["qualified", "Qualified"], ["active", "Active"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
+        <div className="crm-tabs">{[["all", "All"], ["verified", "Verified Email"], ["email_review", "Email Review"], ["research", "Needs Research"], ["ready", "Ready for Review"], ["qualified", "Qualified"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
         <Table
           columns={tableColumns}
           data={contacts}

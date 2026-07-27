@@ -139,6 +139,9 @@ export const fetchContacts = (params = {}) =>
     .get("/contacts", { params })
     .then((res) => res.data);
 
+export const fetchContactOverview = () =>
+  api.get("/contacts/overview").then((res) => res.data);
+
 
 export const fetchIntegrationHub = () =>
   api
