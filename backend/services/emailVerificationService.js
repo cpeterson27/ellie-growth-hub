@@ -50,8 +50,8 @@ function normalizeBatch(data = {}) {
   const results = Array.isArray(data.emails)
     ? data.emails.map(normalizeVerificationResult).filter((item) => item.email)
     : [];
-  const processed = Number(data.processed || results.length || 0);
-  const total = Number(data.total || processed || 0);
+  const processed = Number(data.total_counts?.processed ?? data.processed ?? results.length ?? 0);
+  const total = Number(data.total_counts?.total ?? data.total ?? processed ?? 0);
   return {
     id: String(data.id || ""),
     processed,
