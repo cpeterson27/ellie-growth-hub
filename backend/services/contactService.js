@@ -523,6 +523,29 @@ class ContactService {
 
     }
 
+    const confirmEmailManually = updates.confirmEmailManually === true;
+    delete updates.confirmEmailManually;
+    const currentEmail = String(contact.email || "").trim().toLowerCase();
+    const nextEmail = updates.email === undefined
+      ? currentEmail
+      : String(updates.email || "").trim().toLowerCase();
+
+    if (updates.email !== undefined) updates.email = nextEmail;
+    if (nextEmail !== currentEmail) {
+      updates.emailStatus = "";
+      updates.primaryEmailVerificationSource = "";
+      updates.emailConfidence = "";
+      updates.primaryEmailLastVerifiedAt = null;
+    }
+
+    if (confirmEmailManually) {
+      if (!nextEmail) throw new Error("Add an email address before confirming it");
+      updates.emailStatus = "verified";
+      updates.primaryEmailVerificationSource = "owner_confirmation";
+      updates.emailConfidence = "personally_confirmed";
+      updates.primaryEmailLastVerifiedAt = new Date();
+    }
+
 
 
 

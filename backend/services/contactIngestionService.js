@@ -64,6 +64,16 @@ function normalizeIncoming(row, source = "manual") {
   for (const field of dateFields) if (mapped[field]) mapped[field] = new Date(mapped[field]);
   mapped.email = String(mapped.email || "").trim().toLowerCase();
   if (!mapped.email) delete mapped.email;
+  const manuallyConfirmedEmail = source === "manual"
+    && Boolean(mapped.email)
+    && truthy(mapped.confirmEmailManually);
+  delete mapped.confirmEmailManually;
+  if (manuallyConfirmedEmail) {
+    mapped.emailStatus = "verified";
+    mapped.primaryEmailVerificationSource = "owner_confirmation";
+    mapped.emailConfidence = "personally_confirmed";
+    mapped.primaryEmailLastVerifiedAt = new Date();
+  }
   mapped.linkedin = normalizeUrl(mapped.linkedin || mapped.linkedinUrl);
   if (!mapped.title && mapped.seniority && !/^[+()\d\s.-]{7,}$/.test(String(mapped.seniority))) mapped.title = mapped.seniority;
   mapped.name = String(mapped.name || `${mapped.firstName || ""} ${mapped.lastName || ""}`).trim();

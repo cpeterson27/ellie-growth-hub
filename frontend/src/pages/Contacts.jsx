@@ -51,7 +51,7 @@ export default function Contacts() {
   const [importSummary, setImportSummary] = useState(null);
   const [isContactFormOpen, setContactFormOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
-  const [manualContact, setManualContact] = useState({ name: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "" });
+  const [manualContact, setManualContact] = useState({ name: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", confirmEmailManually: false });
   const [importRows, setImportRows] = useState([]);
   const [importHeaders, setImportHeaders] = useState([]);
   const [importCampaignId, setImportCampaignId] = useState("");
@@ -225,7 +225,7 @@ export default function Contacts() {
   async function saveManualContact() {
     if (!manualContact.name.trim()) { setError("Enter a name to save this contact."); return; }
     const saved = await saveIngestion([{ ...manualContact, city: manualContact.location, tags: manualContact.tags.split(",").map((tag) => tag.trim()).filter(Boolean) }], "manual", importCampaignId);
-    if (saved) { setContactFormOpen(false); setManualContact({ name: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "" }); }
+    if (saved) { setContactFormOpen(false); setManualContact({ name: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", confirmEmailManually: false }); }
   }
 
   async function saveUploadedContacts() {
@@ -515,6 +515,10 @@ export default function Contacts() {
         <div className="contact-form-grid">
           {[["name", "Name *"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /></label>)}
           <label className="form-field"><span>Campaign</span><select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
+          {manualContact.email ? <label className="contact-qualify-choice span-2">
+            <input type="checkbox" checked={manualContact.confirmEmailManually} onChange={(event) => setManualContact({ ...manualContact, confirmEmailManually: event.target.checked })} />
+            <span><strong>I personally confirmed this email address</strong><small>Use this only when the person gave you the address directly or you already confirmed it. Ellie records this as owner-confirmed, not Emailable-verified.</small></span>
+          </label> : null}
         </div>
         <label className="form-field contact-notes"><span>Notes</span><textarea className="select-input" value={manualContact.notes} onChange={(event) => setManualContact({ ...manualContact, notes: event.target.value })} /></label>
       </Modal>
@@ -564,6 +568,10 @@ export default function Contacts() {
         <p className="contact-modal-intro"><strong>Name and a verified email are enough to qualify someone.</strong> Company, title, and industry improve targeting but are optional and can be completed later.</p>
         <div className="contact-form-grid">
           {["name", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}
+          {editingContact.emailStatus !== "verified" && editingContact.email ? <label className="contact-qualify-choice span-2">
+            <input type="checkbox" checked={Boolean(editingContact.confirmEmailManually)} onChange={(event) => setEditingContact({ ...editingContact, confirmEmailManually: event.target.checked })} />
+            <span><strong>I personally confirmed this email address</strong><small>Marks the address as owner-confirmed with a timestamp, so Angela can become Campaign Ready without paying to verify it again.</small></span>
+          </label> : null}
           <fieldset className="contact-decision-panel span-2">
             <legend>Campaign decision</legend>
             <label className="contact-qualify-choice">
