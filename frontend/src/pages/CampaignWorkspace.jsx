@@ -5,6 +5,7 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import { assignCampaignAudience, fetchCampaign, previewCampaignAudience } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
+import "./CampaignRegistration.css";
 
 const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Evergreen";
 const formatMoney = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -52,6 +53,10 @@ export default function CampaignWorkspace() {
   const overview = isProgram
     ? [["Offer", campaign.programName || "Premium program"], ["Audience", campaign.audience?.join(", ") || "Not specified"], ["Campaign type", "Program enrollment"]]
     : [["Event date", formatDate(campaign.startDate)], ["Ticket price", formatMoney(campaign.ticketPrice)], ["Registration goal", campaign.ticketGoal || "Not specified"], ["Audience", campaign.audience?.join(", ") || "Not specified"]];
+  const registrationLinks = [
+    ["Eventbrite", campaign.registrationLinks?.eventbrite],
+    ["Meetup", campaign.registrationLinks?.meetup],
+  ].filter(([, link]) => link?.enabled && link?.url);
 
   return (
     <div className="page-dashboard campaign-workspace">
@@ -80,6 +85,16 @@ export default function CampaignWorkspace() {
           <p><strong>Subject</strong><br />{campaign.content?.subject || "No subject set yet."}</p>
           <p className="campaign-workspace__body-preview">{campaign.content?.body || "Your outreach draft will appear here after it is prepared."}</p>
         </DashboardCard>
+
+        {!isProgram && <DashboardCard title="Registration channels">
+          {registrationLinks.length ? <div className="campaign-registration-links">
+            {registrationLinks.map(([provider, link], index) => <a href={link.url} target="_blank" rel="noreferrer" key={provider}>
+              <span>{index === 0 ? "Primary registration" : "Additional listing"}</span>
+              <strong>{provider}</strong>
+              <small>{index === 0 ? "Ticket checkout and main email button" : "Meetup discovery and RSVPs"} ↗</small>
+            </a>)}
+          </div> : <p className="campaign-workspace__empty">No registration channels connected yet.</p>}
+        </DashboardCard>}
 
         <DashboardCard title="Matched audience">
           {audienceMatch ? <>

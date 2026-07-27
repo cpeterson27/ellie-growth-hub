@@ -65,6 +65,20 @@ const campaignSchema = new mongoose.Schema(
 
   },
 
+  registrationLinks: {
+    eventbrite: {
+      enabled: { type: Boolean, default: false },
+      url: { type: String, default: "" },
+      label: { type: String, default: "Register on Eventbrite" },
+    },
+    meetup: {
+      enabled: { type: Boolean, default: false },
+      url: { type: String, default: "" },
+      label: { type: String, default: "View on Meetup" },
+      eventId: { type: String, default: "" },
+    },
+  },
+
 
   metrics: {
 

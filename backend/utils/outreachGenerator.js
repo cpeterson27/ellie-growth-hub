@@ -73,7 +73,20 @@ function generateOutreachDraft(contact, campaign) {
 
 
   const eventLink =
+    campaign.registrationLinks?.eventbrite?.url ||
+    campaign.content?.callToActionUrl ||
     "https://www.eventbrite.com/e/deal-to-close-multifamily-bootcamp-tickets-1994515277887?aff=ebdssbdestsearch";
+
+  const meetupLink =
+    campaign.registrationLinks?.meetup?.url || "";
+
+  const meetupText = meetupLink
+    ? `\nAlso listed on Meetup:\n${meetupLink}\n`
+    : "";
+
+  const meetupHtml = meetupLink
+    ? `<p style="margin-top:16px;">Also listed on <a href="${escapeHtml(meetupLink)}">Meetup</a>.</p>`
+    : "";
 
 
   // Replace this later with Cloudinary flyer URL
@@ -100,6 +113,7 @@ Saturday, August 22, 2026
 
 Register Here:
 ${eventLink}
+${meetupText}
 
 Would you be open to discussing a potential partnership?
 
@@ -161,6 +175,7 @@ font-weight:bold;
 Reserve Your Spot
 </a>
 
+${meetupHtml}
 
 <p>
 Would you be open to discussing a potential partnership?
@@ -214,6 +229,7 @@ Ellie's Coaching
 
 
     eventLink,
+    meetupLink,
 
 
     flyerUrl,

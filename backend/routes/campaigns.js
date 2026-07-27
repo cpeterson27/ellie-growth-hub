@@ -9,6 +9,22 @@ const { assignCampaignMatches, getCampaignMatches } = require("../services/campa
 
 const router = express.Router();
 
+const REGISTRATION_HOSTS = {
+  eventbrite: ["eventbrite.com", "www.eventbrite.com"],
+  meetup: ["meetup.com", "www.meetup.com"],
+};
+
+function normalizeRegistrationUrl(provider, value) {
+  if (!value) return "";
+
+  const parsed = new URL(String(value).trim());
+  if (parsed.protocol !== "https:" || !REGISTRATION_HOSTS[provider].includes(parsed.hostname.toLowerCase())) {
+    throw new Error(`Enter a valid ${provider === "eventbrite" ? "Eventbrite" : "Meetup"} https link`);
+  }
+
+  return parsed.toString();
+}
+
 
 // ==================================
 // GET ALL CAMPAIGNS
@@ -126,6 +142,60 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.patch("/:id/registration-links", async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+    const eventbriteUrl = normalizeRegistrationUrl("eventbrite", req.body?.eventbriteUrl);
+    const meetupUrl = normalizeRegistrationUrl("meetup", req.body?.meetupUrl);
+    const meetupEventId = meetupUrl ? new URL(meetupUrl).pathname.match(/\/events\/([^/]+)/)?.[1] || "" : "";
+
+    campaign.registrationLinks = {
+      eventbrite: {
+        enabled: Boolean(eventbriteUrl),
+        url: eventbriteUrl,
+        label: "Register on Eventbrite",
+      },
+      meetup: {
+        enabled: Boolean(meetupUrl),
+        url: meetupUrl,
+        label: "View on Meetup",
+        eventId: meetupEventId,
+      },
+    };
+
+    // Eventbrite remains the main checkout link used by campaign emails.
+    if (eventbriteUrl) campaign.content.callToActionUrl = eventbriteUrl;
+    await campaign.save();
+
+    if (campaign.eventId) {
+      const activeChannels = [
+        eventbriteUrl ? "eventbrite" : "",
+        meetupUrl ? "meetup" : "",
+      ].filter(Boolean);
+
+      await Event.findByIdAndUpdate(campaign.eventId, {
+        "integrations.eventbrite.enabled": Boolean(eventbriteUrl),
+        "integrations.eventbrite.url": eventbriteUrl,
+        "integrations.meetup.enabled": Boolean(meetupUrl),
+        "integrations.meetup.url": meetupUrl,
+        "integrations.meetup.eventId": meetupEventId,
+        ...(activeChannels.length ? { $addToSet: { channels: { $each: activeChannels } } } : {}),
+      });
+    }
+
+    return res.json({
+      message: "Registration channels updated",
+      registrationLinks: campaign.registrationLinks,
+      primaryRegistrationProvider: eventbriteUrl ? "eventbrite" : meetupUrl ? "meetup" : null,
+    });
+  } catch (error) {
+    const isValidationError = error instanceof TypeError || /Enter a valid/.test(error.message);
+    return res.status(isValidationError ? 400 : 500).json({ error: error.message || "Unable to update registration links" });
+  }
+});
+
 // ==================================
 // CREATE CAMPAIGN FROM EXISTING EVENT
 // Event -> Campaign
@@ -195,6 +265,19 @@ router.post("/from-event/:eventId", async (req, res) => {
           event.audience,
 
         content,
+        registrationLinks: {
+          eventbrite: {
+            enabled: Boolean(event.integrations?.eventbrite?.url),
+            url: event.integrations?.eventbrite?.url || content.callToActionUrl || "",
+            label: "Register on Eventbrite",
+          },
+          meetup: {
+            enabled: Boolean(event.integrations?.meetup?.url),
+            url: event.integrations?.meetup?.url || "",
+            label: "View on Meetup",
+            eventId: event.integrations?.meetup?.eventId || "",
+          },
+        },
 
         status:
           "active",

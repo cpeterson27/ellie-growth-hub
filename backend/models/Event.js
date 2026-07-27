@@ -112,6 +112,21 @@ const eventSchema = new mongoose.Schema(
         },
       },
 
+      meetup: {
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+        eventId: {
+          type: String,
+          default: "",
+        },
+        url: {
+          type: String,
+          default: "",
+        },
+      },
+
       monday: {
         enabled: {
           type: Boolean,

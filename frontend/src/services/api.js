@@ -26,6 +26,9 @@ export const previewCampaignAudience = (campaignId) =>
 export const assignCampaignAudience = (campaignId) =>
   api.post(`/campaigns/${campaignId}/audience-match`).then((res) => res.data);
 
+export const updateCampaignRegistrationLinks = (campaignId, links) =>
+  api.patch(`/campaigns/${campaignId}/registration-links`, links).then((res) => res.data);
+
 
 
 export const fetchMarketingCampaign = async (campaignId) => {
