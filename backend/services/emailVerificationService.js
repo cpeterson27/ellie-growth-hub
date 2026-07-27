@@ -1,4 +1,5 @@
 const axios = require("axios");
+const crypto = require("crypto");
 
 const emailable = axios.create({
   baseURL: "https://api.emailable.com/v1",
@@ -25,6 +26,10 @@ function cleanEmails(emails) {
       .map((email) => String(email || "").trim().toLowerCase())
       .filter(Boolean),
   )];
+}
+
+function fingerprintEmails(emails) {
+  return crypto.createHash("sha256").update(cleanEmails(emails).sort().join("\n")).digest("hex");
 }
 
 function normalizeVerificationResult(result = {}) {
@@ -80,6 +85,7 @@ async function getBatch(id) {
 
 module.exports = {
   cleanEmails,
+  fingerprintEmails,
   createBatch,
   getBatch,
   getApiKey,

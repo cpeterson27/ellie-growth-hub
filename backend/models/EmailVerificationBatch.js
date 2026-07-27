@@ -1,0 +1,37 @@
+const mongoose = require("mongoose");
+
+const emailVerificationResultSchema = new mongoose.Schema(
+  {
+    email: { type: String, required: true },
+    state: { type: String, default: "unknown" },
+    reason: { type: String, default: "" },
+    score: { type: Number, default: null },
+    didYouMean: { type: String, default: "" },
+    acceptAll: { type: Boolean, default: false },
+    disposable: { type: Boolean, default: false },
+    role: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
+const emailVerificationBatchSchema = new mongoose.Schema(
+  {
+    provider: { type: String, default: "emailable" },
+    providerBatchId: { type: String, required: true, unique: true, index: true },
+    emailFingerprint: { type: String, required: true, index: true },
+    emails: { type: [String], default: [] },
+    processed: { type: Number, default: 0 },
+    total: { type: Number, default: 0 },
+    complete: { type: Boolean, default: false },
+    counts: { type: mongoose.Schema.Types.Mixed, default: {} },
+    results: { type: [emailVerificationResultSchema], default: [] },
+    expiresAt: {
+      type: Date,
+      default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expires: 0,
+    },
+  },
+  { timestamps: true },
+);
+
+module.exports = mongoose.model("EmailVerificationBatch", emailVerificationBatchSchema);

@@ -169,6 +169,9 @@ export const createEmailVerificationBatch = (emails) =>
 export const fetchEmailVerificationBatch = (batchId) =>
   api.get(`/contacts/email-verification/batches/${batchId}`).then((res) => res.data);
 
+export const recoverEmailVerificationBatch = (emails) =>
+  api.post("/contacts/email-verification/batches/recover", { emails }).then((res) => res.data);
+
 export const archiveContact = (contactId) => api.post(`/contacts/${contactId}/archive`).then((res) => res.data);
 export const deleteContact = (contactId, confirmCascade = false) => api.delete(`/contacts/${contactId}`, { data: { confirmCascade } }).then((res) => res.data);
 export const updateContact = (contactId, data) => api.patch(`/contacts/${contactId}`, data).then((res) => res.data);

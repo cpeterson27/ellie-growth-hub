@@ -10,6 +10,7 @@ const integrationHub = require("../services/integrationHub");
 const { importApolloLeads } = require("../services/apolloLeadService");
 const { ingestContacts, canonicalFieldMap } = require("../services/contactIngestionService");
 const emailVerificationService = require("../services/emailVerificationService");
+const EmailVerificationBatch = require("../models/EmailVerificationBatch");
 const Contact = require("../models/Contact");
 const Outreach = require("../models/Outreach");
 
@@ -123,7 +124,31 @@ router.get("/", async (req, res) => {
 
 router.post("/email-verification/batches", async (req, res) => {
   try {
-    const data = await emailVerificationService.createBatch(req.body?.emails);
+    const emails = emailVerificationService.cleanEmails(req.body?.emails);
+    const emailFingerprint = emailVerificationService.fingerprintEmails(emails);
+    const existing = await EmailVerificationBatch.findOne({
+      emailFingerprint,
+      expiresAt: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
+    if (existing) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          id: existing.providerBatchId,
+          total: existing.total,
+          complete: existing.complete,
+          reused: true,
+        },
+      });
+    }
+
+    const data = await emailVerificationService.createBatch(emails);
+    await EmailVerificationBatch.create({
+      providerBatchId: data.id,
+      emailFingerprint,
+      emails,
+      total: data.total,
+    });
     return res.status(202).json({ success: true, data });
   } catch (err) {
     const providerStatus = err.response?.status;
@@ -155,9 +180,40 @@ router.post("/email-verification/batches", async (req, res) => {
   }
 });
 
+router.post("/email-verification/batches/recover", async (req, res) => {
+  const emails = emailVerificationService.cleanEmails(req.body?.emails);
+  if (!emails.length) return res.status(400).json({ success: false, message: "At least one email is required" });
+  const saved = await EmailVerificationBatch.findOne({
+    emailFingerprint: emailVerificationService.fingerprintEmails(emails),
+    expiresAt: { $gt: new Date() },
+  }).sort({ createdAt: -1 });
+  if (!saved) return res.status(404).json({ success: false, message: "No saved verification batch matches this CSV" });
+  return res.json({
+    success: true,
+    data: {
+      id: saved.providerBatchId,
+      processed: saved.processed,
+      total: saved.total,
+      complete: saved.complete,
+      counts: saved.counts,
+      results: saved.results,
+    },
+  });
+});
+
 router.get("/email-verification/batches/:batchId", async (req, res) => {
   try {
     const data = await emailVerificationService.getBatch(req.params.batchId);
+    await EmailVerificationBatch.findOneAndUpdate(
+      { providerBatchId: req.params.batchId },
+      {
+        processed: data.processed,
+        total: data.total,
+        complete: data.complete,
+        counts: data.counts,
+        results: data.results,
+      },
+    );
     return res.json({ success: true, data });
   } catch (err) {
     const status = err.code === "email_verification_not_configured" ? 503 : 502;
