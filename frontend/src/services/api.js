@@ -191,10 +191,11 @@ export const updateContentBrief = (id, data) => api.patch(`/content/${id}`, data
 
 
 
-export const generateOutreach = (campaignId) =>
+export const generateOutreach = (campaignId, onlyMissing = false) =>
   api
     .post("/outreach/generate", {
       campaignId,
+      onlyMissing,
     })
     .then((res) => res.data);
 

@@ -112,11 +112,13 @@ export default function Contacts() {
 
   useEffect(() => {
     loadContacts();
+  }, [contactTab, campaignId, searchTerm]);
+
+  useEffect(() => {
     fetchCampaigns().then((items) => {
       setCampaigns(items);
-      setCampaignId("");
     }).catch(() => setError("Unable to load campaigns"));
-  }, [contactTab, campaignId, searchTerm]);
+  }, []);
 
   function openImportConfirmation(source) {
     setError("");

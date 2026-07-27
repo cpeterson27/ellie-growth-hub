@@ -91,7 +91,8 @@ router.post("/generate", async (req,res)=>{
   try {
 
     const {
-      campaignId
+      campaignId,
+      onlyMissing = false,
     } = req.body;
 
 
@@ -213,6 +214,10 @@ router.post("/generate", async (req,res)=>{
         );
 
       if (exists) {
+        if (onlyMissing) {
+          skippedExisting++;
+          continue;
+        }
         if (["pending", "failed"].includes(exists.status)) {
           exists.organization = draft.organization;
           exists.contactName = draft.contactName;
