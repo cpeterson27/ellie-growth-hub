@@ -18,6 +18,7 @@ function applyResearchClassification(contact) {
     tags.delete("needs-research");
     contact.researchStatus = contact.qualifyContact ? "qualified" : "ready_for_review";
     if (!contact.stage || contact.stage === "Needs Research") contact.stage = contact.qualifyContact ? "Qualified" : "Ready for Review";
+    if (contact.qualifyContact && contact.status === "prospect") contact.status = "active";
   }
   contact.tags = [...tags];
   return contact;

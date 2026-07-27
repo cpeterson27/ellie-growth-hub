@@ -32,6 +32,9 @@ const complete = applyResearchClassification({ company: "Example Co", title: "Ow
 assert.strictEqual(complete.researchStatus, "ready_for_review");
 assert.strictEqual(complete.stage, "Ready for Review");
 assert(!complete.tags.includes("needs-research"));
+const qualified = applyResearchClassification({ company: "Example Co", title: "Owner", industry: "Real Estate", tags: [], qualifyContact: true, status: "prospect" });
+assert.strictEqual(qualified.researchStatus, "qualified");
+assert.strictEqual(qualified.status, "active");
 const placeholders = normalizeIncoming({
   "First Name": "Derek",
   "Company Name": "Stage = Needs Research",
