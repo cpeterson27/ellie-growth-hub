@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
-import Table from "../components/Table.jsx";
 import {
   deleteContact,
   createAudienceDefinition,
@@ -14,6 +13,7 @@ import {
 } from "../services/api.js";
 import "./Discovery.css";
 import "./DiscoveryTargeting.css";
+import "./DiscoveryReview.css";
 
 const TARGET_PRESETS = {
   custom: { name: "Custom search", titles: "", industries: "", keywords: "", locations: "", employeeMin: "", employeeMax: "" },
@@ -115,25 +115,6 @@ export default function Discovery() {
     }
   };
 
-  const columns = [
-    { header: "Name", accessor: "name" },
-    { header: "Title", accessor: "title" },
-    { header: "Company", accessor: "company" },
-    { header: "Email", accessor: "email" },
-    { header: "Source", render: (row) => row.sourceProvider || row.sources?.join(", ") || "—" },
-    { header: "Campaign", render: (row) => row.campaignIds?.length ? "Assigned" : "—" },
-    { header: "Imported", render: (row) => row.importedAt ? new Date(row.importedAt).toLocaleDateString() : "—" },
-    {
-      header: "Actions",
-      render: (row) => (
-        <div className="discovery-actions">
-          <Button variant="outline" onClick={() => approve(row)}>Approve</Button>
-          <Button variant="outline" onClick={() => setDeleteTarget(row)}>Delete</Button>
-        </div>
-      ),
-    },
-  ];
-
   return (
     <div className="page-dashboard discovery-page">
       <header className="discovery-header">
@@ -178,7 +159,28 @@ export default function Discovery() {
           <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select>
         </div>
         {notice ? <p className="discovery-notice">{notice}</p> : null}
-        <Table columns={columns} data={filtered} emptyMessage="No prospects are waiting for review." />
+        {filtered.length ? <div className="prospect-review-list">
+          {filtered.map((prospect) => <article className="prospect-review-card" key={prospect._id}>
+            <header>
+              <div>
+                <h3>{prospect.name}</h3>
+                <p>{prospect.title || "Title missing"}{prospect.company ? ` · ${prospect.company}` : " · Company missing"}</p>
+              </div>
+              <span className={`contact-status-badge contact-status-badge--${prospect.emailStatus || "missing"}`}>{prospect.emailStatus === "verified" ? "Verified email" : prospect.emailStatus === "risky" ? "Risky email withheld" : prospect.emailStatus === "undeliverable" ? "Undeliverable email withheld" : "No verified email"}</span>
+            </header>
+            <div className="prospect-review-card__details">
+              <div><span>Email</span><strong>{prospect.email || "Withheld or unavailable"}</strong></div>
+              <div><span>Source</span><strong>{prospect.sourceProvider || prospect.sources?.join(", ") || "Unknown"}</strong></div>
+              <div><span>Research status</span><strong>{String(prospect.researchStatus || "needs_research").replaceAll("_", " ")}</strong></div>
+              <div><span>Missing information</span><strong>{prospect.missingFields?.length ? prospect.missingFields.join(", ") : "None"}</strong></div>
+              <div><span>Imported</span><strong>{prospect.importedAt ? new Date(prospect.importedAt).toLocaleDateString() : "Unknown"}</strong></div>
+            </div>
+            <footer className="discovery-actions">
+              <Button onClick={() => approve(prospect)}>Approve to Contacts</Button>
+              <Button variant="outline" onClick={() => setDeleteTarget(prospect)}>Delete prospect</Button>
+            </footer>
+          </article>)}
+        </div> : <div className="table-state table-state--empty">No prospects are waiting for review.</div>}
       </DashboardCard>
 
       <Modal isOpen={importOpen} onClose={() => setImportOpen(false)} title="Import prospects" footer={<Button variant="outline" onClick={() => setImportOpen(false)}>Close</Button>}>

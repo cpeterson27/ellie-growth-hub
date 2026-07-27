@@ -8,7 +8,6 @@ import "./ContactDashboard.css";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
-import Table from "../components/Table.jsx";
 import {
   fetchContacts,
   fetchContactOverview,
@@ -22,17 +21,6 @@ import {
   createEmailVerificationBatch,
   fetchEmailVerificationBatch,
 } from "../services/api.js";
-
-const columns = [
-  { header: "Name", accessor: "name" },
-  { header: "Company", accessor: "company" },
-  { header: "Title", accessor: "title" },
-  { header: "Email", accessor: "email", render: (contact) => contact.email || "Withheld" },
-  { header: "Email safety", accessor: "emailStatus", render: (contact) => <span className={`contact-status-badge contact-status-badge--${contact.emailStatus || "missing"}`}>{contact.emailStatus === "verified" ? "Verified" : contact.emailStatus === "risky" ? "Risky — withheld" : contact.emailStatus === "undeliverable" ? "Undeliverable — withheld" : "No verified email"}</span> },
-  { header: "Phone", accessor: "phone" },
-  { header: "Research status", accessor: "researchStatus", render: (contact) => String(contact.researchStatus || "needs_research").replaceAll("_", " ") },
-  { header: "Missing information", accessor: "missingFields", render: (contact) => contact.missingFields?.length ? contact.missingFields.join(", ") : "Complete" },
-];
 
 const recognizedImportHeaders = ["Name", "First Name", "Last Name", "Title", "Company Name", "Email", "Email Status", "Phone", "Work Direct Phone", "Person Linkedin Url", "Website", "City", "State", "Country", "# Employees", "Industry", "Seniority", "Departments", "Keywords", "Lists", "Stage", "Qualify Contact", "Tags", "Notes", "Apollo Contact Id", "Apollo Record Id"];
 
@@ -80,7 +68,6 @@ export default function Contacts() {
   const [verificationResults, setVerificationResults] = useState({});
   const [importError, setImportError] = useState("");
   const [existingBatchId, setExistingBatchId] = useState(() => localStorage.getItem("ellie-email-verification-batch") || "");
-  const tableColumns = [...columns, { header: "Actions", render: (contact) => <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}><button className="crm-overflow" onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>⋮</button>{actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View Contact</button><button onClick={() => setEditingContact({ ...contact })}>Edit</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete</button></div> : null}</div> }];
 
   async function loadContacts() {
     try {
@@ -396,13 +383,29 @@ export default function Contacts() {
         </p> : null}
         <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
         <div className="crm-tabs">{[["all", "All"], ["verified", "Verified Email"], ["email_review", "Email Review"], ["research", "Needs Research"], ["ready", "Ready for Review"], ["qualified", "Qualified"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
-        <Table
-          columns={tableColumns}
-          data={contacts}
-          loading={loading}
-          emptyMessage="No contacts found yet."
-          onRowClick={setDetailContact}
-        />
+        {loading ? <div className="table-state">Loading contacts…</div> : contacts.length ? <div className="contact-record-list">
+          {contacts.map((contact) => <article className="contact-record" key={contact._id} onClick={() => setDetailContact(contact)}>
+            <header>
+              <div>
+                <h3>{contact.name}</h3>
+                <p>{contact.title || "Title missing"}{contact.company ? ` · ${contact.company}` : " · Company missing"}</p>
+              </div>
+              <div className="contact-record__top-actions">
+                <span className={`contact-status-badge contact-status-badge--${contact.emailStatus || "missing"}`}>{contact.emailStatus === "verified" ? "Verified email" : contact.emailStatus === "risky" ? "Risky — withheld" : contact.emailStatus === "undeliverable" ? "Undeliverable — withheld" : "No verified email"}</span>
+                <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}>
+                  <button className="crm-overflow" aria-label={`Actions for ${contact.name}`} onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>•••</button>
+                  {actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View details</button><button onClick={() => setEditingContact({ ...contact })}>Research and edit</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete permanently</button></div> : null}
+                </div>
+              </div>
+            </header>
+            <div className="contact-record__details">
+              <div><span>Email</span><strong>{contact.email || "Withheld or unavailable"}</strong></div>
+              <div><span>Phone</span><strong>{contact.phone || "Not provided"}</strong></div>
+              <div><span>Research status</span><strong>{String(contact.researchStatus || "needs_research").replaceAll("_", " ")}</strong></div>
+              <div><span>Missing information</span><strong>{contact.missingFields?.length ? contact.missingFields.join(", ") : "None"}</strong></div>
+            </div>
+          </article>)}
+        </div> : <div className="table-state table-state--empty">No contacts match this view.</div>}
       </DashboardCard>
 
       {false ? <DashboardCard title="Find Leads">
