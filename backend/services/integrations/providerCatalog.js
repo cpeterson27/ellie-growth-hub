@@ -17,14 +17,6 @@ const providers = [
     builtIn: true,
   },
   {
-    id: "monday",
-    name: "Monday CRM",
-    category: "crm_provider",
-    description: "CRM workflows",
-    capabilities: ["createContact", "updateContact", "syncContacts"],
-    environmentKeys: ["MONDAY_API_KEY", "MONDAY_CONTACTS_BOARD_ID"],
-  },
-  {
     id: "resend",
     name: "Resend",
     category: "communication",

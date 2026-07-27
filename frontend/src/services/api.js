@@ -143,12 +143,6 @@ export const fetchIntegrationHub = () =>
     .then((res) => res.data);
 
 
-export const importContactsFromMonday = () =>
-  api
-    .post("/contacts/import/monday")
-    .then((res) => res.data);
-
-
 export const searchApolloLeads = (payload) =>
   api.post("/contacts/apollo/search", payload).then((res) => res.data);
 
@@ -171,9 +165,6 @@ export const createEmailVerificationBatch = (emails) =>
 
 export const fetchEmailVerificationBatch = (batchId) =>
   api.get(`/contacts/email-verification/batches/${batchId}`).then((res) => res.data);
-
-export const retryMondaySync = (contactId) =>
-  api.post(`/contacts/${contactId}/retry-monday`).then((res) => res.data);
 
 export const archiveContact = (contactId) => api.post(`/contacts/${contactId}/archive`).then((res) => res.data);
 export const deleteContact = (contactId, confirmCascade = false) => api.delete(`/contacts/${contactId}`, { data: { confirmCascade } }).then((res) => res.data);

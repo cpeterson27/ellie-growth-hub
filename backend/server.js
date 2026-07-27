@@ -16,7 +16,6 @@ const integrationConnectionsRouter = require("./routes/integrationConnections");
 const marketingCampaignsRouter = require("./routes/marketingCampaigns");
 const growthOperatorsRouter = require("./routes/growthOperators");
 const bootcampCampaignsRouter = require("./routes/bootcampCampaigns");
-const mondayRouter = require("./routes/monday");
 const jarvisRouter = require("./routes/jarvis");
 const webhooksRouter = require("./routes/webhooks");
 const partnersRouter = require("./routes/partners");
@@ -55,7 +54,6 @@ connectDatabase(mongoUri)
     app.use("/api/marketing-campaigns", marketingCampaignsRouter);
     app.use("/api/growth-operators", growthOperatorsRouter);
     app.use("/api/bootcamp-campaigns", bootcampCampaignsRouter);
-    app.use("/api/monday", mondayRouter);
     app.use("/api/jarvis", jarvisRouter);
     app.use("/api/webhooks", webhooksRouter);
     app.use("/api/partners", partnersRouter);

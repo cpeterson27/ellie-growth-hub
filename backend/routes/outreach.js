@@ -127,6 +127,10 @@ router.post("/generate", async (req,res)=>{
       await Contact.find({
         type: "lead",
         status: "active",
+        researchStatus: "qualified",
+        qualifyContact: true,
+        emailStatus: "verified",
+        email: { $exists: true, $nin: ["", null] },
         // Imported Apollo leads are campaign-scoped. Legacy leads without a
         // campaign association retain the previous behavior.
         $or: [

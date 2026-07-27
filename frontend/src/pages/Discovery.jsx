@@ -9,7 +9,6 @@ import {
   discoverAudienceOrganizations,
   fetchCampaigns,
   fetchContacts,
-  importContactsFromMonday,
   searchApolloLeads,
   updateContact,
 } from "../services/api.js";
@@ -175,7 +174,7 @@ export default function Discovery() {
       <DashboardCard title="Prospect review">
         <div className="discovery-filters">
           <input className="select-input" placeholder="Search name, company, or email" value={query} onChange={(event) => setQuery(event.target.value)} />
-          <select value={source} onChange={(event) => setSource(event.target.value)}><option value="">All sources</option><option value="apollo">Apollo</option><option value="csv">CSV</option><option value="monday">Monday</option></select>
+          <select value={source} onChange={(event) => setSource(event.target.value)}><option value="">All sources</option><option value="apollo">Apollo</option><option value="csv">CSV</option></select>
           <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select>
         </div>
         {notice ? <p className="discovery-notice">{notice}</p> : null}
@@ -187,7 +186,6 @@ export default function Discovery() {
           <p>Choose how you want to add prospects. Imported records stay in Discovery until you approve them.</p>
           <button onClick={() => setNotice("Use Contacts → Import → Apollo CSV to upload your Apollo export.")}><strong>Apollo CSV</strong><span>Import a downloaded Apollo export</span></button>
           <button onClick={() => setNotice("Use Contacts → Import → Standard CSV to upload a spreadsheet export.")}><strong>Standard CSV</strong><span>Import contacts from a spreadsheet export</span></button>
-          <button onClick={async () => { await importContactsFromMonday(); await loadProspects(); setImportOpen(false); }}><strong>Monday CRM</strong><span>Pull prospects from your connected Monday board</span></button>
           <button onClick={() => setNotice("Organization discovery will use Apollo Organization Search when that workflow is enabled.")}><strong>Organization discovery</strong><span>Search organizations before People Search is upgraded</span></button>
         </div>
       </Modal>

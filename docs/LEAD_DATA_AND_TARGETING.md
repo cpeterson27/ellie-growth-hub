@@ -2,13 +2,11 @@
 
 ## Recommended operating model
 
-Use Monday CRM as Ellie's ongoing working CRM when the team already maintains
-contacts there. Use CSV for the first bulk import, Apollo exports, or occasional
-lists from another source. Both sources ultimately create or update the same
-contact records in Ellie.
-
-CSV is currently the richest initial import path. Monday becomes equally useful
-after its board column IDs are mapped in the Monday integration credentials.
+MongoDB is Ellie AI's single contact database and source of truth. CSV is the
+primary bulk import path for signup sheets, Apollo exports, and external lists.
+Contact creation, research status, qualification, campaign membership, and
+outreach history remain in Ellie AI; contact imports do not synchronize to
+Monday CRM.
 
 ## Email verification during CSV import
 
@@ -99,41 +97,10 @@ Recommended columns:
 | `Tags` | Flexible segments; comma-separated |
 | `Notes` | Human context |
 
-For the $15K program, select its campaign during import and use tags such as
-`15k-program`, `multifamily`, and `portfolio-growth`. Campaign assignment is the
-primary offer relationship; tags provide reusable secondary filters.
-
-## Monday board fields
-
-The Monday item name is the contact name. The board must contain an email column.
-Ellie recognizes `lead_email`, `email`, `Email`, or `contact_email` by default.
-It recognizes `lead_company` or `company` for company.
-
-Map these additional Ellie fields to the actual Monday column IDs in the Monday
-integration's `columnIds` object:
-
-```json
-{
-  "email": "lead_email",
-  "company": "lead_company",
-  "firstName": "first_name",
-  "lastName": "last_name",
-  "title": "job_title",
-  "phone": "phone",
-  "industry": "industry",
-  "city": "city",
-  "state": "state",
-  "country": "country",
-  "linkedin": "linkedin_url",
-  "website": "website",
-  "stage": "lead_stage",
-  "notes": "notes"
-}
-```
-
-Column IDs are Monday's internal IDs, not necessarily the labels shown at the
-top of the board. After the connection and board ID are configured, use
-**Discovery → Import prospects → Monday CRM** to pull the board into Ellie.
+For the $15K program, use tags such as `15k-program`, `multifamily`, and
+`portfolio-growth`. CSV rows are not assigned directly to campaigns. After
+verification, research, and human qualification, Ellie's audience matcher adds
+safe contacts to the appropriate campaign.
 
 ## How Apollo targeting works
 

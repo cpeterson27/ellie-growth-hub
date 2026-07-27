@@ -11,11 +11,9 @@ import {
   fetchContacts,
   fetchCampaigns,
   importContactsFromApollo,
-  importContactsFromMonday,
   ingestContacts,
   archiveContact,
   deleteContact,
-  retryMondaySync,
   updateContact,
   searchApolloLeads,
   createEmailVerificationBatch,
@@ -28,17 +26,12 @@ const columns = [
   { header: "Title", accessor: "title" },
   { header: "Email", accessor: "email" }, { header: "Phone", accessor: "phone" },
   { header: "Research", accessor: "researchStatus", render: (contact) => String(contact.researchStatus || "needs_research").replaceAll("_", " ") },
-  { header: "Monday Sync", accessor: "mondaySyncStatus" },
   { header: "Status", accessor: "status" },
 ];
 
 const recognizedImportHeaders = ["Name", "First Name", "Last Name", "Title", "Company Name", "Email", "Email Status", "Phone", "Work Direct Phone", "Person Linkedin Url", "Website", "City", "State", "Country", "# Employees", "Industry", "Seniority", "Departments", "Keywords", "Lists", "Stage", "Qualify Contact", "Tags", "Notes", "Apollo Contact Id", "Apollo Record Id"];
 
 const importCopy = {
-  monday: {
-    title: "Import Contacts from Monday CRM?",
-    body: "This will pull contacts from your Monday CRM into Ellie AI. Do you want to continue?",
-  },
   apollo: {
     title: "Import Contacts from Apollo?",
     body: "This will use Apollo API credits to pull contacts into Ellie AI. Do you want to continue?",
@@ -79,7 +72,7 @@ export default function Contacts() {
   const [verifyingEmails, setVerifyingEmails] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(null);
   const [verificationResults, setVerificationResults] = useState({});
-  const tableColumns = [...columns, { header: "Actions", render: (contact) => <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}><button className="crm-overflow" onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>⋮</button>{actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View Contact</button><button onClick={() => setEditingContact({ ...contact })}>Edit</button>{contact.mondaySyncStatus === "failed" ? <button onClick={() => retryMondaySync(contact._id).then(loadContacts)}>Retry Monday Sync</button> : null}<button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete</button></div> : null}</div> }];
+  const tableColumns = [...columns, { header: "Actions", render: (contact) => <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}><button className="crm-overflow" onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>⋮</button>{actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View Contact</button><button onClick={() => setEditingContact({ ...contact })}>Edit</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete</button></div> : null}</div> }];
 
   async function loadContacts() {
     try {
@@ -94,7 +87,7 @@ export default function Contacts() {
               ? { status: "active" }
             : {};
       const response = await fetchContacts(query);
-      setContacts((response.data || []).filter((contact) => (contactTab !== "needsSync" || contact.mondaySyncStatus === "failed") && (!campaignId || contact.campaignIds?.some((id) => String(id) === campaignId)) && (!searchTerm || [contact.name, contact.company, contact.email].join(" ").toLowerCase().includes(searchTerm.toLowerCase()))));
+      setContacts((response.data || []).filter((contact) => (!campaignId || contact.campaignIds?.some((id) => String(id) === campaignId)) && (!searchTerm || [contact.name, contact.company, contact.email].join(" ").toLowerCase().includes(searchTerm.toLowerCase()))));
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load contacts");
     } finally {
@@ -129,12 +122,8 @@ export default function Contacts() {
       setImporting(true);
       setError("");
 
-      if (selectedSource === "monday") {
-        await importContactsFromMonday();
-      } else {
-        const response = await importContactsFromApollo({ campaignId, leads: selectedLeads });
-        setImportSummary(response.data);
-      }
+      const response = await importContactsFromApollo({ campaignId, leads: selectedLeads });
+      setImportSummary(response.data);
 
       setConfirmOpen(false);
       setSelectedSource(null);
@@ -224,7 +213,7 @@ export default function Contacts() {
       )].join(",");
       return { ...row, Email: "", "Email Status": result?.state || "unverified", Tags: tags };
     });
-    const saved = await saveIngestion(sanitizedRows, "csv", importCampaignId);
+    const saved = await saveIngestion(sanitizedRows, "csv", null);
     if (saved) { setUploadOpen(false); setImportRows([]); setImportHeaders([]); setVerificationResults({}); setVerificationProgress(null); }
   }
 
@@ -286,7 +275,7 @@ export default function Contacts() {
           <Button onClick={() => { setError(""); setContactFormOpen(true); }}>+ New Contact</Button>
           <div className="crm-menu-wrap">
             <Button variant="outline" onClick={() => setImportMenuOpen((open) => !open)}>Import ▾</Button>
-            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Apollo CSV</button><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Standard CSV</button><button onClick={() => { openImportConfirmation("monday"); setImportMenuOpen(false); }}>Monday CRM</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
+            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Apollo CSV</button><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Standard CSV</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
           </div>
           <Button variant="outline" onClick={() => navigate("/discovery")}>Discover New Prospects</Button>
         </div>
@@ -294,9 +283,9 @@ export default function Contacts() {
 
       <DashboardCard title="Contacts">
         {error ? <p className="form-error">{error}</p> : null}
-        {importSummary ? <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated. Monday CRM: {importSummary.mondayCreated} created, {importSummary.mondayUpdated} updated, {importSummary.mondayFailed} failed.</p> : null}
+        {importSummary ? <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated, {importSummary.failed || 0} failed.</p> : null}
         <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
-        <div className="crm-tabs">{[["all", "All"], ["research", "Needs Research"], ["qualified", "Qualified"], ["active", "Active"], ["archived", "Archived"], ["needsSync", "Needs Sync"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
+        <div className="crm-tabs">{[["all", "All"], ["research", "Needs Research"], ["qualified", "Qualified"], ["active", "Active"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
         <Table
           columns={tableColumns}
           data={contacts}
@@ -328,7 +317,7 @@ export default function Contacts() {
             openImportConfirmation("apollo");
           }}>Import to Ellie AI{campaignId ? " and Add to Selected Campaign" : ""}</Button>
         </> : <p>Search Apollo to review leads before importing.</p>}
-        {importSummary ? <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated; Monday: {importSummary.mondayCreated} created, {importSummary.mondayUpdated} updated, {importSummary.mondayFailed} failed.</p> : null}
+        {importSummary ? <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated, {importSummary.failed || 0} failed.</p> : null}
       </DashboardCard> : null}
 
       <Modal
@@ -359,7 +348,7 @@ export default function Contacts() {
         title="New Contact"
         footer={<><Button variant="outline" disabled={savingContact} onClick={() => setContactFormOpen(false)}>Cancel</Button><Button loading={savingContact} onClick={saveManualContact}>Save Contact</Button></>}
       >
-        <p className="contact-modal-intro">Only a usable name is required. Saving updates MongoDB first and then synchronizes Monday CRM when it is configured.</p>
+        <p className="contact-modal-intro">Only a usable name is required. Ellie AI saves this contact directly to MongoDB.</p>
         <div className="contact-form-grid">
           {[["name", "Name *"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /></label>)}
           <label className="form-field"><span>Campaign</span><select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
@@ -378,7 +367,7 @@ export default function Contacts() {
           <p>Detected headers: {importHeaders.join(", ")}</p>
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
-          <select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select>
+          <p className="contact-modal-intro">Campaigns are assigned after research and qualification. This prevents incomplete contacts from entering outreach.</p>
           {emailsToVerify.length ? <div className="email-verification-panel">
             <div>
               <strong>Email safety check</strong>
@@ -394,12 +383,12 @@ export default function Contacts() {
               Deliverable: {verificationCounts.deliverable || 0} · Risky: {verificationCounts.risky || 0} · Undeliverable: {verificationCounts.undeliverable || 0} · Unknown: {verificationCounts.unknown || 0}
             </p> : null}
           </div> : null}
-          <div style={{ overflowX: "auto", marginTop: "0.75rem" }}><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source", "Campaign"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => { const result = verificationResults[String(row.Email || "").toLowerCase()]; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{row["Work Direct Phone"] || row.Phone}</td><td>{row["Company Name"] || row.Company}</td><td>{row.Title}</td><td>{[row.City, row.State].filter(Boolean).join(", ")}</td><td>CSV import</td><td>{campaigns.find((campaign) => campaign._id === importCampaignId)?.name || "—"}</td></tr>; })}</tbody></table></div>
+          <div style={{ overflowX: "auto", marginTop: "0.75rem" }}><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => { const result = verificationResults[String(row.Email || "").toLowerCase()]; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{row["Work Direct Phone"] || row.Phone}</td><td>{row["Company Name"] || row.Company}</td><td>{row.Title}</td><td>{[row.City, row.State].filter(Boolean).join(", ")}</td><td>CSV import</td></tr>; })}</tbody></table></div>
           <p>{importRows.length} rows ready. Deliverable emails are saved. Risky, unknown, and undeliverable addresses are removed while the contact is retained and tagged for review.</p>
         </>}
       </Modal>
-      <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; Monday sync: {deleteTarget.mondaySyncStatus || "pending"}; Monday item: {deleteTarget.mondayItemId ? "linked" : "not linked"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
-      <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Research", ["researchStatus", "missingFields", "qualifyContact", "stage", "tags", "lists"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments"]], ["Marketing", ["keywords", "lastContacted", "notes"]], ["Monday", ["mondaySyncStatus", "mondayItemId", "mondaySyncedAt"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : typeof detailContact[field] === "boolean" ? (detailContact[field] ? "Yes" : "No") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
+      <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
+      <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Research", ["researchStatus", "missingFields", "qualifyContact", "stage", "tags", "lists"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments"]], ["Marketing", ["keywords", "lastContacted", "notes"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : typeof detailContact[field] === "boolean" ? (detailContact[field] ? "Yes" : "No") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
       <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Research and Edit Contact" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>Save and Reclassify</Button></>}>{editingContact ? <><p className="contact-modal-intro">Fill in what you can confirm. Ellie automatically removes this contact from Needs Research after company, title, and industry are complete. Qualification remains a human decision.</p><div className="contact-form-grid">{["name", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}<label className="form-field span-2"><span><input type="checkbox" checked={Boolean(editingContact.qualifyContact)} onChange={(event) => setEditingContact({ ...editingContact, qualifyContact: event.target.checked })} /> Qualified for targeted campaigns</span></label></div></> : null}</Modal>
     </div>
   );

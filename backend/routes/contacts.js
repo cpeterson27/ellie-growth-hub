@@ -6,10 +6,9 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const contactService = require("../services/contactService");
-const mondaySyncService = require("../services/mondaySyncService");
 const integrationHub = require("../services/integrationHub");
 const { importApolloLeads } = require("../services/apolloLeadService");
-const { ingestContacts, canonicalFieldMap, retryMondaySync } = require("../services/contactIngestionService");
+const { ingestContacts, canonicalFieldMap } = require("../services/contactIngestionService");
 const emailVerificationService = require("../services/emailVerificationService");
 const Contact = require("../models/Contact");
 const Outreach = require("../models/Outreach");
@@ -187,9 +186,6 @@ router.patch("/:id", async (req, res) => {
     }
 
     const contact = await contactService.updateContact(req.params.id, req.body);
-    if (contact.mondayItemId) {
-      try { await retryMondaySync(contact._id); } catch (_) { /* MongoDB remains the source of truth; sync status is recorded */ }
-    }
     res.json({ success: true, data: contact, message: "Contact updated" });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -206,7 +202,6 @@ router.post("/:id/archive", async (req, res) => {
     if (!contact) return res.status(404).json({ success: false, message: "Contact not found" });
     contact.status = "archived";
     await contact.save();
-    try { await retryMondaySync(contact._id); } catch (_) { /* archive remains local if Monday is unavailable */ }
     return res.json({ success: true, data: contact, message: "Contact archived" });
   } catch (err) { return res.status(400).json({ success: false, message: "Unable to archive contact" }); }
 });
@@ -221,11 +216,6 @@ router.delete("/:id", async (req, res) => {
 
     const outreachCount = await Outreach.countDocuments({ contactId: req.params.id });
     if (outreachCount && !req.body?.confirmCascade) return res.status(409).json({ success: false, message: `Cannot permanently delete: ${outreachCount} outreach record(s) depend on this contact.`, outreachCount });
-    const contact = await Contact.findById(req.params.id);
-    if (contact?.mondayItemId) {
-      const credentials = await mondaySyncService.getMondayCredentials();
-      if (credentials?.apiKey) await integrationHub.execute("monday", "archiveContact", credentials, contact.toObject());
-    }
     await contactService.deleteContact(req.params.id);
     res.json({ success: true, message: "Contact deleted" });
   } catch (err) {
@@ -335,27 +325,6 @@ router.post("/sync", async (req, res) => {
 });
 
 /**
- * POST /api/contacts/import/monday
- * Import contacts from Monday CRM.
- */
-router.post("/import/monday", async (req, res) => {
-  try {
-    const result = await mondaySyncService.syncMondayContacts();
-
-    res.json({
-      success: true,
-      data: result,
-      message: result.message,
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message || "Failed to import contacts from Monday CRM",
-    });
-  }
-});
-
-/**
  * POST /api/contacts/import/apollo
  * Import the first page of Apollo contact-search results.
  */
@@ -432,16 +401,6 @@ router.post("/import/apollo", async (req, res) => {
 router.post("/ingest", async (req, res) => {
   try { return res.json({ success: true, data: await ingestContacts(req.body) }); }
   catch (err) { return res.status(400).json({ success: false, message: err.message || "Unable to import contacts" }); }
-});
-
-router.post("/:id/retry-monday", async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ success: false, message: "Invalid contact ID" });
-    const result = await retryMondaySync(req.params.id);
-    return res.json({ success: true, data: result, message: "Monday CRM sync completed" });
-  } catch (err) {
-    return res.status(502).json({ success: false, message: "Monday CRM sync failed" });
-  }
 });
 
 router.get("/import/field-map", (req, res) => res.json({ success: true, data: canonicalFieldMap }));

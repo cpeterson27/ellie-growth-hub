@@ -1,7 +1,5 @@
 const Contact = require("../models/Contact");
 const Campaign = require("../models/Campaign");
-const integrationHub = require("./integrationHub");
-const mondaySyncService = require("./mondaySyncService");
 const { applyResearchClassification } = require("./contactResearchService");
 
 const canonicalFieldMap = Object.fromEntries([
@@ -75,11 +73,11 @@ function normalizeIncoming(row, source = "manual") {
   return mapped;
 }
 
-async function ingestContacts({ contacts, source = "manual", campaignId = null, syncMonday = true }) {
+async function ingestContacts({ contacts, source = "manual", campaignId = null }) {
   if (!Array.isArray(contacts) || !contacts.length || contacts.length > 500) throw new Error("Provide between 1 and 500 contacts");
   let campaign = null;
   if (campaignId) { campaign = await Campaign.findById(campaignId).select("_id name"); if (!campaign) throw new Error("Campaign not found"); }
-  const summary = { requested: contacts.length, mongoCreated: 0, mongoUpdated: 0, mongoSkipped: 0, mondayCreated: 0, mondayUpdated: 0, mondaySkipped: 0, mondayFailed: 0, campaignAssociated: 0, failed: 0, errors: [], missingMondayMappings: [] };
+  const summary = { requested: contacts.length, mongoCreated: 0, mongoUpdated: 0, mongoSkipped: 0, campaignAssociated: 0, failed: 0, errors: [] };
   for (let index = 0; index < contacts.length; index += 1) {
     const data = normalizeIncoming(contacts[index], source);
     if (!data.name) { summary.failed += 1; summary.errors.push({ index, message: "Name is required" }); continue; }
@@ -112,46 +110,8 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null, 
     applyResearchClassification(contact);
     if (campaign && !contact.campaignIds.some((id) => String(id) === String(campaign._id))) { contact.campaignIds.push(campaign._id); summary.campaignAssociated += 1; }
     await contact.save();
-    if (!syncMonday || source === "monday") { summary.mondaySkipped += 1; continue; }
-    try {
-      const credentials = await mondaySyncService.getMondayCredentials();
-      if (!credentials?.apiKey) throw new Error("not_configured");
-      if (!contact.mondayItemId) {
-        const existingItem = await integrationHub.execute("monday", "findExistingContact", credentials, contact.toObject());
-        if (existingItem?.id) contact.mondayItemId = String(existingItem.id);
-      }
-      const operation = contact.mondayItemId ? "updateContact" : "createContact";
-      const result = await integrationHub.execute("monday", operation, credentials, { ...contact.toObject(), campaignName: campaign?.name || "" });
-      contact.mondayItemId = String(result.id || contact.mondayItemId || ""); contact.mondaySyncStatus = "synced"; contact.mondaySyncedAt = new Date(); contact.mondaySyncError = "";
-      if (Array.isArray(result.missingMappings)) summary.missingMondayMappings.push(...result.missingMappings);
-      await contact.save();
-      if (operation === "createContact") summary.mondayCreated += 1; else summary.mondayUpdated += 1;
-    } catch (err) { contact.mondaySyncStatus = "failed"; contact.mondaySyncError = String(err.message || "Sync failed").slice(0, 300); await contact.save(); summary.mondayFailed += 1; }
   }
-  summary.missingMondayMappings = [...new Set(summary.missingMondayMappings)];
   return summary;
 }
 
-async function retryMondaySync(contactId) {
-  const contact = await Contact.findById(contactId);
-  if (!contact) throw new Error("Contact not found");
-  const credentials = await mondaySyncService.getMondayCredentials();
-  if (!credentials?.apiKey) throw new Error("Monday CRM is not configured");
-  try {
-    const operation = contact.mondayItemId ? "updateContact" : "createContact";
-    const result = await integrationHub.execute("monday", operation, credentials, contact.toObject());
-    contact.mondayItemId = String(result.id || contact.mondayItemId || "");
-    contact.mondaySyncStatus = "synced";
-    contact.mondaySyncedAt = new Date();
-    contact.mondaySyncError = "";
-    await contact.save();
-    return { contact, operation, missingMappings: result.missingMappings || [] };
-  } catch (err) {
-    contact.mondaySyncStatus = "failed";
-    contact.mondaySyncError = String(err.message || "Sync failed").slice(0, 300);
-    await contact.save();
-    throw err;
-  }
-}
-
-module.exports = { canonicalFieldMap, normalizeIncoming, ingestContacts, retryMondaySync };
+module.exports = { canonicalFieldMap, normalizeIncoming, ingestContacts };
