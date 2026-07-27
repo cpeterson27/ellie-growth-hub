@@ -196,6 +196,10 @@
 }
 
 @media (max-width: 900px) {
+  .contact-bulk-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .contact-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -206,6 +210,10 @@
 }
 
 @media (max-width: 720px) {
+  .contact-bulk-actions {
+    grid-template-columns: 1fr;
+  }
+
   .contact-overview {
     grid-template-columns: 1fr;
   }
@@ -279,4 +287,53 @@
   color: #6f5100;
   font-size: 0.88rem;
   line-height: 1.45;
+}
+.contact-bulk-actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 0.8fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 1rem 0;
+  padding: 0.9rem;
+  border: 1px solid #b9d8ce;
+  border-radius: 14px;
+  background: #edf9f4;
+}
+
+.contact-bulk-actions small {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+}
+
+.contact-select-all,
+.contact-record__identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.contact-select-all {
+  align-items: center;
+  font-weight: 800;
+}
+
+.contact-select-all input,
+.contact-record__identity > input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  accent-color: #176655;
+}
+
+.contact-record__identity > input {
+  margin-top: 0.15rem;
+}
+
+.contact-bulk-notice {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  background: #eaf6f1;
+  color: #125646;
+  font-weight: 700;
 }

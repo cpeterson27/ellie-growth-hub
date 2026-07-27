@@ -17,6 +17,7 @@ import {
   archiveContact,
   deleteContact,
   updateContact,
+  bulkAssignContactsToCampaign,
   searchApolloLeads,
   createEmailVerificationBatch,
   fetchEmailVerificationBatch,
@@ -68,6 +69,10 @@ export default function Contacts() {
   const [verificationResults, setVerificationResults] = useState({});
   const [importError, setImportError] = useState("");
   const [existingBatchId, setExistingBatchId] = useState(() => localStorage.getItem("ellie-email-verification-batch") || "");
+  const [selectedContactIds, setSelectedContactIds] = useState([]);
+  const [bulkCampaignId, setBulkCampaignId] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkNotice, setBulkNotice] = useState("");
 
   async function loadContacts() {
     try {
@@ -93,6 +98,7 @@ export default function Contacts() {
           (!searchTerm || [contact.name, contact.company, contact.email, contact.title].join(" ").toLowerCase().includes(searchTerm.toLowerCase()));
       });
       setContacts(items);
+      setSelectedContactIds((current) => current.filter((id) => items.some((contact) => contact._id === id)));
       if (contactTab !== "archived") {
         const overview = await fetchContactOverview();
         setContactOverview(overview.data);
@@ -116,6 +122,24 @@ export default function Contacts() {
     setError("");
     setSelectedSource(source);
     setConfirmOpen(true);
+  }
+
+  async function assignSelectedContacts() {
+    if (!selectedContactIds.length) return setError("Select at least one contact.");
+    if (!bulkCampaignId) return setError("Choose the campaign or event first.");
+    try {
+      setBulkSaving(true);
+      setError("");
+      setBulkNotice("");
+      const response = await bulkAssignContactsToCampaign(selectedContactIds, bulkCampaignId);
+      setBulkNotice(`${response.data?.assigned || 0} selected contact${response.data?.assigned === 1 ? "" : "s"} qualified and assigned to ${response.data?.campaignName || "the campaign"}.${response.data?.skipped ? ` ${response.data.skipped} skipped because a verified name and email were unavailable.` : ""} No emails were sent.`);
+      setSelectedContactIds([]);
+      await loadContacts();
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to assign selected contacts");
+    } finally {
+      setBulkSaving(false);
+    }
   }
 
   function closeImportConfirmation() {
@@ -379,19 +403,36 @@ export default function Contacts() {
           <button className="is-warning" onClick={() => setContactTab("email_review")}><span>Email review</span><strong>{contactOverview.withoutEmail}</strong><small>{contactOverview.risky} risky · {contactOverview.undeliverable} undeliverable</small></button>
           <button onClick={() => setContactTab("research")}><span>Needs research</span><strong>{contactOverview.needsResearch}</strong><small>Missing company, title, or industry</small></button>
           <button onClick={() => setContactTab("ready")}><span>Ready for review</span><strong>{contactOverview.readyForReview}</strong><small>Research complete; needs a decision</small></button>
-          <button onClick={() => setContactTab("qualified")}><span>Campaign ready</span><strong>{contactOverview.qualified}</strong><small>Researched and qualified for targeting</small></button>
+          <button onClick={() => setContactTab("qualified")}><span>Campaign ready</span><strong>{contactOverview.qualified}</strong><small>Verified and approved for targeting</small></button>
         </section> : null}
         {contactOverview ? <p className="contact-guidance">
           <strong>What to do next:</strong> Start with Needs Research. Missing fields across the database: company {contactOverview.missingFields?.company || 0}, title {contactOverview.missingFields?.title || 0}, industry {contactOverview.missingFields?.industry || 0}. Email Review contains contacts whose address was withheld because it was risky, undeliverable, or absent.
         </p> : null}
         <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
         <div className="crm-tabs">{[["approved", "Approved Contacts"], ["verified", "Verified Email"], ["research", "Needs Research"], ["ready", "Ready for Review"], ["qualified", "Campaign Ready"], ["email_review", "Email Review"], ["all", "All Records"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
+        {contacts.length && contactTab !== "archived" ? <section className="contact-bulk-actions" aria-label="Bulk contact actions">
+          <label className="contact-select-all">
+            <input type="checkbox" checked={contacts.some((contact) => contact.emailStatus === "verified") && contacts.filter((contact) => contact.emailStatus === "verified").every((contact) => selectedContactIds.includes(contact._id))} onChange={(event) => setSelectedContactIds(event.target.checked ? contacts.filter((contact) => contact.emailStatus === "verified").map((contact) => contact._id) : [])} />
+            <span>Select all verified contacts in this view</span>
+          </label>
+          <strong>{selectedContactIds.length} selected</strong>
+          <select className="select-input" value={bulkCampaignId} onChange={(event) => setBulkCampaignId(event.target.value)}>
+            <option value="">Choose campaign or event</option>
+            {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
+          </select>
+          <Button loading={bulkSaving} disabled={!selectedContactIds.length || !bulkCampaignId} onClick={assignSelectedContacts}>Qualify & assign selected</Button>
+          <small>This assigns the audience only. It does not generate or send emails.</small>
+        </section> : null}
+        {bulkNotice ? <p className="contact-bulk-notice">{bulkNotice}</p> : null}
         {loading ? <div className="table-state">Loading contacts…</div> : contacts.length ? <div className="contact-record-list">
           {contacts.map((contact) => <article className="contact-record" key={contact._id} onClick={() => setDetailContact(contact)}>
             <header>
-              <div>
+              <div className="contact-record__identity">
+                <input type="checkbox" aria-label={`Select ${contact.name}`} disabled={contact.emailStatus !== "verified"} checked={selectedContactIds.includes(contact._id)} onClick={(event) => event.stopPropagation()} onChange={(event) => setSelectedContactIds((current) => event.target.checked ? [...new Set([...current, contact._id])] : current.filter((id) => id !== contact._id))} />
+                <div>
                 <h3>{contact.name}</h3>
                 <p>{contact.title || "Title missing"}{contact.company ? ` · ${contact.company}` : " · Company missing"}</p>
+                </div>
               </div>
               <div className="contact-record__top-actions">
                 <span className={`contact-status-badge contact-status-badge--${contact.emailStatus || "missing"}`}>{contact.emailStatus === "verified" ? "Verified email" : contact.emailStatus === "risky" ? "Risky — withheld" : contact.emailStatus === "undeliverable" ? "Undeliverable — withheld" : "No verified email"}</span>
@@ -410,7 +451,7 @@ export default function Contacts() {
           </article>)}
         </div> : <div className="table-state table-state--empty">
           {contactTab === "qualified"
-            ? "No contacts are campaign ready yet. Approved contacts still need their missing company, title, and industry information completed before qualification."
+            ? "No contacts are campaign ready yet. Select verified contacts, choose a campaign, and use Qualify & assign selected."
             : contactTab === "approved"
               ? "No prospects have been approved from Discovery yet."
               : "No contacts match this view."}

@@ -12,7 +12,9 @@ const { ingestContacts, canonicalFieldMap } = require("../services/contactIngest
 const emailVerificationService = require("../services/emailVerificationService");
 const EmailVerificationBatch = require("../models/EmailVerificationBatch");
 const Contact = require("../models/Contact");
+const Campaign = require("../models/Campaign");
 const Outreach = require("../models/Outreach");
+const { applyResearchClassification } = require("../services/contactResearchService");
 
 const router = express.Router();
 
@@ -272,6 +274,46 @@ router.get("/overview", async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: "Unable to summarize contacts" });
+  }
+});
+
+router.patch("/bulk/assign-campaign", async (req, res) => {
+  try {
+    const contactIds = [...new Set(Array.isArray(req.body?.contactIds) ? req.body.contactIds : [])];
+    const { campaignId } = req.body || {};
+    if (!contactIds.length || contactIds.length > 500) {
+      return res.status(400).json({ success: false, message: "Select between 1 and 500 contacts" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(campaignId) || contactIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ success: false, message: "Invalid contact or campaign ID" });
+    }
+    const campaign = await Campaign.findById(campaignId).select("_id name");
+    if (!campaign) return res.status(404).json({ success: false, message: "Campaign not found" });
+
+    const contacts = await Contact.find({ _id: { $in: contactIds }, status: { $ne: "archived" } });
+    let assigned = 0;
+    let skipped = 0;
+    for (const contact of contacts) {
+      if (!contact.name || !contact.email || contact.emailStatus !== "verified") {
+        skipped += 1;
+        continue;
+      }
+      if (!contact.campaignIds.some((id) => String(id) === String(campaign._id))) {
+        contact.campaignIds.push(campaign._id);
+      }
+      contact.qualifyContact = true;
+      applyResearchClassification(contact);
+      await contact.save();
+      assigned += 1;
+    }
+    skipped += contactIds.length - contacts.length;
+    return res.json({
+      success: true,
+      data: { assigned, skipped, campaignId: campaign._id, campaignName: campaign.name },
+      message: `${assigned} contact${assigned === 1 ? "" : "s"} qualified and assigned to ${campaign.name}`,
+    });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message || "Unable to assign selected contacts" });
   }
 });
 
