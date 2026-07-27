@@ -41,6 +41,20 @@ function escapeHtml(value = "") {
     .replace(/>/g, "&gt;");
 }
 
+function fillTemplate(value = "", variables = {}) {
+  return Object.entries(variables).reduce(
+    (output, [key, replacement]) => output.replaceAll(`{{${key}}}`, String(replacement || "")),
+    String(value || ""),
+  );
+}
+
+function textToHtml(value = "") {
+  return String(value)
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replaceAll("\n", "<br>")}</p>`)
+    .join("\n");
+}
+
 
 // ======================================
 // GENERATE OUTREACH DRAFT
@@ -68,10 +82,6 @@ function generateOutreachDraft(contact, campaign) {
     "manual";
 
 
-  const subject =
-    `Partner With ${campaignName}`;
-
-
   const eventLink =
     campaign.registrationLinks?.eventbrite?.url ||
     campaign.content?.callToActionUrl ||
@@ -94,7 +104,7 @@ function generateOutreachDraft(contact, campaign) {
     "https://res.cloudinary.com/de1vvqtp3/image/upload/v1784844473/deal-to-close-flyer.png_bmxmbw.png";
 
 
-  const emailDraft = `
+  const fallbackEmailDraft = `
 Hi ${contactName},
 
 I wanted to personally introduce you to Deal to Close: Multifamily Bootcamp.
@@ -122,9 +132,37 @@ Thank you,
 Ellie's Coaching
 `.trim();
 
+  const variables = {
+    firstName: cleanName(contact.firstName || contactName.split(" ")[0] || contactName),
+    name: contactName,
+    campaignName,
+    programName: campaign.programName || campaignName,
+    eventLink,
+  };
+  const savedSubject = String(campaign.content?.subject || "").trim();
+  const savedBody = String(campaign.content?.body || "").trim();
+  const hasSavedSubject = savedSubject && savedSubject !== "Event Campaign";
+  const hasSavedBody = savedBody && savedBody !== "Campaign created for event promotion.";
+  const subject = fillTemplate(hasSavedSubject ? savedSubject : `Partner With ${campaignName}`, variables);
+  let emailDraft = fillTemplate(hasSavedBody ? savedBody : fallbackEmailDraft, variables);
+  if (eventLink && !emailDraft.includes(eventLink)) {
+    emailDraft = `${emailDraft}\n\n${campaign.content?.callToAction || "Learn more"}:\n${eventLink}`;
+  }
+  if (meetupLink && !emailDraft.includes(meetupLink)) {
+    emailDraft = `${emailDraft}\n\nAlso listed on Meetup:\n${meetupLink}`;
+  }
 
-
-  const htmlBody = `
+  const htmlBody = hasSavedBody ? `
+<!DOCTYPE html>
+<html>
+<body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+${textToHtml(fillTemplate(savedBody, variables))}
+${flyerUrl ? `<img src="${escapeHtml(flyerUrl)}" alt="Deal to Close Multifamily Bootcamp" style="width:100%;max-width:600px;border-radius:8px;">` : ""}
+${eventLink ? `<p><a href="${escapeHtml(eventLink)}" style="display:inline-block;background:#000;color:#fff;padding:14px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">${escapeHtml(campaign.content?.callToAction || "Learn more")}</a></p>` : ""}
+${meetupHtml}
+</body>
+</html>
+`.trim() : `
 <!DOCTYPE html>
 <html>
 <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">

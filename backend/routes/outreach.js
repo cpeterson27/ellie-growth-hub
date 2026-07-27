@@ -148,6 +148,7 @@ router.post("/generate", async (req,res)=>{
 
 
     let createdCount = 0;
+    let updatedCount = 0;
     let skippedExisting = 0;
     let skippedMissingEmail = 0;
 
@@ -184,16 +185,6 @@ router.post("/generate", async (req,res)=>{
 
 
 
-      if(exists){
-
-        skippedExisting++;
-
-        continue;
-
-      }
-
-
-
       const cleanedContact = {
 
         ...contact.toObject(),
@@ -221,7 +212,26 @@ router.post("/generate", async (req,res)=>{
           campaign
         );
 
-
+      if (exists) {
+        if (["pending", "failed"].includes(exists.status)) {
+          exists.organization = draft.organization;
+          exists.contactName = draft.contactName;
+          exists.contactRole = draft.contactRole;
+          exists.reason = draft.reason;
+          exists.subject = draft.subject;
+          exists.emailDraft = draft.emailDraft;
+          exists.htmlBody = draft.htmlBody || "";
+          exists.eventLink = draft.eventLink || "";
+          exists.flyerUrl = draft.flyerUrl || "";
+          exists.status = "pending";
+          exists.errorMessage = "";
+          await exists.save();
+          updatedCount++;
+        } else {
+          skippedExisting++;
+        }
+        continue;
+      }
 
       await Outreach.create({
 
@@ -289,6 +299,7 @@ router.post("/generate", async (req,res)=>{
     console.log({
 
       createdCount,
+      updatedCount,
 
       skippedExisting,
 
@@ -312,6 +323,7 @@ router.post("/generate", async (req,res)=>{
       outreach,
 
       createdCount,
+      updatedCount,
 
       skippedExisting,
 
