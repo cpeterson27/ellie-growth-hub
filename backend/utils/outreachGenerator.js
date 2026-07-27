@@ -95,7 +95,7 @@ function generateOutreachDraft(contact, campaign) {
     : "";
 
   const meetupHtml = meetupLink
-    ? `<p style="margin-top:16px;">Also listed on <a href="${escapeHtml(meetupLink)}">Meetup</a>.</p>`
+    ? `<p style="margin-top:12px;"><a href="${escapeHtml(meetupLink)}" style="display:inline-block;background:#e0393e;color:#fff;padding:14px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">View on Meetup</a></p>`
     : "";
 
 
