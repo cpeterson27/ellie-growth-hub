@@ -55,7 +55,7 @@ export default function Contacts() {
   const [importHeaders, setImportHeaders] = useState([]);
   const [importCampaignId, setImportCampaignId] = useState("");
   const [savingContact, setSavingContact] = useState(false);
-  const [contactTab, setContactTab] = useState("all");
+  const [contactTab, setContactTab] = useState("verified");
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [actionMenu, setActionMenu] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);

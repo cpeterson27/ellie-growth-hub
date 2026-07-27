@@ -30,6 +30,7 @@ export default function Discovery() {
   const [query, setQuery] = useState("");
   const [campaignId, setCampaignId] = useState("");
   const [source, setSource] = useState("");
+  const [emailFilter, setEmailFilter] = useState("verified");
   const [importOpen, setImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [notice, setNotice] = useState("");
@@ -39,7 +40,7 @@ export default function Discovery() {
   const [searchingApollo, setSearchingApollo] = useState(false);
 
   const loadProspects = async () => {
-    const response = await fetchContacts({ status: "prospect" });
+    const response = await fetchContacts({ status: "prospect", limit: 500 });
     setProspects(Array.isArray(response?.data) ? response.data.filter(Boolean) : []);
   };
 
@@ -54,8 +55,20 @@ export default function Discovery() {
     const searchText = [item?.name, item?.company, item?.email].filter(Boolean).join(" ").toLowerCase();
     return (!query || searchText.includes(query.toLowerCase()))
       && (!campaignId || item?.campaignIds?.some((id) => String(id) === campaignId))
-      && (!source || item?.sourceProvider === source || item?.sources?.includes(source));
-  }), [prospects, query, campaignId, source]);
+      && (!source || item?.sourceProvider === source || item?.sources?.includes(source))
+      && (emailFilter === "verified"
+        ? item?.emailStatus === "verified"
+        : emailFilter === "review"
+          ? item?.emailStatus !== "verified"
+          : true);
+  }), [prospects, query, campaignId, source, emailFilter]);
+
+  const emailCounts = useMemo(() => ({
+    verified: prospects.filter((item) => item?.emailStatus === "verified").length,
+    review: prospects.filter((item) => item?.emailStatus !== "verified").length,
+    risky: prospects.filter((item) => item?.emailStatus === "risky").length,
+    undeliverable: prospects.filter((item) => item?.emailStatus === "undeliverable").length,
+  }), [prospects]);
 
   const approve = async (row) => {
     await updateContact(row._id, { status: "active" });
@@ -153,6 +166,16 @@ export default function Discovery() {
       </section>
 
       <DashboardCard title="Prospect review">
+        <div className="discovery-workflow">
+          <div><span>1</span><strong>Review verified emails</strong><small>Start with deliverable addresses only.</small></div>
+          <div><span>2</span><strong>Complete missing research</strong><small>Confirm company, title, and industry.</small></div>
+          <div><span>3</span><strong>Approve the right fit</strong><small>Move only reviewed prospects into active Contacts.</small></div>
+        </div>
+        <div className="discovery-email-tabs" aria-label="Email safety filters">
+          <button className={emailFilter === "verified" ? "active" : ""} onClick={() => setEmailFilter("verified")}><strong>{emailCounts.verified}</strong><span>Verified emails</span><small>Review these first</small></button>
+          <button className={emailFilter === "review" ? "active" : ""} onClick={() => setEmailFilter("review")}><strong>{emailCounts.review}</strong><span>Email review</span><small>{emailCounts.risky} risky · {emailCounts.undeliverable} undeliverable</small></button>
+          <button className={emailFilter === "all" ? "active" : ""} onClick={() => setEmailFilter("all")}><strong>{prospects.length}</strong><span>All prospects</span><small>Every imported person</small></button>
+        </div>
         <div className="discovery-filters">
           <input className="select-input" placeholder="Search name, company, or email" value={query} onChange={(event) => setQuery(event.target.value)} />
           <select value={source} onChange={(event) => setSource(event.target.value)}><option value="">All sources</option><option value="apollo">Apollo</option><option value="csv">CSV</option></select>
