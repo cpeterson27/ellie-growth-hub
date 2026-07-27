@@ -44,8 +44,10 @@ const contactSchema = new mongoose.Schema(
 
     email: {
       type: String,
-      lowercase: true,
-      trim: true,
+      set: (value) => {
+        const email = String(value || "").trim().toLowerCase();
+        return email || undefined;
+      },
     },
 
 

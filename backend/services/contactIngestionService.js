@@ -63,6 +63,7 @@ function normalizeIncoming(row, source = "manual") {
   for (const field of numberFields) if (mapped[field] !== undefined) mapped[field] = Number(mapped[field]) || null;
   for (const field of dateFields) if (mapped[field]) mapped[field] = new Date(mapped[field]);
   mapped.email = String(mapped.email || "").trim().toLowerCase();
+  if (!mapped.email) delete mapped.email;
   mapped.linkedin = normalizeUrl(mapped.linkedin || mapped.linkedinUrl);
   if (!mapped.title && mapped.seniority && !/^[+()\d\s.-]{7,}$/.test(String(mapped.seniority))) mapped.title = mapped.seniority;
   mapped.name = String(mapped.name || `${mapped.firstName || ""} ${mapped.lastName || ""}`).trim();
@@ -87,6 +88,7 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null }
     if (data.mondayItemId) keys.push({ mondayItemId: data.mondayItemId }); if (data.phone) keys.push({ phone: data.phone });
     if (!keys.length && data.company) keys.push({ name: data.name, company: data.company });
     let contact = keys.length ? await Contact.findOne({ $or: keys }) : null;
+    const contactExisted = Boolean(contact);
     if (contact) {
       Object.entries(data).forEach(([key, value]) => {
         if (key === "apolloFields") contact.apolloFields = { ...(contact.apolloFields || {}), ...(value || {}) };
@@ -94,7 +96,6 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null }
         else if (value !== undefined && value !== "" && value !== null) contact[key] = value;
       });
       if (!contact.sources.includes(source)) contact.sources.push(source);
-      summary.mongoUpdated += 1;
     }
     else {
       contact = new Contact({
@@ -105,11 +106,17 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null }
         status: source === "manual" ? "active" : "prospect",
         importedAt: new Date(),
       });
-      summary.mongoCreated += 1;
     }
     applyResearchClassification(contact);
     if (campaign && !contact.campaignIds.some((id) => String(id) === String(campaign._id))) { contact.campaignIds.push(campaign._id); summary.campaignAssociated += 1; }
-    await contact.save();
+    try {
+      await contact.save();
+      if (contactExisted) summary.mongoUpdated += 1;
+      else summary.mongoCreated += 1;
+    } catch (error) {
+      summary.failed += 1;
+      summary.errors.push({ index, message: error.message || "Unable to save contact" });
+    }
   }
   return summary;
 }
