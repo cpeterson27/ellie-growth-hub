@@ -220,6 +220,33 @@ export default function Contacts() {
     if (saved) { setUploadOpen(false); setImportRows([]); setImportHeaders([]); setVerificationResults({}); setVerificationProgress(null); }
   }
 
+  async function saveUploadedContactsWithoutEmails() {
+    const contactsWithoutEmails = importRows.map((row) => {
+      const tags = [...new Set(
+        [String(row.Tags || "").split(","), ["needs-email-verification"]]
+          .flat()
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      )].join(",");
+
+      return {
+        ...row,
+        Email: "",
+        "Email Status": "unverified",
+        Tags: tags,
+      };
+    });
+
+    const saved = await saveIngestion(contactsWithoutEmails, "csv", null);
+    if (saved) {
+      setUploadOpen(false);
+      setImportRows([]);
+      setImportHeaders([]);
+      setVerificationResults({});
+      setVerificationProgress(null);
+    }
+  }
+
   const emailsToVerify = [...new Set(importRows.map((row) => String(row.Email || "").trim().toLowerCase()).filter(Boolean))];
   const pendingEmailCount = emailsToVerify.filter((email) => !verificationResults[email]).length;
   const verificationCounts = Object.values(verificationResults).reduce((counts, result) => {
@@ -412,7 +439,7 @@ export default function Contacts() {
         isOpen={isUploadOpen}
         onClose={() => !savingContact && !verifyingEmails && setUploadOpen(false)}
         title="Import Contacts"
-        footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import safe contacts</Button></>}
+        footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button>{importRows.length && pendingEmailCount > 0 ? <Button variant="outline" loading={savingContact} disabled={verifyingEmails} onClick={saveUploadedContactsWithoutEmails}>Save people without emails</Button> : null}<Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import verified contacts</Button></>}
       >
         {importError ? <p className="form-error" role="alert">{importError}</p> : null}
         {!importRows.length ? <><p>Upload a CSV or paste comma- or tab-separated data. Excel files are not supported in this build.</p><input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} /><textarea className="select-input" style={{ width: "100%", marginTop: "0.75rem", minHeight: "130px" }} placeholder="Paste header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) prepareImport(event.target.value); }} /></> : <>
@@ -421,6 +448,7 @@ export default function Contacts() {
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p className="contact-modal-intro">Campaigns are assigned after research and qualification. This prevents incomplete contacts from entering outreach.</p>
+          {pendingEmailCount > 0 ? <p className="contact-modal-intro"><strong>No-credit option:</strong> Save people without emails keeps every contact and removes every email address from the MongoDB import. Each record is tagged needs-email-verification.</p> : null}
           {emailsToVerify.length ? <div className="email-verification-panel">
             <div>
               <strong>Email safety check</strong>
