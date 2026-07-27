@@ -356,6 +356,23 @@ router.post("/generate", async (req,res)=>{
 // APPROVE
 // ======================================
 
+router.patch("/bulk/approve", async (req, res) => {
+  try {
+    const { campaignId } = req.body || {};
+    if (!campaignId) return res.status(400).json({ error: "campaignId required" });
+    const result = await Outreach.updateMany(
+      { campaignId, status: "pending" },
+      { $set: { status: "approved", errorMessage: "" } },
+    );
+    return res.json({
+      approvedCount: result.modifiedCount || 0,
+      message: `${result.modifiedCount || 0} pending draft${result.modifiedCount === 1 ? "" : "s"} approved`,
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Unable to approve pending drafts" });
+  }
+});
+
 router.patch("/:id/approve", async(req,res)=>{
 
   try {
