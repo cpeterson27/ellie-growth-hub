@@ -19,7 +19,7 @@ assert.strictEqual(contact.providerRecordId, "record-1");
 assert.strictEqual(contact.employeeCount, 42);
 const custom = normalizeIncoming({ "First Name": "Ada", "ICP Fit 8478 0723201923": "high" }, "csv");
 assert.strictEqual(custom.additionalFields["ICP Fit 8478 0723201923"], "high");
-assert.strictEqual(normalizeIncoming({ name: "Name Only" }).email, "");
+assert.strictEqual(normalizeIncoming({ name: "Name Only" }).email, undefined);
 const segmented = normalizeIncoming({ Name: "Jane Doe", Tags: "15k-program, multifamily", Notes: "Warm referral" }, "csv");
 assert.deepStrictEqual(segmented.tags, ["15k-program", "multifamily"]);
 assert.strictEqual(segmented.notes, "Warm referral");
@@ -28,11 +28,25 @@ assert.deepStrictEqual(getMissingTargetingFields(incomplete), ["company", "indus
 assert.strictEqual(incomplete.researchStatus, "needs_research");
 assert.strictEqual(incomplete.qualifyContact, false);
 assert(incomplete.tags.includes("needs-research"));
+const qualifiedWithOptionalFieldsMissing = applyResearchClassification({
+  name: "Event Lead",
+  email: "lead@example.com",
+  emailStatus: "verified",
+  company: "",
+  title: "",
+  industry: "",
+  tags: ["event"],
+  qualifyContact: true,
+  status: "active",
+});
+assert.strictEqual(qualifiedWithOptionalFieldsMissing.researchStatus, "qualified");
+assert.strictEqual(qualifiedWithOptionalFieldsMissing.qualifyContact, true);
+assert(qualifiedWithOptionalFieldsMissing.tags.includes("needs-enrichment"));
 const complete = applyResearchClassification({ company: "Example Co", title: "Owner", industry: "Real Estate", tags: ["event"], qualifyContact: false, stage: "Needs Research" });
 assert.strictEqual(complete.researchStatus, "ready_for_review");
 assert.strictEqual(complete.stage, "Ready for Review");
 assert(!complete.tags.includes("needs-research"));
-const qualified = applyResearchClassification({ company: "Example Co", title: "Owner", industry: "Real Estate", tags: [], qualifyContact: true, status: "prospect" });
+const qualified = applyResearchClassification({ name: "Qualified Lead", email: "qualified@example.com", emailStatus: "verified", company: "Example Co", title: "Owner", industry: "Real Estate", tags: [], qualifyContact: true, status: "prospect" });
 assert.strictEqual(qualified.researchStatus, "qualified");
 assert.strictEqual(qualified.status, "active");
 const placeholders = normalizeIncoming({

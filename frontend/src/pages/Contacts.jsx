@@ -520,14 +520,14 @@ export default function Contacts() {
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
       <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Research", ["researchStatus", "missingFields", "qualifyContact", "stage", "tags", "lists"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments"]], ["Marketing", ["keywords", "lastContacted", "notes"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : typeof detailContact[field] === "boolean" ? (detailContact[field] ? "Yes" : "No") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
       <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Research, Qualify & Assign" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>Save Contact Decision</Button></>}>{editingContact ? <>
-        <p className="contact-modal-intro"><strong>Complete these three fields first:</strong> company, title, and industry. Then decide whether this person fits the offer and assign the appropriate campaign.</p>
+        <p className="contact-modal-intro"><strong>Name and a verified email are enough to qualify someone.</strong> Company, title, and industry improve targeting but are optional and can be completed later.</p>
         <div className="contact-form-grid">
-          {["name", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}{["company", "title", "industry"].includes(field) ? " *" : ""}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}
+          {["name", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}
           <fieldset className="contact-decision-panel span-2">
             <legend>Campaign decision</legend>
             <label className="contact-qualify-choice">
               <input type="checkbox" checked={Boolean(editingContact.qualifyContact)} onChange={(event) => setEditingContact({ ...editingContact, qualifyContact: event.target.checked })} />
-              <span><strong>This person is a good fit</strong><small>Move them to Campaign Ready after the required research is complete.</small></span>
+              <span><strong>This person is a good fit</strong><small>Move them to Campaign Ready now when their name and email are verified.</small></span>
             </label>
             <label className="form-field">
               <span>Assign to campaign</span>
@@ -536,9 +536,11 @@ export default function Contacts() {
                 {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
               </select>
             </label>
-            {!editingContact.company || !editingContact.title || !editingContact.industry
-              ? <p className="contact-decision-warning">This person will remain in Needs Research until company, title, and industry are filled in—even if “good fit” is checked.</p>
-              : null}
+            {editingContact.emailStatus !== "verified"
+              ? <p className="contact-decision-warning">A verified email is required before this person can become Campaign Ready.</p>
+              : (!editingContact.company || !editingContact.title || !editingContact.industry)
+                ? <p className="contact-decision-warning">Optional targeting information is still missing. You may qualify and campaign to this person now, then enrich the record later.</p>
+                : null}
           </fieldset>
         </div>
       </> : null}</Modal>
