@@ -55,7 +55,7 @@ export default function Contacts() {
   const [importHeaders, setImportHeaders] = useState([]);
   const [importCampaignId, setImportCampaignId] = useState("");
   const [savingContact, setSavingContact] = useState(false);
-  const [contactTab, setContactTab] = useState("verified");
+  const [contactTab, setContactTab] = useState("approved");
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [actionMenu, setActionMenu] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -75,8 +75,10 @@ export default function Contacts() {
       const query = { limit: 500, ...(contactTab === "archived" ? { status: "archived" } : {}) };
       const response = await fetchContacts(query);
       const items = (response.data || []).filter((contact) => {
-        const tabMatches = contactTab === "verified"
-          ? contact.emailStatus === "verified"
+        const tabMatches = contactTab === "approved"
+          ? contact.status === "active"
+          : contactTab === "verified"
+            ? contact.emailStatus === "verified"
           : contactTab === "email_review"
             ? contact.emailStatus !== "verified"
             : contactTab === "research"
@@ -372,17 +374,18 @@ export default function Contacts() {
         </div> : null}
         {contactOverview ? <section className="contact-overview" aria-label="Contact status overview">
           <button onClick={() => setContactTab("all")}><span>Total contacts</span><strong>{contactOverview.total}</strong><small>Unique people in MongoDB</small></button>
+          <button className="is-safe" onClick={() => setContactTab("approved")}><span>Approved contacts</span><strong>{contactOverview.approved}</strong><small>Moved here from Discovery</small></button>
           <button className="is-safe" onClick={() => setContactTab("verified")}><span>Verified emails</span><strong>{contactOverview.verified}</strong><small>Safe for reviewed outreach</small></button>
           <button className="is-warning" onClick={() => setContactTab("email_review")}><span>Email review</span><strong>{contactOverview.withoutEmail}</strong><small>{contactOverview.risky} risky · {contactOverview.undeliverable} undeliverable</small></button>
           <button onClick={() => setContactTab("research")}><span>Needs research</span><strong>{contactOverview.needsResearch}</strong><small>Missing company, title, or industry</small></button>
           <button onClick={() => setContactTab("ready")}><span>Ready for review</span><strong>{contactOverview.readyForReview}</strong><small>Research complete; needs a decision</small></button>
-          <button onClick={() => setContactTab("qualified")}><span>Qualified</span><strong>{contactOverview.qualified}</strong><small>Approved for targeted campaigns</small></button>
+          <button onClick={() => setContactTab("qualified")}><span>Campaign ready</span><strong>{contactOverview.qualified}</strong><small>Researched and qualified for targeting</small></button>
         </section> : null}
         {contactOverview ? <p className="contact-guidance">
           <strong>What to do next:</strong> Start with Needs Research. Missing fields across the database: company {contactOverview.missingFields?.company || 0}, title {contactOverview.missingFields?.title || 0}, industry {contactOverview.missingFields?.industry || 0}. Email Review contains contacts whose address was withheld because it was risky, undeliverable, or absent.
         </p> : null}
         <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
-        <div className="crm-tabs">{[["all", "All"], ["verified", "Verified Email"], ["email_review", "Email Review"], ["research", "Needs Research"], ["ready", "Ready for Review"], ["qualified", "Qualified"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
+        <div className="crm-tabs">{[["approved", "Approved Contacts"], ["verified", "Verified Email"], ["research", "Needs Research"], ["ready", "Ready for Review"], ["qualified", "Campaign Ready"], ["email_review", "Email Review"], ["all", "All Records"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
         {loading ? <div className="table-state">Loading contacts…</div> : contacts.length ? <div className="contact-record-list">
           {contacts.map((contact) => <article className="contact-record" key={contact._id} onClick={() => setDetailContact(contact)}>
             <header>
@@ -405,7 +408,13 @@ export default function Contacts() {
               <div><span>Missing information</span><strong>{contact.missingFields?.length ? contact.missingFields.join(", ") : "None"}</strong></div>
             </div>
           </article>)}
-        </div> : <div className="table-state table-state--empty">No contacts match this view.</div>}
+        </div> : <div className="table-state table-state--empty">
+          {contactTab === "qualified"
+            ? "No contacts are campaign ready yet. Approved contacts still need their missing company, title, and industry information completed before qualification."
+            : contactTab === "approved"
+              ? "No prospects have been approved from Discovery yet."
+              : "No contacts match this view."}
+        </div>}
       </DashboardCard>
 
       {false ? <DashboardCard title="Find Leads">

@@ -229,6 +229,7 @@ router.get("/overview", async (req, res) => {
     const active = { status: { $ne: "archived" } };
     const [
       total,
+      approved,
       verified,
       risky,
       undeliverable,
@@ -239,6 +240,7 @@ router.get("/overview", async (req, res) => {
       missingFields,
     ] = await Promise.all([
       Contact.countDocuments(active),
+      Contact.countDocuments({ status: "active" }),
       Contact.countDocuments({ ...active, emailStatus: "verified", email: { $type: "string", $ne: "" } }),
       Contact.countDocuments({ ...active, emailStatus: "risky" }),
       Contact.countDocuments({ ...active, emailStatus: "undeliverable" }),
@@ -257,6 +259,7 @@ router.get("/overview", async (req, res) => {
       success: true,
       data: {
         total,
+        approved,
         verified,
         risky,
         undeliverable,
