@@ -1,59 +1,233 @@
 # Ellie AI Growth Operator
 
-A modern SaaS dashboard for event marketing and partnership management.
+Ellie AI Growth Operator is a private event-marketing workspace that combines
+contact management, audience discovery, campaign planning, email outreach,
+Eventbrite operations, and an AI assistant in one application.
 
-## Overview
+It is designed to help a small team move from an event idea to a measurable
+campaign without maintaining separate spreadsheets, disconnected contact lists,
+and manual outreach records.
 
-Ellie AI Growth Operator is an AI-powered Event Marketing CRM dashboard for event creators to manage campaigns, partners, ticket sales, outreach, and analytics.
+## What the product does
 
-## Tech Stack
+Ellie AI organizes the work surrounding an event:
 
-- React
-- Vite
-- JavaScript
-- React Router
-- Recharts
+- Manage events and connect each event to its marketing campaign.
+- Import contacts from CSV and preserve incomplete records for later research.
+- Verify email addresses before they are used for outreach.
+- Find and review prospects before approving them as contacts.
+- Assign one or many contacts to a campaign.
+- Generate, review, approve, and send personalized outreach.
+- Track campaign activity, replies, registrations, attendees, and event results.
+- Use Jarvis to summarize workspace information and help plan next actions.
 
-## Frontend Structure
+The system uses MongoDB as its primary operational database. External services
+such as Eventbrite, Emailable, Resend, Apollo, OpenAI, and the Jarvis memory
+bridge contribute specialized capabilities, but Ellie AI remains the central
+workspace.
 
-- `frontend/src/components/` – reusable UI building blocks
-- `frontend/src/layouts/` – app shell and page layout
-- `frontend/src/pages/` – dashboard, campaigns, partners, marketing, AI content, analytics, settings
-- `frontend/src/App.jsx` – router setup
-- `frontend/src/main.jsx` – app entry point
+## How the main workflow fits together
 
-## Run locally
+### 1. Events
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+An event represents the actual experience being promoted: its name, date,
+location, price, audience, ticket goal, and registration details.
 
-Open the app at `http://localhost:4173`.
+An event and a campaign are related, but they are not the same:
 
-## Build
+- **Event:** what people register for and attend.
+- **Campaign:** the marketing effort used to reach the right people.
 
-```bash
-cd frontend
-npm run build
-```
+An event should have only one matching campaign for the same promotion unless
+the team intentionally creates separate campaigns for different audiences or
+offers. When a campaign already exists, Ellie AI should show **View Campaign**
+instead of asking the user to create a duplicate.
 
-## Deployed Jarvis and Obsidian memory
+### 2. Eventbrite connection
 
-The deployed frontend and backend run on Render. Jarvis reads a cloud mirror of
-approved Obsidian notes; the browser never reads the local vault directly.
+Eventbrite is the ticketing and registration system. Ellie AI is the operating
+workspace around it.
 
-- The client can use deployed Jarvis at any time after the initial sync.
-- Run `npm run sync` from `tools/jarvis-vault-bridge` after important note
-  changes.
-- `npm run watch` is optional and mirrors changes every minute while it remains
-  running.
-- OpenAI cannot start the local bridge by chat or voice command.
+Once an Eventbrite account is authorized, Ellie AI can:
 
-See [docs/JARVIS_DEPLOYED_SETUP.md](docs/JARVIS_DEPLOYED_SETUP.md) for deployment
-configuration and [tools/jarvis-vault-bridge/README.md](tools/jarvis-vault-bridge/README.md)
-for the exact sync workflow.
+- Import an existing Eventbrite event.
+- Create and publish a managed Eventbrite event.
+- Update supported event details.
+- Synchronize tickets, orders, attendees, check-ins, and gross sales.
+- Preserve synchronization history so the team can see when data was refreshed.
 
-See [docs/LEAD_DATA_AND_TARGETING.md](docs/LEAD_DATA_AND_TARGETING.md) for the
-canonical CSV fields, Monday board mapping, and Apollo audience workflow.
+**Sync Eventbrite** does not create a second event or campaign. It refreshes the
+Ellie AI record with the latest information from the already-connected
+Eventbrite listing.
+
+The private-token connection supports the original account integration. OAuth
+is the professional connection method intended for a sellable, multi-client
+product because each business can authorize its own Eventbrite account without
+sharing credentials with the application owner.
+
+### 3. Contacts and email safety
+
+Contacts may be entered manually or imported from a CSV. A usable name is enough
+to retain a record, so missing company, title, industry, or email information
+does not cause the person to disappear.
+
+Email readiness is tracked separately from research completeness:
+
+- **Verified email:** approved by the verification provider and safe for normal
+  outreach.
+- **Owner confirmed:** a team member personally confirmed the address; it may be
+  used without purchasing another verification.
+- **Risky, unknown, or undeliverable:** withheld from campaigns until reviewed or
+  replaced.
+- **No email:** the contact remains in the database for research, but cannot
+  receive email.
+
+Verification does not automatically send an email. Importing a contact does not
+automatically add that person to a campaign.
+
+### 4. Contact readiness
+
+The contact views answer different operational questions:
+
+- **Approved Contacts:** contacts accepted into the working database.
+- **Verified Email:** contacts with an address that may be used for outreach.
+- **Needs Research:** useful records with missing context.
+- **Ready for Review:** research is sufficiently complete for a team decision.
+- **Campaign Ready:** contacts intentionally approved and assigned to a campaign.
+- **Email Review:** contacts whose email is missing or withheld.
+- **Archived:** records retained for history but removed from active work.
+
+A contact does not need a company, title, and industry to join a campaign. A
+name plus a verified or owner-confirmed email is sufficient when the team knows
+the person is a good fit.
+
+Contacts can belong to multiple campaigns. Removing a campaign assignment should
+not delete the contact or erase their history.
+
+### 5. Discovery
+
+Discovery is the review area for prospective people and organizations before
+they enter active outreach.
+
+Apollo organization discovery can use configurable targeting such as:
+
+- Target profile
+- Titles
+- Industries
+- Keywords
+- Locations
+- Company size
+
+This makes it possible to search for a different audience each time rather than
+locking the application to one permanent profile. Apollo People Search depends
+on the connected Apollo plan and its API permissions.
+
+Approving a discovery prospect accepts the record into the contact workflow. It
+does not automatically make an unsafe email deliverable or send outreach.
+
+### 6. Campaign assignment
+
+Campaign assignment is an intentional audience decision. A user may select
+individual contacts or choose a group of approved contacts and assign them in
+bulk.
+
+For the Deal to Close bootcamp, the intended flow is:
+
+1. Review or import a contact.
+2. Confirm that the person is relevant to the offer.
+3. Confirm that the email is verified or personally confirmed.
+4. Assign the contact to the Deal to Close campaign.
+5. Generate the campaign outreach draft.
+6. Review and approve the message.
+7. Send it and track the result.
+
+Changing the assignment later should remove the person from that campaign
+without deleting the contact.
+
+### 7. Outreach
+
+Outreach records are saved separately from the contact so the application has an
+auditable history of what was prepared and sent.
+
+Typical states are:
+
+- Pending review
+- Approved
+- Sent
+- Replied
+- Failed
+
+Editing a contact after a message has already been sent does not alter the
+historical sent message. A resend should create a new outreach attempt using the
+contact's current email address, rather than silently changing the original
+record.
+
+Campaign email may include personalized copy, event artwork, and registration
+buttons. Messages are reviewed before sending so a user can verify the
+recipient, subject, body, links, and visual presentation.
+
+### 8. Jarvis
+
+Jarvis is the conversational interface for Ellie AI. It can read approved
+workspace data and synchronized memory notes, summarize priorities, explain
+campaign status, and suggest actions.
+
+Jarvis does not independently modify source code, operate a developer computer,
+or start local services. Development requests can be recorded for review, but
+code changes are completed through the development workflow.
+
+Jarvis's cloud memory is a synchronized copy of approved Obsidian notes. The
+deployed application does not directly read a private local vault.
+
+## Recommended operating rules
+
+- Do not send to risky, unknown, undeliverable, or unsubscribed addresses.
+- Allow owner-confirmed addresses when the team genuinely knows the recipient.
+- Require explicit campaign assignment before generating outreach.
+- Require review and approval before the first send.
+- Stop automated follow-up when a recipient replies, registers, unsubscribes, or
+  is removed from the campaign.
+- Keep sent messages immutable and record resends as new attempts.
+- Preserve archived contacts and campaign history for reporting.
+- Treat Eventbrite as the ticketing source of truth and Ellie AI as the
+  marketing and relationship source of truth.
+
+## Current integrations
+
+| Integration | Purpose |
+| --- | --- |
+| Eventbrite | Events, publishing, orders, attendees, check-ins, and sales |
+| Emailable | Email deliverability verification |
+| Resend | Transactional and campaign email delivery |
+| Apollo | Organization and eligible people discovery |
+| OpenAI | Jarvis response generation and workspace assistance |
+| Obsidian bridge | Approved long-term notes for Jarvis |
+| MongoDB | Primary application data and workflow history |
+
+Integration credentials belong only in secured backend environment settings.
+They must never be stored in the browser, committed to the repository, included
+in screenshots, or shared in documentation.
+
+## Product direction
+
+The current application is an event-marketing CRM built for Ellie AI's operating
+workflow. The architecture is moving toward a multi-business product in which
+each customer has:
+
+- Their own users, roles, and permissions.
+- Their own contacts, events, campaigns, templates, and reporting.
+- Their own authorized integrations.
+- Isolated credentials and data.
+- An audit trail for sensitive actions.
+
+Public access should not expose the operational dashboard. A sellable version
+requires authenticated accounts, organization-level data isolation, role-based
+permissions, secure onboarding, subscription management, and production audit
+controls.
+
+## Additional reference guides
+
+- [Jarvis deployed behavior](docs/JARVIS_DEPLOYED_SETUP.md)
+- [Jarvis and Obsidian memory](docs/JARVIS_OBSIDIAN_SETUP.md)
+- [Lead data and audience targeting](docs/LEAD_DATA_AND_TARGETING.md)
+- [Contact import template](docs/ELLIE_CONTACT_IMPORT_TEMPLATE.csv)
