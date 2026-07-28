@@ -28,6 +28,7 @@
 .crm-connection-card h2 { margin: 10px 0 0; }
 .crm-connection-card p { color: inherit; line-height: 1.55; margin: 0; opacity: .82; }
 .crm-connection-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; }
+.gmail-status-card{align-items:center;background:linear-gradient(145deg,#fff,#f7faf9);border:1px solid var(--border);border-radius:22px;display:flex;justify-content:space-between;margin-bottom:22px;padding:24px}.gmail-status-card h2{margin:10px 0 5px}.gmail-status-card p{color:var(--text-muted);margin:0}.gmail-toolbar{display:flex;gap:10px;margin-bottom:18px}.gmail-toolbar input{flex:1}.gmail-thread-list{display:grid}.gmail-thread-list article{border-top:1px solid var(--border);padding:16px 4px}.gmail-thread-list article:first-child{border-top:0}.gmail-thread-list article>div{display:flex;justify-content:space-between}.gmail-thread-list h3{font-size:1rem;margin:7px 0}.gmail-thread-list p,.gmail-thread-list small{color:var(--text-muted)}.gmail-compose{display:grid;gap:14px}
 
 .integration-status {
   background: #eeeae1;

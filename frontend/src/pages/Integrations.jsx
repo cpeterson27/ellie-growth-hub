@@ -8,6 +8,9 @@ import {
   fetchEventbriteWebhookStatus,
   fetchEvents,
   fetchIntegrationHub,
+  fetchGmailConnection,
+  beginGmailConnection,
+  disconnectGmail,
 } from "../services/api.js";
 import "./Integrations.css";
 
@@ -47,26 +50,43 @@ export default function Integrations() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [gmail, setGmail] = useState(null);
 
   const loadProviders = async () => {
     try {
       setLoading(true);
-      const [response, connection, webhook, eventData] = await Promise.all([
+      const [response, connection, webhook, eventData, gmailConnection] = await Promise.all([
         fetchIntegrationHub(),
         fetchEventbriteConnection().catch(() => null),
         fetchEventbriteWebhookStatus().catch(() => null),
         fetchEvents().catch(() => []),
+        fetchGmailConnection().catch(() => null),
       ]);
       setProviders(response.data?.providers || []);
       setEventbriteConnection(connection);
       setEventbriteWebhook(webhook);
       setEvents(Array.isArray(eventData) ? eventData : []);
+      setGmail(gmailConnection);
       setError("");
     } catch (err) {
       setError(err.response?.data?.error || "Unable to load integrations");
     } finally {
       setLoading(false);
     }
+  };
+
+  const connectGmail = async () => {
+    try {
+      const response = await beginGmailConnection();
+      window.location.assign(response.authorizationUrl);
+    } catch (err) {
+      setError(err.response?.data?.error || "Google app credentials must be configured before Gmail can connect.");
+    }
+  };
+
+  const removeGmail = async () => {
+    await disconnectGmail();
+    await loadProviders();
   };
 
   useEffect(() => { loadProviders(); }, []);
@@ -100,7 +120,7 @@ export default function Integrations() {
           <p>Your built-in CRM for contacts, audience profiles, campaign assignments, outreach history, and CSV imports. No external CRM account is required.</p>
           <div className="crm-connection-actions">
             <Button onClick={() => navigate("/contacts")}>Open CRM</Button>
-            <Button variant="outline" onClick={() => navigate("/settings")}>Customize CRM</Button>
+            <Button variant="outline" onClick={() => navigate("/integrations/crm")}>Configure CRM</Button>
           </div>
         </article>
         {externalCrms.map((crm) => (
@@ -110,6 +130,22 @@ export default function Integrations() {
             <button className="integration-disabled-action" disabled>Coming soon</button>
           </article>
         ))}
+      </section>
+
+      <h2 className="integration-section-title">Email and inbox</h2>
+      <section className="crm-connection-grid">
+        <article className={gmail?.connected ? "crm-connection-card crm-connection-card--active" : "crm-connection-card"}>
+          <div><span className={`integration-status integration-status--${gmail?.connected ? "connected" : "configuration_required"}`}>{gmail?.connected ? "Connected" : gmail?.configured ? "Ready to connect" : "App setup required"}</span><h2>Gmail</h2></div>
+          <p>{gmail?.connected ? `${gmail.email} is authorized for inbox visibility and approved sending.` : "Connect a client’s Google account so Ellie can read relevant threads, prepare replies, and send only after user approval."}</p>
+          <div className="crm-connection-actions">
+            {gmail?.connected ? <><Button onClick={() => navigate("/integrations/gmail")}>Open inbox</Button><Button variant="outline" onClick={removeGmail}>Disconnect Gmail</Button></> : <><Button onClick={connectGmail} disabled={!gmail?.configured}>Connect Gmail</Button><Button variant="outline" onClick={() => navigate("/integrations/gmail")}>Setup details</Button></>}
+          </div>
+          {!gmail?.configured ? <small>Add the Google OAuth client ID, secret, redirect URI, and credential encryption key to the backend environment first.</small> : null}
+        </article>
+        <article className="crm-connection-card">
+          <div><span className="integration-status">Delivery</span><h2>Resend</h2></div>
+          <p>Resend remains the campaign delivery provider. Gmail is for the connected inbox and personal replies; the two integrations have separate jobs.</p>
+        </article>
       </section>
 
       <h2 className="integration-section-title">Connected apps</h2>

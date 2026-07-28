@@ -50,3 +50,4 @@
   .campaign-modal__footer { justify-content: stretch; }
   .campaign-modal__footer .btn { flex: 1; }
 }
+.audience-custom-entry{display:flex;gap:10px;margin-top:14px}.audience-custom-entry input{flex:1}

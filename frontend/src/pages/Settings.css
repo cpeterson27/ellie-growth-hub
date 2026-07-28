@@ -42,6 +42,14 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.account-settings-card{background:#fff;border:1px solid var(--border);border-radius:24px;box-shadow:var(--crm-shadow);display:grid;grid-template-columns:minmax(260px,.7fr) minmax(0,1.3fr);overflow:hidden}
+.account-settings-card__intro{background:linear-gradient(145deg,#123f36,#1f5c50);color:#fff;padding:34px}
+.account-settings-card__intro span{color:#f4d47a;font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.account-settings-card__intro h2{font-size:2rem;margin:10px 0}
+.account-settings-card__intro p{color:rgba(255,255,255,.8);line-height:1.6}
+.account-settings-card__form{display:grid;gap:18px;grid-template-columns:repeat(2,minmax(0,1fr));padding:34px}
+.crm-core-fields{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}.crm-core-fields span{background:#f2f4f7;border:1px solid #e4e7ec;border-radius:999px;padding:7px 10px;font-size:.82rem;font-weight:700}
+
 .settings-card-note {
   color: var(--text-muted);
   line-height: 1.55;
@@ -76,7 +84,7 @@
 
 @media (max-width: 900px) {
   .settings-hero-card,
-  .settings-grid {
+  .settings-grid,.account-settings-card,.account-settings-card__form {
     grid-template-columns: 1fr;
   }
 }

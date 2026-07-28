@@ -22,6 +22,7 @@ const webhooksRouter = require("./routes/webhooks");
 const partnersRouter = require("./routes/partners");
 const contentRouter = require("./routes/content");
 const developmentRequestsRouter = require("./routes/developmentRequests");
+const gmailRouter = require("./routes/gmail");
 
 const app = express();
 
@@ -77,6 +78,7 @@ connectDatabase(mongoUri)
     app.use("/api/partners", partnersRouter);
     app.use("/api/content", contentRouter);
     app.use("/api/development-requests", developmentRequestsRouter);
+    app.use("/api/gmail", gmailRouter);
 
     app.get("/api/health", (req, res) => {
       res.json({

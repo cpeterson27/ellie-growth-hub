@@ -23,7 +23,10 @@ const IntegrationConnectionSchema = new mongoose.Schema(
         "facebook",
         "instagram",
         "x",
-        "monday"
+        "monday",
+        "gmail",
+        "hubspot",
+        "salesforce"
       ],
       index: true,
     },

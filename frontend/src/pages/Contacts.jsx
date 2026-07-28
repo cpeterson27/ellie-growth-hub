@@ -53,6 +53,19 @@ function fullContactName(contact = {}) {
     .join(" ");
 }
 
+const contactDetailGroups = [
+  ["Contact", [["name", "Name"], ["email", "Email"], ["phone", "Phone"], ["title", "Job title"], ["linkedin", "LinkedIn"]]],
+  ["Company", [["company", "Company"], ["industry", "Industry"], ["website", "Website"], ["employeeCount", "Company size"]]],
+  ["CRM", [["stage", "Lifecycle stage"], ["type", "Relationship type"], ["audienceProfiles", "Audience / interests"], ["tags", "Tags"], ["lists", "Lists"], ["sources", "Source"]]],
+  ["History", [["lastContacted", "Last contacted"], ["notes", "Notes"]]],
+];
+
+function detailValue(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).join(", ");
+  if (value instanceof Date) return value.toLocaleDateString();
+  return String(value ?? "").trim();
+}
+
 function hasAudienceSignals(contact = {}) {
   return Boolean(
     contact.audienceProfiles?.length ||
@@ -699,7 +712,20 @@ export default function Contacts() {
         </>}
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
-      <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Research", ["researchStatus", "missingFields", "qualifyContact", "stage", "tags", "lists"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments"]], ["Marketing", ["keywords", "lastContacted", "notes"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : typeof detailContact[field] === "boolean" ? (detailContact[field] ? "Yes" : "No") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
+      <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title={detailContact?.name || "Contact"}>
+        {detailContact ? <div className="contact-detail">
+          <div className="contact-detail__summary">
+            <div><span>{(detailContact.name || "?").slice(0, 1).toUpperCase()}</span><p><strong>{detailContact.name}</strong><small>{detailContact.title || "Contact"}{detailContact.company ? ` at ${detailContact.company}` : ""}</small></p></div>
+            <Button size="sm" onClick={() => { setContactEditMode("full"); setEditingContact({ ...detailContact, ...contactNameParts(detailContact) }); setDetailContact(null); }}>Edit contact</Button>
+          </div>
+          {contactDetailGroups.map(([group, fields]) => {
+            const visible = fields.map(([field, label]) => [field, label, detailValue(detailContact[field])]).filter(([, , value]) => value);
+            if (!visible.length) return null;
+            return <section className="contact-detail__group" key={group}><h3>{group}</h3><dl>{visible.map(([field, label, value]) => <div key={field}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>;
+          })}
+          <section className="contact-detail__group"><h3>Campaigns</h3><p>{detailContact.campaignIds?.length ? `${detailContact.campaignIds.length} campaign assignment${detailContact.campaignIds.length === 1 ? "" : "s"}` : "Not assigned to a campaign yet."}</p></section>
+        </div> : null}
+      </Modal>
       <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title={contactEditMode === "audience" ? "Tell Ellie who this contact is" : "Edit contact & campaign"} footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, name: fullContactName(editingContact), tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), audienceProfiles: Array.isArray(editingContact.audienceProfiles) ? editingContact.audienceProfiles : String(editingContact.audienceProfiles || "").split(",").map((profile) => profile.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{contactEditMode === "audience" ? "Save audience information" : editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? contactEditMode === "audience" ? <>
         <div className="audience-editor-intro">
           <span>Audience unknown</span>

@@ -11,15 +11,15 @@ const EVENT_TEMPLATES = [
 ];
 
 const PROGRAM_TEMPLATES = [
-  { key: "program_enrollment", name: "$15k program enrollment", description: "A premium, outcome-led invitation for qualified buyers." },
-  { key: "program_operator", name: "Established operator enrollment", description: "For experienced operators who are a strong fit for your $15k program." },
-  { key: "program_partner", name: "Program partner referral", description: "For affiliates and strategic partners who can refer ideal buyers." },
+  { key: "program_enrollment", name: "Program enrollment", description: "Invite qualified people to join a course, membership, coaching program, or community." },
+  { key: "program_operator", name: "Direct offer", description: "Promote a service or offer directly to the people most likely to need it." },
+  { key: "program_partner", name: "Partner referral", description: "Ask affiliates and strategic partners to refer the right people." },
 ];
 
 const PROGRAM_AUDIENCES = [
-  "High-ticket program buyers",
-  "Experienced real-estate operators",
-  "Skool community candidates",
+  "Prospective members",
+  "Existing community members",
+  "Qualified buyers",
   "Affiliate and referral partners",
 ];
 
@@ -47,6 +47,7 @@ export default function CampaignModal({
   const [form, setForm] = useState(() => createEmptyForm(defaultCampaignKind));
   const [error, setError] = useState("");
   const [savedTemplates, setSavedTemplates] = useState([]);
+  const [newAudience, setNewAudience] = useState("");
 
   const templateOptions = useMemo(
     () => (form.campaignKind === "program" ? PROGRAM_TEMPLATES : EVENT_TEMPLATES),
@@ -109,6 +110,13 @@ export default function CampaignModal({
     }));
   };
 
+  const addAudience = () => {
+    const value = newAudience.trim();
+    if (!value) return;
+    setForm((current) => ({ ...current, audience: [...new Set([...current.audience, value])] }));
+    setNewAudience("");
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -151,14 +159,14 @@ export default function CampaignModal({
       )}
     >
       <form id="campaign-form" className="campaign-form" onSubmit={handleSubmit}>
-        <p className="campaign-form__intro">Choose what you are promoting first. Ellie will attach the appropriate starting email template without changing any existing campaign content.</p>
+        <p className="campaign-form__intro">Choose the business goal first. An event campaign promotes a dated registration. An offer campaign promotes an ongoing program, service, membership, or community such as Skool.</p>
 
         <div className="campaign-kind-picker" role="group" aria-label="Campaign type">
           <button type="button" className={form.campaignKind === "event" ? "is-selected" : ""} onClick={() => setCampaignKind("event")}>
             <span>Event campaign</span><small>Sell tickets or registrations</small>
           </button>
           <button type="button" className={form.campaignKind === "program" ? "is-selected" : ""} onClick={() => setCampaignKind("program")}>
-            <span>Program campaign</span><small>Promote your premium $15k offer</small>
+            <span>Offer / program campaign</span><small>Enroll people in a program, service, membership, or Skool community</small>
           </button>
         </div>
 
@@ -170,8 +178,8 @@ export default function CampaignModal({
 
           {isProgram ? (
             <div className="form-field span-2">
-              <label htmlFor="program-name">Program / offer name</label>
-              <input id="program-name" type="text" placeholder="e.g. The $15k Real Estate Growth Program" value={form.programName} onChange={handleChange("programName")} />
+              <label htmlFor="program-name">What are you promoting?</label>
+              <input id="program-name" type="text" placeholder="e.g. Multifamily Mentorship on Skool" value={form.programName} onChange={handleChange("programName")} />
             </div>
           ) : (
             <>
@@ -228,6 +236,10 @@ export default function CampaignModal({
                 <span>{option}</span>
               </label>
             ))}
+          </div>
+          <div className="audience-custom-entry">
+            <input type="text" value={newAudience} placeholder="Add a client-specific audience" onChange={(event) => setNewAudience(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addAudience(); } }} />
+            <Button type="button" variant="outline" size="sm" onClick={addAudience}>Add audience</Button>
           </div>
         </fieldset>
 

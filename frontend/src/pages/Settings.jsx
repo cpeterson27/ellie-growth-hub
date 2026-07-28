@@ -1,34 +1,7 @@
 import { useState } from "react";
 import Button from "../components/Button.jsx";
-import DashboardCard from "../components/DashboardCard.jsx";
 import { getWorkspaceSettings, saveWorkspaceSettings } from "../utils/workspaceSettings.js";
 import "./Settings.css";
-
-const pipelinePresets = {
-  event: [
-    "New contact",
-    "Needs research",
-    "Qualified",
-    "Assigned to campaign",
-    "Outreach drafted",
-    "Contacted",
-    "Responded",
-    "Registered",
-    "Attended",
-    "Follow-up needed",
-  ],
-  investor: [
-    "New relationship",
-    "Needs qualification",
-    "Investor fit",
-    "Education sent",
-    "Call booked",
-    "Interested",
-    "Committed",
-    "Nurture",
-    "Not a fit",
-  ],
-};
 
 export default function Settings() {
   const [settings, setSettings] = useState(getWorkspaceSettings);
@@ -39,58 +12,29 @@ export default function Settings() {
     setSaved(true);
   };
 
-  const applyPreset = (preset) => {
-    setSettings({ ...settings, contactStages: pipelinePresets[preset] || settings.contactStages });
-  };
-
   return <div className="page-dashboard settings-page">
     <div className="page-header">
       <div>
-        <p className="page-eyebrow">Workspace setup</p>
-        <h1 className="page-title">Workspace settings</h1>
-        <p className="page-subtitle">Customize the words your team sees in Ellie CRM. This changes labels and workflow stages, not your contacts.</p>
+        <p className="page-eyebrow">Account & workspace</p>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">Manage the client workspace identity and account preferences. CRM configuration and connected apps live in Integrations.</p>
       </div>
       <Button onClick={save}>Save changes</Button>
     </div>
-    {saved ? <p className="discovery-notice">Saved. Your workspace name now appears in the top bar, and your campaign type is preselected when you create a campaign.</p> : null}
+    {saved ? <p className="discovery-notice">Workspace settings saved.</p> : null}
 
-    <section className="settings-hero-card">
-      <div>
-        <span>Recommended order</span>
-        <h2>Set your workspace name, choose the default campaign type, then choose the CRM stages your team actually uses.</h2>
+    <section className="account-settings-card">
+      <div className="account-settings-card__intro">
+        <span>Client account</span>
+        <h2>Workspace identity</h2>
+        <p>These details identify the client’s account across Ellie. They do not change CRM fields, pipelines, contacts, or connected applications.</p>
       </div>
-      <p>Most clients should not need this page every day. They use Contacts, Campaigns, Events, and Outreach. Settings is for initial setup and occasional process changes.</p>
-    </section>
-
-    <section className="settings-grid">
-      <DashboardCard title="1. Workspace identity">
-        <p className="settings-card-note">This is the business name shown across the dashboard.</p>
+      <div className="account-settings-card__form">
         <label className="form-field"><span>Workspace name</span><input className="select-input" value={settings.workspaceName} onChange={(event) => setSettings({ ...settings, workspaceName: event.target.value })} /></label>
-        <label className="form-field"><span>Default campaign type</span><select className="select-input" value={settings.defaultCampaignKind} onChange={(event) => setSettings({ ...settings, defaultCampaignKind: event.target.value })}><option value="event">Event campaigns</option><option value="program">Program / offer campaigns</option></select></label>
-      </DashboardCard>
-
-      <DashboardCard title="2. CRM pipeline">
-        <p className="settings-card-note">These are the relationship stages your contacts move through. Use the recommended event pipeline, or edit it to match your sales process.</p>
-        <div className="settings-preset-actions">
-          <Button variant="outline" size="sm" onClick={() => applyPreset("event")}>Use event pipeline</Button>
-          <Button variant="outline" size="sm" onClick={() => applyPreset("investor")}>Use investor pipeline</Button>
-        </div>
-        <label className="form-field"><span>Contact stages</span><textarea className="select-input" rows="10" value={(settings.contactStages || []).join("\n")} onChange={(event) => setSettings({ ...settings, contactStages: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} /></label>
-      </DashboardCard>
-
-      <DashboardCard title="3. Contact fields">
-        <p className="settings-card-note">Only add fields your team truly needs. The core CRM already tracks name, email, phone, title, company, campaign, audience profile, source, and notes.</p>
-        <label className="form-field"><span>Field labels — one per line</span><textarea className="select-input" rows="8" value={(settings.customContactFields || []).join("\n")} onChange={(event) => setSettings({ ...settings, customContactFields: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} /></label>
-      </DashboardCard>
-
-      <DashboardCard title="4. What belongs here">
-        <div className="settings-explainer-list">
-          <p><strong>Settings:</strong> workspace name, CRM language, default campaign style.</p>
-          <p><strong>Integrations:</strong> Eventbrite, Apollo, Gmail, CRM connectors, social accounts.</p>
-          <p><strong>Contacts:</strong> import, edit, qualify, and assign people to campaigns.</p>
-        </div>
-        <small>For a sellable multi-client version, these preferences should be stored per client account on the backend with user roles and permissions.</small>
-      </DashboardCard>
+        <label className="form-field"><span>Primary business type</span><select className="select-input" value={settings.businessType || "coaching"} onChange={(event) => setSettings({ ...settings, businessType: event.target.value })}><option value="coaching">Coaching / education</option><option value="events">Events</option><option value="real_estate">Real estate</option><option value="agency">Agency / services</option><option value="other">Other</option></select></label>
+        <label className="form-field"><span>Time zone</span><select className="select-input" value={settings.timezone || "America/Los_Angeles"} onChange={(event) => setSettings({ ...settings, timezone: event.target.value })}><option value="America/Los_Angeles">Pacific Time</option><option value="America/Denver">Mountain Time</option><option value="America/Chicago">Central Time</option><option value="America/New_York">Eastern Time</option></select></label>
+        <label className="form-field"><span>Default sender name</span><input className="select-input" value={settings.senderName || ""} placeholder="e.g. Ellie’s Coaching" onChange={(event) => setSettings({ ...settings, senderName: event.target.value })} /></label>
+      </div>
     </section>
   </div>;
 }

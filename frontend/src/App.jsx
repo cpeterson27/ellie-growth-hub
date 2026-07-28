@@ -18,6 +18,8 @@ import Integrations from "./pages/Integrations.jsx";
 import EventbriteIntegration from "./pages/EventbriteIntegration.jsx";
 import Discovery from "./pages/Discovery.jsx";
 import DevelopmentRequests from "./pages/DevelopmentRequests.jsx";
+import CrmSetup from "./pages/CrmSetup.jsx";
+import GmailIntegration from "./pages/GmailIntegration.jsx";
 
 
 function App() {
@@ -114,6 +116,8 @@ function App() {
             path="/integrations/eventbrite"
             element={<EventbriteIntegration />}
           />
+          <Route path="/integrations/crm" element={<CrmSetup />} />
+          <Route path="/integrations/gmail" element={<GmailIntegration />} />
 
 
           <Route

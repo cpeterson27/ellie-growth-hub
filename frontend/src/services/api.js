@@ -117,6 +117,21 @@ export const beginEventbriteConnection = () =>
 export const disconnectEventbrite = () =>
   api.post("/eventbrite/oauth/disconnect").then((res) => res.data);
 
+export const fetchGmailConnection = () =>
+  api.get("/gmail/status").then((res) => res.data);
+
+export const beginGmailConnection = () =>
+  api.get("/gmail/oauth/start").then((res) => res.data);
+
+export const disconnectGmail = () =>
+  api.post("/gmail/disconnect").then((res) => res.data);
+
+export const fetchGmailThreads = (q = "in:inbox") =>
+  api.get("/gmail/threads", { params: { q } }).then((res) => res.data);
+
+export const sendGmailMessage = (message) =>
+  api.post("/gmail/send", message).then((res) => res.data);
+
 export const syncEventbriteEvent = (eventId) =>
   api.post(`/eventbrite/events/${eventId}/sync`).then((res) => res.data);
 
