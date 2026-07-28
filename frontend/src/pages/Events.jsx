@@ -12,6 +12,7 @@ import {
   fetchCampaigns,
   fetchEventbriteConnection,
   fetchEventbriteEvents,
+  fetchEventbriteWebhookStatus,
   fetchEvents,
   importEventbriteEvent,
   publishManagedEventbriteEvent,
@@ -187,6 +188,7 @@ export default function Events() {
   const [campaigns, setCampaigns] = useState([]);
   const [eventbriteEvents, setEventbriteEvents] = useState([]);
   const [connection, setConnection] = useState(null);
+  const [webhookStatus, setWebhookStatus] = useState(null);
   const [selectedEventId, setSelectedEventId] = useState("");
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -245,19 +247,28 @@ export default function Events() {
       total + Number(event.eventbriteLogistics?.grossRevenue || 0),
     0,
   );
+  const connectedEvents = events.filter((event) => event.integrations?.eventbrite?.eventId);
+  const latestEventbriteSync = connectedEvents
+    .map((event) => event.eventbriteLogistics?.lastSyncedAt)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b) - new Date(a))[0];
+  const formatDateTime = (value) =>
+    value ? new Date(value).toLocaleString() : "Not recorded yet";
 
   const loadWorkspace = async () => {
-    const [eventData, campaignData, connectionData, externalData] =
+    const [eventData, campaignData, connectionData, externalData, webhookData] =
       await Promise.all([
         fetchEvents(),
         fetchCampaigns(),
         fetchEventbriteConnection(),
         fetchEventbriteEvents().catch(() => []),
+        fetchEventbriteWebhookStatus().catch(() => null),
       ]);
     setEvents(Array.isArray(eventData) ? eventData : []);
     setCampaigns(Array.isArray(campaignData) ? campaignData : []);
     setConnection(connectionData);
     setEventbriteEvents(Array.isArray(externalData) ? externalData : []);
+    setWebhookStatus(webhookData);
   };
 
   useEffect(() => {
@@ -269,13 +280,15 @@ export default function Events() {
       fetchCampaigns(),
       fetchEventbriteConnection(),
       fetchEventbriteEvents().catch(() => []),
+      fetchEventbriteWebhookStatus().catch(() => null),
     ])
-      .then(([eventData, campaignData, connectionData, externalData]) => {
+      .then(([eventData, campaignData, connectionData, externalData, webhookData]) => {
         const loadedEvents = Array.isArray(eventData) ? eventData : [];
         setEvents(loadedEvents);
         setCampaigns(Array.isArray(campaignData) ? campaignData : []);
         setConnection(connectionData);
         setEventbriteEvents(Array.isArray(externalData) ? externalData : []);
+        setWebhookStatus(webhookData);
         const refreshCutoff = Date.now() - 15 * 60 * 1000;
         const staleConnectedEvents = loadedEvents.filter(
           (event) =>
@@ -305,6 +318,24 @@ export default function Events() {
       })
       .catch(() => setError("Unable to load event operations."));
   }, []);
+
+  const refreshEventbriteData = async (event) => {
+    if (!event.integrations?.eventbrite?.eventId) return;
+    try {
+      setWorkingId(event._id);
+      setError("");
+      const result = await syncEventbriteEvent(event._id);
+      const current = result.event || event;
+      setEvents((items) =>
+        items.map((item) => (item._id === current._id ? current : item)),
+      );
+      setSuccess(`Eventbrite data refreshed for ${current.name}.`);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to refresh Eventbrite data.");
+    } finally {
+      setWorkingId("");
+    }
+  };
 
   const connectEventbrite = async () => {
     try {
@@ -647,6 +678,33 @@ export default function Events() {
         ) : null}
       </section>
 
+      <section className="eventbrite-health-grid" aria-label="Eventbrite automation status">
+        <DashboardCard title="Eventbrite automation">
+          <div className="eventbrite-health-list">
+            <div>
+              <span className={`connection-dot connection-dot--${connection?.connected ? "on" : "off"}`} />
+              <p><strong>Account connection</strong><small>{connection?.connected ? "Connected for publishing and reporting" : "Needs authorization"}</small></p>
+            </div>
+            <div>
+              <span className={`connection-dot connection-dot--${webhookStatus?.configured && webhookStatus?.lastReceivedAt ? "on" : "off"}`} />
+              <p><strong>Webhook listener</strong><small>{webhookStatus?.lastReceivedAt ? `Last received ${formatDateTime(webhookStatus.lastReceivedAt)}` : webhookStatus?.configured ? "Configured; waiting for Eventbrite activity" : "Webhook token is not configured"}</small></p>
+            </div>
+            <div>
+              <span className={`connection-dot connection-dot--${latestEventbriteSync ? "on" : "off"}`} />
+              <p><strong>Event data sync</strong><small>{latestEventbriteSync ? `Last synced ${formatDateTime(latestEventbriteSync)}` : "No Eventbrite event has synced yet"}</small></p>
+            </div>
+          </div>
+          {webhookStatus?.lastMessage ? <p className="eventbrite-health-note">{webhookStatus.lastMessage}</p> : null}
+        </DashboardCard>
+        <DashboardCard title="How this works">
+          <ol className="eventbrite-flow-list">
+            <li>Client connects Eventbrite once.</li>
+            <li>Eventbrite sends Ellie updates automatically.</li>
+            <li>Ellie refreshes the matching event, dashboard, and campaign metrics.</li>
+          </ol>
+        </DashboardCard>
+      </section>
+
       <section className="event-summary-grid">
         <DashboardCard title="Upcoming">
           <strong>{upcomingEvents.length}</strong>
@@ -807,6 +865,15 @@ export default function Events() {
                           }
                         >
                           View listing
+                        </Button>
+                      ) : null}
+                      {isEventbrite ? (
+                        <Button
+                          variant="outline"
+                          loading={workingId === event._id}
+                          onClick={() => refreshEventbriteData(event)}
+                        >
+                          Refresh Eventbrite data
                         </Button>
                       ) : null}
                       {linkedCampaign ? (
@@ -1085,8 +1152,9 @@ export default function Events() {
                     <p className="events-eyebrow">Ellie AI only</p>
                     <h3>Campaign audience</h3>
                     <p>
-                      This controls prospect filters and campaign messaging. It
-                      never rewrites the Eventbrite listing.
+                      Pick the audience segments Ellie should use for contact
+                      matching and campaign messaging. These are internal
+                      targeting rules, not public Eventbrite copy.
                     </p>
                   </div>
                   <span
@@ -1097,10 +1165,10 @@ export default function Events() {
                 </div>
                 {(editingEvent.audienceSuggestions || []).length ? (
                   <div className="audience-suggestions">
-                    <strong>Suggested from the Eventbrite description</strong>
+                    <strong>Step 1 · Suggested audience segments</strong>
                     <p>
-                      Ellie found these near “Who this event is for.” Select
-                      only the groups you want to target.
+                      Ellie found these in the Eventbrite listing. Choose only
+                      the groups this campaign should actually target.
                     </p>
                     <div>
                       {editingEvent.audienceSuggestions.map((suggestion) => {
@@ -1142,7 +1210,7 @@ export default function Events() {
                   </p>
                 )}
                 <label className="form-field">
-                  <span>Approved audience groups</span>
+                  <span>Step 2 · Selected target audience</span>
                   <textarea
                     className="select-input"
                     value={draft.audience}
@@ -1153,8 +1221,13 @@ export default function Events() {
                         audienceConfirmed: false,
                       })
                     }
-                    placeholder="Separate audience groups with commas"
+                    placeholder="Choose suggestions above or type audience groups separated with commas"
                   />
+                  <small>
+                    These labels are used later to match MongoDB contacts by
+                    confirmed title, industry, company, tags, keywords, lists,
+                    and notes.
+                  </small>
                 </label>
                 <label className="event-publish-choice">
                   <input
@@ -1168,10 +1241,11 @@ export default function Events() {
                     }
                   />
                   <span>
-                    <strong>Ellie has approved this target audience</strong>
+                    <strong>Step 3 · Approve this audience for matching</strong>
                     <small>
-                      Suggestions never become campaign filters until this is
-                      checked and saved.
+                      After this is checked and saved, Ellie can use these
+                      groups to filter contacts and guide outreach. No emails
+                      are sent from this step.
                     </small>
                   </span>
                 </label>
@@ -1385,16 +1459,20 @@ export default function Events() {
               <div className="event-strategy">
                 <div className="event-strategy__header">
                   <div><h3>Audience recommendations</h3>
-                    <p>Ellie analyzes this draft’s name, overview, attendee outcomes, business goal, highlights, and optional notes. It does not pull an audience from MongoDB or Eventbrite.</p>
+                    <p>Ellie analyzes the event draft and your ideal-attendee notes to suggest audience segments. It does not pull contacts yet.</p>
                   </div>
                   <Button loading={loading} onClick={generateAudience}>Generate recommendations</Button>
                 </div>
-                <label className="form-field"><span>Who do you believe this is for? (optional input)</span>
+                <label className="form-field"><span>Who do you believe this is for? (optional strategy note)</span>
                   <textarea className="select-input" value={draft.planning.idealAttendee}
                     onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, idealAttendee: e.target.value } })} />
                 </label>
                 <p className="event-form-note">
-                  These are suggested audience groups—not contacts. After you approve groups, Ellie can match them against MongoDB contacts with known professional or interest signals. Name-and-email-only contacts remain “Audience unknown” until a real signal is added.
+                  These are audience segments, not contacts. After you select
+                  and approve segments, Ellie can match them against MongoDB
+                  contacts with known professional or interest signals.
+                  Name-and-email-only contacts stay “Audience unknown” until a
+                  real signal is added.
                 </p>
                 {draft.audienceRecommendationSource ? (
                   <p className="audience-source-note">

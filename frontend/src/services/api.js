@@ -120,6 +120,9 @@ export const disconnectEventbrite = () =>
 export const syncEventbriteEvent = (eventId) =>
   api.post(`/eventbrite/events/${eventId}/sync`).then((res) => res.data);
 
+export const fetchEventbriteWebhookStatus = () =>
+  api.get("/eventbrite/webhook/status").then((res) => res.data);
+
 export const createManagedEventbriteEvent = (data) =>
   api.post("/eventbrite/managed-events", data).then((res) => res.data);
 

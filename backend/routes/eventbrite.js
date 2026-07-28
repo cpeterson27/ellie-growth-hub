@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const Event = require("../models/Event");
+const IntegrationConnection = require("../models/IntegrationConnection");
 
 const { getEvent, getEvents } = require("../services/eventbrite");
 const eventbriteOAuthService = require("../services/eventbriteOAuthService");
@@ -12,6 +13,36 @@ const router = express.Router();
 
 function webhookToken() {
   return String(process.env.EVENTBRITE_WEBHOOK_TOKEN || "").trim();
+}
+
+async function recordWebhookStatus(req, status, details = {}) {
+  try {
+    const now = new Date();
+    await IntegrationConnection.findOneAndUpdate(
+      { provider: "eventbrite" },
+      {
+        $set: {
+          lastVerifiedAt: now,
+          "metadata.webhook.configured": Boolean(webhookToken()),
+          "metadata.webhook.lastReceivedAt": now,
+          "metadata.webhook.lastStatus": status,
+          "metadata.webhook.lastAction":
+            req.get("x-eventbrite-event") || req.body?.config?.action || "",
+          "metadata.webhook.lastDeliveryId": req.get("x-eventbrite-delivery") || "",
+          "metadata.webhook.lastEventbriteResource": req.body?.api_url || "",
+          "metadata.webhook.lastLocalEventId": details.localEventId || "",
+          "metadata.webhook.lastMessage": details.message || "",
+        },
+        $setOnInsert: {
+          provider: "eventbrite",
+          status: "configured",
+        },
+      },
+      { upsert: true, new: true },
+    );
+  } catch (error) {
+    console.error("EVENTBRITE WEBHOOK STATUS RECORD ERROR:", error.message);
+  }
 }
 
 router.post("/webhook", async (req, res) => {
@@ -35,6 +66,7 @@ router.post("/webhook", async (req, res) => {
     return res.status(400).json({ error: "Unexpected webhook source resource" });
   }
 
+  await recordWebhookStatus(req, "accepted", { message: "Webhook accepted by Ellie." });
   res.status(202).json({ accepted: true });
   setImmediate(async () => {
     try {
@@ -48,11 +80,43 @@ router.post("/webhook", async (req, res) => {
       const localEvent = await Event.findOne({
         "integrations.eventbrite.eventId": eventbriteId,
       });
-      if (localEvent) await eventbriteLogisticsService.syncEvent(localEvent._id);
+      if (localEvent) {
+        await eventbriteLogisticsService.syncEvent(localEvent._id);
+        await recordWebhookStatus(req, "synced", {
+          localEventId: String(localEvent._id),
+          message: `Synced ${localEvent.name}`,
+        });
+      } else {
+        await recordWebhookStatus(req, "accepted", {
+          message: "Webhook accepted; no matching Ellie event was found yet.",
+        });
+      }
     } catch (error) {
       console.error("EVENTBRITE WEBHOOK SYNC ERROR:", error.response?.data || error.message);
+      await recordWebhookStatus(req, "sync_failed", {
+        message: error.response?.data?.error_description || error.message,
+      });
     }
   });
+});
+
+router.get("/webhook/status", async (req, res) => {
+  try {
+    const connection = await IntegrationConnection.findOne({ provider: "eventbrite" }).lean();
+    const webhook = connection?.metadata?.webhook || {};
+    res.json({
+      configured: Boolean(webhookToken()),
+      lastReceivedAt: webhook.lastReceivedAt || null,
+      lastStatus: webhook.lastStatus || "",
+      lastAction: webhook.lastAction || "",
+      lastDeliveryId: webhook.lastDeliveryId || "",
+      lastLocalEventId: webhook.lastLocalEventId || "",
+      lastMessage: webhook.lastMessage || "",
+    });
+  } catch (error) {
+    console.error("EVENTBRITE WEBHOOK STATUS ERROR:", error.message);
+    res.status(500).json({ error: "Unable to read Eventbrite webhook status" });
+  }
 });
 
 router.get("/oauth/status", async (req, res) => {

@@ -57,6 +57,47 @@ export default function Dashboard() {
   const syncLabel = logistics.lastSyncedAt
     ? `Synced ${new Date(logistics.lastSyncedAt).toLocaleString()}`
     : "Eventbrite data has not synced yet";
+  const hasAudienceSuggestions = Boolean(
+    selected?.audienceRecommendationDetails?.length ||
+      selected?.audienceSuggestions?.length,
+  );
+  const hasSelectedAudience = Boolean(selected?.audience?.length);
+  const audienceApproved = Boolean(selected?.audienceConfirmedAt);
+  const nextStep = audienceApproved
+    ? {
+        status: "Campaign ready",
+        tone: "is-ready",
+        title: "Continue campaign outreach",
+        body: "The audience strategy is approved. Review contact matches, assignments, and outreach activity next.",
+        label: "Open outreach",
+        path: "/outreach",
+      }
+    : hasSelectedAudience
+      ? {
+          status: "Needs approval",
+          tone: "needs-attention",
+          title: "Approve the selected audience",
+          body: "Audience groups have been selected, but Ellie will not use them for matching or outreach until you approve them.",
+          label: "Approve target audience",
+          path: `/events?eventId=${selected._id}&tab=strategy`,
+        }
+      : hasAudienceSuggestions
+        ? {
+            status: "Needs decision",
+            tone: "needs-attention",
+            title: "Choose the target audience",
+            body: "Ellie has suggestions. Pick the groups this campaign should target, then approve them.",
+            label: "Choose audience",
+            path: `/events?eventId=${selected._id}&tab=strategy`,
+          }
+        : {
+            status: "Needs strategy",
+            tone: "needs-attention",
+            title: "Generate audience recommendations",
+            body: "Add or review event strategy so Ellie can suggest audience segments before matching contacts.",
+            label: "Open audience strategy",
+            path: `/events?eventId=${selected._id}&tab=strategy`,
+          };
 
   return <div className="page-dashboard dashboard-portfolio">
     <div className="page-header">
@@ -107,10 +148,10 @@ export default function Dashboard() {
       </DashboardCard>
       <DashboardCard title="Next step">
         <div className="dashboard-next-step">
-          <span className={selected.audienceConfirmedAt ? "is-ready" : "needs-attention"}>{selected.audienceConfirmedAt ? "Campaign ready" : "Needs attention"}</span>
-          <h3>{selected.audienceConfirmedAt ? "Continue campaign outreach" : "Approve the target audience"}</h3>
-          <p>{selected.audienceConfirmedAt ? "The audience strategy is approved. Review campaign assignments and outreach activity next." : "Review Ellie’s suggested audience before using it to filter contacts or create outreach."}</p>
-          <Button size="sm" onClick={() => navigate(selected.audienceConfirmedAt ? "/outreach" : `/events?eventId=${selected._id}&tab=strategy`)}>{selected.audienceConfirmedAt ? "Open outreach" : "Review target audience"}</Button>
+          <span className={nextStep.tone}>{nextStep.status}</span>
+          <h3>{nextStep.title}</h3>
+          <p>{nextStep.body}</p>
+          <Button size="sm" onClick={() => navigate(nextStep.path)}>{nextStep.label}</Button>
         </div>
       </DashboardCard>
     </section>
