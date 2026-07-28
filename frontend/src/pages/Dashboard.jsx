@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiCalendar, FiDollarSign, FiTrendingUp, FiUsers } from "react-icons/fi";
+import { FiCalendar, FiChevronLeft, FiChevronRight, FiDollarSign, FiGrid, FiTrendingUp, FiUsers } from "react-icons/fi";
 import StatCard from "../components/StatCard.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Button from "../components/Button.jsx";
@@ -27,6 +27,12 @@ export default function Dashboard() {
   }, []);
 
   const selected = events.find((event) => event._id === selectedId) || events[0];
+  const selectedIndex = Math.max(0, events.findIndex((event) => event._id === selected?._id));
+  const moveSelectedEvent = (direction) => {
+    if (events.length < 2) return;
+    const nextIndex = (selectedIndex + direction + events.length) % events.length;
+    setSelectedId(events[nextIndex]._id);
+  };
   useEffect(() => {
     if (!selected?._id) return setOutreachCount(0);
     fetchOutreach(selected._id).then((items) => setOutreachCount((Array.isArray(items) ? items : items?.outreach || []).length)).catch(() => setOutreachCount(0));
@@ -65,7 +71,33 @@ export default function Dashboard() {
     </section>
 
     <section className="dashboard-main-grid">
-      <DashboardCard title="Event portfolio" action={<span className="label-pill">{events.length} events</span>}>
+      <DashboardCard title="Event performance" action={<Button variant="outline" size="sm" onClick={() => navigate("/events")}>Manage event</Button>}>
+        <div className="event-navigator" aria-label="Choose an event to view">
+          <div className="event-navigator__label">
+            <FiCalendar aria-hidden="true" />
+            <span><small>Viewing event</small><strong>{selectedIndex + 1} of {events.length}</strong></span>
+          </div>
+          <label className="event-navigator__select">
+            <span className="sr-only">Selected event</span>
+            <select value={selected?._id || ""} onChange={(event) => setSelectedId(event.target.value)}>
+              {events.map((event) => <option value={event._id} key={event._id}>{event.name}</option>)}
+            </select>
+          </label>
+          <div className="event-navigator__buttons">
+            <button type="button" onClick={() => moveSelectedEvent(-1)} disabled={events.length < 2} aria-label="View previous event"><FiChevronLeft /></button>
+            <button type="button" onClick={() => moveSelectedEvent(1)} disabled={events.length < 2} aria-label="View next event"><FiChevronRight /></button>
+          </div>
+        </div>
+        <div className="selected-event-summary">
+          <p className="page-eyebrow">{eventDate(selected)?.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) || "Date not set"}</p>
+          <h2>{selected.name}</h2>
+          <p>{selected.audience?.join(", ") || "Audience strategy not approved yet"}</p>
+          <div className="selected-event-kpis"><span><strong>{selectedProgress}%</strong> ticket goal</span><span><strong>{outreachCount}</strong> outreach records</span><span><strong>${eventRevenue(selected).toLocaleString()}</strong> gross</span></div>
+          <div className="progress-bar"><div className="progress-bar__fill" style={{ width: `${selectedProgress}%` }} /></div>
+        </div>
+      </DashboardCard>
+      <DashboardCard title="All events" action={<Button variant="outline" size="sm" onClick={() => navigate("/events")}><FiGrid /> Open event workspace</Button>}>
+        <p className="event-directory-help">Choose any event below to display its performance above.</p>
         <div className="event-portfolio-list">
           {events.map((event) => {
             const goal = Number(event.ticketGoal || 0);
@@ -74,17 +106,9 @@ export default function Dashboard() {
               <div><strong>{event.name}</strong><span>{eventDate(event)?.toLocaleDateString() || "Date not set"}</span></div>
               <div><strong>{sold}{goal ? ` / ${goal}` : ""}</strong><span>tickets</span></div>
               <div><strong>${eventRevenue(event).toLocaleString()}</strong><span>gross</span></div>
+              <span className="event-row-state">{selected?._id === event._id ? "Viewing" : "View"}</span>
             </button>;
           })}
-        </div>
-      </DashboardCard>
-      <DashboardCard title="Selected event" action={<Button variant="outline" onClick={() => navigate("/events")}>Manage</Button>}>
-        <div className="selected-event-summary">
-          <p className="page-eyebrow">{eventDate(selected)?.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) || "Date not set"}</p>
-          <h2>{selected.name}</h2>
-          <p>{selected.audience?.join(", ") || "Audience strategy not approved yet"}</p>
-          <div className="selected-event-kpis"><span><strong>{selectedProgress}%</strong> ticket goal</span><span><strong>{outreachCount}</strong> outreach records</span><span><strong>${eventRevenue(selected).toLocaleString()}</strong> gross</span></div>
-          <div className="progress-bar"><div className="progress-bar__fill" style={{ width: `${selectedProgress}%` }} /></div>
         </div>
       </DashboardCard>
     </section>
