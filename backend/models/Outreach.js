@@ -217,6 +217,10 @@ outreachSchema.index({
   sentAt: -1,
 });
 
+// A recipient has one lifecycle record per campaign. Refreshing drafts must
+// never create a second send record for the same email address.
+outreachSchema.index({ campaignId: 1, contactEmail: 1 }, { unique: true });
+
 
 // Resend message lookup
 outreachSchema.index(

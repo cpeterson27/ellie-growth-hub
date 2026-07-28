@@ -62,8 +62,9 @@ async function sendEmail(outreachItem) {
   const unsubscribeUrl = `${publicBackendUrl()}/api/unsubscribe/${encodeURIComponent(token)}`;
   const businessName = workspace?.legalBusinessName || workspace?.workspaceName || "Ellie's Coaching";
   const postalAddress = workspace?.postalAddress || "";
-  const complianceText = `${businessName}${postalAddress ? ` · ${postalAddress}` : ""}\nUnsubscribe: ${unsubscribeUrl}`;
-  const footerHtml = `<div style="margin-top:36px;padding-top:20px;border-top:1px solid #ddd7ca;color:#737b77;font-size:12px;line-height:1.6;text-align:center"><div>${String(businessName).replace(/[<>&"]/g, "")}</div>${postalAddress ? `<div>${String(postalAddress).replace(/[<>&"]/g, "")}</div>` : ""}<div><a href="${unsubscribeUrl}" style="color:#506b63">Unsubscribe from campaign emails</a></div></div>`;
+  const websiteUrl = String(workspace?.websiteUrl || "").trim();
+  const complianceText = `This promotional message was sent because we believed this opportunity may be relevant to your professional work.\n${businessName}${postalAddress ? ` · ${postalAddress}` : ""}${websiteUrl ? ` · ${websiteUrl}` : ""}\nUnsubscribe: ${unsubscribeUrl}`;
+  const footerHtml = `<div style="margin-top:36px;padding-top:20px;border-top:1px solid #ddd7ca;color:#737b77;font-size:12px;line-height:1.6;text-align:center"><div style="margin-bottom:8px">This promotional message was sent because we believed this opportunity may be relevant to your professional work.</div><div><strong>${String(businessName).replace(/[<>&"]/g, "")}</strong></div>${postalAddress ? `<div>${String(postalAddress).replace(/[<>&"]/g, "")}</div>` : ""}${websiteUrl ? `<div><a href="${websiteUrl.replace(/"/g, "&quot;")}" style="color:#506b63">${websiteUrl.replace(/[<>&"]/g, "")}</a></div>` : ""}<div style="margin-top:8px"><a href="${unsubscribeUrl}" style="color:#506b63">Unsubscribe from campaign emails</a></div></div>`;
   const text = `${outreachItem.emailDraft || ""}\n\n—\n${complianceText}`;
   let html = outreachItem.htmlBody || `<html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${(outreachItem.emailDraft || "")
     .split(/\n{2,}/)

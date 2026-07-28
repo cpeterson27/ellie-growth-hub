@@ -458,6 +458,8 @@ router.post("/send", async(req,res)=>{
 
 
     let sentCount = 0;
+    let failedCount = 0;
+    const failures = [];
 
 
 
@@ -488,6 +490,12 @@ router.post("/send", async(req,res)=>{
 
         item.errorMessage =
           result.message;
+        failedCount++;
+        failures.push({
+          outreachId: item._id,
+          email: item.contactEmail,
+          message: result.message,
+        });
 
       }
 
@@ -502,7 +510,9 @@ router.post("/send", async(req,res)=>{
 
       success:true,
 
-      sentCount
+      sentCount,
+      failedCount,
+      failures
 
     });
 

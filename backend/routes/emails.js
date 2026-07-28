@@ -21,10 +21,17 @@ router.post("/send", async (req, res) => {
         .json({ error: "No approved outreach items found" });
     }
 
+    let failedCount = 0;
+    const failures = [];
     for (const item of items) {
       const result = await sendEmail(item);
       if (!result.success) {
-        return res.status(503).json({ error: result.message });
+        item.status = "failed";
+        item.errorMessage = result.message;
+        await item.save();
+        failedCount += 1;
+        failures.push({ outreachId: item._id, email: item.contactEmail, message: result.message });
+        continue;
       }
       item.status = "sent";
       item.sentAt = new Date();
@@ -33,7 +40,7 @@ router.post("/send", async (req, res) => {
       await item.save();
     }
 
-    res.json({ success: true, sentCount: items.length });
+    res.json({ success: true, sentCount: items.length - failedCount, failedCount, failures });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to send emails" });
