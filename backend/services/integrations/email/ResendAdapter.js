@@ -68,7 +68,7 @@ class ResendAdapter extends BaseIntegration {
         throw new Error("Resend API key missing.");
       }
 
-      const { to, subject, text, html, from } = params;
+      const { to, subject, text, html, from, replyTo } = params;
 
       if (!to || !subject || !html || !from) {
         throw new Error("Missing required email fields");
@@ -87,6 +87,7 @@ class ResendAdapter extends BaseIntegration {
           subject,
           text,
           html,
+          ...(replyTo ? { reply_to: replyTo } : {}),
         }),
       });
 

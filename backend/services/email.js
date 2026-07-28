@@ -1,4 +1,5 @@
 const integrationHub = require("./integrationHub");
+const IntegrationConnection = require("../models/IntegrationConnection");
 
 
 
@@ -50,6 +51,13 @@ async function sendEmail(outreachItem) {
 
 try {
 
+const gmailConnection = await IntegrationConnection.findOne({
+  provider: "gmail",
+  status: "connected",
+}).select("settings");
+const replyTo =
+  String(process.env.EMAIL_REPLY_TO || "").trim() ||
+  String(gmailConnection?.settings?.email || "").trim();
 
 const response = await integrationHub.execute("resend", "sendEmail", {
   from: process.env.EMAIL_FROM || "Ellie AI <onboarding@resend.dev>",
@@ -57,6 +65,7 @@ const response = await integrationHub.execute("resend", "sendEmail", {
   subject: outreachItem.subject || "A message from Ellie's Coaching",
   text,
   html,
+  replyTo,
 });
 
 

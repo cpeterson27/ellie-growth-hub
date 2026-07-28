@@ -20,7 +20,7 @@ const navItems = [
   { label: "Discovery", path: "/discovery", icon: <FiTrendingUp /> },
   { label: "Contacts", path: "/contacts", icon: <FiUsers /> },
   { label: "Outreach", path: "/outreach", icon: <FiMail /> },
-  { label: "Inbox", path: "/inbox", icon: <FiMail /> },
+  { label: "Conversations", path: "/inbox", icon: <FiMail /> },
   { label: "Marketing", path: "/marketing", icon: <FiTrendingUp /> },
   { label: "Partners", path: "/partners", icon: <FiUsers /> },
   { label: "AI Content", path: "/content", icon: <FiZap /> },

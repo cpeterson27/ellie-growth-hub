@@ -106,4 +106,27 @@ router.get("/contact-history", async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
+router.get("/outreach-history", async (_req, res) => {
+  try {
+    const outreach = await Outreach.find({ status: { $in: ["sent", "replied"] } })
+      .populate("campaignId", "name")
+      .sort({ sentAt: -1 })
+      .limit(100)
+      .lean();
+    res.json({
+      outreach: outreach.map((item) => ({
+        id: item._id,
+        contactName: item.contactName,
+        contactEmail: item.contactEmail,
+        campaignName: item.campaignId?.name || "Campaign outreach",
+        subject: item.subject,
+        status: item.status,
+        sentAt: item.sentAt,
+        repliedAt: item.repliedAt,
+        replyText: item.replyText,
+      })),
+    });
+  } catch (error) { res.status(400).json({ error: error.message }); }
+});
+
 module.exports = router;

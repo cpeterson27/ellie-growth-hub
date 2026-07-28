@@ -144,6 +144,9 @@ export const syncGmailOutreachReplies = () =>
 export const fetchContactEmailHistory = (email) =>
   api.get("/gmail/contact-history", { params: { email } }).then((res) => res.data);
 
+export const fetchOutreachEmailHistory = () =>
+  api.get("/gmail/outreach-history").then((res) => res.data);
+
 export const syncEventbriteEvent = (eventId) =>
   api.post(`/eventbrite/events/${eventId}/sync`).then((res) => res.data);
 
