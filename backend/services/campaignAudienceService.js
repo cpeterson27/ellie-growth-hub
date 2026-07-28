@@ -7,6 +7,31 @@ const AUDIENCE_TERMS = {
   "house flippers": ["house flip", "fix and flip", "flipping", "wholesaling", "distressed properties", "renovation"],
   "property management companies": ["property management", "property manager", "leasing"],
   "multifamily investors": ["multifamily", "multi-family", "apartments", "apartment investor"],
+  "beginner multifamily investors": [
+    "multifamily", "multi-family", "apartment investor", "beginner investor",
+    "new investor", "real estate investor",
+  ],
+  "capital raisers": [
+    "capital raising", "capital raiser", "raise capital", "investor relations",
+    "syndication", "syndicator",
+  ],
+  "passive investors": [
+    "passive investor", "limited partner", "accredited investor", "passive income",
+    "real estate investor",
+  ],
+  "real estate professionals": [
+    "real estate", "realtor", "broker", "property manager", "acquisitions",
+    "asset management", "developer",
+  ],
+  "entrepreneurs": ["entrepreneur", "founder", "owner", "business owner"],
+  "w-2 professionals": ["w-2", "w2", "professional", "employee", "executive"],
+  "medical professionals": [
+    "medical", "physician", "doctor", "dentist", "nurse", "healthcare",
+  ],
+  "anyone looking to build passive income through commercial real estate": [
+    "passive income", "commercial real estate", "multifamily", "multi-family",
+    "apartment investor", "real estate investor",
+  ],
   "experienced real-estate operators": ["operator", "developer", "owner", "founder", "asset management", "acquisitions"],
   "affiliate and referral partners": ["affiliate", "referral", "broker", "realtor", "real estate agent", "lender"],
   "high-ticket program buyers": ["operator", "developer", "owner", "founder", "investor", "acquisitions", "multifamily"],

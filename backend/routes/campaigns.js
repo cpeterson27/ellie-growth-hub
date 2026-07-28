@@ -231,6 +231,8 @@ router.post("/from-event/:eventId", async (req, res) => {
       });
 
     if (existingCampaign) {
+      existingCampaign.audience = event.audienceConfirmedAt ? event.audience : [];
+      await existingCampaign.save();
       const audienceMatch = await assignCampaignMatches(existingCampaign._id);
 
       return res.json({
@@ -267,7 +269,7 @@ router.post("/from-event/:eventId", async (req, res) => {
           event.ticketsSold || 0,
 
         audience:
-          event.audience,
+          event.audienceConfirmedAt ? event.audience : [],
 
         content,
         registrationLinks: {

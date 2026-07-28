@@ -1,4 +1,5 @@
 const axios = require("axios");
+const Campaign = require("../models/Campaign");
 const Event = require("../models/Event");
 const { accessToken, organizationId } = require("./eventbriteOAuthService");
 const { syncEvent } = require("./eventbriteLogisticsService");
@@ -126,6 +127,18 @@ async function updateManagedEvent(localEventId, input) {
   if (input.audienceConfirmed === true) localEvent.audienceConfirmedAt = new Date();
   if (input.audienceConfirmed === false) localEvent.audienceConfirmedAt = null;
   await localEvent.save();
+
+  if (input.audience !== undefined || input.audienceConfirmed !== undefined) {
+    await Campaign.updateMany(
+      { eventId: localEvent._id },
+      {
+        $set: {
+          audience: localEvent.audienceConfirmedAt ? localEvent.audience : [],
+        },
+      }
+    );
+  }
+
   return externalId ? syncEvent(localEvent._id) : localEvent;
 }
 
