@@ -70,6 +70,13 @@
   margin: 0 0 34px;
 }
 
+.eventbrite-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, .7fr);
+  gap: 18px;
+  margin: 0 0 34px;
+}
+
 .eventbrite-setup-intro {
   color: var(--text-muted);
   line-height: 1.55;
@@ -171,13 +178,59 @@
 
 .integration-role-list p { margin: 6px 0 0; }
 
+.eventbrite-config-list {
+  display: grid;
+  gap: 14px;
+}
+
+.eventbrite-config-list > div {
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+}
+
+.eventbrite-config-list span {
+  background: #fff0c9;
+  border-radius: 50%;
+  color: #7b5700;
+  display: grid;
+  flex: 0 0 auto;
+  font-size: .78rem;
+  font-weight: 900;
+  height: 26px;
+  place-items: center;
+  width: 26px;
+}
+
+.eventbrite-config-list span.is-ready {
+  background: #3cc89c;
+  color: #fff;
+}
+
+.eventbrite-config-list p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.eventbrite-config-list small {
+  color: var(--text-muted);
+  font-size: .84rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 1100px) {
   .crm-connection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .integration-provider-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .eventbrite-setup-grid { grid-template-columns: 1fr; }
+  .eventbrite-setup-grid,
+  .eventbrite-admin-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
   .crm-connection-grid,
   .integration-provider-grid,
-  .eventbrite-setup-grid { grid-template-columns: 1fr; }
+  .eventbrite-setup-grid,
+  .eventbrite-admin-grid { grid-template-columns: 1fr; }
 }

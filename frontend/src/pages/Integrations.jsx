@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import {
+  beginEventbriteConnection,
   fetchEventbriteConnection,
   fetchEventbriteWebhookStatus,
   fetchEvents,
@@ -31,6 +32,7 @@ export default function Integrations() {
   const [eventbriteWebhook, setEventbriteWebhook] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [connectingEventbrite, setConnectingEventbrite] = useState(false);
   const [error, setError] = useState("");
 
   const loadProviders = async () => {
@@ -69,6 +71,18 @@ export default function Integrations() {
   const webhookMessage = eventbriteWebhook?.lastMessage?.toLowerCase().includes("path you requested")
     ? "Test received. Eventbrite can reach Ellie automatically."
     : eventbriteWebhook?.lastMessage;
+
+  const connectEventbrite = async () => {
+    try {
+      setConnectingEventbrite(true);
+      setError("");
+      const result = await beginEventbriteConnection();
+      window.location.assign(result.authorizationUrl);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to start Eventbrite authorization.");
+      setConnectingEventbrite(false);
+    }
+  };
 
   return (
     <div className="page-dashboard integrations-page">
@@ -121,7 +135,7 @@ export default function Integrations() {
             </div>
             <div>
               <span className={`eventbrite-step-number ${webhookVerified ? "is-ready" : ""}`}>{webhookVerified ? "✓" : "2"}</span>
-              <p><strong>Automatic updates are verified</strong><small>{webhookVerified ? `Eventbrite last checked in ${formatDateTime(eventbriteWebhook.lastReceivedAt)}.` : eventbriteWebhook?.configured ? "Waiting for the first Eventbrite test or real event update." : "Developer setup needed: configure Ellie’s backend webhook token and Eventbrite webhook endpoint."}</small></p>
+              <p><strong>Automatic updates are verified</strong><small>{webhookVerified ? `Eventbrite last checked in ${formatDateTime(eventbriteWebhook.lastReceivedAt)}.` : eventbriteWebhook?.configured ? "Waiting for the first Eventbrite test or real event update." : "Developer/admin setup needed once: configure Ellie’s backend webhook receiver."}</small></p>
             </div>
             <div>
               <span className={`eventbrite-step-number ${latestEventbriteSync ? "is-ready" : ""}`}>{latestEventbriteSync ? "✓" : "3"}</span>
@@ -130,7 +144,7 @@ export default function Integrations() {
           </div>
           {webhookMessage ? <p className="eventbrite-health-note">{webhookMessage}</p> : null}
           <div className="integration-card-actions">
-            {!eventbriteConnection?.connected && eventbriteConnection?.configured ? <Button onClick={() => navigate("/events")}>Connect Eventbrite</Button> : null}
+            {!eventbriteConnection?.connected && eventbriteConnection?.configured ? <Button loading={connectingEventbrite} onClick={connectEventbrite}>Connect Eventbrite</Button> : null}
             <Button variant="outline" onClick={() => navigate("/events")}>Open Events</Button>
             <Button variant="outline" onClick={loadProviders}>Refresh setup status</Button>
           </div>
@@ -155,6 +169,32 @@ export default function Integrations() {
             webhook configuration, and no manual sharing of API keys or private
             Eventbrite login credentials.
           </p>
+        </DashboardCard>
+      </section>
+
+      <section className="eventbrite-admin-grid">
+        <DashboardCard title="API keys and webhooks">
+          <div className="integration-role-list">
+            <article>
+              <strong>Ellie app keys</strong>
+              <p>You configure one Eventbrite app for Ellie with its own client ID, client secret, and redirect URL. Those values live in the backend environment, not in the client’s browser.</p>
+            </article>
+            <article>
+              <strong>Client authorization</strong>
+              <p>Each client authorizes Ellie with OAuth. Ellie stores that client’s access token securely and uses it to read and manage only the Eventbrite account they approved.</p>
+            </article>
+            <article>
+              <strong>Webhook setup</strong>
+              <p>Ellie receives Eventbrite updates at the backend webhook receiver. If Eventbrite requires manual webhook creation for a client account, do it by screen-share with the client logged in—not by collecting their password or private token.</p>
+            </article>
+          </div>
+        </DashboardCard>
+        <DashboardCard title="Setup status">
+          <div className="eventbrite-config-list">
+            <div><span className={eventbriteConnection?.configured ? "is-ready" : ""}>{eventbriteConnection?.configured ? "✓" : "!"}</span><p><strong>OAuth app credentials</strong><small>{eventbriteConnection?.configured ? "Configured in Ellie’s backend environment." : "Missing Eventbrite client ID, client secret, redirect URI, or encryption key."}</small></p></div>
+            <div><span className={eventbriteWebhook?.configured ? "is-ready" : ""}>{eventbriteWebhook?.configured ? "✓" : "!"}</span><p><strong>Webhook receiver token</strong><small>{eventbriteWebhook?.configured ? "Configured in Ellie’s backend environment." : "Missing EVENTBRITE_WEBHOOK_TOKEN in the backend environment."}</small></p></div>
+            <div><span className={eventbriteConnection?.connected ? "is-ready" : ""}>{eventbriteConnection?.connected ? "✓" : "!"}</span><p><strong>Connected client account</strong><small>{eventbriteConnection?.connected ? "At least one Eventbrite account has authorized Ellie." : "No Eventbrite account is connected yet."}</small></p></div>
+          </div>
         </DashboardCard>
       </section>
 
