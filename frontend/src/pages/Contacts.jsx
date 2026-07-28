@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
+import { FiMoreHorizontal } from "react-icons/fi";
 import "./Contacts.css";
 import "./ContactVerification.css";
 import "./ContactDashboard.css";
@@ -546,7 +547,9 @@ export default function Contacts() {
                   setEditingContact({ ...contact, ...contactNameParts(contact) });
                 }}>{workflow.label}</button>
                 <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}>
-                  <button className="crm-overflow" aria-label={`Actions for ${contact.name}`} onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>•••</button>
+                  <button className="crm-overflow" aria-label={`Actions for ${contact.name}`} onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>
+                    <FiMoreHorizontal aria-hidden="true" />
+                  </button>
                   {actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View details</button><button onClick={() => { setContactEditMode("full"); setEditingContact({ ...contact, ...contactNameParts(contact) }); }}>Edit contact & campaign</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete permanently</button></div> : null}
                 </div>
               </div>
