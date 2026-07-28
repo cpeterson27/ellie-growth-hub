@@ -1,63 +1,130 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { FiArchive, FiArrowLeft, FiMail, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
 import Button from "../components/Button.jsx";
-import DashboardCard from "../components/DashboardCard.jsx";
-import Modal from "../components/Modal.jsx";
-import { beginGmailConnection, disconnectGmail, fetchGmailConnection, fetchGmailThreads, sendGmailMessage } from "../services/api.js";
+import {
+  beginGmailConnection,
+  disconnectGmail,
+  fetchContactEmailHistory,
+  fetchGmailConnection,
+  fetchGmailThread,
+  fetchGmailThreads,
+  sendGmailMessage,
+  updateGmailThread,
+} from "../services/api.js";
 import "./Integrations.css";
+
+const mailboxQueries = {
+  inbox: "in:inbox",
+  sent: "in:sent",
+  unread: "in:inbox is:unread",
+  trash: "in:trash",
+};
+
+const emailAddress = (value = "") => String(value).match(/<([^>]+)>/)?.[1] || String(value).match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || "";
 
 export default function GmailIntegration() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [status, setStatus] = useState(null);
   const [threads, setThreads] = useState([]);
+  const [outreachHistory, setOutreachHistory] = useState([]);
+  const [selectedThread, setSelectedThread] = useState(null);
+  const [mailbox, setMailbox] = useState(params.get("view") || "inbox");
+  const [search, setSearch] = useState(params.get("contact") || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [query, setQuery] = useState("in:inbox");
-  const [compose, setCompose] = useState(null);
+  const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
 
+  const query = search.trim() ? search.trim() : mailboxQueries[mailbox] || mailboxQueries.inbox;
+  const needsModifyPermission = status?.connected && !status.scopes?.includes("https://www.googleapis.com/auth/gmail.modify");
+  const reconnect = async () => window.location.assign((await beginGmailConnection()).authorizationUrl);
   const load = async () => {
     try {
       setLoading(true);
       const connection = await fetchGmailConnection();
       setStatus(connection);
       setThreads(connection.connected ? (await fetchGmailThreads(query)).threads || [] : []);
+      const searchedEmail = emailAddress(search);
+      setOutreachHistory(searchedEmail ? (await fetchContactEmailHistory(searchedEmail)).outreach || [] : []);
       setError("");
     } catch (err) { setError(err.response?.data?.error || "Unable to load Gmail."); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [mailbox]);
 
-  const connect = async () => {
-    const response = await beginGmailConnection();
-    window.location.assign(response.authorizationUrl);
+  const openThread = async (thread) => {
+    try {
+      setLoading(true);
+      const detail = await fetchGmailThread(thread.id);
+      setSelectedThread(detail);
+      setReply("");
+      if (thread.labels?.includes("UNREAD")) await updateGmailThread(thread.id, "read");
+    } catch (err) { setError(err.response?.data?.error || "Unable to open this conversation."); }
+    finally { setLoading(false); }
   };
-  const send = async () => {
+
+  const actOnThread = async (action) => {
+    if (!selectedThread) return;
+    await updateGmailThread(selectedThread.id, action);
+    setSelectedThread(null);
+    await load();
+  };
+
+  const sendReply = async () => {
+    const messages = selectedThread?.messages || [];
+    const latest = messages[messages.length - 1];
+    const recipient = emailAddress(latest?.from);
     try {
       setSending(true);
-      await sendGmailMessage(compose);
-      setCompose(null);
-      await load();
-    } catch (err) { setError(err.response?.data?.error || "Unable to send this Gmail message."); }
+      await sendGmailMessage({
+        to: recipient,
+        subject: /^re:/i.test(latest?.subject || "") ? latest.subject : `Re: ${latest?.subject || ""}`,
+        body: reply,
+        threadId: selectedThread.id,
+        inReplyTo: latest?.messageId || "",
+      });
+      setReply("");
+      setSelectedThread(await fetchGmailThread(selectedThread.id));
+    } catch (err) { setError(err.response?.data?.error || "Unable to send this reply."); }
     finally { setSending(false); }
   };
 
-  return <div className="page-dashboard integrations-page">
+  if (!status?.connected && !loading) return <div className="page-dashboard inbox-page">
+    <div className="page-header"><div><p className="page-eyebrow">Conversations</p><h1 className="page-title">Inbox</h1><p className="page-subtitle">Connect Gmail once, then manage client conversations here.</p></div></div>
+    <section className="gmail-status-card"><div><h2>Connect a Google account</h2><p>The client signs into Google and grants access themselves. Passwords are never shared with Ellie.</p></div><Button disabled={!status?.configured} onClick={async () => window.location.assign((await beginGmailConnection()).authorizationUrl)}>Connect Gmail</Button></section>
+  </div>;
+
+  return <div className="page-dashboard inbox-page">
     <div className="page-header">
-      <div><p className="page-eyebrow">Integrations · Email</p><h1 className="page-title">Gmail</h1><p className="page-subtitle">Connect a client inbox, review conversations, prepare replies, and send only after explicit approval.</p></div>
-      <Button variant="outline" onClick={() => navigate("/integrations")}>Back to integrations</Button>
+      <div><p className="page-eyebrow">Conversations</p><h1 className="page-title">Inbox</h1><p className="page-subtitle">Read, reply to, and organize client conversations from {status?.email || "the connected Gmail account"}.</p></div>
+      <div className="crm-header-actions"><Button variant="outline" onClick={load}><FiRefreshCw /> Refresh</Button><Button variant="outline" onClick={() => navigate("/integrations")}>Connection settings</Button></div>
     </div>
     {error ? <p className="form-error">{error}</p> : null}
-    <section className="gmail-status-card">
-      <div><span className={`integration-status integration-status--${status?.connected ? "connected" : "configuration_required"}`}>{status?.connected ? "Connected" : "Not connected"}</span><h2>{status?.connected ? status.email : "Connect a Google account"}</h2><p>{status?.connected ? "Ellie can read this inbox and send messages only when a user approves the send action." : "The client signs into Google and grants access themselves. Passwords are never shared with Ellie."}</p></div>
-      {status?.connected ? <Button variant="outline" onClick={async () => { await disconnectGmail(); await load(); }}>Disconnect</Button> : <Button disabled={!status?.configured} onClick={connect}>Connect Gmail</Button>}
+    {needsModifyPermission ? <section className="inbox-permission-notice"><div><strong>Approve conversation management</strong><p>Reconnect once to let Ellie archive, mark, and move Gmail conversations to Trash. Google will show the updated permission request.</p></div><Button onClick={reconnect}>Approve Gmail access</Button></section> : null}
+    <section className="inbox-shell">
+      <aside className="inbox-folders">
+        <button className={mailbox === "inbox" ? "is-active" : ""} onClick={() => { setMailbox("inbox"); setSearch(""); setSelectedThread(null); }}><FiMail /> Inbox</button>
+        <button className={mailbox === "unread" ? "is-active" : ""} onClick={() => { setMailbox("unread"); setSearch(""); setSelectedThread(null); }}>Unread</button>
+        <button className={mailbox === "sent" ? "is-active" : ""} onClick={() => { setMailbox("sent"); setSearch(""); setSelectedThread(null); }}><FiSend /> Sent</button>
+        <button className={mailbox === "trash" ? "is-active" : ""} onClick={() => { setMailbox("trash"); setSearch(""); setSelectedThread(null); }}><FiTrash2 /> Trash</button>
+        <hr />
+        <button onClick={async () => { await disconnectGmail(); setStatus({ configured: true, connected: false }); }}>Disconnect Gmail</button>
+      </aside>
+      <div className="inbox-main">
+        <form className="inbox-search" onSubmit={(event) => { event.preventDefault(); load(); }}><FiSearch /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sender, recipient, subject, or Gmail query" /><Button size="sm" type="submit">Search</Button></form>
+        {selectedThread ? <div className="conversation-view">
+          <header><Button variant="ghost" size="sm" onClick={() => setSelectedThread(null)}><FiArrowLeft /> Back</Button><div><Button variant="outline" size="sm" onClick={() => actOnThread("archive")}><FiArchive /> Archive</Button><Button variant="outline" size="sm" onClick={() => actOnThread("trash")}><FiTrash2 /> Move to trash</Button></div></header>
+          <h2>{selectedThread.messages?.[0]?.subject || "Conversation"}</h2>
+          <div className="conversation-messages">{selectedThread.messages?.map((message) => <article key={message.id} className={message.labels?.includes("SENT") ? "is-sent" : ""}><div><strong>{message.labels?.includes("SENT") ? "You" : message.from}</strong><time>{message.date ? new Date(message.date).toLocaleString() : ""}</time></div><small>To: {message.to}</small><pre>{message.body || message.snippet}</pre></article>)}</div>
+          <section className="conversation-reply"><h3>Reply</h3><textarea rows="7" value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Write a reply…" /><Button loading={sending} disabled={!reply.trim()} onClick={sendReply}><FiSend /> Approve and send reply</Button></section>
+        </div> : <>
+          <div className="inbox-list-heading"><div><h2>{search ? "Search results" : mailbox[0].toUpperCase() + mailbox.slice(1)}</h2><p>{threads.length} conversation{threads.length === 1 ? "" : "s"}</p></div></div>
+          {outreachHistory.length ? <section className="outreach-conversation-history"><h3>Campaign messages sent by Ellie</h3>{outreachHistory.map((item) => <article key={item.id}><div><strong>{item.campaignName}</strong><span className={`outreach-status outreach-status--${item.status}`}>{item.status}</span></div><h4>{item.subject}</h4><p>{item.body}</p><small>{item.sentAt ? `Sent ${new Date(item.sentAt).toLocaleString()}` : "Not sent yet"}</small>{item.replyText ? <blockquote><strong>Latest reply</strong>{item.replyText}</blockquote> : null}</article>)}</section> : null}
+          {loading ? <p className="table-state">Loading conversations…</p> : threads.length ? <div className="gmail-thread-list">{threads.map((thread) => <button type="button" key={thread.id} className={thread.labels?.includes("UNREAD") ? "gmail-thread is-unread" : "gmail-thread"} onClick={() => openThread(thread)}><div className="gmail-thread__meta"><strong>{mailbox === "sent" ? thread.to : thread.from || "Unknown sender"}</strong><time>{thread.date ? new Date(thread.date).toLocaleDateString() : ""}</time></div><h3>{thread.subject}</h3><p>{thread.snippet}</p><small>{thread.messageCount} message{thread.messageCount === 1 ? "" : "s"}</small></button>)}</div> : <p className="table-state table-state--empty">No conversations match this view.</p>}
+        </>}
+      </div>
     </section>
-    {status?.connected ? <DashboardCard title="Inbox">
-      <div className="gmail-toolbar"><input className="select-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Gmail search, e.g. in:inbox newer_than:30d" /><Button variant="outline" onClick={load}>Search</Button><Button onClick={() => setCompose({ to: "", subject: "", body: "" })}>Compose</Button></div>
-      {loading ? <p>Loading inbox…</p> : threads.length ? <div className="gmail-thread-list">{threads.map((thread) => <article key={thread.id}><div><strong>{thread.from || "Unknown sender"}</strong><span>{thread.date ? new Date(thread.date).toLocaleDateString() : ""}</span></div><h3>{thread.subject}</h3><p>{thread.snippet}</p><small>{thread.messageCount} message{thread.messageCount === 1 ? "" : "s"}</small></article>)}</div> : <p className="table-state table-state--empty">No Gmail threads match this search.</p>}
-    </DashboardCard> : <DashboardCard title="What Gmail adds"><div className="settings-explainer-list"><p><strong>Inbox visibility:</strong> review relevant conversations and replies alongside contacts.</p><p><strong>Draft and approve:</strong> prepare a personal email without sending it automatically.</p><p><strong>Account ownership:</strong> each client connects their own Google account through OAuth.</p></div></DashboardCard>}
-    <Modal isOpen={Boolean(compose)} onClose={() => !sending && setCompose(null)} title="Compose Gmail message" footer={<><Button variant="outline" disabled={sending} onClick={() => setCompose(null)}>Cancel</Button><Button loading={sending} onClick={send}>Approve and send</Button></>}>
-      {compose ? <div className="gmail-compose"><label className="form-field"><span>To</span><input className="select-input" value={compose.to} onChange={(event) => setCompose({ ...compose, to: event.target.value })} /></label><label className="form-field"><span>Subject</span><input className="select-input" value={compose.subject} onChange={(event) => setCompose({ ...compose, subject: event.target.value })} /></label><label className="form-field"><span>Message</span><textarea className="select-input" rows="10" value={compose.body} onChange={(event) => setCompose({ ...compose, body: event.target.value })} /></label><p className="contact-modal-intro">This button sends the message from the connected Gmail account. Review the recipient and content before approving.</p></div> : null}
-    </Modal>
   </div>;
 }

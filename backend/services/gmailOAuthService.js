@@ -8,6 +8,7 @@ const scopes = [
   "profile",
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.modify",
 ];
 
 function required(name) {
@@ -158,6 +159,22 @@ function header(message, name) {
   return message.payload?.headers?.find((item) => item.name.toLowerCase() === name.toLowerCase())?.value || "";
 }
 
+function decodeBody(data = "") {
+  if (!data) return "";
+  try { return Buffer.from(data, "base64url").toString("utf8"); }
+  catch { return ""; }
+}
+
+function messageBody(part = {}) {
+  if (part.mimeType === "text/plain" && part.body?.data) return decodeBody(part.body.data);
+  const plain = (part.parts || []).map(messageBody).find(Boolean);
+  if (plain) return plain;
+  if (part.mimeType === "text/html" && part.body?.data) {
+    return decodeBody(part.body.data).replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim();
+  }
+  return part.body?.data ? decodeBody(part.body.data) : "";
+}
+
 async function listThreads({ query = "in:inbox", maxResults = 20 } = {}) {
   const list = await gmailRequest(`/threads?${new URLSearchParams({ q: query, maxResults: String(Math.min(50, maxResults)) })}`);
   const threads = await Promise.all((list.threads || []).map(async ({ id }) => {
@@ -166,6 +183,37 @@ async function listThreads({ query = "in:inbox", maxResults = 20 } = {}) {
     return { id, messageCount: thread.messages?.length || 0, from: header(message, "From"), to: header(message, "To"), subject: header(message, "Subject") || "(no subject)", date: header(message, "Date"), snippet: message.snippet || "", labels: message.labelIds || [] };
   }));
   return { threads, nextPageToken: list.nextPageToken || null };
+}
+
+async function getThread(threadId) {
+  const thread = await gmailRequest(`/threads/${encodeURIComponent(threadId)}?format=full`);
+  return {
+    id: thread.id,
+    messages: (thread.messages || []).map((message) => ({
+      id: message.id,
+      threadId: message.threadId,
+      from: header(message, "From"),
+      to: header(message, "To"),
+      subject: header(message, "Subject") || "(no subject)",
+      date: header(message, "Date"),
+      messageId: header(message, "Message-ID"),
+      labels: message.labelIds || [],
+      body: messageBody(message.payload),
+      snippet: message.snippet || "",
+    })),
+  };
+}
+
+async function modifyThread(threadId, action) {
+  const operations = {
+    archive: { removeLabelIds: ["INBOX"] },
+    trash: null,
+    read: { removeLabelIds: ["UNREAD"] },
+    unread: { addLabelIds: ["UNREAD"] },
+  };
+  if (!(action in operations)) throw new Error("Unsupported Gmail action");
+  if (action === "trash") return gmailRequest(`/threads/${encodeURIComponent(threadId)}/trash`, { method: "POST", body: "{}" });
+  return gmailRequest(`/threads/${encodeURIComponent(threadId)}/modify`, { method: "POST", body: JSON.stringify(operations[action]) });
 }
 
 async function sendMessage({ to, subject, body, threadId = null, inReplyTo = "" }) {
@@ -184,4 +232,4 @@ async function sendMessage({ to, subject, body, threadId = null, inReplyTo = "" 
   return gmailRequest("/messages/send", { method: "POST", body: JSON.stringify({ raw, ...(threadId ? { threadId } : {}) }) });
 }
 
-module.exports = { authorizationUrl, exchangeCode, googleProfile, listThreads, saveConnection, sendMessage, status, verifyState };
+module.exports = { authorizationUrl, exchangeCode, getThread, googleProfile, listThreads, modifyThread, saveConnection, sendMessage, status, verifyState };

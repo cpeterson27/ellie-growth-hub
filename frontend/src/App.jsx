@@ -118,6 +118,7 @@ function App() {
           />
           <Route path="/integrations/crm" element={<CrmSetup />} />
           <Route path="/integrations/gmail" element={<GmailIntegration />} />
+          <Route path="/inbox" element={<GmailIntegration />} />
 
 
           <Route

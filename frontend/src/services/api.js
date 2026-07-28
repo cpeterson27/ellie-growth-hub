@@ -129,8 +129,20 @@ export const disconnectGmail = () =>
 export const fetchGmailThreads = (q = "in:inbox") =>
   api.get("/gmail/threads", { params: { q } }).then((res) => res.data);
 
+export const fetchGmailThread = (threadId) =>
+  api.get(`/gmail/threads/${threadId}`).then((res) => res.data);
+
+export const updateGmailThread = (threadId, action) =>
+  api.post(`/gmail/threads/${threadId}/action`, { action }).then((res) => res.data);
+
 export const sendGmailMessage = (message) =>
   api.post("/gmail/send", message).then((res) => res.data);
+
+export const syncGmailOutreachReplies = () =>
+  api.post("/gmail/sync-outreach-replies").then((res) => res.data);
+
+export const fetchContactEmailHistory = (email) =>
+  api.get("/gmail/contact-history", { params: { email } }).then((res) => res.data);
 
 export const syncEventbriteEvent = (eventId) =>
   api.post(`/eventbrite/events/${eventId}/sync`).then((res) => res.data);

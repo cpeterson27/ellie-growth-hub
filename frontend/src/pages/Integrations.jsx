@@ -138,7 +138,7 @@ export default function Integrations() {
           <div><span className={`integration-status integration-status--${gmail?.connected ? "connected" : "configuration_required"}`}>{gmail?.connected ? "Connected" : gmail?.configured ? "Ready to connect" : "App setup required"}</span><h2>Gmail</h2></div>
           <p>{gmail?.connected ? `${gmail.email} is authorized for inbox visibility and approved sending.` : "Connect a client’s Google account so Ellie can read relevant threads, prepare replies, and send only after user approval."}</p>
           <div className="crm-connection-actions">
-            {gmail?.connected ? <><Button onClick={() => navigate("/integrations/gmail")}>Open inbox</Button><Button variant="outline" onClick={removeGmail}>Disconnect Gmail</Button></> : <><Button onClick={connectGmail} disabled={!gmail?.configured}>Connect Gmail</Button><Button variant="outline" onClick={() => navigate("/integrations/gmail")}>Setup details</Button></>}
+            {gmail?.connected ? <><Button onClick={() => navigate("/inbox")}>Open inbox</Button><Button variant="outline" onClick={removeGmail}>Disconnect Gmail</Button></> : <><Button onClick={connectGmail} disabled={!gmail?.configured}>Connect Gmail</Button><Button variant="outline" onClick={() => navigate("/integrations/gmail")}>Setup details</Button></>}
           </div>
           {!gmail?.configured ? <small>Add the Google OAuth client ID, secret, redirect URI, and credential encryption key to the backend environment first.</small> : null}
         </article>

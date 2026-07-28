@@ -16,6 +16,7 @@ export default function Navbar({ onMenuClick }) {
     discovery: ["Discovery", "Find and qualify the right organizations."],
     contacts: ["Contacts", "Keep every relationship organized and actionable."],
     outreach: ["Outreach", "Turn approved prospects into thoughtful conversations."],
+    inbox: ["Inbox", "Read, reply to, and organize client conversations."],
     marketing: ["Marketing", "Coordinate channels, content, and performance."],
     partners: ["Partners", "Grow through aligned operators and affiliates."],
     content: ["AI Content", "Create polished campaign assets with confidence."],
