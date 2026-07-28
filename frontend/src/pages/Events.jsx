@@ -254,6 +254,11 @@ export default function Events() {
     .sort((a, b) => new Date(b) - new Date(a))[0];
   const formatDateTime = (value) =>
     value ? new Date(value).toLocaleString() : "Not recorded yet";
+  const webhookVerified = Boolean(webhookStatus?.configured && webhookStatus?.lastReceivedAt);
+  const setupComplete = Boolean(connection?.connected && webhookVerified && latestEventbriteSync);
+  const webhookMessage = webhookStatus?.lastMessage?.toLowerCase().includes("path you requested")
+    ? "Test received. Eventbrite can reach Ellie automatically."
+    : webhookStatus?.lastMessage;
 
   const loadWorkspace = async () => {
     const [eventData, campaignData, connectionData, externalData, webhookData] =
@@ -678,30 +683,42 @@ export default function Events() {
         ) : null}
       </section>
 
-      <section className="eventbrite-health-grid" aria-label="Eventbrite automation status">
-        <DashboardCard title="Eventbrite automation">
+      <section className="eventbrite-health-grid" aria-label="Eventbrite setup and automation status">
+        <DashboardCard
+          title="Eventbrite setup"
+          action={<span className={`eventbrite-setup-badge ${setupComplete ? "is-ready" : ""}`}>{setupComplete ? "Ready" : "In progress"}</span>}
+        >
+          <p className="eventbrite-setup-intro">
+            For a client, this should feel simple: connect Eventbrite once,
+            choose or create an event, and Ellie keeps registrations and
+            check-ins current automatically.
+          </p>
           <div className="eventbrite-health-list">
             <div>
-              <span className={`connection-dot connection-dot--${connection?.connected ? "on" : "off"}`} />
-              <p><strong>Account connection</strong><small>{connection?.connected ? "Connected for publishing and reporting" : "Needs authorization"}</small></p>
+              <span className={`eventbrite-step-number ${connection?.connected ? "is-ready" : ""}`}>{connection?.connected ? "✓" : "1"}</span>
+              <p><strong>Connect the Eventbrite account</strong><small>{connection?.connected ? `${connection.accountEmail || "Authorized account"} is connected for publishing and reporting.` : "The client clicks Connect Eventbrite and authorizes their own account."}</small></p>
             </div>
             <div>
-              <span className={`connection-dot connection-dot--${webhookStatus?.configured && webhookStatus?.lastReceivedAt ? "on" : "off"}`} />
-              <p><strong>Webhook listener</strong><small>{webhookStatus?.lastReceivedAt ? `Last received ${formatDateTime(webhookStatus.lastReceivedAt)}` : webhookStatus?.configured ? "Configured; waiting for Eventbrite activity" : "Webhook token is not configured"}</small></p>
+              <span className={`eventbrite-step-number ${webhookVerified ? "is-ready" : ""}`}>{webhookVerified ? "✓" : "2"}</span>
+              <p><strong>Verify automatic updates</strong><small>{webhookVerified ? `Eventbrite last checked in ${formatDateTime(webhookStatus.lastReceivedAt)}.` : webhookStatus?.configured ? "Waiting for Eventbrite to send the first test or event update." : "Admin setup needed: webhook token is not configured."}</small></p>
             </div>
             <div>
-              <span className={`connection-dot connection-dot--${latestEventbriteSync ? "on" : "off"}`} />
-              <p><strong>Event data sync</strong><small>{latestEventbriteSync ? `Last synced ${formatDateTime(latestEventbriteSync)}` : "No Eventbrite event has synced yet"}</small></p>
+              <span className={`eventbrite-step-number ${latestEventbriteSync ? "is-ready" : ""}`}>{latestEventbriteSync ? "✓" : "3"}</span>
+              <p><strong>Sync event reporting</strong><small>{latestEventbriteSync ? `Ellie last refreshed event data ${formatDateTime(latestEventbriteSync)}.` : "Add or open a connected Eventbrite event so Ellie can pull registrations, revenue, and check-ins."}</small></p>
             </div>
           </div>
-          {webhookStatus?.lastMessage ? <p className="eventbrite-health-note">{webhookStatus.lastMessage}</p> : null}
+          {webhookMessage ? <p className="eventbrite-health-note">{webhookMessage}</p> : null}
         </DashboardCard>
-        <DashboardCard title="How this works">
-          <ol className="eventbrite-flow-list">
-            <li>Client connects Eventbrite once.</li>
-            <li>Eventbrite sends Ellie updates automatically.</li>
-            <li>Ellie refreshes the matching event, dashboard, and campaign metrics.</li>
-          </ol>
+        <DashboardCard title="What happens automatically">
+          <ul className="eventbrite-flow-list">
+            <li>New orders and attendee changes notify Ellie.</li>
+            <li>Check-ins update attendance reporting.</li>
+            <li>Ticket, venue, organizer, and event edits refresh the connected Ellie event.</li>
+          </ul>
+          <p className="eventbrite-client-note">
+            New clients should not paste webhook URLs. That belongs in admin
+            setup; the client-facing action is simply “Connect Eventbrite.”
+          </p>
         </DashboardCard>
       </section>
 

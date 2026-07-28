@@ -15,6 +15,12 @@ function webhookToken() {
   return String(process.env.EVENTBRITE_WEBHOOK_TOKEN || "").trim();
 }
 
+function isEventbriteTestRequest(req) {
+  const action = String(req.body?.config?.action || req.get("x-eventbrite-event") || "").toLowerCase();
+  const apiUrl = String(req.body?.api_url || "");
+  return action === "test" || apiUrl.includes("{api-endpoint-to-fetch-object-details}");
+}
+
 async function recordWebhookStatus(req, status, details = {}) {
   try {
     const now = new Date();
@@ -64,6 +70,13 @@ router.post("/webhook", async (req, res) => {
   }
   if (parsed.hostname !== "www.eventbriteapi.com") {
     return res.status(400).json({ error: "Unexpected webhook source resource" });
+  }
+
+  if (isEventbriteTestRequest(req)) {
+    await recordWebhookStatus(req, "verified", {
+      message: "Test received. Eventbrite can reach Ellie automatically.",
+    });
+    return res.status(202).json({ accepted: true, test: true });
   }
 
   await recordWebhookStatus(req, "accepted", { message: "Webhook accepted by Ellie." });
