@@ -136,10 +136,35 @@ export default function Events() {
       fetchEventbriteEvents().catch(() => []),
     ])
       .then(([eventData, campaignData, connectionData, externalData]) => {
-        setEvents(Array.isArray(eventData) ? eventData : []);
+        const loadedEvents = Array.isArray(eventData) ? eventData : [];
+        setEvents(loadedEvents);
         setCampaigns(Array.isArray(campaignData) ? campaignData : []);
         setConnection(connectionData);
         setEventbriteEvents(Array.isArray(externalData) ? externalData : []);
+        const refreshCutoff = Date.now() - 15 * 60 * 1000;
+        const staleConnectedEvents = loadedEvents.filter((event) => (
+          event.integrations?.eventbrite?.eventId &&
+          (!event.endDate || new Date(event.endDate) >= new Date()) &&
+          (!event.eventbriteLogistics?.lastSyncedAt ||
+            new Date(event.eventbriteLogistics.lastSyncedAt).getTime() < refreshCutoff)
+        ));
+        if (staleConnectedEvents.length) {
+          Promise.allSettled(
+            staleConnectedEvents.map((event) => syncEventbriteEvent(event._id)),
+          ).then((results) => {
+            const refreshed = new Map();
+            results.forEach((result) => {
+              if (result.status === "fulfilled" && result.value?.event?._id) {
+                refreshed.set(result.value.event._id, result.value.event);
+              }
+            });
+            if (refreshed.size) {
+              setEvents((current) => current.map(
+                (event) => refreshed.get(event._id) || event,
+              ));
+            }
+          });
+        }
       })
       .catch(() => setError("Unable to load event operations."));
   }, []);
@@ -221,21 +246,6 @@ export default function Events() {
       setError(err.response?.data?.error || "Unable to add this Eventbrite event.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const refreshEvent = async (eventId) => {
-    try {
-      setWorkingId(eventId);
-      const result = await syncEventbriteEvent(eventId);
-      setEvents((current) => current.map(
-        (event) => event._id === eventId ? result.event : event,
-      ));
-      setSuccess("Registration and sales data refreshed.");
-    } catch (err) {
-      setError(err.response?.data?.error || "Unable to refresh Eventbrite data.");
-    } finally {
-      setWorkingId("");
     }
   };
 
@@ -373,9 +383,6 @@ export default function Events() {
                       <Button variant="outline" onClick={() => openManage(event)}>Manage event</Button>
                       {eventbriteUrl ? (
                         <Button variant="outline" onClick={() => window.open(eventbriteUrl, "_blank", "noopener,noreferrer")}>View listing</Button>
-                      ) : null}
-                      {isEventbrite ? (
-                        <Button variant="outline" loading={workingId === event._id} onClick={() => refreshEvent(event._id)}>Refresh data</Button>
                       ) : null}
                       {linkedCampaign ? (
                         <Button onClick={() => navigate(`/campaigns/${linkedCampaign._id}`)}>View campaign</Button>
