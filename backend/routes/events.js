@@ -7,6 +7,7 @@ const Outreach = require("../models/Outreach");
 const {
   generateOutreachSuggestions,
 } = require("../utils/outreachGenerator");
+const { recommendAudiences } = require("../services/eventAudienceRecommendationService");
 
 
 const router = express.Router();
@@ -109,6 +110,16 @@ router.post("/", async(req,res)=>{
 
   }
 
+});
+
+router.post("/audience-recommendations", async (req, res) => {
+  try {
+    const result = await recommendAudiences(req.body || {});
+    res.json(result);
+  } catch (error) {
+    console.error("EVENT AUDIENCE RECOMMENDATION ERROR:", error.message);
+    res.status(500).json({ error: "Unable to generate audience recommendations" });
+  }
 });
 
 

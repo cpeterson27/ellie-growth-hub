@@ -8,13 +8,14 @@ import {
   beginEventbriteConnection,
   createCampaignFromEvent,
   createEvent,
-  createManagedEventbriteEvent,
+  createEventbriteDraft,
   fetchCampaigns,
   fetchEventbriteConnection,
   fetchEventbriteEvents,
   fetchEvents,
   importEventbriteEvent,
   publishManagedEventbriteEvent,
+  recommendEventAudience,
   syncEventbriteEvent,
   updateManagedEventbriteEvent,
 } from "../services/api.js";
@@ -34,7 +35,23 @@ const emptyDraft = {
   ticketGoal: "50",
   audience: "",
   audienceConfirmed: false,
-  publishNow: false,
+  planning: {
+    attendeeOutcomes: "",
+    idealAttendee: "",
+    businessGoal: "",
+    organizerName: "",
+    organizerDescription: "",
+    presenters: [],
+    agenda: [],
+    faqs: [],
+    refundPolicy: "",
+    highlights: [],
+    imageUrl: "",
+    ticketClasses: [],
+    draftStep: 1,
+  },
+  audienceRecommendations: [],
+  audienceRecommendationSource: "",
 };
 
 function campaignEventId(campaign) {
@@ -63,6 +80,38 @@ function draftFromEvent(event) {
     ticketGoal: String(event.ticketGoal ?? ""),
     audience: (event.audience || []).join(", "),
     audienceConfirmed: Boolean(event.audienceConfirmedAt),
+    planning: { ...emptyDraft.planning, ...(event.planning || {}) },
+    audienceRecommendations:
+      event.audienceRecommendationDetails ||
+      (event.audienceSuggestions || []).map((label) => ({
+        label,
+        reason: "Suggested from the Eventbrite description.",
+        evidence: [],
+      })),
+    audienceRecommendationSource: event.audienceRecommendationSource || "",
+  };
+}
+
+const wizardSteps = ["Concept", "Schedule", "Experience", "Tickets", "Audience", "Review"];
+
+function eventReadiness(draft) {
+  const planning = draft.planning || {};
+  const checks = [
+    ["Event concept", Boolean(draft.name && draft.summary && draft.description)],
+    ["Schedule and format", Boolean(draft.startDate && draft.endDate && draft.timeZone)],
+    ["Attendee outcome", Boolean(planning.attendeeOutcomes)],
+    ["Organizer", Boolean(planning.organizerName)],
+    ["Agenda or highlights", Boolean(planning.agenda?.length || planning.highlights?.length)],
+    ["Tickets", Number(draft.ticketGoal) > 0],
+    ["Refund policy", Boolean(planning.refundPolicy)],
+    ["Event image", Boolean(planning.imageUrl)],
+    ["Audience strategy", Boolean(draft.audienceRecommendations?.length)],
+  ];
+  return {
+    checks,
+    complete: checks.filter(([, ready]) => ready).length,
+    total: checks.length,
+    eventbriteReady: checks.slice(0, 6).every(([, ready]) => ready),
   };
 }
 
@@ -141,6 +190,7 @@ export default function Events() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [manageTab, setManageTab] = useState("listing");
+  const [wizardStep, setWizardStep] = useState(0);
   const [changePreview, setChangePreview] = useState([]);
   const [draft, setDraft] = useState(emptyDraft);
   const [loading, setLoading] = useState(false);
@@ -271,6 +321,7 @@ export default function Events() {
   const openCreate = () => {
     setEditingEvent(null);
     setDraft(emptyDraft);
+    setWizardStep(0);
     setChangePreview([]);
     setEventModalOpen(true);
   };
@@ -302,22 +353,41 @@ export default function Events() {
   };
 
   const saveEvent = async (confirmed = false) => {
-    if (!draft.name || !draft.startDate || !draft.endDate) {
-      setError("Event name, start time, and end time are required.");
+    if (!draft.name) {
+      setError("Give the event a working name before saving the draft.");
       return;
     }
     let payload = {
       ...draft,
-      startDate: new Date(draft.startDate),
-      endDate: new Date(draft.endDate),
+      startDate: draft.startDate ? new Date(draft.startDate) : null,
+      endDate: draft.endDate ? new Date(draft.endDate) : null,
       ticketPrice: Number(draft.ticketPrice || 0),
       ticketGoal: Number(draft.ticketGoal || 0),
       audience: draft.audience
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean),
+      planning: { ...draft.planning, draftStep: wizardStep + 1 },
+      audienceSuggestions: draft.audienceRecommendations.map((item) => item.label),
+      audienceRecommendationDetails: draft.audienceRecommendations,
+      audienceRecommendationSource: draft.audienceRecommendationSource,
     };
     if (editingEvent) {
+      if (!editingEvent.integrations?.eventbrite?.eventId) {
+        try {
+          setLoading(true);
+          setError("");
+          await updateManagedEventbriteEvent(editingEvent._id, payload);
+          setEventModalOpen(false);
+          setSuccess("Ellie draft updated. Nothing was sent to Eventbrite.");
+          await loadWorkspace();
+        } catch (err) {
+          setError(err.response?.data?.error || "Unable to save this draft.");
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
       const changes = changedFields(editingEvent, draft);
       if (!confirmed) {
         if (!changes.length) {
@@ -354,20 +424,10 @@ export default function Events() {
       if (editingEvent) {
         await updateManagedEventbriteEvent(editingEvent._id, payload);
         setSuccess("Approved changes were saved to their listed destinations.");
-      } else if (connection?.connected) {
-        await createManagedEventbriteEvent({
-          ...payload,
-          organizationId: connection.defaultOrganizationId,
-        });
-        setSuccess(
-          draft.publishNow
-            ? "Event created and published to Eventbrite."
-            : "Eventbrite draft created.",
-        );
       } else {
         await createEvent({ ...payload, status: "draft" });
         setSuccess(
-          "Draft saved in Ellie. Connect Eventbrite when you are ready to publish it.",
+          "Draft saved in Ellie. No Eventbrite listing was created.",
         );
       }
       setEventModalOpen(false);
@@ -377,6 +437,45 @@ export default function Events() {
       setError(err.response?.data?.error || "Unable to save this event.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateAudience = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const result = await recommendEventAudience(draft);
+      const recommendations = result.recommendations || [];
+      setDraft({
+        ...draft,
+        audienceRecommendations: recommendations,
+        audienceRecommendationSource: result.source || "rules",
+        audienceConfirmed: false,
+      });
+      setSuccess(
+        recommendations.length
+          ? `Generated ${recommendations.length} grounded audience recommendations.`
+          : "Add more detail about the attendee and event outcome so Ellie can recommend an audience.",
+      );
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to recommend an audience.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendDraftToEventbrite = async (eventId) => {
+    try {
+      setWorkingId(eventId);
+      setError("");
+      await createEventbriteDraft(eventId);
+      setEventModalOpen(false);
+      setSuccess("Eventbrite draft created. It is not published.");
+      await loadWorkspace();
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to create the Eventbrite draft.");
+    } finally {
+      setWorkingId("");
     }
   };
 
@@ -668,6 +767,23 @@ export default function Events() {
             <Button variant="outline" onClick={() => setEventModalOpen(false)}>
               Cancel
             </Button>
+            {!editingEvent && wizardStep > 0 ? (
+              <Button variant="outline" onClick={() => setWizardStep(wizardStep - 1)}>
+                Back
+              </Button>
+            ) : null}
+            {editingEvent &&
+            !editingEvent.integrations?.eventbrite?.eventId &&
+            connection?.connected ? (
+              <Button
+                variant="outline"
+                loading={workingId === editingEvent._id}
+                disabled={!eventReadiness(draft).eventbriteReady}
+                onClick={() => sendDraftToEventbrite(editingEvent._id)}
+              >
+                Create Eventbrite draft
+              </Button>
+            ) : null}
             {editingEvent?.integrations?.eventbrite?.eventId &&
             editingEvent.eventbriteLogistics?.status !== "live" &&
             connection?.connected ? (
@@ -679,13 +795,18 @@ export default function Events() {
                 Publish on Eventbrite
               </Button>
             ) : null}
-            <Button loading={loading} onClick={() => saveEvent(false)}>
-              {editingEvent
-                ? "Review changes"
-                : connection?.connected
-                  ? "Create event"
-                  : "Save draft"}
-            </Button>
+            {!editingEvent && wizardStep < wizardSteps.length - 1 ? (
+              <>
+                <Button variant="outline" loading={loading} onClick={() => saveEvent(false)}>
+                  Save and exit
+                </Button>
+                <Button onClick={() => setWizardStep(wizardStep + 1)}>Continue</Button>
+              </>
+            ) : (
+              <Button loading={loading} onClick={() => saveEvent(false)}>
+                {editingEvent ? "Review changes" : "Save Ellie draft"}
+              </Button>
+            )}
           </>
         }
       >
@@ -978,152 +1099,197 @@ export default function Events() {
             ) : null}
           </div>
         ) : (
-          <div className="campaign-form-grid event-form">
-            <label className="form-field span-2">
-              <span>Event name</span>
-              <input
-                className="select-input"
-                value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              />
-            </label>
-            <label className="form-field span-2">
-              <span>Short summary</span>
-              <input
-                className="select-input"
-                maxLength="140"
-                value={draft.summary}
-                onChange={(e) =>
-                  setDraft({ ...draft, summary: e.target.value })
-                }
-              />
-              <small>{draft.summary.length}/140 characters</small>
-            </label>
-            <label className="form-field">
-              <span>Starts</span>
-              <input
-                className="select-input"
-                type="datetime-local"
-                value={draft.startDate}
-                onChange={(e) =>
-                  setDraft({ ...draft, startDate: e.target.value })
-                }
-              />
-            </label>
-            <label className="form-field">
-              <span>Ends</span>
-              <input
-                className="select-input"
-                type="datetime-local"
-                value={draft.endDate}
-                onChange={(e) =>
-                  setDraft({ ...draft, endDate: e.target.value })
-                }
-              />
-            </label>
-            <label className="form-field">
-              <span>Format</span>
-              <select
-                className="select-input"
-                value={draft.locationType}
-                onChange={(e) =>
-                  setDraft({ ...draft, locationType: e.target.value })
-                }
-              >
-                <option value="online">Online</option>
-                <option value="venue">In person</option>
-              </select>
-            </label>
-            <label className="form-field">
-              <span>Time zone</span>
-              <select
-                className="select-input"
-                value={draft.timeZone}
-                onChange={(e) =>
-                  setDraft({ ...draft, timeZone: e.target.value })
-                }
-              >
-                <option value="America/Los_Angeles">Pacific Time</option>
-                <option value="America/Denver">Mountain Time</option>
-                <option value="America/Chicago">Central Time</option>
-                <option value="America/New_York">Eastern Time</option>
-              </select>
-            </label>
-            {draft.locationType === "venue" ? (
-              <label className="form-field span-2">
-                <span>Venue</span>
-                <input
-                  className="select-input"
-                  value={draft.location}
-                  onChange={(e) =>
-                    setDraft({ ...draft, location: e.target.value })
-                  }
-                />
-              </label>
+          <div className="event-wizard">
+            <div className="event-wizard__steps">
+              {wizardSteps.map((step, index) => (
+                <button
+                  key={step}
+                  type="button"
+                  className={wizardStep === index ? "active" : ""}
+                  onClick={() => setWizardStep(index)}
+                >
+                  <span>{index + 1}</span>{step}
+                </button>
+              ))}
+            </div>
+
+            {wizardStep === 0 ? (
+              <div className="campaign-form-grid event-form">
+                <p className="event-section-intro span-2">
+                  Start with the promise of the event. This stays in Ellie until
+                  you explicitly create an Eventbrite draft.
+                </p>
+                <label className="form-field span-2">
+                  <span>Working event name</span>
+                  <input className="select-input" value={draft.name}
+                    onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+                </label>
+                <label className="form-field span-2">
+                  <span>Short public summary</span>
+                  <input className="select-input" maxLength="140" value={draft.summary}
+                    onChange={(e) => setDraft({ ...draft, summary: e.target.value })} />
+                  <small>{draft.summary.length}/140 characters</small>
+                </label>
+                <label className="form-field span-2">
+                  <span>Complete event overview</span>
+                  <textarea className="select-input" value={draft.description}
+                    onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  <span>What will attendees be able to do afterward?</span>
+                  <textarea className="select-input" value={draft.planning.attendeeOutcomes}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, attendeeOutcomes: e.target.value } })} />
+                </label>
+                <label className="form-field">
+                  <span>What business result should this event create?</span>
+                  <textarea className="select-input" value={draft.planning.businessGoal}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, businessGoal: e.target.value } })} />
+                </label>
+              </div>
             ) : null}
-            <label className="form-field">
-              <span>Ticket price</span>
-              <input
-                className="select-input"
-                type="number"
-                min="0"
-                value={draft.ticketPrice}
-                onChange={(e) =>
-                  setDraft({ ...draft, ticketPrice: e.target.value })
-                }
-              />
-            </label>
-            <label className="form-field">
-              <span>Ticket quantity</span>
-              <input
-                className="select-input"
-                type="number"
-                min="1"
-                value={draft.ticketGoal}
-                onChange={(e) =>
-                  setDraft({ ...draft, ticketGoal: e.target.value })
-                }
-              />
-            </label>
-            <label className="form-field span-2">
-              <span>Audience</span>
-              <input
-                className="select-input"
-                value={draft.audience}
-                onChange={(e) =>
-                  setDraft({ ...draft, audience: e.target.value })
-                }
-                placeholder="Real estate investors, entrepreneurs"
-              />
-            </label>
-            <label className="form-field span-2">
-              <span>Description</span>
-              <textarea
-                className="select-input"
-                value={draft.description}
-                onChange={(e) =>
-                  setDraft({ ...draft, description: e.target.value })
-                }
-              />
-            </label>
-            {!editingEvent && connection?.connected ? (
-              <label className="event-publish-choice span-2">
-                <input
-                  type="checkbox"
-                  checked={draft.publishNow}
-                  onChange={(e) =>
-                    setDraft({ ...draft, publishNow: e.target.checked })
-                  }
-                />
-                <span>
-                  <strong>Publish immediately</strong>
-                  <small>
-                    Leave unchecked to create a private Eventbrite draft for
-                    review.
-                  </small>
-                </span>
-              </label>
+
+            {wizardStep === 1 ? (
+              <div className="campaign-form-grid event-form">
+                <label className="form-field"><span>Starts</span>
+                  <input className="select-input" type="datetime-local" value={draft.startDate}
+                    onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} />
+                </label>
+                <label className="form-field"><span>Ends</span>
+                  <input className="select-input" type="datetime-local" value={draft.endDate}
+                    onChange={(e) => setDraft({ ...draft, endDate: e.target.value })} />
+                </label>
+                <label className="form-field"><span>Format</span>
+                  <select className="select-input" value={draft.locationType}
+                    onChange={(e) => setDraft({ ...draft, locationType: e.target.value })}>
+                    <option value="online">Online</option><option value="venue">In person</option>
+                  </select>
+                </label>
+                <label className="form-field"><span>Time zone</span>
+                  <select className="select-input" value={draft.timeZone}
+                    onChange={(e) => setDraft({ ...draft, timeZone: e.target.value })}>
+                    <option value="America/Los_Angeles">Pacific Time</option>
+                    <option value="America/Denver">Mountain Time</option>
+                    <option value="America/Chicago">Central Time</option>
+                    <option value="America/New_York">Eastern Time</option>
+                  </select>
+                </label>
+                {draft.locationType === "venue" ? (
+                  <label className="form-field span-2"><span>Venue and address</span>
+                    <input className="select-input" value={draft.location}
+                      onChange={(e) => setDraft({ ...draft, location: e.target.value })} />
+                  </label>
+                ) : null}
+              </div>
             ) : null}
+
+            {wizardStep === 2 ? (
+              <div className="campaign-form-grid event-form">
+                <label className="form-field"><span>Organizer name</span>
+                  <input className="select-input" value={draft.planning.organizerName}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, organizerName: e.target.value } })} />
+                </label>
+                <label className="form-field"><span>Presenter names, one per line</span>
+                  <textarea className="select-input"
+                    value={draft.planning.presenters.map((item) => item.name || item).join("\n")}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, presenters: e.target.value.split("\n").filter(Boolean).map((name) => ({ name })) } })} />
+                </label>
+                <label className="form-field span-2"><span>Organizer or host description</span>
+                  <textarea className="select-input" value={draft.planning.organizerDescription}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, organizerDescription: e.target.value } })} />
+                </label>
+                <label className="form-field"><span>Agenda sessions, one per line</span>
+                  <textarea className="select-input"
+                    value={draft.planning.agenda.map((item) => item.title || item).join("\n")}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, agenda: e.target.value.split("\n").filter(Boolean).map((title) => ({ title })) } })} />
+                </label>
+                <label className="form-field"><span>Highlights, one per line</span>
+                  <textarea className="select-input" value={draft.planning.highlights.join("\n")}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, highlights: e.target.value.split("\n").filter(Boolean) } })} />
+                </label>
+                <label className="form-field span-2"><span>Event image URL</span>
+                  <input className="select-input" value={draft.planning.imageUrl}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, imageUrl: e.target.value } })} />
+                </label>
+              </div>
+            ) : null}
+
+            {wizardStep === 3 ? (
+              <div className="campaign-form-grid event-form">
+                <label className="form-field"><span>Primary ticket name</span>
+                  <input className="select-input" value={draft.ticketName}
+                    onChange={(e) => setDraft({ ...draft, ticketName: e.target.value })} />
+                </label>
+                <label className="form-field"><span>Ticket price</span>
+                  <input className="select-input" type="number" min="0" value={draft.ticketPrice}
+                    onChange={(e) => setDraft({ ...draft, ticketPrice: e.target.value })} />
+                </label>
+                <label className="form-field"><span>Ticket quantity</span>
+                  <input className="select-input" type="number" min="1" value={draft.ticketGoal}
+                    onChange={(e) => setDraft({ ...draft, ticketGoal: e.target.value })} />
+                </label>
+                <label className="form-field"><span>Refund policy</span>
+                  <textarea className="select-input" value={draft.planning.refundPolicy}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, refundPolicy: e.target.value } })} />
+                </label>
+                <p className="event-form-note span-2">
+                  Additional ticket tiers, fee rules, sale windows, tax settings,
+                  and payout settings will appear on the completion checklist
+                  when Eventbrite requires its own editor.
+                </p>
+              </div>
+            ) : null}
+
+            {wizardStep === 4 ? (
+              <div className="event-strategy">
+                <div className="event-strategy__header">
+                  <div><h3>AI audience recommendations</h3>
+                    <p>Ellie uses the event promise and ideal-attendee information—not Eventbrite contact data.</p>
+                  </div>
+                  <Button loading={loading} onClick={generateAudience}>Generate recommendations</Button>
+                </div>
+                <label className="form-field"><span>Who do you believe this is for? (optional input)</span>
+                  <textarea className="select-input" value={draft.planning.idealAttendee}
+                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, idealAttendee: e.target.value } })} />
+                </label>
+                <div className="audience-recommendation-list">
+                  {draft.audienceRecommendations.map((item) => {
+                    const selected = draft.audience.split(",").map((value) => value.trim()).includes(item.label);
+                    return <article key={item.label}>
+                      <div><strong>{item.label}</strong><p>{item.reason}</p></div>
+                      <button type="button" className={selected ? "selected" : ""}
+                        onClick={() => {
+                          const current = draft.audience.split(",").map((value) => value.trim()).filter(Boolean);
+                          const next = selected ? current.filter((value) => value !== item.label) : [...current, item.label];
+                          setDraft({ ...draft, audience: next.join(", "), audienceConfirmed: false });
+                        }}>{selected ? "Selected" : "Add audience"}</button>
+                    </article>;
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {wizardStep === 5 ? (() => {
+              const readiness = eventReadiness(draft);
+              return <div className="event-readiness">
+                <div><p className="events-eyebrow">Draft readiness</p>
+                  <h3>{readiness.complete} of {readiness.total} sections ready</h3>
+                  <p>Saving here creates only an Ellie draft. Nothing is sent to Eventbrite.</p>
+                </div>
+                <div className="event-readiness__checks">
+                  {readiness.checks.map(([label, ready]) => (
+                    <div key={label} className={ready ? "ready" : ""}>
+                      <span>{ready ? "✓" : "○"}</span><strong>{label}</strong>
+                      <small>{ready ? "Ready" : "Needs information"}</small>
+                    </div>
+                  ))}
+                </div>
+                <p className="event-form-note">
+                  After saving, open Manage Event. When the required listing
+                  sections are ready, “Create Eventbrite draft” becomes available.
+                  Publishing remains a separate confirmation.
+                </p>
+              </div>;
+            })() : null}
           </div>
         )}
       </Modal>

@@ -51,6 +51,20 @@ function fullContactName(contact = {}) {
     .join(" ");
 }
 
+function hasAudienceSignals(contact = {}) {
+  return Boolean(
+    contact.title ||
+    contact.industry ||
+    contact.company ||
+    contact.seniority ||
+    contact.linkedin ||
+    contact.tags?.length ||
+    contact.keywords?.length ||
+    contact.lists?.length ||
+    contact.notes
+  );
+}
+
 export default function Contacts() {
   const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
@@ -458,6 +472,14 @@ export default function Contacts() {
               </div>
               <div className="contact-record__top-actions">
                 <span className={`contact-status-badge contact-status-badge--${contact.emailStatus || "missing"}`}>{contact.emailStatus === "verified" ? "Verified email" : contact.emailStatus === "risky" ? "Risky — withheld" : contact.emailStatus === "undeliverable" ? "Undeliverable — withheld" : "No verified email"}</span>
+                {!hasAudienceSignals(contact) ? (
+                  <span
+                    className="contact-status-badge contact-status-badge--unknown"
+                    title="Ellie has only identity information and will not guess this person’s interests."
+                  >
+                    Audience unknown
+                  </span>
+                ) : null}
                 <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}>
                   <button className="crm-overflow" aria-label={`Actions for ${contact.name}`} onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>•••</button>
                   {actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View details</button><button onClick={() => setEditingContact({ ...contact, ...contactNameParts(contact) })}>Research, qualify & assign</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete permanently</button></div> : null}

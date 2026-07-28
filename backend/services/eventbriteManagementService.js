@@ -103,6 +103,42 @@ async function createManagedEvent(input) {
   return syncEvent(localEvent._id);
 }
 
+async function createEventbriteDraft(localEventId) {
+  const localEvent = await Event.findById(localEventId);
+  if (!localEvent) throw new Error("Event not found");
+  if (localEvent.integrations?.eventbrite?.eventId) {
+    return syncEvent(localEvent._id);
+  }
+  if (!localEvent.name || !localEvent.startDate || !localEvent.endDate) {
+    throw new Error("Complete the event name, start time, and end time first");
+  }
+  const orgId = await organizationId();
+  if (!orgId) throw new Error("Choose an Eventbrite organization before creating the draft");
+
+  const externalEvent = await post(`/organizations/${orgId}/events/`, {
+    event: eventPayload(localEvent.toObject(), { includeCurrency: true }),
+  });
+  if (Number(localEvent.ticketGoal) > 0) {
+    const ticketClass = {
+      name: localEvent.planning?.ticketClasses?.[0]?.name || "General Admission",
+      quantity_total: Number(localEvent.ticketGoal),
+    };
+    if (Number(localEvent.ticketPrice) > 0) {
+      ticketClass.cost = `USD,${Math.round(Number(localEvent.ticketPrice) * 100)}`;
+    } else {
+      ticketClass.free = true;
+    }
+    await post(`/events/${externalEvent.id}/ticket_classes/`, { ticket_class: ticketClass });
+  }
+  localEvent.integrations.eventbrite = {
+    enabled: true,
+    eventId: String(externalEvent.id),
+    url: externalEvent.url || "",
+  };
+  await localEvent.save();
+  return syncEvent(localEvent._id);
+}
+
 async function updateManagedEvent(localEventId, input) {
   const localEvent = await Event.findById(localEventId);
   if (!localEvent) throw new Error("Event not found");
@@ -119,6 +155,8 @@ async function updateManagedEvent(localEventId, input) {
   const allowed = [
     "name", "summary", "description", "startDate", "endDate", "timeZone",
     "locationType", "location", "ticketPrice", "ticketGoal", "audience",
+    "planning", "audienceSuggestions", "audienceRecommendationDetails",
+    "audienceRecommendationSource",
   ];
   allowed.forEach((field) => {
     if (input[field] !== undefined) localEvent[field] = input[field];
@@ -153,4 +191,9 @@ async function publishManagedEvent(localEventId) {
   return syncEvent(localEvent._id);
 }
 
-module.exports = { createManagedEvent, updateManagedEvent, publishManagedEvent };
+module.exports = {
+  createEventbriteDraft,
+  createManagedEvent,
+  updateManagedEvent,
+  publishManagedEvent,
+};

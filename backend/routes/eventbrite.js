@@ -124,6 +124,18 @@ router.post("/managed-events", async (req, res) => {
   }
 });
 
+router.post("/managed-events/:eventId/create-draft", async (req, res) => {
+  try {
+    const event = await eventbriteManagementService.createEventbriteDraft(req.params.eventId);
+    res.status(201).json({ success: true, event });
+  } catch (error) {
+    console.error("EVENTBRITE CREATE DRAFT ERROR:", error.response?.data || error.message);
+    res.status(400).json({
+      error: error.response?.data?.error_description || error.message || "Unable to create Eventbrite draft",
+    });
+  }
+});
+
 router.patch("/managed-events/:eventId", async (req, res) => {
   try {
     const event = await eventbriteManagementService.updateManagedEvent(req.params.eventId, req.body);

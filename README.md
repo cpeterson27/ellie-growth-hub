@@ -51,7 +51,10 @@ workspace around it.
 Once an Eventbrite account is authorized, Ellie AI can:
 
 - Import an existing Eventbrite event.
-- Create and publish a managed Eventbrite event.
+- Plan a new event as an Ellie-only draft without creating anything in
+  Eventbrite.
+- Create an Eventbrite draft only after the required listing information is
+  ready, and publish it through a separate confirmation.
 - Display the summary, structured overview, organizer, media, category, format,
   venue, policy, ticket classes, purchasing rules, and online-event status that
   Eventbrite exposes through its public API.
@@ -80,10 +83,13 @@ separate:
 - **Ellie campaign strategy:** approved target audience, channels, prospect
   filters, campaign assignment, and messaging.
 
-Ellie AI may suggest audience groups by finding the event's own “Who this event
-is for,” “Perfect for,” or “Ideal for” section. These are suggestions only. They
-do not become campaign filters until a team member selects them, confirms the
-audience, reviews the change, and saves it. Imports never seed a generic
+For imported events, Ellie AI may suggest audience groups by finding the
+event's own “Who this event is for,” “Perfect for,” or “Ideal for” section. For
+new events, the planning wizard generates grounded recommendations from the
+event promise, attendee outcomes, ideal-attendee notes, format, price, and
+business goal. OpenAI is used when enabled; a conservative rule-based strategy
+remains available when it is not. Suggestions do not become campaign filters
+until a team member selects and confirms them. Imports never seed a generic
 hardcoded audience.
 
 For near-real-time updates, an Eventbrite webhook can point to
@@ -103,6 +109,12 @@ sharing credentials with the application owner.
 ### 3. Contacts and email safety
 
 Contacts may be entered manually or imported from a CSV. A usable name is enough
+to retain the relationship, and a verified email is enough for intentional
+manual campaign assignment. It is not enough for automatic audience matching.
+Ellie AI labels a name-and-email-only record **Audience unknown** and waits for
+a real targeting signal such as a title, company, industry, tag, form answer,
+event attendance, campaign response, LinkedIn profile, keyword, list, or note.
+Ellie AI does not infer interests or profession from a person's name.
 to retain a record, so missing company, title, industry, or email information
 does not cause the person to disappear.
 

@@ -32,7 +32,7 @@ const eventSchema = new mongoose.Schema(
     // Date and time
     startDate: {
       type: Date,
-      required: true,
+      default: null,
     },
 
     endDate: {
@@ -64,12 +64,12 @@ const eventSchema = new mongoose.Schema(
     // Ticketing
     ticketPrice: {
       type: Number,
-      required: true,
+      default: 0,
     },
 
     ticketGoal: {
       type: Number,
-      required: true,
+      default: 0,
     },
 
     ticketsSold: {
@@ -137,7 +137,34 @@ const eventSchema = new mongoose.Schema(
     ],
 
     audienceSuggestions: [{ type: String }],
+    audienceRecommendationDetails: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+    audienceRecommendationSource: {
+      type: String,
+      enum: ["", "rules", "openai", "eventbrite_description"],
+      default: "",
+    },
     audienceConfirmedAt: { type: Date, default: null },
+
+    // Draft-first planning information. These fields are owned by Ellie AI
+    // until the user explicitly creates an Eventbrite draft.
+    planning: {
+      attendeeOutcomes: { type: String, default: "" },
+      idealAttendee: { type: String, default: "" },
+      businessGoal: { type: String, default: "" },
+      organizerName: { type: String, default: "" },
+      organizerDescription: { type: String, default: "" },
+      presenters: { type: [mongoose.Schema.Types.Mixed], default: [] },
+      agenda: { type: [mongoose.Schema.Types.Mixed], default: [] },
+      faqs: { type: [mongoose.Schema.Types.Mixed], default: [] },
+      refundPolicy: { type: String, default: "" },
+      highlights: { type: [String], default: [] },
+      imageUrl: { type: String, default: "" },
+      ticketClasses: { type: [mongoose.Schema.Types.Mixed], default: [] },
+      draftStep: { type: Number, default: 1 },
+    },
 
     channels: [
       {

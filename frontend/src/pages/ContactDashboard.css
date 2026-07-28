@@ -83,6 +83,11 @@
   color: #a1241c;
 }
 
+.contact-status-badge--unknown {
+  background: #eee9fb;
+  color: #574285;
+}
+
 .contact-record-list {
   display: grid;
   gap: 0.8rem;

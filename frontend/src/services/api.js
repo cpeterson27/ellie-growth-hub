@@ -84,6 +84,8 @@ export const createEvent = (eventData) =>
     .post("/events", eventData)
     .then((res) => res.data);
 
+export const recommendEventAudience = (eventData) =>
+  api.post("/events/audience-recommendations", eventData).then((res) => res.data);
 
 
 
@@ -117,6 +119,9 @@ export const syncEventbriteEvent = (eventId) =>
 
 export const createManagedEventbriteEvent = (data) =>
   api.post("/eventbrite/managed-events", data).then((res) => res.data);
+
+export const createEventbriteDraft = (eventId) =>
+  api.post(`/eventbrite/managed-events/${eventId}/create-draft`).then((res) => res.data);
 
 export const updateManagedEventbriteEvent = (eventId, data) =>
   api.patch(`/eventbrite/managed-events/${eventId}`, data).then((res) => res.data);
