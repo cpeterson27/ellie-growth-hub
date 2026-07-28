@@ -15,6 +15,7 @@
   flex-direction: column;
   min-width: 0;
   overflow-x: clip;
+  padding-top: 88px;
 }
 
 .dashboard-content {
@@ -29,9 +30,30 @@
   display: none;
 }
 
+.dashboard-view .navbar {
+  position: fixed;
+  inset: 0 0 auto 236px;
+  width: auto;
+  z-index: 35;
+}
+
+.dashboard-shell--collapsed .dashboard-view .navbar {
+  left: 78px;
+}
+
 @media (max-width: 900px) {
   .dashboard-shell {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-view {
+    grid-column: 1;
+    padding-top: 76px;
+  }
+
+  .dashboard-view .navbar,
+  .dashboard-shell--collapsed .dashboard-view .navbar {
+    left: 0;
   }
 
   .dashboard-content {
