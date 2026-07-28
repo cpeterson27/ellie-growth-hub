@@ -105,11 +105,11 @@ export default function CampaignWorkspace() {
         <DashboardCard title="Audience matching">
           {audienceMatch ? <>
             <div className="audience-flow">
-              <div><span>1</span><p><strong>Define the event audience</strong>Ellie suggests groups from the event description. You review and approve them.</p></div>
-              <div><span>2</span><p><strong>Compare CRM contacts</strong>Approved groups are compared with contact titles, industries, tags, keywords, companies, lists, and notes.</p></div>
-              <div><span>3</span><p><strong>Protect outreach</strong>Only verified, qualified contacts become safe matches. Nothing is sent automatically.</p></div>
+              <div><span>1</span><p><strong>Confirm the targeting brief</strong>Ellie can suggest segments from the event, but you decide the official audience for this campaign.</p></div>
+              <div><span>2</span><p><strong>Use real contact sources</strong>Contacts come from Ellie CRM, CSV uploads, Apollo imports/searches, manual entry, and future CRM/Gmail integrations.</p></div>
+              <div><span>3</span><p><strong>Match safely</strong>Ellie compares the brief with titles, industries, tags, keywords, companies, lists, and notes. Nothing is emailed automatically.</p></div>
             </div>
-            {eventId ? <div className="audience-strategy-action"><p><strong>Target audience</strong><span>{campaign.audience?.join(", ") || "Not approved yet"}</span></p><Button variant="outline" size="sm" onClick={() => navigate(`/events?eventId=${eventId}&tab=strategy`)}>Review target audience</Button></div> : null}
+            {eventId ? <div className="audience-strategy-action"><p><strong>Targeting brief</strong><span>{campaign.audience?.join(", ") || "Not approved yet"}</span></p><Button variant="outline" size="sm" onClick={() => navigate(`/events?eventId=${eventId}&tab=strategy`)}>Review targeting brief</Button></div> : null}
             <div className="campaign-audience-counts">
               <div><strong>{audienceMatch.matched || 0}</strong><span>safe matches</span></div>
               <div><strong>{audienceMatch.alreadyAssigned || 0}</strong><span>already assigned</span></div>

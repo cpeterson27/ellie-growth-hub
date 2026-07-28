@@ -1,0 +1,82 @@
+.settings-page .page-header {
+  align-items: flex-start;
+}
+
+.settings-hero-card {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(60, 200, 156, .18), transparent 34%),
+    linear-gradient(135deg, #123f36, #1f5c50);
+  border-radius: 24px;
+  color: #fff;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr);
+  margin: 0 0 24px;
+  padding: 28px;
+}
+
+.settings-hero-card span {
+  color: #f4d47a;
+  font-size: .78rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.settings-hero-card h2 {
+  font-size: clamp(1.35rem, 2vw, 2rem);
+  line-height: 1.18;
+  margin: 8px 0 0;
+  max-width: 880px;
+}
+
+.settings-hero-card p {
+  color: rgba(255, 255, 255, .82);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-card-note {
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+
+.settings-preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.settings-explainer-list {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-explainer-list p {
+  background: #f7f5ef;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+  padding: 14px;
+}
+
+.settings-explainer-list strong {
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .settings-hero-card,
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}

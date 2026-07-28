@@ -4,7 +4,7 @@ import { FiCalendar, FiChevronLeft, FiChevronRight, FiDollarSign, FiMail, FiTren
 import StatCard from "../components/StatCard.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Button from "../components/Button.jsx";
-import { fetchEvents, fetchOutreach } from "../services/api.js";
+import { fetchCampaigns, fetchEvents, fetchOutreach } from "../services/api.js";
 import "./Dashboard.css";
 
 const eventRevenue = (event) => Number(event.eventbriteLogistics?.grossRevenue || 0) || (Number(event.ticketsSold || 0) * Number(event.ticketPrice || 0));
@@ -13,14 +13,16 @@ const eventDate = (event) => event.startDate ? new Date(event.startDate) : null;
 export default function Dashboard() {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [outreachCount, setOutreachCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchEvents().then((items) => {
+    Promise.all([fetchEvents(), fetchCampaigns().catch(() => [])]).then(([items, campaignItems]) => {
       const list = Array.isArray(items) ? items : [];
       setEvents(list);
+      setCampaigns(Array.isArray(campaignItems) ? campaignItems : []);
       setSelectedId(list[0]?._id || "");
     }).finally(() => setLoading(false));
   }, []);
@@ -61,8 +63,18 @@ export default function Dashboard() {
     selected?.audienceRecommendationDetails?.length ||
       selected?.audienceSuggestions?.length,
   );
+  const selectedCampaign = campaigns.find((campaign) => {
+    const campaignEventId = String(campaign?.eventId?._id || campaign?.eventId || "");
+    return campaignEventId && campaignEventId === String(selected?._id || "");
+  });
   const hasSelectedAudience = Boolean(selected?.audience?.length);
+  const campaignHasAudience = Boolean(selectedCampaign?.audience?.length);
   const audienceApproved = Boolean(selected?.audienceConfirmedAt);
+  const displayedAudience = audienceApproved
+    ? selected.audience
+    : campaignHasAudience
+      ? selectedCampaign.audience
+      : selected?.audience || [];
   const nextStep = audienceApproved
     ? {
         status: "Campaign ready",
@@ -81,12 +93,21 @@ export default function Dashboard() {
           label: "Approve target audience",
           path: `/events?eventId=${selected._id}&tab=strategy`,
         }
-      : hasAudienceSuggestions
+      : campaignHasAudience
+        ? {
+            status: "Needs confirmation",
+            tone: "needs-attention",
+            title: "Confirm the targeting brief",
+            body: "This campaign already has assigned contacts. Confirming the target audience makes Ellie’s matching, Apollo searches, and future outreach use one approved source of truth.",
+            label: "Confirm audience",
+            path: `/events?eventId=${selected._id}&tab=strategy`,
+          }
+        : hasAudienceSuggestions
         ? {
             status: "Needs decision",
             tone: "needs-attention",
             title: "Choose the target audience",
-            body: "Ellie has suggestions. Pick the groups this campaign should target, then approve them.",
+            body: "Ellie has suggestions from the event listing. Pick the groups this campaign should target, then approve them before matching new contacts.",
             label: "Choose audience",
             path: `/events?eventId=${selected._id}&tab=strategy`,
           }
@@ -126,7 +147,7 @@ export default function Dashboard() {
       <div className="selected-event-summary">
         <p className="page-eyebrow">{eventDate(selected)?.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) || "Date not set"}</p>
         <h2>{selected.name}</h2>
-        <p>{selected.audience?.join(", ") || "Audience strategy still needs approval"}</p>
+        <p>{displayedAudience.length ? displayedAudience.join(", ") : "Audience strategy still needs approval"}</p>
       </div>
       <Button variant="outline" size="sm" onClick={() => navigate("/events")}>Manage this event</Button>
     </section>

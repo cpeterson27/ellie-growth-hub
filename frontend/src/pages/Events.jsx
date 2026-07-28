@@ -66,7 +66,9 @@ function localDateTime(value) {
   return local.toISOString().slice(0, 16);
 }
 
-function draftFromEvent(event) {
+function draftFromEvent(event, campaign) {
+  const eventAudience = event.audience || [];
+  const campaignAudience = campaign?.audience || [];
   return {
     ...emptyDraft,
     name: event.name || "",
@@ -79,7 +81,7 @@ function draftFromEvent(event) {
     location: event.locationType === "online" ? "" : event.location || "",
     ticketPrice: String(event.ticketPrice ?? ""),
     ticketGoal: String(event.ticketGoal ?? ""),
-    audience: (event.audience || []).join(", "),
+    audience: (eventAudience.length ? eventAudience : campaignAudience).join(", "),
     audienceConfirmed: Boolean(event.audienceConfirmedAt),
     planning: { ...emptyDraft.planning, ...(event.planning || {}) },
     audienceRecommendations:
@@ -417,11 +419,12 @@ export default function Events() {
         ? await syncEventbriteEvent(event._id)
         : { event };
       const current = result.event || event;
+      const campaign = campaignsByEvent.get(String(current._id));
       setEvents((items) =>
         items.map((item) => (item._id === current._id ? current : item)),
       );
       setEditingEvent(current);
-      setDraft(draftFromEvent(current));
+      setDraft(draftFromEvent(current, campaign));
       setManageTab("listing");
       setChangePreview([]);
       setEventModalOpen(true);
@@ -1115,9 +1118,10 @@ export default function Events() {
                     <p className="events-eyebrow">Ellie AI only</p>
                     <h3>Campaign audience</h3>
                     <p>
-                      Pick the audience segments Ellie should use for contact
-                      matching and campaign messaging. These are internal
-                      targeting rules, not public Eventbrite copy.
+                      This is Ellie’s internal targeting brief. It guides
+                      contact matching, Apollo searches, and campaign messaging.
+                      It does not change the public Eventbrite listing and it
+                      does not remove contacts you already assigned.
                     </p>
                   </div>
                   <span
@@ -1130,8 +1134,8 @@ export default function Events() {
                   <div className="audience-suggestions">
                     <strong>Step 1 · Suggested audience segments</strong>
                     <p>
-                      Ellie found these in the Eventbrite listing. Choose only
-                      the groups this campaign should actually target.
+                      Ellie found these in the Eventbrite listing. Use them as a
+                      shortcut, or keep the campaign audience you already chose.
                     </p>
                     <div>
                       {editingEvent.audienceSuggestions.map((suggestion) => {
@@ -1187,9 +1191,10 @@ export default function Events() {
                     placeholder="Choose suggestions above or type audience groups separated with commas"
                   />
                   <small>
-                    These labels are used later to match MongoDB contacts by
-                    confirmed title, industry, company, tags, keywords, lists,
-                    and notes.
+                    Ellie compares these labels against CRM contacts, Apollo
+                    imports, titles, industries, companies, tags, keywords,
+                    lists, and notes. Contacts can already be assigned; this
+                    confirms the targeting rule for future matching.
                   </small>
                 </label>
                 <label className="event-publish-choice">
@@ -1207,8 +1212,8 @@ export default function Events() {
                     <strong>Step 3 · Approve this audience for matching</strong>
                     <small>
                       After this is checked and saved, Ellie can use these
-                      groups to filter contacts and guide outreach. No emails
-                      are sent from this step.
+                      groups as the official campaign filter. No emails are
+                      generated or sent from this step.
                     </small>
                   </span>
                 </label>
@@ -1422,7 +1427,7 @@ export default function Events() {
               <div className="event-strategy">
                 <div className="event-strategy__header">
                   <div><h3>Audience recommendations</h3>
-                    <p>Ellie analyzes the event draft and your ideal-attendee notes to suggest audience segments. It does not pull contacts yet.</p>
+                    <p>Ellie analyzes the event draft and your ideal-attendee notes to suggest targeting segments. Contacts come from the CRM, CSV imports, Apollo, or future CRM/Gmail integrations.</p>
                   </div>
                   <Button loading={loading} onClick={generateAudience}>Generate recommendations</Button>
                 </div>
@@ -1431,9 +1436,10 @@ export default function Events() {
                     onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, idealAttendee: e.target.value } })} />
                 </label>
                 <p className="event-form-note">
-                  These are audience segments, not contacts. After you select
-                  and approve segments, Ellie can match them against MongoDB
-                  contacts with known professional or interest signals.
+                  These are targeting segments, not people. After you select
+                  and approve segments, Ellie can match them against existing
+                  CRM contacts and future Apollo/CRM imports with known
+                  professional or interest signals.
                   Name-and-email-only contacts stay “Audience unknown” until a
                   real signal is added.
                 </p>
