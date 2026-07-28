@@ -49,16 +49,6 @@
   padding: 12px;
 }
 
-.integration-explainer {
-  background: #f5f2eb;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  display: grid;
-  gap: 5px;
-  margin: 22px 0 34px;
-  padding: 18px 22px;
-}
-.integration-explainer span,
 .integration-capabilities { color: var(--text-muted); }
 .integration-section-title { margin: 0 0 16px; }
 .integration-provider-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

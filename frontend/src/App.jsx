@@ -15,6 +15,7 @@ import Analytics from "./pages/Analytics.jsx";
 import Settings from "./pages/Settings.jsx";
 import Jarvis from "./pages/Jarvis.jsx";
 import Integrations from "./pages/Integrations.jsx";
+import EventbriteIntegration from "./pages/EventbriteIntegration.jsx";
 import Discovery from "./pages/Discovery.jsx";
 import DevelopmentRequests from "./pages/DevelopmentRequests.jsx";
 
@@ -107,6 +108,11 @@ function App() {
           <Route
             path="/integrations"
             element={<Integrations />}
+          />
+
+          <Route
+            path="/integrations/eventbrite"
+            element={<EventbriteIntegration />}
           />
 
 
