@@ -1,6 +1,8 @@
 export const defaultWorkspaceSettings = {
   workspaceName: "Ellie AI Growth Operator",
   defaultCampaignKind: "event",
+  contactStages: ["New lead", "Qualified", "Campaign assigned", "Contacted", "Responded", "Registered", "Attended", "Purchased", "Not interested"],
+  customContactFields: ["Relationship type", "Referral source", "Investment interests"],
 };
 
 export function getWorkspaceSettings() {

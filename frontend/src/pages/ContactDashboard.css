@@ -131,6 +131,72 @@
   gap: 0.8rem;
 }
 
+.contact-record-list--compact {
+  gap: 0.65rem;
+}
+
+.contact-record-list--compact .contact-record {
+  padding: 0.9rem 1rem;
+}
+
+.contact-record-list--compact .contact-record__details {
+  grid-template-columns: 1.4fr 1fr 1.8fr;
+  padding-top: 0.7rem;
+}
+
+.crm-results-summary,
+.crm-pagination {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  font-size: 0.88rem;
+  justify-content: space-between;
+}
+
+.crm-results-summary {
+  border-bottom: 1px solid var(--border);
+  margin-top: 0.8rem;
+  padding: 0.75rem 0;
+}
+
+.crm-pagination {
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.25rem 0 0.25rem;
+}
+
+.audience-editor-intro {
+  background: linear-gradient(135deg, #f3eefc, #eef8f4);
+  border: 1px solid #dcd0f2;
+  border-radius: 18px;
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+}
+
+.audience-editor-intro span {
+  color: #624b91;
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.audience-editor-intro h3 {
+  font-size: 1.22rem;
+  margin: 0.35rem 0;
+}
+
+.audience-editor-intro p {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.audience-editor {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .contact-record {
   padding: 1rem 1.1rem;
   border: 1px solid var(--border);
@@ -364,6 +430,14 @@
   }
 
   .contact-record__details {
+    grid-template-columns: 1fr;
+  }
+
+  .contact-record-list--compact .contact-record__details {
+    grid-template-columns: 1fr;
+  }
+
+  .audience-editor {
     grid-template-columns: 1fr;
   }
 

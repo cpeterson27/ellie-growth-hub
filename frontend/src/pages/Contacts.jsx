@@ -8,6 +8,7 @@ import "./ContactDashboard.css";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
+import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import {
   fetchContacts,
   fetchContactOverview,
@@ -95,6 +96,7 @@ function contactWorkflowState(contact = {}) {
 
 export default function Contacts() {
   const navigate = useNavigate();
+  const workspaceSettings = getWorkspaceSettings();
   const [contacts, setContacts] = useState([]);
   const [contactOverview, setContactOverview] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -124,7 +126,9 @@ export default function Contacts() {
   const [previewStats, setPreviewStats] = useState(null);
   const [detailContact, setDetailContact] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
+  const [contactEditMode, setContactEditMode] = useState("full");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [verifyingEmails, setVerifyingEmails] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(null);
   const [verificationResults, setVerificationResults] = useState({});
@@ -134,6 +138,7 @@ export default function Contacts() {
   const [bulkCampaignId, setBulkCampaignId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkNotice, setBulkNotice] = useState("");
+  const pageSize = 15;
 
   async function loadContacts() {
     try {
@@ -168,6 +173,10 @@ export default function Contacts() {
 
   useEffect(() => {
     loadContacts();
+  }, [contactTab, campaignId, searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [contactTab, campaignId, searchTerm]);
 
   useEffect(() => {
@@ -465,7 +474,7 @@ export default function Contacts() {
           </p>
         </div>
         <Button variant="secondary" onClick={() => navigate("/integrations")}>
-          View CRM integrations
+          Manage CRM options
         </Button>
       </section>
 
@@ -500,8 +509,12 @@ export default function Contacts() {
           <small>This assigns the audience only. It does not generate or send emails.</small>
         </section> : null}
         {bulkNotice ? <p className="contact-bulk-notice">{bulkNotice}</p> : null}
-        {loading ? <div className="table-state">Loading contacts…</div> : contacts.length ? <div className="contact-record-list">
-          {contacts.map((contact) => {
+        {!loading && contacts.length ? <div className="crm-results-summary">
+          <span>Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, contacts.length)} of {contacts.length} contacts</span>
+          <span>Page {currentPage} of {Math.max(1, Math.ceil(contacts.length / pageSize))}</span>
+        </div> : null}
+        {loading ? <div className="table-state">Loading contacts…</div> : contacts.length ? <div className="contact-record-list contact-record-list--compact">
+          {contacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
             const workflow = contactWorkflowState(contact);
             return <article className="contact-record" key={contact._id} onClick={() => setDetailContact(contact)}>
             <header>
@@ -524,23 +537,28 @@ export default function Contacts() {
                 ) : null}
                 <button className={`contact-next-action contact-next-action--${workflow.key}`} onClick={(event) => {
                   event.stopPropagation();
+                  setContactEditMode(workflow.key === "audience" ? "audience" : "full");
                   setEditingContact({ ...contact, ...contactNameParts(contact) });
                 }}>{workflow.label}</button>
                 <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}>
                   <button className="crm-overflow" aria-label={`Actions for ${contact.name}`} onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>•••</button>
-                  {actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View details</button><button onClick={() => setEditingContact({ ...contact, ...contactNameParts(contact) })}>Research, qualify & assign</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete permanently</button></div> : null}
+                  {actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View details</button><button onClick={() => { setContactEditMode("full"); setEditingContact({ ...contact, ...contactNameParts(contact) }); }}>Edit contact & campaign</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete permanently</button></div> : null}
                 </div>
               </div>
             </header>
             <div className="contact-record__details">
               <div><span>Email</span><strong>{contact.email || "Withheld or unavailable"}</strong></div>
-              <div><span>Phone</span><strong>{contact.phone || "Not provided"}</strong></div>
-              <div><span>Research status</span><strong>{String(contact.researchStatus || "needs_research").replaceAll("_", " ")}</strong></div>
-              <div><span>Missing information</span><strong>{contact.missingFields?.length ? contact.missingFields.join(", ") : "None"}</strong></div>
+              <div><span>Audience</span><strong>{contact.audienceProfiles?.join(", ") || contact.industry || contact.title || "Unknown"}</strong></div>
+              <div><span>Campaign</span><strong>{contact.campaignIds?.length ? "Assigned" : "Not assigned"}</strong></div>
               <div><span>Next action</span><strong>{workflow.detail}</strong></div>
             </div>
           </article>;
           })}
+          <nav className="crm-pagination" aria-label="Contact pages">
+            <Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</Button>
+            <span>Page {currentPage} of {Math.ceil(contacts.length / pageSize)}</span>
+            <Button variant="outline" disabled={currentPage >= Math.ceil(contacts.length / pageSize)} onClick={() => setCurrentPage((page) => page + 1)}>Next</Button>
+          </nav>
         </div> : <div className="table-state table-state--empty">
           {contactTab === "ready"
             ? "No verified contacts are waiting for a campaign assignment."
@@ -674,7 +692,27 @@ export default function Contacts() {
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
       <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Research", ["researchStatus", "missingFields", "qualifyContact", "stage", "tags", "lists"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments"]], ["Marketing", ["keywords", "lastContacted", "notes"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : typeof detailContact[field] === "boolean" ? (detailContact[field] ? "Yes" : "No") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
-      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Prepare Contact for a Campaign" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, name: fullContactName(editingContact), tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), audienceProfiles: Array.isArray(editingContact.audienceProfiles) ? editingContact.audienceProfiles : String(editingContact.audienceProfiles || "").split(",").map((profile) => profile.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? <>
+      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title={contactEditMode === "audience" ? "Tell Ellie who this contact is" : "Edit contact & campaign"} footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, name: fullContactName(editingContact), tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), audienceProfiles: Array.isArray(editingContact.audienceProfiles) ? editingContact.audienceProfiles : String(editingContact.audienceProfiles || "").split(",").map((profile) => profile.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{contactEditMode === "audience" ? "Save audience information" : editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? contactEditMode === "audience" ? <>
+        <div className="audience-editor-intro">
+          <span>Audience unknown</span>
+          <h3>What would make {editingContact.firstName || editingContact.name} relevant to a future campaign?</h3>
+          <p>Add only information you know. Ellie uses these categories to suggest the right campaigns—it will never guess from a name or email.</p>
+        </div>
+        <div className="audience-editor">
+          <label className="form-field span-2">
+            <span>Audience groups or interests</span>
+            <input autoFocus className="select-input" placeholder="Example: Multifamily investor, entrepreneur, event host" value={Array.isArray(editingContact.audienceProfiles) ? editingContact.audienceProfiles.join(", ") : editingContact.audienceProfiles || ""} onChange={(event) => setEditingContact({ ...editingContact, audienceProfiles: event.target.value })} />
+            <small>Separate multiple groups with commas.</small>
+          </label>
+          {(workspaceSettings.customContactFields || []).map((label) => {
+            const key = label.toLowerCase().replace(/[^a-z0-9]+(.)/g, (_, character) => character.toUpperCase());
+            return <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={editingContact.additionalFields?.[key] || ""} onChange={(event) => setEditingContact({ ...editingContact, additionalFields: { ...(editingContact.additionalFields || {}), [key]: event.target.value } })} /></label>;
+          })}
+          <label className="form-field"><span>Industry (optional)</span><input className="select-input" placeholder="Example: Real estate" value={editingContact.industry || ""} onChange={(event) => setEditingContact({ ...editingContact, industry: event.target.value })} /></label>
+          <label className="form-field"><span>Role or title (optional)</span><input className="select-input" placeholder="Example: Investor" value={editingContact.title || ""} onChange={(event) => setEditingContact({ ...editingContact, title: event.target.value })} /></label>
+          <label className="form-field span-2"><span>Company (optional)</span><input className="select-input" value={editingContact.company || ""} onChange={(event) => setEditingContact({ ...editingContact, company: event.target.value })} /></label>
+        </div>
+      </> : <>
         <p className="contact-modal-intro"><strong>A name and a confirmed email are enough to add someone to a campaign.</strong> Company, title, and industry are optional and can be completed later.</p>
         <div className="contact-form-grid">
           {["firstName", "lastName", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}

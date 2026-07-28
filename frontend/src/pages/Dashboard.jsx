@@ -1,233 +1,94 @@
-import { useEffect, useState } from "react";
-import {
-  FiCalendar,
-  FiDollarSign,
-  FiTrendingUp,
-  FiUsers,
-} from "react-icons/fi";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FiCalendar, FiDollarSign, FiTrendingUp, FiUsers } from "react-icons/fi";
 import StatCard from "../components/StatCard.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
+import Button from "../components/Button.jsx";
 import { TicketSalesChart, RevenueBarChart } from "../components/Charts.jsx";
-import {
-  fetchEvents,
-  fetchOutreach,
-  getGrowthOperatorHistory,
-} from "../services/api.js";
+import { fetchEvents, fetchOutreach } from "../services/api.js";
+import "./Dashboard.css";
+
+const eventRevenue = (event) => Number(event.eventbriteLogistics?.grossRevenue || 0) || (Number(event.ticketsSold || 0) * Number(event.ticketPrice || 0));
+const eventDate = (event) => event.startDate ? new Date(event.startDate) : null;
 
 export default function Dashboard() {
-  const [event, setEvent] = useState(null);
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
-  const [outreach, setOutreach] = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [outreachCount, setOutreachCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [growthHistory, setGrowthHistory] = useState([]);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const events = await fetchEvents();
-        const activeEvent = events[0] || null;
-        setEvents(Array.isArray(events) ? events : []);
-        setEvent(activeEvent);
-        if (activeEvent) {
-          const outreachItems = await fetchOutreach(activeEvent._id);
-          setOutreach(outreachItems);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
+    fetchEvents().then((items) => {
+      const list = Array.isArray(items) ? items : [];
+      setEvents(list);
+      setSelectedId(list[0]?._id || "");
+    }).finally(() => setLoading(false));
   }, []);
 
-  const selectEvent = async (eventId) => {
-    const nextEvent = events.find((item) => item._id === eventId) || null;
-    setEvent(nextEvent);
-    if (!nextEvent) return setOutreach([]);
-    try {
-      const items = await fetchOutreach(nextEvent._id);
-      setOutreach(Array.isArray(items) ? items : items.outreach || []);
-    } catch {
-      setOutreach([]);
-    }
-  };
+  const selected = events.find((event) => event._id === selectedId) || events[0];
+  useEffect(() => {
+    if (!selected?._id) return setOutreachCount(0);
+    fetchOutreach(selected._id).then((items) => setOutreachCount((Array.isArray(items) ? items : items?.outreach || []).length)).catch(() => setOutreachCount(0));
+  }, [selected?._id]);
 
-  if (loading) {
-    return (
-      <div className="page-dashboard">
-        <p>Loading dashboard...</p>
-      </div>
-    );
-  }
+  const totals = useMemo(() => events.reduce((sum, event) => ({
+    tickets: sum.tickets + Number(event.ticketsSold || 0),
+    revenue: sum.revenue + eventRevenue(event),
+    attendees: sum.attendees + Number(event.eventbriteLogistics?.attendees || 0),
+    checkedIn: sum.checkedIn + Number(event.eventbriteLogistics?.checkedIn || 0),
+  }), { tickets: 0, revenue: 0, attendees: 0, checkedIn: 0 }), [events]);
 
-  if (!event) {
-    return (
-      <div className="page-dashboard">
-        <div className="page-header">
-          <div>
-            <p className="page-subtitle">Event</p>
-            <h1 className="page-title">No Event Connected</h1>
-            <p className="page-subtitle">
-              Connect Eventbrite to import your event data.
-            </p>
-          </div>
-        </div>
+  if (loading) return <div className="page-dashboard"><p>Loading dashboard…</p></div>;
+  if (!events.length) return <div className="page-dashboard"><div className="page-header"><div><h1 className="page-title">Business dashboard</h1><p className="page-subtitle">Create or import your first event to begin tracking performance.</p></div><Button onClick={() => navigate("/events")}>Open Events</Button></div></div>;
 
-        <DashboardCard title="Event Connection">
-          <p>
-            No event has been connected yet. Connect Eventbrite to sync event
-            details, ticket sales, revenue, and attendee information.
-          </p>
-        </DashboardCard>
-      </div>
-    );
-  }
+  const selectedTickets = Number(selected?.ticketsSold || 0);
+  const selectedGoal = Number(selected?.ticketGoal || 0);
+  const selectedProgress = selectedGoal ? Math.min(100, Math.round((selectedTickets / selectedGoal) * 100)) : 0;
+  const salesData = [...events].sort((a, b) => (eventDate(a) || 0) - (eventDate(b) || 0)).map((event) => ({
+    date: eventDate(event)?.toLocaleDateString("en-US", { month: "short", day: "numeric" }) || "TBD",
+    tickets: Number(event.ticketsSold || 0),
+  }));
+  const revenueData = events.map((event) => ({ campaign: event.name.length > 18 ? `${event.name.slice(0, 18)}…` : event.name, revenue: eventRevenue(event) }));
 
-  const ticketsSold = event.ticketsSold || 0;
-  const ticketsGoal = event.ticketGoal || 0;
-  const revenue = ticketsSold * (event.ticketPrice || 0);
-  const conversionRate =
-    ticketsGoal > 0 ? ((ticketsSold / ticketsGoal) * 100).toFixed(1) : "0.0";
-  const successRate =
-    ticketsGoal > 0
-      ? `${Math.min(100, ((ticketsSold / ticketsGoal) * 100).toFixed(0))}% complete`
-      : "0% complete";
-
-  const stats = [
-    {
-      title: "Tickets Sold",
-      value: `${ticketsSold} / ${ticketsGoal}`,
-      subtitle: "Seats reserved for the event",
-      icon: <FiCalendar />,
-      trend: ticketsGoal > 0 ? successRate : "",
-    },
-    {
-      title: "Revenue",
-      value: `$${revenue}`,
-      subtitle: "Event ticket revenue so far",
-      icon: <FiDollarSign />,
-      trend:
-        ticketsSold > 0 ? "Revenue is tracking with sales" : "No revenue yet",
-    },
-    {
-      title: "Conversion Rate",
-      value: `${conversionRate}%`,
-      subtitle: "Booked tickets vs goal",
-      icon: <FiTrendingUp />,
-      trend: ticketsGoal > 0 ? "Based on current event progress" : "",
-    },
-    {
-      title: "Outreach Opportunities",
-      value: `${outreach.length}`,
-      subtitle: "Suggested outreach targets for the event",
-      icon: <FiUsers />,
-      trend:
-        outreach.length > 0
-          ? "Awaiting review"
-          : "Generate outreach suggestions",
-    },
-  ];
-
-  const salesData = [
-    {
-      date: event.startDate
-        ? new Date(event.startDate).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-          })
-        : "Event",
-      tickets: ticketsSold,
-    },
-  ];
-
-  const revenueData = [
-    {
-      campaign: event.name,
-      revenue,
-    },
-  ];
-
-  return (
-    <div className="page-dashboard">
-      <div className="page-header">
-        <div>
-          <p className="page-subtitle">Event</p>
-          <h1 className="page-title">{event.name}</h1>
-          <p className="page-subtitle">
-            {new Date(event.startDate).toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}{" "}
-            · Ticket Price ${event.ticketPrice}
-          </p>
-          {events.length > 1 ? (
-            <label className="dashboard-event-picker">
-              Dashboard event
-              <select value={event._id} onChange={(entry) => selectEvent(entry.target.value)}>
-                {events.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
-              </select>
-            </label>
-          ) : null}
-        </div>
-      </div>
-
-      <section className="section-grid">
-        {stats.map((item) => (
-          <StatCard
-            key={item.title}
-            title={item.title}
-            value={item.value}
-            subtitle={item.subtitle}
-            icon={item.icon}
-            trend={item.trend}
-          />
-        ))}
-      </section>
-
-      <section className="section-grid" style={{ marginTop: "1.5rem" }}>
-        <DashboardCard
-          title="Event Progress"
-          action={<span className="label-pill">{successRate}</span>}
-        >
-          <p>Current ticket sales show event momentum and event performance.</p>
-          <div className="progress-bar">
-            <div
-              className="progress-bar__fill"
-              style={{
-                width: `${Math.min(100, (ticketsSold / Math.max(1, ticketsGoal)) * 100)}%`,
-              }}
-            />
-          </div>
-        </DashboardCard>
-
-        <DashboardCard title="Upcoming Event">
-          <div className="upcoming-card">
-            <div>
-              <p className="stat-card__title">{event.name}</p>
-              <p className="page-subtitle">{event.audience?.join(", ")}</p>
-            </div>
-            <div className="event-meta">
-              <span>
-                {new Date(event.startDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-              <span>Ticket goal: {event.ticketGoal}</span>
-            </div>
-          </div>
-        </DashboardCard>
-      </section>
-
-      <section className="section-grid" style={{ marginTop: "1.5rem" }}>
-        <TicketSalesChart data={salesData} />
-        <RevenueBarChart data={revenueData} />
-      </section>
+  return <div className="page-dashboard dashboard-portfolio">
+    <div className="page-header">
+      <div><p className="page-eyebrow">Portfolio overview</p><h1 className="page-title">Business dashboard</h1><p className="page-subtitle">See every event first, then open the performance details that need attention.</p></div>
+      <div className="dashboard-header-actions"><Button variant="outline" onClick={() => navigate("/analytics")}>Full analytics</Button><Button onClick={() => navigate("/events")}>Manage events</Button></div>
     </div>
-  );
+
+    <section className="dashboard-stat-grid">
+      <StatCard title="Events" value={events.length} subtitle="Imported and created events" icon={<FiCalendar />} trend={`${events.filter((event) => (eventDate(event) || 0) >= new Date()).length} upcoming`} />
+      <StatCard title="Tickets sold" value={totals.tickets} subtitle="Across every event" icon={<FiTrendingUp />} trend={`${totals.attendees} attendee records`} />
+      <StatCard title="Gross revenue" value={`$${totals.revenue.toLocaleString()}`} subtitle="Synchronized event revenue" icon={<FiDollarSign />} trend="Across all tracked events" />
+      <StatCard title="Checked in" value={totals.checkedIn} subtitle="Live attendance activity" icon={<FiUsers />} trend={totals.attendees ? `${Math.round((totals.checkedIn / totals.attendees) * 100)}% of attendees` : "No attendee data yet"} />
+    </section>
+
+    <section className="dashboard-main-grid">
+      <DashboardCard title="Event portfolio" action={<span className="label-pill">{events.length} events</span>}>
+        <div className="event-portfolio-list">
+          {events.map((event) => {
+            const goal = Number(event.ticketGoal || 0);
+            const sold = Number(event.ticketsSold || 0);
+            return <button className={selected?._id === event._id ? "is-selected" : ""} key={event._id} onClick={() => setSelectedId(event._id)}>
+              <div><strong>{event.name}</strong><span>{eventDate(event)?.toLocaleDateString() || "Date not set"}</span></div>
+              <div><strong>{sold}{goal ? ` / ${goal}` : ""}</strong><span>tickets</span></div>
+              <div><strong>${eventRevenue(event).toLocaleString()}</strong><span>gross</span></div>
+            </button>;
+          })}
+        </div>
+      </DashboardCard>
+      <DashboardCard title="Selected event" action={<Button variant="outline" onClick={() => navigate("/events")}>Manage</Button>}>
+        <div className="selected-event-summary">
+          <p className="page-eyebrow">{eventDate(selected)?.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) || "Date not set"}</p>
+          <h2>{selected.name}</h2>
+          <p>{selected.audience?.join(", ") || "Audience strategy not approved yet"}</p>
+          <div className="selected-event-kpis"><span><strong>{selectedProgress}%</strong> ticket goal</span><span><strong>{outreachCount}</strong> outreach records</span><span><strong>${eventRevenue(selected).toLocaleString()}</strong> gross</span></div>
+          <div className="progress-bar"><div className="progress-bar__fill" style={{ width: `${selectedProgress}%` }} /></div>
+        </div>
+      </DashboardCard>
+    </section>
+
+    <section className="dashboard-chart-grid"><TicketSalesChart data={salesData} /><RevenueBarChart data={revenueData} /></section>
+  </div>;
 }
