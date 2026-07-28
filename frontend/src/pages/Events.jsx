@@ -12,7 +12,6 @@ import {
   fetchCampaigns,
   fetchEventbriteConnection,
   fetchEventbriteEvents,
-  fetchEventbriteWebhookStatus,
   fetchEvents,
   importEventbriteEvent,
   publishManagedEventbriteEvent,
@@ -188,7 +187,6 @@ export default function Events() {
   const [campaigns, setCampaigns] = useState([]);
   const [eventbriteEvents, setEventbriteEvents] = useState([]);
   const [connection, setConnection] = useState(null);
-  const [webhookStatus, setWebhookStatus] = useState(null);
   const [selectedEventId, setSelectedEventId] = useState("");
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -247,33 +245,18 @@ export default function Events() {
       total + Number(event.eventbriteLogistics?.grossRevenue || 0),
     0,
   );
-  const connectedEvents = events.filter((event) => event.integrations?.eventbrite?.eventId);
-  const latestEventbriteSync = connectedEvents
-    .map((event) => event.eventbriteLogistics?.lastSyncedAt)
-    .filter(Boolean)
-    .sort((a, b) => new Date(b) - new Date(a))[0];
-  const formatDateTime = (value) =>
-    value ? new Date(value).toLocaleString() : "Not recorded yet";
-  const webhookVerified = Boolean(webhookStatus?.configured && webhookStatus?.lastReceivedAt);
-  const setupComplete = Boolean(connection?.connected && webhookVerified && latestEventbriteSync);
-  const webhookMessage = webhookStatus?.lastMessage?.toLowerCase().includes("path you requested")
-    ? "Test received. Eventbrite can reach Ellie automatically."
-    : webhookStatus?.lastMessage;
-
   const loadWorkspace = async () => {
-    const [eventData, campaignData, connectionData, externalData, webhookData] =
+    const [eventData, campaignData, connectionData, externalData] =
       await Promise.all([
         fetchEvents(),
         fetchCampaigns(),
         fetchEventbriteConnection(),
         fetchEventbriteEvents().catch(() => []),
-        fetchEventbriteWebhookStatus().catch(() => null),
       ]);
     setEvents(Array.isArray(eventData) ? eventData : []);
     setCampaigns(Array.isArray(campaignData) ? campaignData : []);
     setConnection(connectionData);
     setEventbriteEvents(Array.isArray(externalData) ? externalData : []);
-    setWebhookStatus(webhookData);
   };
 
   useEffect(() => {
@@ -285,15 +268,13 @@ export default function Events() {
       fetchCampaigns(),
       fetchEventbriteConnection(),
       fetchEventbriteEvents().catch(() => []),
-      fetchEventbriteWebhookStatus().catch(() => null),
     ])
-      .then(([eventData, campaignData, connectionData, externalData, webhookData]) => {
+      .then(([eventData, campaignData, connectionData, externalData]) => {
         const loadedEvents = Array.isArray(eventData) ? eventData : [];
         setEvents(loadedEvents);
         setCampaigns(Array.isArray(campaignData) ? campaignData : []);
         setConnection(connectionData);
         setEventbriteEvents(Array.isArray(externalData) ? externalData : []);
-        setWebhookStatus(webhookData);
         const refreshCutoff = Date.now() - 15 * 60 * 1000;
         const staleConnectedEvents = loadedEvents.filter(
           (event) =>
@@ -680,46 +661,11 @@ export default function Events() {
           <Button loading={loading} onClick={connectEventbrite}>
             Connect Eventbrite
           </Button>
-        ) : null}
-      </section>
-
-      <section className="eventbrite-health-grid" aria-label="Eventbrite setup and automation status">
-        <DashboardCard
-          title="Eventbrite setup"
-          action={<span className={`eventbrite-setup-badge ${setupComplete ? "is-ready" : ""}`}>{setupComplete ? "Ready" : "In progress"}</span>}
-        >
-          <p className="eventbrite-setup-intro">
-            For a client, this should feel simple: connect Eventbrite once,
-            choose or create an event, and Ellie keeps registrations and
-            check-ins current automatically.
-          </p>
-          <div className="eventbrite-health-list">
-            <div>
-              <span className={`eventbrite-step-number ${connection?.connected ? "is-ready" : ""}`}>{connection?.connected ? "✓" : "1"}</span>
-              <p><strong>Connect the Eventbrite account</strong><small>{connection?.connected ? `${connection.accountEmail || "Authorized account"} is connected for publishing and reporting.` : "The client clicks Connect Eventbrite and authorizes their own account."}</small></p>
-            </div>
-            <div>
-              <span className={`eventbrite-step-number ${webhookVerified ? "is-ready" : ""}`}>{webhookVerified ? "✓" : "2"}</span>
-              <p><strong>Verify automatic updates</strong><small>{webhookVerified ? `Eventbrite last checked in ${formatDateTime(webhookStatus.lastReceivedAt)}.` : webhookStatus?.configured ? "Waiting for Eventbrite to send the first test or event update." : "Admin setup needed: webhook token is not configured."}</small></p>
-            </div>
-            <div>
-              <span className={`eventbrite-step-number ${latestEventbriteSync ? "is-ready" : ""}`}>{latestEventbriteSync ? "✓" : "3"}</span>
-              <p><strong>Sync event reporting</strong><small>{latestEventbriteSync ? `Ellie last refreshed event data ${formatDateTime(latestEventbriteSync)}.` : "Add or open a connected Eventbrite event so Ellie can pull registrations, revenue, and check-ins."}</small></p>
-            </div>
-          </div>
-          {webhookMessage ? <p className="eventbrite-health-note">{webhookMessage}</p> : null}
-        </DashboardCard>
-        <DashboardCard title="What happens automatically">
-          <ul className="eventbrite-flow-list">
-            <li>New orders and attendee changes notify Ellie.</li>
-            <li>Check-ins update attendance reporting.</li>
-            <li>Ticket, venue, organizer, and event edits refresh the connected Ellie event.</li>
-          </ul>
-          <p className="eventbrite-client-note">
-            New clients should not paste webhook URLs. That belongs in admin
-            setup; the client-facing action is simply “Connect Eventbrite.”
-          </p>
-        </DashboardCard>
+        ) : (
+          <Button variant="outline" onClick={() => navigate("/integrations")}>
+            View setup
+          </Button>
+        )}
       </section>
 
       <section className="event-summary-grid">

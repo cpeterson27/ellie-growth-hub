@@ -63,11 +63,121 @@
 .integration-section-title { margin: 0 0 16px; }
 .integration-provider-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
+.eventbrite-setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+  gap: 18px;
+  margin: 0 0 34px;
+}
+
+.eventbrite-setup-intro {
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+
+.eventbrite-setup-badge {
+  align-items: center;
+  background: #f3eee4;
+  border-radius: 999px;
+  color: #71644f;
+  display: inline-flex;
+  font-size: .72rem;
+  font-weight: 800;
+  justify-content: center;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.eventbrite-setup-badge.is-ready {
+  background: #d9f4e9;
+  color: #12634f;
+}
+
+.eventbrite-health-list {
+  display: grid;
+  gap: 18px;
+}
+
+.eventbrite-health-list > div {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+}
+
+.eventbrite-health-list p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.eventbrite-health-list small,
+.eventbrite-health-note,
+.eventbrite-client-note,
+.integration-role-list p {
+  color: var(--text-muted);
+  font-size: .86rem;
+  line-height: 1.5;
+}
+
+.eventbrite-step-number {
+  background: #f3eee4;
+  border-radius: 50%;
+  color: #71644f;
+  display: grid;
+  flex: 0 0 auto;
+  font-size: .78rem;
+  font-weight: 900;
+  height: 30px;
+  place-items: center;
+  width: 30px;
+}
+
+.eventbrite-step-number.is-ready {
+  background: #3cc89c;
+  box-shadow:
+    0 0 0 6px rgba(60, 200, 156, .15),
+    0 0 14px rgba(60, 200, 156, .4);
+  color: #fff;
+}
+
+.eventbrite-health-note,
+.eventbrite-client-note {
+  border-radius: 12px;
+  margin: 16px 0 0;
+  padding: 13px 15px;
+}
+
+.eventbrite-health-note { background: #f4f9f7; }
+.eventbrite-client-note { background: #fff9e9; }
+
+.integration-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.integration-role-list {
+  display: grid;
+  gap: 14px;
+}
+
+.integration-role-list article {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.integration-role-list p { margin: 6px 0 0; }
+
 @media (max-width: 1100px) {
   .crm-connection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .integration-provider-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .eventbrite-setup-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
   .crm-connection-grid,
-  .integration-provider-grid { grid-template-columns: 1fr; }
+  .integration-provider-grid,
+  .eventbrite-setup-grid { grid-template-columns: 1fr; }
 }
