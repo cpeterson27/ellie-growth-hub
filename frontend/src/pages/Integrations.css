@@ -17,8 +17,12 @@
 }
 
 .crm-connection-card--active {
-  background: linear-gradient(145deg, #0d372f, #19584c);
-  color: white;
+  background:
+    linear-gradient(90deg, rgba(60, 200, 156, .14), transparent 40%),
+    var(--surface);
+  border-color: rgba(31, 92, 80, .28);
+  box-shadow: 0 16px 38px rgba(31, 92, 80, .08);
+  color: var(--text);
 }
 
 .crm-connection-card h2 { margin: 10px 0 0; }
@@ -50,7 +54,7 @@
 }
 
 .integration-capabilities { color: var(--text-muted); }
-.integration-section-title { margin: 0 0 16px; }
+.integration-section-title { margin: 26px 0 16px; }
 .integration-provider-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .eventbrite-setup-grid {
@@ -153,6 +157,18 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 18px;
+}
+
+.eventbrite-action-with-note {
+  display: grid;
+  gap: 6px;
+  max-width: 320px;
+}
+
+.eventbrite-action-with-note small {
+  color: var(--text-muted);
+  font-size: .78rem;
+  line-height: 1.35;
 }
 
 .integration-role-list {

@@ -1,5 +1,6 @@
 const express = require("express");
 const crypto = require("crypto");
+const axios = require("axios");
 const Event = require("../models/Event");
 const IntegrationConnection = require("../models/IntegrationConnection");
 
@@ -11,8 +12,46 @@ const { retrieveCompleteListing } = require("../services/eventbriteListingServic
 
 const router = express.Router();
 
+const EVENTBRITE_WEBHOOK_ACTIONS = [
+  "attendee.updated",
+  "barcode.checked_in",
+  "barcode.un_checked_in",
+  "event.created",
+  "event.published",
+  "event.unpublished",
+  "event.updated",
+  "order.placed",
+  "order.refunded",
+  "order.updated",
+  "organizer.updated",
+  "ticket_class.created",
+  "ticket_class.deleted",
+  "ticket_class.updated",
+  "venue.updated",
+];
+
 function webhookToken() {
   return String(process.env.EVENTBRITE_WEBHOOK_TOKEN || "").trim();
+}
+
+function backendBaseUrl(req) {
+  const configured = String(process.env.PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "").trim().replace(/\/$/, "");
+  if (configured) return configured;
+  const host = req.get("x-forwarded-host") || req.get("host");
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "https";
+  return `${protocol}://${host}`.replace(/\/$/, "");
+}
+
+function webhookReceiverUrl(req) {
+  const url = new URL(`${backendBaseUrl(req)}/api/eventbrite/webhook`);
+  url.searchParams.set("token", webhookToken());
+  return url.toString();
+}
+
+function maskedWebhookReceiverUrl(req) {
+  const url = new URL(`${backendBaseUrl(req)}/api/eventbrite/webhook`);
+  url.searchParams.set("token", "••••");
+  return url.toString();
 }
 
 function isEventbriteTestRequest(req) {
@@ -51,6 +90,72 @@ async function recordWebhookStatus(req, status, details = {}) {
   }
 }
 
+function eventbriteHeaders(accessToken) {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  };
+}
+
+async function findExistingWebhook(accessToken, organizationId, receiverUrl) {
+  const response = await axios.get(
+    `https://www.eventbriteapi.com/v3/organizations/${organizationId}/webhooks/`,
+    { headers: eventbriteHeaders(accessToken) },
+  );
+  const receiverPath = new URL(receiverUrl).pathname;
+  return (response.data?.webhooks || []).find((webhook) => {
+    const endpointUrl = String(webhook.endpoint_url || webhook.endpointUrl || "");
+    try {
+      const parsed = new URL(endpointUrl);
+      return parsed.pathname === receiverPath;
+    } catch {
+      return endpointUrl.includes(receiverPath);
+    }
+  });
+}
+
+async function createEventbriteWebhook(accessToken, organizationId, receiverUrl) {
+  const endpoint = `https://www.eventbriteapi.com/v3/organizations/${organizationId}/webhooks/`;
+  const payload = {
+    endpoint_url: receiverUrl,
+    actions: EVENTBRITE_WEBHOOK_ACTIONS.join(","),
+  };
+  try {
+    const response = await axios.post(endpoint, payload, {
+      headers: eventbriteHeaders(accessToken),
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status !== 400) throw error;
+    const response = await axios.post(endpoint, { webhook: payload }, {
+      headers: eventbriteHeaders(accessToken),
+    });
+    return response.data;
+  }
+}
+
+async function recordWebhookConfiguration(req, details) {
+  const now = new Date();
+  await IntegrationConnection.findOneAndUpdate(
+    { provider: "eventbrite" },
+    {
+      $set: {
+        lastVerifiedAt: now,
+        "metadata.webhook.configured": Boolean(webhookToken()),
+        "metadata.webhook.autoConfiguredAt": now,
+        "metadata.webhook.providerWebhookId": details.providerWebhookId || "",
+        "metadata.webhook.providerOrganizationId": details.organizationId || "",
+        "metadata.webhook.lastMessage": details.message || "",
+      },
+      $setOnInsert: {
+        provider: "eventbrite",
+        status: "configured",
+      },
+    },
+    { upsert: true, new: true },
+  );
+}
+
 router.post("/webhook", async (req, res) => {
   const expected = webhookToken();
   const provided = String(req.query.token || req.get("x-ellie-webhook-token") || "");
@@ -59,6 +164,13 @@ router.post("/webhook", async (req, res) => {
   if (!expected || providedBuffer.length !== expectedBuffer.length ||
       !crypto.timingSafeEqual(providedBuffer, expectedBuffer)) {
     return res.status(401).json({ error: "Invalid webhook token" });
+  }
+
+  if (isEventbriteTestRequest(req)) {
+    await recordWebhookStatus(req, "verified", {
+      message: "Test received. Eventbrite can reach Ellie automatically.",
+    });
+    return res.status(202).json({ accepted: true, test: true });
   }
 
   const apiUrl = String(req.body?.api_url || "");
@@ -70,13 +182,6 @@ router.post("/webhook", async (req, res) => {
   }
   if (parsed.hostname !== "www.eventbriteapi.com") {
     return res.status(400).json({ error: "Unexpected webhook source resource" });
-  }
-
-  if (isEventbriteTestRequest(req)) {
-    await recordWebhookStatus(req, "verified", {
-      message: "Test received. Eventbrite can reach Ellie automatically.",
-    });
-    return res.status(202).json({ accepted: true, test: true });
   }
 
   await recordWebhookStatus(req, "accepted", { message: "Webhook accepted by Ellie." });
@@ -129,6 +234,72 @@ router.get("/webhook/status", async (req, res) => {
   } catch (error) {
     console.error("EVENTBRITE WEBHOOK STATUS ERROR:", error.message);
     res.status(500).json({ error: "Unable to read Eventbrite webhook status" });
+  }
+});
+
+router.post("/webhook/configure", async (req, res) => {
+  try {
+    if (!webhookToken()) {
+      return res.status(409).json({
+        configured: false,
+        manualSetupRequired: true,
+        error: "Ellie’s backend webhook token is not configured yet.",
+        receiverUrl: maskedWebhookReceiverUrl(req),
+      });
+    }
+
+    const token = await eventbriteOAuthService.accessToken();
+    if (!token) {
+      return res.status(409).json({
+        configured: false,
+        manualSetupRequired: true,
+        error: "Connect Eventbrite before configuring automatic updates.",
+        receiverUrl: maskedWebhookReceiverUrl(req),
+      });
+    }
+
+    const status = await eventbriteOAuthService.status();
+    const organizationId = status.defaultOrganizationId || status.organizations?.[0]?.id || "";
+    if (!organizationId) {
+      return res.status(409).json({
+        configured: false,
+        manualSetupRequired: true,
+        error: "Ellie could not find an Eventbrite organization for this account.",
+        receiverUrl: maskedWebhookReceiverUrl(req),
+      });
+    }
+
+    const receiverUrl = webhookReceiverUrl(req);
+    const existing = await findExistingWebhook(token, organizationId, receiverUrl).catch((error) => {
+      if (error.response?.status === 404) return null;
+      throw error;
+    });
+    const webhook = existing || await createEventbriteWebhook(token, organizationId, receiverUrl);
+    const providerWebhookId = String(webhook.id || webhook.webhook?.id || existing?.id || "");
+    const message = existing
+      ? "Webhook already exists. Ellie can receive automatic Eventbrite updates."
+      : "Webhook created. Ellie can receive automatic Eventbrite updates.";
+
+    await recordWebhookConfiguration(req, { providerWebhookId, organizationId, message });
+    res.json({
+      configured: true,
+      manualSetupRequired: false,
+      providerWebhookId,
+      organizationId,
+      receiverUrl: maskedWebhookReceiverUrl(req),
+      message,
+    });
+  } catch (error) {
+    console.error("EVENTBRITE WEBHOOK CONFIGURE ERROR:", error.response?.data || error.message);
+    res.status(502).json({
+      configured: false,
+      manualSetupRequired: true,
+      error: error.response?.data?.error_description ||
+        error.response?.data?.error ||
+        "Eventbrite did not allow Ellie to create the webhook automatically.",
+      receiverUrl: maskedWebhookReceiverUrl(req),
+      message: "Use the manual screen-share setup if Eventbrite requires the webhook to be created from the client’s Developer Links page.",
+    });
   }
 });
 

@@ -19,9 +19,9 @@ const statusLabels = {
 };
 
 const externalCrms = [
-  { name: "HubSpot", detail: "OAuth contact, company, and deal synchronization" },
-  { name: "Salesforce", detail: "OAuth leads, contacts, accounts, and opportunities" },
-  { name: "monday CRM", detail: "Board and contact synchronization" },
+  { name: "HubSpot", detail: "Contact, company, and deal synchronization for teams already using HubSpot." },
+  { name: "Salesforce", detail: "Lead, contact, account, and opportunity synchronization for enterprise sales teams." },
+  { name: "monday CRM", detail: "Board and contact synchronization for teams managing pipelines in monday." },
 ];
 
 function providerSummary(provider, eventbriteReady) {
@@ -88,15 +88,16 @@ export default function Integrations() {
         <div>
           <p className="page-eyebrow">Data & connections</p>
           <h1 className="page-title">Integrations</h1>
-          <p className="page-subtitle">Connect the tools Ellie uses for events, contacts, discovery, and outreach.</p>
+          <p className="page-subtitle">Set up the accounts Ellie uses for events, contacts, discovery, marketing, and outreach.</p>
         </div>
         <Button variant="outline" onClick={loadProviders}>Refresh status</Button>
       </div>
 
+      <h2 className="integration-section-title">CRM and contact sources</h2>
       <section className="crm-connection-grid">
         <article className="crm-connection-card crm-connection-card--active">
           <div><span className="integration-status integration-status--connected">Active</span><h2>Ellie CRM</h2></div>
-          <p>Built-in contacts, audience profiles, campaigns, outreach history, and CSV imports. No external account is required.</p>
+          <p>Your built-in CRM for contacts, audience profiles, campaign assignments, outreach history, and CSV imports. No external CRM account is required.</p>
           <div className="crm-connection-actions">
             <Button onClick={() => navigate("/contacts")}>Open CRM</Button>
             <Button variant="outline" onClick={() => navigate("/settings")}>Customize CRM</Button>
@@ -105,13 +106,13 @@ export default function Integrations() {
         {externalCrms.map((crm) => (
           <article className="crm-connection-card" key={crm.name}>
             <div><span className="integration-status">Planned</span><h2>{crm.name}</h2></div>
-            <p>{crm.detail} will appear here when its connector is available.</p>
+            <p>{crm.detail}</p>
             <button className="integration-disabled-action" disabled>Coming soon</button>
           </article>
         ))}
       </section>
 
-      <h2 className="integration-section-title">Business integrations</h2>
+      <h2 className="integration-section-title">Connected apps</h2>
       {error ? <p className="form-error">{error}</p> : null}
       {loading ? <p>Loading integrations…</p> : (
         <section className="integration-provider-grid">

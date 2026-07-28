@@ -5,6 +5,7 @@ import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import {
   beginEventbriteConnection,
+  configureEventbriteWebhook,
   fetchEventbriteConnection,
   fetchEventbriteWebhookStatus,
   fetchEvents,
@@ -18,6 +19,8 @@ export default function EventbriteIntegration() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [configuringWebhook, setConfiguringWebhook] = useState(false);
+  const [setupNotice, setSetupNotice] = useState("");
   const [error, setError] = useState("");
 
   const loadStatus = async () => {
@@ -65,6 +68,23 @@ export default function EventbriteIntegration() {
     }
   };
 
+  const autoConfigureWebhook = async () => {
+    try {
+      setConfiguringWebhook(true);
+      setError("");
+      setSetupNotice("");
+      const result = await configureEventbriteWebhook();
+      setSetupNotice(result.message || "Automatic updates are configured.");
+      await loadStatus();
+    } catch (err) {
+      const message = err.response?.data?.message || err.response?.data?.error ||
+        "Ellie could not configure the webhook automatically.";
+      setSetupNotice(message);
+    } finally {
+      setConfiguringWebhook(false);
+    }
+  };
+
   const webhookUrl = "https://ellie-ai-backend.onrender.com/api/eventbrite/webhook?token=YOUR_BACKEND_WEBHOOK_TOKEN";
 
   return (
@@ -108,8 +128,30 @@ export default function EventbriteIntegration() {
             </div>
           </div>
           {webhookMessage ? <p className="eventbrite-health-note">{webhookMessage}</p> : null}
+          {setupNotice ? <p className="eventbrite-client-note">{setupNotice}</p> : null}
           <div className="integration-card-actions">
-            {connection?.configured ? <Button loading={connecting} onClick={connectEventbrite}>{connection?.connected ? "Reconnect Eventbrite" : "Connect Eventbrite"}</Button> : null}
+            {connection?.configured ? (
+              <div className="eventbrite-action-with-note">
+                <Button loading={connecting} onClick={connectEventbrite}>
+                  {connection?.connected ? "Refresh authorization" : "Connect Eventbrite"}
+                </Button>
+                {connection?.connected ? (
+                  <small>Use this only if Eventbrite access stops working or you need to switch accounts.</small>
+                ) : null}
+              </div>
+            ) : null}
+            {connection?.connected ? (
+              <div className="eventbrite-action-with-note">
+                <Button
+                  variant={webhookVerified ? "outline" : "primary"}
+                  loading={configuringWebhook}
+                  onClick={autoConfigureWebhook}
+                >
+                  {webhookVerified ? "Check automatic updates" : "Set up automatic updates"}
+                </Button>
+                <small>Ellie will try to create or verify the Eventbrite webhook for this account.</small>
+              </div>
+            ) : null}
             <Button variant="outline" onClick={() => navigate("/events")}>Open Events</Button>
           </div>
         </DashboardCard>
@@ -128,15 +170,15 @@ export default function EventbriteIntegration() {
           <div className="integration-role-list">
             <article><strong>1. Click Connect Eventbrite</strong><p>The client signs into Eventbrite themselves. They do not send you their password.</p></article>
             <article><strong>2. Approve Ellie</strong><p>Eventbrite grants Ellie an access token for the approved account.</p></article>
-            <article><strong>3. Choose events</strong><p>The client imports or creates events from the Events page.</p></article>
+            <article><strong>3. Choose events</strong><p>The client imports or creates events from the Events page. Ellie then keeps reporting current after automatic updates are verified.</p></article>
           </div>
         </DashboardCard>
 
         <DashboardCard title="Developer/admin actions">
           <div className="integration-role-list">
             <article><strong>Configure Ellie app credentials once</strong><p>Set Eventbrite client ID, client secret, redirect URI, and encryption key in the backend environment.</p></article>
-            <article><strong>Configure webhook receiver once</strong><p>Set Ellie’s backend webhook token and use the receiver URL below for Eventbrite webhook setup.</p></article>
-            <article><strong>Manual fallback</strong><p>If Eventbrite requires webhook creation inside the client’s Developer Links, guide the client by screen-share while they are logged in.</p></article>
+            <article><strong>Set webhook receiver token once</strong><p>This lives in Ellie’s backend environment. Clients should never paste or manage this value.</p></article>
+            <article><strong>Use automatic setup first</strong><p>Click Set up automatic updates. If Eventbrite blocks API webhook creation, guide the client by screen-share while they are logged in.</p></article>
           </div>
         </DashboardCard>
       </section>

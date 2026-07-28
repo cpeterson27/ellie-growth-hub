@@ -123,6 +123,9 @@ export const syncEventbriteEvent = (eventId) =>
 export const fetchEventbriteWebhookStatus = () =>
   api.get("/eventbrite/webhook/status").then((res) => res.data);
 
+export const configureEventbriteWebhook = () =>
+  api.post("/eventbrite/webhook/configure").then((res) => res.data);
+
 export const createManagedEventbriteEvent = (data) =>
   api.post("/eventbrite/managed-events", data).then((res) => res.data);
 
