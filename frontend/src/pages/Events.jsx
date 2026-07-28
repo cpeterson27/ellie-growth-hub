@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
@@ -207,6 +207,7 @@ export default function Events() {
       ? "Eventbrite is connected and ready to manage events."
       : "",
   );
+  const deepLinkHandled = useRef(false);
 
   const campaignsByEvent = useMemo(
     () =>
@@ -416,6 +417,20 @@ export default function Events() {
       setWorkingId("");
     }
   };
+
+  useEffect(() => {
+    if (deepLinkHandled.current || !events.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const eventId = params.get("eventId");
+    if (!eventId) return;
+    const event = events.find((item) => String(item._id) === String(eventId));
+    if (!event) return;
+    deepLinkHandled.current = true;
+    openManage(event).then(() => {
+      setManageTab(params.get("tab") === "strategy" ? "strategy" : "listing");
+      window.history.replaceState({}, "", window.location.pathname);
+    });
+  }, [events]);
 
   const saveEvent = async (confirmed = false) => {
     if (!draft.name) {

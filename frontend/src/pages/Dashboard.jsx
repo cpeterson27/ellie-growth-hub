@@ -110,7 +110,7 @@ export default function Dashboard() {
           <span className={selected.audienceConfirmedAt ? "is-ready" : "needs-attention"}>{selected.audienceConfirmedAt ? "Campaign ready" : "Needs attention"}</span>
           <h3>{selected.audienceConfirmedAt ? "Continue campaign outreach" : "Approve the target audience"}</h3>
           <p>{selected.audienceConfirmedAt ? "The audience strategy is approved. Review campaign assignments and outreach activity next." : "Review Ellie’s suggested audience before using it to filter contacts or create outreach."}</p>
-          <Button size="sm" onClick={() => navigate(selected.audienceConfirmedAt ? "/outreach" : "/events")}>{selected.audienceConfirmedAt ? "Open outreach" : "Review event strategy"}</Button>
+          <Button size="sm" onClick={() => navigate(selected.audienceConfirmedAt ? "/outreach" : `/events?eventId=${selected._id}&tab=strategy`)}>{selected.audienceConfirmedAt ? "Open outreach" : "Review target audience"}</Button>
         </div>
       </DashboardCard>
     </section>

@@ -18,6 +18,7 @@ export default function CampaignWorkspace() {
   const [error, setError] = useState("");
   const [audienceMatch, setAudienceMatch] = useState(null);
   const [matchingAudience, setMatchingAudience] = useState(false);
+  const [matchPage, setMatchPage] = useState(1);
 
   useEffect(() => {
     if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
@@ -57,6 +58,11 @@ export default function CampaignWorkspace() {
     ["Eventbrite", campaign.registrationLinks?.eventbrite],
     ["Meetup", campaign.registrationLinks?.meetup],
   ].filter(([, link]) => link?.enabled && link?.url);
+  const eventId = String(campaign.eventId?._id || campaign.eventId || "");
+  const matchedContacts = audienceMatch?.contacts || [];
+  const matchPageSize = 5;
+  const matchPageCount = Math.max(1, Math.ceil(matchedContacts.length / matchPageSize));
+  const visibleMatches = matchedContacts.slice((matchPage - 1) * matchPageSize, matchPage * matchPageSize);
 
   return (
     <div className="page-dashboard campaign-workspace">
@@ -96,17 +102,28 @@ export default function CampaignWorkspace() {
           </div> : <p className="campaign-workspace__empty">No registration channels connected yet.</p>}
         </DashboardCard>}
 
-        <DashboardCard title="Matched audience">
+        <DashboardCard title="Audience matching">
           {audienceMatch ? <>
+            <div className="audience-flow">
+              <div><span>1</span><p><strong>Define the event audience</strong>Ellie suggests groups from the event description. You review and approve them.</p></div>
+              <div><span>2</span><p><strong>Compare CRM contacts</strong>Approved groups are compared with contact titles, industries, tags, keywords, companies, lists, and notes.</p></div>
+              <div><span>3</span><p><strong>Protect outreach</strong>Only verified, qualified contacts become safe matches. Nothing is sent automatically.</p></div>
+            </div>
+            {eventId ? <div className="audience-strategy-action"><p><strong>Target audience</strong><span>{campaign.audience?.join(", ") || "Not approved yet"}</span></p><Button variant="outline" size="sm" onClick={() => navigate(`/events?eventId=${eventId}&tab=strategy`)}>Review target audience</Button></div> : null}
             <div className="campaign-audience-counts">
               <div><strong>{audienceMatch.matched || 0}</strong><span>safe matches</span></div>
               <div><strong>{audienceMatch.alreadyAssigned || 0}</strong><span>already assigned</span></div>
               <div><strong>{audienceMatch.needsResearch || 0}</strong><span>need research</span></div>
               <div><strong>{audienceMatch.readyForReview || 0}</strong><span>ready for review</span></div>
             </div>
-            <p className="campaign-workspace__empty">Only contacts with verified email, completed targeting fields, and human qualification can match. Audience labels are compared with titles, industries, tags, keywords, lists, companies, and notes.</p>
-            {audienceMatch.contacts?.length ? <div className="campaign-match-list">{audienceMatch.contacts.slice(0, 8).map((contact) => <div key={contact._id}><strong>{contact.name}</strong><span>{contact.company || contact.email}</span><small>{contact.reasons.flatMap((reason) => reason.terms).join(", ")}</small></div>)}</div> : <p>No safe matches yet. Research and qualify contacts first.</p>}
-            <Button loading={matchingAudience} onClick={refreshAudience}>Refresh and assign safe matches</Button>
+            {matchedContacts.length ? <>
+              <div className="campaign-match-table">
+                <div className="campaign-match-table__head"><span>Contact</span><span>Why they match</span></div>
+                {visibleMatches.map((contact) => <div className="campaign-match-table__row" key={contact._id}><p><strong>{contact.name}</strong><span>{contact.company || contact.email}</span></p><small>{contact.reasons.flatMap((reason) => reason.terms).join(", ") || "Qualified audience profile"}</small></div>)}
+              </div>
+              <div className="campaign-match-pagination"><span>Showing {(matchPage - 1) * matchPageSize + 1}–{Math.min(matchPage * matchPageSize, matchedContacts.length)} of {matchedContacts.length}</span><div><button disabled={matchPage === 1} onClick={() => setMatchPage((page) => page - 1)}>Previous</button><button disabled={matchPage === matchPageCount} onClick={() => setMatchPage((page) => page + 1)}>Next</button></div></div>
+            </> : <p className="campaign-workspace__empty">No safe matches yet. Add audience information to contacts, then qualify them for outreach.</p>}
+            <div className="campaign-audience-actions"><Button variant="outline" onClick={() => navigate("/contacts")}>Review contacts</Button><Button loading={matchingAudience} onClick={refreshAudience}>Refresh and assign safe matches</Button></div>
           </> : <p>Checking qualified contacts…</p>}
         </DashboardCard>
       </section>
