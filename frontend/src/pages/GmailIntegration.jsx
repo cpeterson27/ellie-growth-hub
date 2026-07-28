@@ -32,11 +32,13 @@ export default function GmailIntegration() {
   const [outreachHistory, setOutreachHistory] = useState([]);
   const [campaignSends, setCampaignSends] = useState([]);
   const [selectedThread, setSelectedThread] = useState(null);
+  const [selectedOutreach, setSelectedOutreach] = useState(null);
   const [mailbox, setMailbox] = useState(params.get("view") || "inbox");
   const [search, setSearch] = useState(params.get("contact") || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reply, setReply] = useState("");
+  const [followUp, setFollowUp] = useState("");
   const [sending, setSending] = useState(false);
 
   const query = search.trim() ? search.trim() : mailboxQueries[mailbox] || mailboxQueries.inbox;
@@ -102,6 +104,22 @@ export default function GmailIntegration() {
     finally { setSending(false); }
   };
 
+  const sendFollowUp = async () => {
+    const recipient = emailAddress(search) || selectedOutreach?.contactEmail;
+    try {
+      setSending(true);
+      await sendGmailMessage({
+        to: recipient,
+        subject: /^re:/i.test(selectedOutreach?.subject || "") ? selectedOutreach.subject : `Re: ${selectedOutreach?.subject || "Following up"}`,
+        body: followUp,
+      });
+      setFollowUp("");
+      setSelectedOutreach(null);
+      await load();
+    } catch (err) { setError(err.response?.data?.error || "Unable to send this follow-up."); }
+    finally { setSending(false); }
+  };
+
   if (!status?.connected && !loading) return <div className="page-dashboard inbox-page">
     <div className="page-header"><div><p className="page-eyebrow">Client communication</p><h1 className="page-title">Conversations</h1><p className="page-subtitle">Connect Gmail once, then manage campaign replies and personal follow-up here.</p></div></div>
     <section className="gmail-status-card"><div><h2>Connect a Google account</h2><p>The client signs into Google and grants access themselves. Passwords are never shared with Ellie.</p></div><Button disabled={!status?.configured} onClick={async () => window.location.assign((await beginGmailConnection()).authorizationUrl)}>Connect Gmail</Button></section>
@@ -109,14 +127,14 @@ export default function GmailIntegration() {
 
   return <div className="page-dashboard inbox-page">
     <div className="page-header">
-      <div><p className="page-eyebrow">Client communication</p><h1 className="page-title">Conversations</h1><p className="page-subtitle">Campaign sends, incoming replies, and personal follow-up for {status?.email || "the connected Gmail account"}.</p></div>
+      <div><p className="page-eyebrow">Client correspondence</p><h1 className="page-title">Conversations</h1><p className="page-subtitle">A complete record of campaign delivery, incoming replies, and personal follow-up.</p></div>
       <div className="crm-header-actions"><Button variant="outline" onClick={load}><FiRefreshCw /> Refresh</Button><Button variant="outline" onClick={() => navigate("/integrations")}>Connection settings</Button></div>
     </div>
     {error ? <p className="form-error">{error}</p> : null}
-    <section className="conversation-workflow">
-      <div><span>1</span><p><strong>Campaign sent</strong>Resend delivers approved Outreach emails and records them in Ellie.</p></div>
-      <div><span>2</span><p><strong>Reply received</strong>Replies arrive in Gmail and Ellie connects them to the contact and campaign.</p></div>
-      <div><span>3</span><p><strong>Follow up here</strong>Review the full history and send a personal Gmail reply from Ellie.</p></div>
+    <section className="delivery-legend">
+      <p><span>Campaign delivery</span><strong>Resend</strong></p>
+      <i />
+      <p><span>Replies and personal follow-up</span><strong>{status?.email || "Connected Gmail"}</strong></p>
     </section>
     {needsModifyPermission ? <section className="inbox-permission-notice"><div><strong>Approve conversation management</strong><p>Reconnect once to let Ellie archive, mark, and move Gmail conversations to Trash. Google will show the updated permission request.</p></div><Button onClick={reconnect}>Approve Gmail access</Button></section> : null}
     <section className="inbox-shell">
@@ -131,16 +149,24 @@ export default function GmailIntegration() {
       </aside>
       <div className="inbox-main">
         <form className="inbox-search" onSubmit={(event) => { event.preventDefault(); load(); }}><FiSearch /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sender, recipient, subject, or Gmail query" /><Button size="sm" type="submit">Search</Button></form>
-        {selectedThread ? <div className="conversation-view">
+        {selectedOutreach ? <div className="correspondence-detail">
+          <header><Button variant="ghost" size="sm" onClick={() => setSelectedOutreach(null)}><FiArrowLeft /> Back to correspondence</Button><span className={`outreach-status outreach-status--${selectedOutreach.status}`}>{selectedOutreach.status}</span></header>
+          <p className="correspondence-detail__eyebrow">{selectedOutreach.campaignName}</p>
+          <h2>{selectedOutreach.subject}</h2>
+          <dl><div><dt>Recipient</dt><dd>{emailAddress(search) || selectedOutreach.contactEmail}</dd></div><div><dt>Delivered</dt><dd>{selectedOutreach.sentAt ? new Date(selectedOutreach.sentAt).toLocaleString() : "Not delivered"}</dd></div><div><dt>Channel</dt><dd>Campaign email via Resend</dd></div></dl>
+          <article className="correspondence-letter"><div className="correspondence-letter__mark">E</div><pre>{selectedOutreach.body || "The original message body is unavailable."}</pre></article>
+          {selectedOutreach.replyText ? <section className="correspondence-received"><p>Latest response</p><blockquote>{selectedOutreach.replyText}</blockquote></section> : <section className="awaiting-reply"><strong>Awaiting a response</strong><p>No Gmail reply has been received from this contact yet. The original campaign message remains part of this correspondence record.</p></section>}
+          <section className="conversation-reply"><p className="correspondence-detail__eyebrow">Personal follow-up</p><textarea rows="7" value={followUp} onChange={(event) => setFollowUp(event.target.value)} placeholder="Write a thoughtful follow-up from the connected Gmail account…" /><Button loading={sending} disabled={!followUp.trim()} onClick={sendFollowUp}><FiSend /> Approve and send follow-up</Button></section>
+        </div> : selectedThread ? <div className="conversation-view">
           <header><Button variant="ghost" size="sm" onClick={() => setSelectedThread(null)}><FiArrowLeft /> Back</Button><div><Button variant="outline" size="sm" onClick={() => actOnThread("archive")}><FiArchive /> Archive</Button><Button variant="outline" size="sm" onClick={() => actOnThread("trash")}><FiTrash2 /> Move to trash</Button></div></header>
           <h2>{selectedThread.messages?.[0]?.subject || "Conversation"}</h2>
           <div className="conversation-messages">{selectedThread.messages?.map((message) => <article key={message.id} className={message.labels?.includes("SENT") ? "is-sent" : ""}><div><strong>{message.labels?.includes("SENT") ? "You" : message.from}</strong><time>{message.date ? new Date(message.date).toLocaleString() : ""}</time></div><small>To: {message.to}</small><pre>{message.body || message.snippet}</pre></article>)}</div>
           <section className="conversation-reply"><h3>Reply</h3><textarea rows="7" value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Write a reply…" /><Button loading={sending} disabled={!reply.trim()} onClick={sendReply}><FiSend /> Approve and send reply</Button></section>
         </div> : <>
-          <div className="inbox-list-heading"><div><h2>{search ? "Search results" : mailbox === "campaign" ? "Campaign sends" : mailbox[0].toUpperCase() + mailbox.slice(1)}</h2><p>{mailbox === "campaign" ? `${campaignSends.length} delivered message${campaignSends.length === 1 ? "" : "s"}` : `${threads.length} conversation${threads.length === 1 ? "" : "s"}`}</p></div></div>
+          <div className="inbox-list-heading"><div><h2>{search ? `Correspondence with ${search}` : mailbox === "campaign" ? "Campaign sends" : mailbox[0].toUpperCase() + mailbox.slice(1)}</h2><p>{mailbox === "campaign" ? `${campaignSends.length} delivered message${campaignSends.length === 1 ? "" : "s"}` : search ? `${outreachHistory.length} campaign message${outreachHistory.length === 1 ? "" : "s"} · ${threads.length} Gmail repl${threads.length === 1 ? "y" : "ies"}` : `${threads.length} email thread${threads.length === 1 ? "" : "s"}`}</p></div></div>
           {mailbox === "campaign" ? <div className="campaign-send-list">{campaignSends.map((item) => <button key={item.id} onClick={() => { setSearch(item.contactEmail); setMailbox("inbox"); }}><div><strong>{item.contactName || item.contactEmail}</strong><span className={`outreach-status outreach-status--${item.status}`}>{item.status}</span></div><h3>{item.subject}</h3><p>{item.campaignName}</p><small>{item.sentAt ? new Date(item.sentAt).toLocaleString() : ""}</small></button>)}</div> : null}
-          {outreachHistory.length ? <section className="outreach-conversation-history"><h3>Campaign messages sent by Ellie</h3>{outreachHistory.map((item) => <article key={item.id}><div><strong>{item.campaignName}</strong><span className={`outreach-status outreach-status--${item.status}`}>{item.status}</span></div><h4>{item.subject}</h4><p>{item.body}</p><small>{item.sentAt ? `Sent ${new Date(item.sentAt).toLocaleString()}` : "Not sent yet"}</small>{item.replyText ? <blockquote><strong>Latest reply</strong>{item.replyText}</blockquote> : null}</article>)}</section> : null}
-          {mailbox !== "campaign" ? loading ? <p className="table-state">Loading conversations…</p> : threads.length ? <div className="gmail-thread-list">{threads.map((thread) => <button type="button" key={thread.id} className={thread.labels?.includes("UNREAD") ? "gmail-thread is-unread" : "gmail-thread"} onClick={() => openThread(thread)}><div className="gmail-thread__meta"><strong>{mailbox === "sent" ? thread.to : thread.from || "Unknown sender"}</strong><time>{thread.date ? new Date(thread.date).toLocaleDateString() : ""}</time></div><h3>{thread.subject}</h3><p>{thread.snippet}</p><small>{thread.messageCount} message{thread.messageCount === 1 ? "" : "s"}</small></button>)}</div> : <p className="table-state table-state--empty">No conversations match this view.</p> : null}
+          {outreachHistory.length ? <section className="outreach-conversation-history"><header><h3>Campaign correspondence</h3><span>Delivered through Resend</span></header>{outreachHistory.map((item) => <button type="button" key={item.id} onClick={() => setSelectedOutreach({ ...item, contactEmail: emailAddress(search) })}><div><strong>{item.campaignName}</strong><span className={`outreach-status outreach-status--${item.status}`}>{item.status}</span></div><h4>{item.subject}</h4><p>{item.body}</p><footer><small>{item.sentAt ? new Date(item.sentAt).toLocaleString() : "Not sent yet"}</small><span>Read full message →</span></footer>{item.replyText ? <blockquote><strong>Latest response</strong>{item.replyText}</blockquote> : null}</button>)}</section> : null}
+          {mailbox !== "campaign" ? loading ? <p className="table-state">Loading correspondence…</p> : threads.length ? <div className="gmail-thread-list">{threads.map((thread) => <button type="button" key={thread.id} className={thread.labels?.includes("UNREAD") ? "gmail-thread is-unread" : "gmail-thread"} onClick={() => openThread(thread)}><div className="gmail-thread__meta"><strong>{mailbox === "sent" ? thread.to : thread.from || "Unknown sender"}</strong><time>{thread.date ? new Date(thread.date).toLocaleDateString() : ""}</time></div><h3>{thread.subject}</h3><p>{thread.snippet}</p><small>{thread.messageCount} message{thread.messageCount === 1 ? "" : "s"}</small></button>)}</div> : search && outreachHistory.length ? <section className="correspondence-empty"><span>Awaiting reply</span><h3>No Gmail response yet</h3><p>The campaign message above was delivered successfully. When this contact replies, their response will appear here and Outreach will change to Replied.</p></section> : <section className="correspondence-empty"><span>{mailbox === "sent" ? "No personal follow-up" : "Inbox clear"}</span><h3>{mailbox === "sent" ? "No Gmail messages have been sent from this view" : "There is nothing requiring attention here"}</h3><p>{mailbox === "sent" ? "Campaign delivery lives under Campaign sends. Personal replies sent from Ellie appear here." : "New client replies will appear here automatically when you refresh Conversations."}</p></section> : null}
         </>}
       </div>
     </section>
