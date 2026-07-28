@@ -1,0 +1,42 @@
+.campaign-summary {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 22px;
+}
+.campaign-summary > div {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: flex;
+  gap: 13px;
+  padding: 17px 19px;
+}
+.campaign-summary svg { color: #236557; font-size: 1.3rem; }
+.campaign-summary span { color: var(--text-muted); display: grid; font-size: .8rem; gap: 2px; }
+.campaign-summary strong { color: var(--text); font-size: 1.3rem; }
+.campaign-card-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.campaign-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 12px 36px rgba(20,42,36,.055); display: grid; gap: 17px; padding: 23px; }
+.campaign-card header,
+.campaign-card footer { align-items: center; display: flex; justify-content: space-between; }
+.campaign-card header > span:last-child,
+.campaign-card footer > span { color: var(--text-muted); font-size: .8rem; }
+.campaign-card h2 { font-size: 1.35rem; margin: 0; }
+.campaign-card__audience { color: var(--text-muted); line-height: 1.5; margin: -8px 0 0; min-height: 46px; }
+.campaign-state { background: #eeeae1; border-radius: 999px; color: #675f52; font-size: .7rem; font-weight: 850; padding: 6px 9px; text-transform: uppercase; }
+.campaign-state--active { background: #d9f4e9; color: #12634f; }
+.campaign-card__meta { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); }
+.campaign-card__meta span { background: #f6f3ed; border-radius: 12px; display: grid; gap: 4px; padding: 12px; }
+.campaign-card__meta small { color: var(--text-muted); font-size: .72rem; text-transform: uppercase; }
+.campaign-progress { background: #e7e4dc; border-radius: 999px; height: 7px; overflow: hidden; }
+.campaign-progress span { background: linear-gradient(90deg,#1f6658,#61c5a9); display: block; height: 100%; }
+.campaign-card footer > div { display: flex; gap: 8px; }
+@media (max-width: 900px) {
+  .campaign-card-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 650px) {
+  .campaign-summary { grid-template-columns: 1fr; }
+  .campaign-card__meta { grid-template-columns: 1fr; }
+  .campaign-card footer { align-items: stretch; flex-direction: column; gap: 12px; }
+}

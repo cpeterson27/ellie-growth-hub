@@ -35,7 +35,7 @@ export default function Dashboard() {
   const totals = useMemo(() => events.reduce((sum, event) => ({
     tickets: sum.tickets + Number(event.ticketsSold || 0),
     revenue: sum.revenue + eventRevenue(event),
-    attendees: sum.attendees + Number(event.eventbriteLogistics?.attendees || 0),
+    attendees: sum.attendees + Number(event.eventbriteLogistics?.attendeeCount || 0),
     checkedIn: sum.checkedIn + Number(event.eventbriteLogistics?.checkedIn || 0),
   }), { tickets: 0, revenue: 0, attendees: 0, checkedIn: 0 }), [events]);
 

@@ -1,6 +1,6 @@
 .dashboard-shell {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 236px 1fr;
   min-height: 100vh;
   background: #f4f3ef;
   position: relative;
@@ -16,7 +16,7 @@
 
 .dashboard-content {
   flex: 1;
-  padding: 2rem 2.5rem 3rem;
+  padding: 1.6rem 2rem 3rem;
   width: 100%;
 }
 

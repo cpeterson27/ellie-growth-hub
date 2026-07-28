@@ -513,6 +513,11 @@ export default function Contacts() {
           <span>Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, contacts.length)} of {contacts.length} contacts</span>
           <span>Page {currentPage} of {Math.max(1, Math.ceil(contacts.length / pageSize))}</span>
         </div> : null}
+        {!loading && contacts.length > pageSize ? <nav className="crm-pagination crm-pagination--top" aria-label="Contact pages above results">
+          <Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</Button>
+          <span>Page {currentPage} of {Math.ceil(contacts.length / pageSize)}</span>
+          <Button variant="outline" disabled={currentPage >= Math.ceil(contacts.length / pageSize)} onClick={() => setCurrentPage((page) => page + 1)}>Next</Button>
+        </nav> : null}
         {loading ? <div className="table-state">Loading contacts…</div> : contacts.length ? <div className="contact-record-list contact-record-list--compact">
           {contacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
             const workflow = contactWorkflowState(contact);

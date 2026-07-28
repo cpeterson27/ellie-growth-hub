@@ -22,6 +22,16 @@ function EmptyField({ children }) {
   return <p className="event-empty-field">{children}</p>;
 }
 
+function ticketStatus(ticket = {}) {
+  if (ticket.salesStatus) return ticket.salesStatus;
+  if (ticket.hidden) return "Hidden";
+  if (Number(ticket.quantityTotal || 0) > 0 && Number(ticket.quantitySold || 0) >= Number(ticket.quantityTotal || 0)) return "Sold out";
+  const now = Date.now();
+  if (ticket.salesStart && now < new Date(ticket.salesStart).getTime()) return "Scheduled";
+  if (ticket.salesEnd && now > new Date(ticket.salesEnd).getTime()) return "Sales ended";
+  return "On sale";
+}
+
 function formattedModule(html = "") {
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     body{margin:0;color:#404844;font:14px/1.65 Arial,sans-serif}
@@ -231,7 +241,7 @@ export default function EventbriteListingDetails({ event }) {
               <article key={ticket.id}>
                 <div>
                   <strong>{ticket.name}</strong>
-                  <span>{ticket.salesStatus || "Status unavailable"}</span>
+                  <span>{ticketStatus(ticket)}</span>
                 </div>
                 <p>
                   {ticket.free
@@ -239,6 +249,16 @@ export default function EventbriteListingDetails({ event }) {
                     : ticket.displayPrice ||
                       `${ticket.currency || "USD"} ${Number(ticket.basePrice || ticket.cost || 0).toFixed(2)}`}
                 </p>
+                {!ticket.free && Number(ticket.fee || ticket.tax || 0) > 0 ? (
+                  <p className="event-ticket-checkout-price">
+                    Buyer pays <strong>${Number(ticket.buyerTotal || (Number(ticket.basePrice || 0) + Number(ticket.fee || 0) + Number(ticket.tax || 0))).toFixed(2)}</strong>
+                    <small>
+                      ${Number(ticket.basePrice || 0).toFixed(2)} ticket
+                      {Number(ticket.fee || 0) ? ` + $${Number(ticket.fee).toFixed(2)} Eventbrite fee` : ""}
+                      {Number(ticket.tax || 0) ? ` + $${Number(ticket.tax).toFixed(2)} tax` : ""}
+                    </small>
+                  </p>
+                ) : null}
                 <dl>
                   <div>
                     <dt>Sold</dt>

@@ -230,6 +230,21 @@ function extractAudienceSuggestions(modules, description) {
 }
 
 function normalizeTicket(ticket) {
+  const basePrice = Number(ticket.cost?.major_value || 0);
+  const fee = Number(ticket.fee?.major_value || 0);
+  const tax = Number(ticket.tax?.major_value || 0);
+  const now = Date.now();
+  const salesStart = ticket.sales_start ? new Date(ticket.sales_start).getTime() : null;
+  const salesEnd = ticket.sales_end ? new Date(ticket.sales_end).getTime() : null;
+  const derivedSalesStatus = ticket.hidden
+    ? "Hidden"
+    : Number(ticket.quantity_sold || 0) >= Number(ticket.quantity_total || 0) && Number(ticket.quantity_total || 0) > 0
+      ? "Sold out"
+      : salesStart && now < salesStart
+        ? "Scheduled"
+        : salesEnd && now > salesEnd
+          ? "Sales ended"
+          : "On sale";
   return {
     id: String(ticket.id || ""),
     name: ticket.name || "Ticket",
@@ -238,9 +253,10 @@ function normalizeTicket(ticket) {
     donation: Boolean(ticket.donation),
     displayPrice: ticket.cost?.display || "",
     currency: ticket.cost?.currency || "",
-    basePrice: Number(ticket.cost?.major_value || 0),
-    fee: Number(ticket.fee?.major_value || 0),
-    tax: Number(ticket.tax?.major_value || 0),
+    basePrice,
+    fee,
+    tax,
+    buyerTotal: basePrice + fee + tax,
     quantityTotal: Number(ticket.quantity_total || 0),
     quantitySold: Number(ticket.quantity_sold || 0),
     minimumQuantity: Number(ticket.minimum_quantity || 1),
@@ -248,7 +264,7 @@ function normalizeTicket(ticket) {
     maximumPerOrder: Number(ticket.maximum_quantity_per_order || 0),
     salesStart: ticket.sales_start || "",
     salesEnd: ticket.sales_end || "",
-    salesStatus: ticket.sales_status || "",
+    salesStatus: ticket.sales_status || derivedSalesStatus,
     hidden: Boolean(ticket.hidden),
     includeFee: Boolean(ticket.include_fee),
     deliveryMethods: ticket.delivery_methods || [],

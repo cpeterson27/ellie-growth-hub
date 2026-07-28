@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiArrowRight } from "react-icons/fi";
-import DashboardCard from "../components/DashboardCard.jsx";
-import Table from "../components/Table.jsx";
+import { FiArrowRight, FiCalendar, FiTarget, FiUsers } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import Modal from "../components/Modal.jsx";
 import CampaignModal from "../components/CampaignModal.jsx";
 import { createCampaign, deleteCampaign, fetchCampaignDeletionPreview, fetchCampaigns } from "../services/api.js";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
+import "./Campaigns.css";
 
 const audienceOptions = ["Airbnb investors", "Real estate investors", "House flippers", "Property management companies", "Multifamily investors", "Experienced real-estate operators", "Affiliate and referral partners"];
 
@@ -58,19 +57,39 @@ export default function Campaigns() {
     finally { setDeleting(false); }
   };
 
-  const columns = [
-    { header: "Campaign", accessor: "name" },
-    { header: "Date", accessor: "startDate", render: (item) => item.startDate ? new Date(item.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : item.campaignKind === "program" ? "Evergreen program" : "—" },
-    { header: "Price", accessor: "ticketPrice", render: (item) => item.campaignKind === "program" ? "Program" : `$${item.ticketPrice}` },
-    { header: "Goal", accessor: "ticketGoal" },
-    { header: "Tickets Sold", accessor: "ticketsSold" },
-    { header: "Status", accessor: "status" },
-    { header: "", accessor: "action", render: (item) => <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}><Button variant="outline" size="sm" onClick={() => navigate(`/campaigns/${item._id}`)}>View <FiArrowRight /></Button><Button variant="ghost" size="sm" onClick={() => openDeleteModal(item)}>Delete</Button></div> },
-  ];
+  const activeCount = campaigns.filter((campaign) => campaign.status === "active").length;
+  const totalGoal = campaigns.reduce((sum, campaign) => sum + Number(campaign.ticketGoal || 0), 0);
+  const totalSold = campaigns.reduce((sum, campaign) => sum + Number(campaign.eventId?.eventbriteLogistics?.ticketsSold ?? campaign.ticketsSold ?? 0), 0);
 
-  return <div className="page-dashboard">
-    <div className="page-header"><div><h1 className="page-title">Campaigns</h1><p className="page-subtitle">Track every campaign from brief to launch.</p></div><Button onClick={() => { setError(""); setIsOpen(true); }}>Create Campaign</Button></div>
-    <DashboardCard title="Active Campaigns"><Table columns={columns} data={campaigns} loading={loading} emptyMessage="No campaigns are active yet." /></DashboardCard>
+  return <div className="page-dashboard campaigns-page">
+    <div className="page-header"><div><p className="page-eyebrow">Campaign portfolio</p><h1 className="page-title">Campaigns</h1><p className="page-subtitle">See the objective, audience, progress, and next action for every campaign.</p></div><Button onClick={() => { setError(""); setIsOpen(true); }}>+ New campaign</Button></div>
+    <section className="campaign-summary">
+      <div><FiTarget /><span><strong>{campaigns.length}</strong>Total campaigns</span></div>
+      <div><FiCalendar /><span><strong>{activeCount}</strong>Active now</span></div>
+      <div><FiUsers /><span><strong>{totalSold} / {totalGoal}</strong>Registrations vs goal</span></div>
+    </section>
+    {loading ? <div className="table-state">Loading campaigns…</div> : campaigns.length ? <section className="campaign-card-grid">
+      {campaigns.map((campaign) => {
+        const logistics = campaign.eventId?.eventbriteLogistics || {};
+        const sold = Number(logistics.ticketsSold ?? campaign.ticketsSold ?? 0);
+        const goal = Number(campaign.eventId?.ticketGoal ?? campaign.ticketGoal ?? 0);
+        const basePrice = Number(campaign.eventId?.ticketPrice ?? campaign.ticketPrice ?? 0);
+        const checkoutPrice = Number(logistics.minimumCheckoutPrice || 0);
+        const progress = goal ? Math.min(100, Math.round((sold / goal) * 100)) : 0;
+        return <article className="campaign-card" key={campaign._id}>
+          <header><span className={`campaign-state campaign-state--${campaign.status}`}>{campaign.status || "draft"}</span><span>{campaign.campaignKind === "program" ? "Program" : "Event campaign"}</span></header>
+          <h2>{campaign.name}</h2>
+          <p className="campaign-card__audience">{campaign.audience?.join(" · ") || "Audience not approved yet"}</p>
+          <div className="campaign-card__meta">
+            <span><small>Date</small><strong>{campaign.startDate ? new Date(campaign.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Evergreen"}</strong></span>
+            <span><small>Current buyer price</small><strong>{campaign.campaignKind === "program" ? "Program" : checkoutPrice ? `From $${checkoutPrice.toFixed(2)}` : `$${basePrice.toFixed(2)}`}</strong>{checkoutPrice > basePrice ? <small>${basePrice.toFixed(2)} base + fees</small> : null}</span>
+            <span><small>Progress</small><strong>{sold} / {goal || "—"}</strong></span>
+          </div>
+          <div className="campaign-progress"><span style={{ width: `${progress}%` }} /></div>
+          <footer><span>{progress}% of registration goal</span><div><Button variant="ghost" size="sm" onClick={() => openDeleteModal(campaign)}>Delete</Button><Button variant="outline" size="sm" onClick={() => navigate(`/campaigns/${campaign._id}`)}>Open workspace <FiArrowRight /></Button></div></footer>
+        </article>;
+      })}
+    </section> : <div className="table-state table-state--empty">No campaigns are active yet.</div>}
     <CampaignModal isOpen={isOpen} onClose={() => setIsOpen(false)} onSubmit={handleCreate} audienceOptions={audienceOptions} submitting={submitting} defaultCampaignKind={defaultCampaignKind} />
     <Modal isOpen={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)} title="Delete campaign" footer={<><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button loading={deleting} onClick={confirmDelete}>Delete campaign</Button></>}>
       {deletePreview ? <div className="campaign-delete-dialog"><p><strong>{deletePreview.campaignName}</strong> will be removed. This cannot be undone.</p>{deletePreview.outreachCount ? <label className="form-field"><span><input type="checkbox" checked={deleteOptions.deleteOutreach} onChange={(event) => setDeleteOptions({ ...deleteOptions, deleteOutreach: event.target.checked })} /> Delete {deletePreview.outreachCount} related outreach record{deletePreview.outreachCount === 1 ? "" : "s"}</span><small>Required to delete this campaign. Sent and replied history will also be removed.</small></label> : <p>No outreach records are attached.</p>}{deletePreview.event ? <label className="form-field"><span><input type="checkbox" disabled={!deletePreview.event.canDelete} checked={deleteOptions.deleteEvent} onChange={(event) => setDeleteOptions({ ...deleteOptions, deleteEvent: event.target.checked })} /> Also delete the linked event</span><small>{deletePreview.event.canDelete ? "Leave this unchecked to keep the event for future use." : "This event is used by another campaign and will be kept."}</small></label> : null}</div> : <p>Checking related records…</p>}
