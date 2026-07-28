@@ -44,6 +44,7 @@ function searchableText(contact = {}) {
     contact.industry,
     contact.seniority,
     contact.company,
+    ...(contact.audienceProfiles || []),
     ...(contact.tags || []),
     ...(contact.keywords || []),
     ...(contact.lists || []),

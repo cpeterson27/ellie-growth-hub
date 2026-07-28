@@ -106,6 +106,13 @@ is the professional connection method intended for a sellable, multi-client
 product because each business can authorize its own Eventbrite account without
 sharing credentials with the application owner.
 
+Event images are uploaded directly from the event wizard and hosted by
+Cloudinary; users never need to create or paste an image URL. The backend needs
+one private `CLOUDINARY_URL` environment variable in local development and in
+the Render backend service. It has the standard
+`cloudinary://API_KEY:API_SECRET@CLOUD_NAME` format and must never be placed in
+the frontend.
+
 ### 3. Contacts and email safety
 
 Contacts may be entered manually or imported from a CSV. A usable name is enough

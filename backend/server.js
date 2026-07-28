@@ -25,7 +25,7 @@ const developmentRequestsRouter = require("./routes/developmentRequests");
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "12mb" }));
 
 const PORT = process.env.PORT || 5001;
 const mongoUri = process.env.MONGO_URI;

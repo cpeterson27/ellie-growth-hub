@@ -52,13 +52,26 @@ function fullContactName(contact = {}) {
 }
 
 function hasAudienceSignals(contact = {}) {
+  const systemTags = new Set([
+    "manual",
+    "needs-enrichment",
+    "csv-import",
+    "email-verified",
+    "owner-confirmed",
+    "verified-email",
+  ]);
+  const meaningfulTags = (contact.tags || []).filter(
+    (tag) => !systemTags.has(String(tag).trim().toLowerCase()),
+  );
   return Boolean(
+    contact.audienceProfiles?.length ||
+    contact.audienceSignals?.some((signal) => signal?.profile) ||
     contact.title ||
     contact.industry ||
     contact.company ||
     contact.seniority ||
     contact.linkedin ||
-    contact.tags?.length ||
+    meaningfulTags.length ||
     contact.keywords?.length ||
     contact.lists?.length ||
     contact.notes
@@ -84,7 +97,7 @@ export default function Contacts() {
   const [importSummary, setImportSummary] = useState(null);
   const [isContactFormOpen, setContactFormOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
-  const [manualContact, setManualContact] = useState({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", confirmEmailManually: false });
+  const [manualContact, setManualContact] = useState({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false });
   const [importRows, setImportRows] = useState([]);
   const [importHeaders, setImportHeaders] = useState([]);
   const [importCampaignId, setImportCampaignId] = useState("");
@@ -260,8 +273,14 @@ export default function Contacts() {
   async function saveManualContact() {
     const name = fullContactName(manualContact);
     if (!name) { setError("Enter a first or last name to save this contact."); return; }
-    const saved = await saveIngestion([{ ...manualContact, name, city: manualContact.location, tags: manualContact.tags.split(",").map((tag) => tag.trim()).filter(Boolean) }], "manual", importCampaignId);
-    if (saved) { setContactFormOpen(false); setManualContact({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", confirmEmailManually: false }); }
+    const saved = await saveIngestion([{
+      ...manualContact,
+      name,
+      city: manualContact.location,
+      tags: manualContact.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      audienceProfiles: manualContact.audienceProfiles.split(",").map((profile) => profile.trim()).filter(Boolean),
+    }], "manual", importCampaignId);
+    if (saved) { setContactFormOpen(false); setManualContact({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false }); }
   }
 
   async function saveUploadedContacts() {
@@ -557,7 +576,7 @@ export default function Contacts() {
       >
         <p className="contact-modal-intro">Only a usable name is required. Ellie AI saves this contact directly to MongoDB.</p>
         <div className="contact-form-grid">
-          {[["firstName", "First Name *"], ["lastName", "Last Name"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /></label>)}
+          {[["firstName", "First Name *"], ["lastName", "Last Name"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"], ["audienceProfiles", "Audience & interests (comma-separated)"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /></label>)}
           <label className="form-field"><span>Campaign</span><select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
           {manualContact.email ? <label className="contact-qualify-choice span-2">
             <input type="checkbox" checked={manualContact.confirmEmailManually} onChange={(event) => setManualContact({ ...manualContact, confirmEmailManually: event.target.checked })} />
@@ -608,10 +627,18 @@ export default function Contacts() {
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
       <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Research", ["researchStatus", "missingFields", "qualifyContact", "stage", "tags", "lists"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments"]], ["Marketing", ["keywords", "lastContacted", "notes"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : typeof detailContact[field] === "boolean" ? (detailContact[field] ? "Yes" : "No") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
-      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Prepare Contact for a Campaign" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, name: fullContactName(editingContact), tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? <>
+      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Prepare Contact for a Campaign" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, name: fullContactName(editingContact), tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), audienceProfiles: Array.isArray(editingContact.audienceProfiles) ? editingContact.audienceProfiles : String(editingContact.audienceProfiles || "").split(",").map((profile) => profile.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? <>
         <p className="contact-modal-intro"><strong>A name and a confirmed email are enough to add someone to a campaign.</strong> Company, title, and industry are optional and can be completed later.</p>
         <div className="contact-form-grid">
           {["firstName", "lastName", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}
+          <label className="form-field span-2">
+            <span>Audience &amp; interests</span>
+            <input className="select-input"
+              placeholder="Example: Multifamily investors, networking event hosts"
+              value={Array.isArray(editingContact.audienceProfiles) ? editingContact.audienceProfiles.join(", ") : editingContact.audienceProfiles || ""}
+              onChange={(event) => setEditingContact({ ...editingContact, audienceProfiles: event.target.value })} />
+            <small>Add only categories you know or the contact has confirmed. These are used for automatic campaign matching.</small>
+          </label>
           <fieldset className="contact-decision-panel span-2">
             <legend>Three steps to add this contact</legend>
             <div className="contact-decision-step">

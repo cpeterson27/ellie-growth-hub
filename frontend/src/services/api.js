@@ -87,6 +87,9 @@ export const createEvent = (eventData) =>
 export const recommendEventAudience = (eventData) =>
   api.post("/events/audience-recommendations", eventData).then((res) => res.data);
 
+export const uploadEventImage = (imageData) =>
+  api.post("/events/images", imageData).then((res) => res.data);
+
 
 
 // ======================================

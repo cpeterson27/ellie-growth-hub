@@ -18,6 +18,7 @@ import {
   recommendEventAudience,
   syncEventbriteEvent,
   updateManagedEventbriteEvent,
+  uploadEventImage,
 } from "../services/api.js";
 import "./Events.css";
 
@@ -30,9 +31,9 @@ const emptyDraft = {
   timeZone: "America/Los_Angeles",
   locationType: "online",
   location: "",
-  ticketName: "General Admission",
-  ticketPrice: "497",
-  ticketGoal: "50",
+  ticketName: "",
+  ticketPrice: "",
+  ticketGoal: "",
   audience: "",
   audienceConfirmed: false,
   planning: {
@@ -193,6 +194,7 @@ export default function Events() {
   const [wizardStep, setWizardStep] = useState(0);
   const [changePreview, setChangePreview] = useState([]);
   const [draft, setDraft] = useState(emptyDraft);
+  const [imageUploading, setImageUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [workingId, setWorkingId] = useState("");
   const [error, setError] = useState(
@@ -324,6 +326,69 @@ export default function Events() {
     setWizardStep(0);
     setChangePreview([]);
     setEventModalOpen(true);
+  };
+
+  const updateAgendaItem = (index, field, value) => {
+    const agenda = [...(draft.planning.agenda || [])];
+    agenda[index] = { ...(agenda[index] || {}), [field]: value };
+    setDraft({ ...draft, planning: { ...draft.planning, agenda } });
+  };
+
+  const addAgendaItem = () => {
+    setDraft({
+      ...draft,
+      planning: {
+        ...draft.planning,
+        agenda: [
+          ...(draft.planning.agenda || []),
+          { title: "", startTime: "", endTime: "", description: "" },
+        ],
+      },
+    });
+  };
+
+  const removeAgendaItem = (index) => {
+    setDraft({
+      ...draft,
+      planning: {
+        ...draft.planning,
+        agenda: draft.planning.agenda.filter((_, itemIndex) => itemIndex !== index),
+      },
+    });
+  };
+
+  const handleImageUpload = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Choose a PNG, JPG, WEBP, or other image file.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("The event image must be smaller than 8 MB.");
+      return;
+    }
+    try {
+      setImageUploading(true);
+      setError("");
+      const reader = new FileReader();
+      const dataUrl = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const result = await uploadEventImage({ file: dataUrl, filename: file.name });
+      setDraft({
+        ...draft,
+        planning: { ...draft.planning, imageUrl: result.url },
+      });
+    } catch (err) {
+      setError(
+        err.response?.data?.error ||
+          "Unable to upload the image. Check the Cloudinary settings on the backend.",
+      );
+    } finally {
+      setImageUploading(false);
+    }
   };
 
   const openManage = async (event) => {
@@ -1197,19 +1262,81 @@ export default function Events() {
                   <textarea className="select-input" value={draft.planning.organizerDescription}
                     onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, organizerDescription: e.target.value } })} />
                 </label>
-                <label className="form-field"><span>Agenda sessions, one per line</span>
-                  <textarea className="select-input"
-                    value={draft.planning.agenda.map((item) => item.title || item).join("\n")}
-                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, agenda: e.target.value.split("\n").filter(Boolean).map((title) => ({ title })) } })} />
-                </label>
                 <label className="form-field"><span>Highlights, one per line</span>
                   <textarea className="select-input" value={draft.planning.highlights.join("\n")}
                     onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, highlights: e.target.value.split("\n").filter(Boolean) } })} />
                 </label>
-                <label className="form-field span-2"><span>Event image URL</span>
-                  <input className="select-input" value={draft.planning.imageUrl}
-                    onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, imageUrl: e.target.value } })} />
-                </label>
+                <section className="agenda-builder span-2">
+                  <div className="agenda-builder__header">
+                    <div>
+                      <h3>Agenda</h3>
+                      <p>Add each session with its time and details. Attendees will see a clear, professional schedule.</p>
+                    </div>
+                    <Button variant="outline" onClick={addAgendaItem}>+ Add session</Button>
+                  </div>
+                  {!draft.planning.agenda.length ? (
+                    <button type="button" className="agenda-empty" onClick={addAgendaItem}>
+                      <strong>Build the event agenda</strong>
+                      <span>Add the first session, break, Q&amp;A, or closing activity.</span>
+                    </button>
+                  ) : (
+                    <div className="agenda-items">
+                      {draft.planning.agenda.map((item, index) => (
+                        <article className="agenda-item" key={index}>
+                          <div className="agenda-item__heading">
+                            <strong>Session {index + 1}</strong>
+                            <button type="button" onClick={() => removeAgendaItem(index)}>Remove</button>
+                          </div>
+                          <div className="agenda-item__grid">
+                            <label className="form-field span-2"><span>Session title</span>
+                              <input className="select-input" value={item.title || ""}
+                                onChange={(e) => updateAgendaItem(index, "title", e.target.value)} />
+                            </label>
+                            <label className="form-field"><span>Starts</span>
+                              <input className="select-input" type="time" value={item.startTime || ""}
+                                onChange={(e) => updateAgendaItem(index, "startTime", e.target.value)} />
+                            </label>
+                            <label className="form-field"><span>Ends</span>
+                              <input className="select-input" type="time" value={item.endTime || ""}
+                                onChange={(e) => updateAgendaItem(index, "endTime", e.target.value)} />
+                            </label>
+                            <label className="form-field span-2"><span>What happens in this session?</span>
+                              <textarea className="select-input" value={item.description || ""}
+                                onChange={(e) => updateAgendaItem(index, "description", e.target.value)} />
+                            </label>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </section>
+                <section className="event-image-uploader span-2">
+                  <div>
+                    <h3>Event image</h3>
+                    <p>Upload an image from this device. Ellie stores it securely and creates the hosted URL automatically.</p>
+                  </div>
+                  <div className="event-image-uploader__body">
+                    {draft.planning.imageUrl ? (
+                      <img src={draft.planning.imageUrl} alt="Event preview" />
+                    ) : (
+                      <div className="event-image-placeholder">Image preview</div>
+                    )}
+                    <div className="event-image-actions">
+                      <label className="event-file-button">
+                        <input type="file" accept="image/*" disabled={imageUploading}
+                          onChange={(e) => handleImageUpload(e.target.files?.[0])} />
+                        {imageUploading ? "Uploading…" : draft.planning.imageUrl ? "Replace image" : "Choose image"}
+                      </label>
+                      {draft.planning.imageUrl ? (
+                        <button type="button" onClick={() => setDraft({
+                          ...draft,
+                          planning: { ...draft.planning, imageUrl: "" },
+                        })}>Remove</button>
+                      ) : null}
+                      <small>PNG, JPG, or WEBP up to 8 MB.</small>
+                    </div>
+                  </div>
+                </section>
               </div>
             ) : null}
 
@@ -1242,8 +1369,8 @@ export default function Events() {
             {wizardStep === 4 ? (
               <div className="event-strategy">
                 <div className="event-strategy__header">
-                  <div><h3>AI audience recommendations</h3>
-                    <p>Ellie uses the event promise and ideal-attendee information—not Eventbrite contact data.</p>
+                  <div><h3>Audience recommendations</h3>
+                    <p>Ellie analyzes this draft’s name, overview, attendee outcomes, business goal, highlights, and optional notes. It does not pull an audience from MongoDB or Eventbrite.</p>
                   </div>
                   <Button loading={loading} onClick={generateAudience}>Generate recommendations</Button>
                 </div>
@@ -1251,6 +1378,17 @@ export default function Events() {
                   <textarea className="select-input" value={draft.planning.idealAttendee}
                     onChange={(e) => setDraft({ ...draft, planning: { ...draft.planning, idealAttendee: e.target.value } })} />
                 </label>
+                <p className="event-form-note">
+                  These are suggested audience groups—not contacts. After you approve groups, Ellie can match them against MongoDB contacts with known professional or interest signals. Name-and-email-only contacts remain “Audience unknown” until a real signal is added.
+                </p>
+                {draft.audienceRecommendationSource ? (
+                  <p className="audience-source-note">
+                    <strong>Recommendation method:</strong>{" "}
+                    {draft.audienceRecommendationSource === "openai"
+                      ? "OpenAI analyzed the event information entered in this draft."
+                      : "Ellie’s built-in matching rules analyzed the event information entered in this draft."}
+                  </p>
+                ) : null}
                 <div className="audience-recommendation-list">
                   {draft.audienceRecommendations.map((item) => {
                     const selected = draft.audience.split(",").map((value) => value.trim()).includes(item.label);

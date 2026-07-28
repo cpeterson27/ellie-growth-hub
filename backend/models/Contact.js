@@ -188,6 +188,13 @@ const contactSchema = new mongoose.Schema(
       default: [],
     },
 
+    // Human-confirmed targeting categories. Operational tags such as
+    // "manual" or "needs-enrichment" must never be treated as audience data.
+    audienceProfiles: {
+      type: [String],
+      default: [],
+    },
+
 
     // -------------------------------------------------------------------------
     // Record status
