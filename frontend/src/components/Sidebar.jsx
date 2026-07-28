@@ -8,6 +8,7 @@ import {
   FiBarChart2,
   FiTrendingUp,
   FiSettings,
+  FiLink,
   FiCpu,
   FiCode,
 } from "react-icons/fi";
@@ -27,7 +28,7 @@ const navItems = [
   { label: "Jarvis", path: "/jarvis", icon: <FiCpu /> },
   { label: "Dev Requests", path: "/development-requests", icon: <FiCode /> },
   { label: "Analytics", path: "/analytics", icon: <FiBarChart2 /> },
-  { label: "Integrations", path: "/integrations", icon: <FiSettings /> },
+  { label: "Integrations", path: "/integrations", icon: <FiLink /> },
   { label: "Settings", path: "/settings", icon: <FiSettings /> },
 ];
 

@@ -1,43 +1,53 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { FiLock, FiMail, FiShield, FiUser, FiUsers } from "react-icons/fi";
 import Button from "../components/Button.jsx";
-import { useNavigate } from "react-router-dom";
+import { fetchGmailConnection, fetchWorkspaceConfig, updateWorkspaceConfig } from "../services/api.js";
 import { getWorkspaceSettings, saveWorkspaceSettings } from "../utils/workspaceSettings.js";
 import "./Settings.css";
 
 export default function Settings() {
-  const navigate = useNavigate();
-  const [settings, setSettings] = useState(getWorkspaceSettings);
+  const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
+  const [accountEmail, setAccountEmail] = useState("");
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
-  const save = () => {
-    saveWorkspaceSettings(settings);
-    setSaved(true);
+  useEffect(() => {
+    fetchWorkspaceConfig().then((config) => setWorkspaceName(config.workspaceName)).catch(() => {});
+    fetchGmailConnection().then((connection) => setAccountEmail(connection.email || "")).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      const config = await updateWorkspaceConfig({ workspaceName });
+      const local = { ...getWorkspaceSettings(), workspaceName: config.workspaceName };
+      saveWorkspaceSettings(local);
+      setWorkspaceName(config.workspaceName);
+      setSaved(true);
+      setError("");
+    } catch (err) { setError(err.response?.data?.error || "Unable to save the workspace name."); }
+    finally { setSaving(false); }
   };
 
-  return <div className="page-dashboard settings-page">
-    <div className="page-header">
-      <div>
-        <p className="page-eyebrow">Account & workspace</p>
-        <h1 className="page-title">Settings</h1>
-        <p className="page-subtitle">Manage the client account identity. Campaign workspaces, CRM fields, and connected applications are managed where they are used.</p>
-      </div>
-      <Button onClick={save}>Save changes</Button>
-    </div>
-    {saved ? <p className="discovery-notice">Workspace settings saved.</p> : null}
-
-    <section className="account-settings-card">
-      <div className="account-settings-card__intro">
-        <span>Client account</span>
-        <h2>Workspace identity</h2>
-        <p>Only settings that currently affect the product belong here. Event and program workspaces are selected from the top navigation.</p>
-      </div>
-      <div className="account-settings-card__form">
-        <label className="form-field"><span>Workspace name</span><input className="select-input" value={settings.workspaceName} onChange={(event) => setSettings({ ...settings, workspaceName: event.target.value })} /></label>
-        <label className="form-field"><span>Default sender name</span><input className="select-input" value={settings.senderName || ""} placeholder="e.g. Ellie’s Coaching" onChange={(event) => setSettings({ ...settings, senderName: event.target.value })} /></label>
-        <div className="settings-linked-areas">
-          <p><strong>Contact fields</strong><span>Review built-in fields or add a business-specific field.</span></p><Button variant="outline" size="sm" onClick={() => navigate("/integrations/crm")}>Manage CRM fields</Button>
-          <p><strong>Connected accounts</strong><span>Manage Gmail, Eventbrite, Resend, and contact sources.</span></p><Button variant="outline" size="sm" onClick={() => navigate("/integrations")}>Open integrations</Button>
+  return <div className="page-dashboard account-page">
+    <div className="page-header"><div><p className="page-eyebrow">Account</p><h1 className="page-title">Settings</h1><p className="page-subtitle">Manage the account and organization behind this Ellie workspace.</p></div></div>
+    {saved ? <p className="discovery-notice">Workspace name saved across Ellie.</p> : null}
+    {error ? <p className="form-error">{error}</p> : null}
+    <section className="account-layout">
+      <nav className="account-settings-nav" aria-label="Settings sections">
+        <button className="is-active"><FiUser /> Organization profile</button>
+        <button disabled><FiLock /> Login & password <small>After user accounts</small></button>
+        <button disabled><FiShield /> Security <small>After user accounts</small></button>
+        <button disabled><FiUsers /> Team access <small>After user accounts</small></button>
+      </nav>
+      <div className="account-settings-panel">
+        <header><p className="page-eyebrow">Organization profile</p><h2>Workspace identity</h2><p>This name appears in Ellie’s navigation and identifies the client account. Events, programs, and offers are selected separately from the workspace menu at the top of the application.</p></header>
+        <div className="account-profile-form">
+          <label className="form-field"><span>Workspace name</span><input value={workspaceName} onChange={(event) => { setWorkspaceName(event.target.value); setSaved(false); }} /><small>Example: Ellie’s Coaching</small></label>
+          <label className="form-field"><span>Connected account email</span><div className="account-readonly-field"><FiMail /> {accountEmail || "No Gmail account connected"}</div><small>Email connections are managed from Integrations.</small></label>
         </div>
+        <footer><Button loading={saving} disabled={workspaceName.trim().length < 2} onClick={save}>Save organization profile</Button></footer>
       </div>
     </section>
   </div>;

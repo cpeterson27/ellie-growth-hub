@@ -6,6 +6,12 @@ const api = axios.create({
     "http://localhost:5001/api",
 });
 
+export const fetchWorkspaceConfig = () =>
+  api.get("/workspace").then((res) => res.data);
+
+export const updateWorkspaceConfig = (values) =>
+  api.patch("/workspace", values).then((res) => res.data);
+
 
 // ======================================
 // CAMPAIGNS

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { FiSearch, FiMenu, FiCpu } from "react-icons/fi";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import { useInitiative } from "../context/InitiativeContext.jsx";
+import { fetchWorkspaceConfig } from "../services/api.js";
 import "./Navbar.css";
 
 export default function Navbar({ onMenuClick }) {
@@ -36,6 +37,7 @@ export default function Navbar({ onMenuClick }) {
   useEffect(() => {
     const refresh = () => setWorkspaceName(getWorkspaceSettings().workspaceName);
     window.addEventListener("ellie-settings-changed", refresh);
+    fetchWorkspaceConfig().then((config) => setWorkspaceName(config.workspaceName)).catch(() => {});
     return () => window.removeEventListener("ellie-settings-changed", refresh);
   }, []);
 

@@ -120,7 +120,6 @@ export default function Integrations() {
           <p>Your built-in CRM for contacts, audience profiles, campaign assignments, outreach history, and CSV imports. No external CRM account is required.</p>
           <div className="crm-connection-actions">
             <Button onClick={() => navigate("/contacts")}>Open CRM</Button>
-            <Button variant="outline" onClick={() => navigate("/integrations/crm")}>Configure CRM</Button>
           </div>
         </article>
         {externalCrms.map((crm) => (

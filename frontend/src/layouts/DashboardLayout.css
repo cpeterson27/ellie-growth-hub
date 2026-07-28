@@ -13,12 +13,16 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .dashboard-content {
   flex: 1;
   padding: 1.6rem 2rem 3rem;
   width: 100%;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .dashboard-overlay {

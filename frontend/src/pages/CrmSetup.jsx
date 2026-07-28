@@ -34,7 +34,7 @@ export default function CrmSetup() {
 
   return <div className="page-dashboard crm-config-page">
     <div className="page-header">
-      <div><p className="page-eyebrow">Ellie CRM · Data structure</p><h1 className="page-title">Contact fields</h1><p className="page-subtitle">Review what Ellie already stores and add business-specific information only when your team needs it.</p></div>
+      <div><p className="page-eyebrow">CRM · Contact setup</p><h1 className="page-title">Contact fields</h1><p className="page-subtitle">Review what Ellie already stores and add business-specific information only when your team needs it.</p></div>
       <div className="crm-header-actions"><Button variant="outline" onClick={() => navigate("/contacts")}>Open contacts</Button><Button onClick={save}>Save field setup</Button></div>
     </div>
     {saved ? <p className="discovery-notice"><FiCheck /> Contact field setup saved.</p> : null}
@@ -53,7 +53,7 @@ export default function CrmSetup() {
         <p className="page-eyebrow">Optional</p><h2>Custom fields</h2><p>Add a field only when this business needs information Ellie does not already store—for example “Preferred market” or “Membership level.”</p>
         <div className="crm-add-field"><label htmlFor="new-contact-field">Field name</label><div><input id="new-contact-field" value={newField} onChange={(event) => setNewField(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addField(); } }} placeholder="e.g. Preferred market" /><Button size="sm" onClick={addField} disabled={!newField.trim()}><FiPlus /> Add field</Button></div></div>
         {fields.length ? <div className="crm-custom-field-list">{fields.map((field) => <div key={field}><span><strong>{field}</strong><small>Text field · shown when editing a contact</small></span><button type="button" onClick={() => removeField(field)} aria-label={`Remove ${field}`}><FiTrash2 /></button></div>)}</div> : <div className="crm-no-custom-fields"><strong>No custom fields</strong><p>This workspace currently uses Ellie’s built-in contact record only.</p></div>}
-        <small className="crm-field-note">Removing a custom field from the form does not delete historical contact data. A future data-management release should include migration and permanent deletion controls.</small>
+        <small className="crm-field-note">Removing a field stops showing it on contact forms. Existing values are retained so information cannot be erased accidentally.</small>
       </aside>
     </section>
   </div>;

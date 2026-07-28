@@ -117,7 +117,8 @@ function App() {
             path="/integrations/eventbrite"
             element={<EventbriteIntegration />}
           />
-          <Route path="/integrations/crm" element={<CrmSetup />} />
+          <Route path="/contacts/fields" element={<CrmSetup />} />
+          <Route path="/integrations/crm" element={<Navigate to="/contacts/fields" replace />} />
           <Route path="/integrations/gmail" element={<GmailIntegration />} />
           <Route path="/inbox" element={<GmailIntegration />} />
 

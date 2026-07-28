@@ -476,6 +476,7 @@ export default function Contacts() {
         </div>
         <div className="crm-header-actions">
           <Button onClick={() => { setError(""); setContactFormOpen(true); }}>+ New Contact</Button>
+          <Button variant="outline" onClick={() => navigate("/contacts/fields")}>Customize fields</Button>
           <div className="crm-menu-wrap">
             <Button variant="outline" onClick={() => setImportMenuOpen((open) => !open)}>Import ▾</Button>
             {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Apollo CSV</button><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Standard CSV</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
