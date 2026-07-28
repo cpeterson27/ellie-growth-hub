@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FiSearch, FiMenu, FiCpu } from "react-icons/fi";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
+import { useInitiative } from "../context/InitiativeContext.jsx";
 import "./Navbar.css";
 
 export default function Navbar({ onMenuClick }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
+  const { campaigns, selected, selectedId, setSelectedId } = useInitiative();
   const pageKey = location.pathname.split("/")[1] || "dashboard";
   const pageMeta = {
     dashboard: ["Command center", "Today’s priorities, pipeline, and next best actions."],
@@ -26,6 +28,10 @@ export default function Navbar({ onMenuClick }) {
     integrations: ["Integrations", "Connect the systems behind Ellie’s growth engine."],
     settings: ["Settings", "Personalize the workspace and operating rules."],
   }[pageKey] || ["Growth workspace", "Operate Ellie’s growth engine from one place."];
+  const changeInitiative = (value) => {
+    setSelectedId(value);
+    if (value !== "all") navigate(`/campaigns/${value}`);
+  };
 
   useEffect(() => {
     const refresh = () => setWorkspaceName(getWorkspaceSettings().workspaceName);
@@ -50,6 +56,19 @@ export default function Navbar({ onMenuClick }) {
           <p className="navbar__eyebrow"><span>{workspaceName}</span><i />{pageMeta[0]}</p>
           <h1 className="navbar__title">{pageMeta[1]}</h1>
         </div>
+        <label className="initiative-switcher">
+          <span>Current workspace</span>
+          <select value={selectedId} onChange={(event) => changeInitiative(event.target.value)}>
+            <option value="all">All business activity</option>
+            <optgroup label="Events">
+              {campaigns.filter((campaign) => campaign.campaignKind !== "program").map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
+            </optgroup>
+            <optgroup label="Programs & offers">
+              {campaigns.filter((campaign) => campaign.campaignKind === "program").map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.programName || campaign.name}</option>)}
+            </optgroup>
+          </select>
+          {selected ? <i className={selected.campaignKind === "program" ? "is-offer" : "is-event"} /> : null}
+        </label>
       </div>
 
       <div className="navbar__actions">

@@ -6,12 +6,14 @@ import Modal from "../components/Modal.jsx";
 import CampaignModal from "../components/CampaignModal.jsx";
 import { createCampaign, deleteCampaign, fetchCampaignDeletionPreview, fetchCampaigns } from "../services/api.js";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
+import { useInitiative } from "../context/InitiativeContext.jsx";
 import "./Campaigns.css";
 
 const audienceOptions = ["Airbnb investors", "Real estate investors", "House flippers", "Property management companies", "Multifamily investors", "Experienced real-estate operators", "Affiliate and referral partners"];
 
 export default function Campaigns() {
   const navigate = useNavigate();
+  const { selectedId } = useInitiative();
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
@@ -57,19 +59,20 @@ export default function Campaigns() {
     finally { setDeleting(false); }
   };
 
-  const activeCount = campaigns.filter((campaign) => campaign.status === "active").length;
-  const totalGoal = campaigns.reduce((sum, campaign) => sum + Number(campaign.ticketGoal || 0), 0);
-  const totalSold = campaigns.reduce((sum, campaign) => sum + Number(campaign.eventId?.eventbriteLogistics?.ticketsSold ?? campaign.ticketsSold ?? 0), 0);
+  const visibleCampaigns = selectedId === "all" ? campaigns : campaigns.filter((campaign) => campaign._id === selectedId);
+  const activeCount = visibleCampaigns.filter((campaign) => campaign.status === "active").length;
+  const totalGoal = visibleCampaigns.reduce((sum, campaign) => sum + Number(campaign.ticketGoal || 0), 0);
+  const totalSold = visibleCampaigns.reduce((sum, campaign) => sum + Number(campaign.eventId?.eventbriteLogistics?.ticketsSold ?? campaign.ticketsSold ?? 0), 0);
 
   return <div className="page-dashboard campaigns-page">
     <div className="page-header"><div><p className="page-eyebrow">Campaign portfolio</p><h1 className="page-title">Campaigns</h1><p className="page-subtitle">See the objective, audience, progress, and next action for every campaign.</p></div><Button onClick={() => { setError(""); setIsOpen(true); }}>+ New campaign</Button></div>
     <section className="campaign-summary">
-      <div><FiTarget /><span><strong>{campaigns.length}</strong>Total campaigns</span></div>
+      <div><FiTarget /><span><strong>{visibleCampaigns.length}</strong>{selectedId === "all" ? "Total campaigns" : "Selected workspace"}</span></div>
       <div><FiCalendar /><span><strong>{activeCount}</strong>Active now</span></div>
       <div><FiUsers /><span><strong>{totalSold} / {totalGoal}</strong>Registrations vs goal</span></div>
     </section>
-    {loading ? <div className="table-state">Loading campaigns…</div> : campaigns.length ? <section className="campaign-card-grid">
-      {campaigns.map((campaign) => {
+    {loading ? <div className="table-state">Loading campaigns…</div> : visibleCampaigns.length ? <section className="campaign-card-grid">
+      {visibleCampaigns.map((campaign) => {
         const logistics = campaign.eventId?.eventbriteLogistics || {};
         const sold = Number(logistics.ticketsSold ?? campaign.ticketsSold ?? 0);
         const goal = Number(campaign.eventId?.ticketGoal ?? campaign.ticketGoal ?? 0);

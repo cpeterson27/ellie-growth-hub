@@ -31,14 +31,14 @@ const navItems = [
   { label: "Settings", path: "/settings", icon: <FiSettings /> },
 ];
 
-export default function Sidebar({ isOpen, onClose }) {
+export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   return (
-    <aside className={isOpen ? "sidebar sidebar--open" : "sidebar"}>
+    <aside className={`${isOpen ? "sidebar sidebar--open" : "sidebar"} ${isCollapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebar__brand">
         <div className="sidebar__logo">E</div>
         <div>
-          <p>Ellie AI</p>
-          <small>Growth Operator</small>
+          <p>Ellie</p>
+          <small>Growth intelligence</small>
         </div>
       </div>
       <nav className="sidebar__nav" aria-label="Primary">
@@ -57,7 +57,7 @@ export default function Sidebar({ isOpen, onClose }) {
         ))}
       </nav>
       <div className="sidebar__footer">
-        <p>Manage events, partners, and revenue from one dashboard.</p>
+        <p>Private growth operating system.</p>
       </div>
     </aside>
   );

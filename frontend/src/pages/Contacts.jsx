@@ -24,6 +24,7 @@ import {
   createEmailVerificationBatch,
   fetchEmailVerificationBatch,
 } from "../services/api.js";
+import { useInitiative } from "../context/InitiativeContext.jsx";
 
 const recognizedImportHeaders = ["Name", "First Name", "Last Name", "Title", "Company Name", "Email", "Email Status", "Phone", "Work Direct Phone", "Person Linkedin Url", "Website", "City", "State", "Country", "# Employees", "Industry", "Seniority", "Departments", "Keywords", "Lists", "Stage", "Qualify Contact", "Tags", "Notes", "Apollo Contact Id", "Apollo Record Id"];
 
@@ -110,6 +111,7 @@ function contactWorkflowState(contact = {}) {
 
 export default function Contacts() {
   const navigate = useNavigate();
+  const { selectedId: initiativeId } = useInitiative();
   const workspaceSettings = getWorkspaceSettings();
   const [contacts, setContacts] = useState([]);
   const [contactOverview, setContactOverview] = useState(null);
@@ -119,7 +121,7 @@ export default function Contacts() {
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState("");
   const [campaigns, setCampaigns] = useState([]);
-  const [campaignId, setCampaignId] = useState("");
+  const [campaignId, setCampaignId] = useState(() => initiativeId === "all" ? "" : initiativeId);
   const [filters, setFilters] = useState({ title: "", location: "", industry: "", employeeSize: "" });
   const [apolloResults, setApolloResults] = useState([]);
   const [selectedLeads, setSelectedLeads] = useState([]);
@@ -198,6 +200,10 @@ export default function Contacts() {
       setCampaigns(items);
     }).catch(() => setError("Unable to load campaigns"));
   }, []);
+
+  useEffect(() => {
+    setCampaignId(initiativeId === "all" ? "" : initiativeId);
+  }, [initiativeId]);
 
   function openImportConfirmation(source) {
     setError("");

@@ -6,12 +6,14 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import Button from "../components/Button.jsx";
 import { fetchCampaigns, fetchEvents, fetchOutreach } from "../services/api.js";
 import "./Dashboard.css";
+import { useInitiative } from "../context/InitiativeContext.jsx";
 
 const eventRevenue = (event) => Number(event.eventbriteLogistics?.grossRevenue || 0) || (Number(event.ticketsSold || 0) * Number(event.ticketPrice || 0));
 const eventDate = (event) => event.startDate ? new Date(event.startDate) : null;
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { selectedId: initiativeId } = useInitiative();
   const [events, setEvents] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -26,6 +28,13 @@ export default function Dashboard() {
       setSelectedId(list[0]?._id || "");
     }).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (initiativeId === "all" || !events.length || !campaigns.length) return;
+    const campaign = campaigns.find((item) => item._id === initiativeId);
+    const campaignEventId = String(campaign?.eventId?._id || campaign?.eventId || "");
+    if (campaignEventId && events.some((event) => String(event._id) === campaignEventId)) setSelectedId(campaignEventId);
+  }, [initiativeId, campaigns, events]);
 
   const selected = events.find((event) => event._id === selectedId) || events[0];
   const selectedIndex = Math.max(0, events.findIndex((event) => event._id === selected?._id));

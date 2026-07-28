@@ -5,13 +5,20 @@ import "./DashboardLayout.css";
 
 export default function DashboardLayout({ children }) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("ellie-sidebar-collapsed") === "true");
 
-  const toggleSidebar = () => setSidebarOpen((value) => !value);
+  const toggleSidebar = () => {
+    if (window.matchMedia("(max-width: 900px)").matches) return setSidebarOpen((value) => !value);
+    setSidebarCollapsed((value) => {
+      localStorage.setItem("ellie-sidebar-collapsed", String(!value));
+      return !value;
+    });
+  };
   const closeSidebar = () => setSidebarOpen(false);
 
   return (
-    <div className="dashboard-shell">
-      <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
+    <div className={isSidebarCollapsed ? "dashboard-shell dashboard-shell--collapsed" : "dashboard-shell"}>
+      <Sidebar isOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} onClose={closeSidebar} />
       {isSidebarOpen ? (
         <div className="dashboard-overlay" onClick={closeSidebar} />
       ) : null}

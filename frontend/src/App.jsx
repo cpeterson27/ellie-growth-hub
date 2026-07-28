@@ -20,12 +20,13 @@ import Discovery from "./pages/Discovery.jsx";
 import DevelopmentRequests from "./pages/DevelopmentRequests.jsx";
 import CrmSetup from "./pages/CrmSetup.jsx";
 import GmailIntegration from "./pages/GmailIntegration.jsx";
+import { InitiativeProvider } from "./context/InitiativeContext.jsx";
 
 
 function App() {
   return (
     <BrowserRouter>
-
+      <InitiativeProvider>
       <DashboardLayout>
 
         <Routes>
@@ -137,7 +138,7 @@ function App() {
         </Routes>
 
       </DashboardLayout>
-
+      </InitiativeProvider>
     </BrowserRouter>
   );
 }
