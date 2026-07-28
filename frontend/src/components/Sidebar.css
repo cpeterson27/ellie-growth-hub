@@ -107,3 +107,5 @@
     transform: translateX(0);
   }
 }
+.sidebar__link--active{box-shadow:inset 3px 0 #c7a758,0 10px 24px rgba(0,0,0,.12)}
+.sidebar__link--active .sidebar__icon{color:#dfc67e;filter:drop-shadow(0 0 8px rgba(223,198,126,.25))}

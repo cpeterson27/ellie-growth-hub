@@ -8,7 +8,12 @@ router.get("/", async (_req, res) => {
     { $setOnInsert: { workspaceName: "Ellie AI Growth Operator" } },
     { upsert: true, new: true },
   );
-  res.json({ workspaceName: config.workspaceName });
+  res.json({
+    workspaceName: config.workspaceName,
+    legalBusinessName: config.legalBusinessName,
+    postalAddress: config.postalAddress,
+    websiteUrl: config.websiteUrl,
+  });
 });
 
 router.patch("/", async (req, res) => {
@@ -16,10 +21,20 @@ router.patch("/", async (req, res) => {
   if (workspaceName.length < 2) return res.status(400).json({ error: "Enter a workspace name." });
   const config = await WorkspaceConfig.findOneAndUpdate(
     { key: "primary" },
-    { $set: { workspaceName } },
+    { $set: {
+      workspaceName,
+      legalBusinessName: String(req.body?.legalBusinessName || "").trim(),
+      postalAddress: String(req.body?.postalAddress || "").trim(),
+      websiteUrl: String(req.body?.websiteUrl || "").trim(),
+    } },
     { upsert: true, new: true },
   );
-  res.json({ workspaceName: config.workspaceName });
+  res.json({
+    workspaceName: config.workspaceName,
+    legalBusinessName: config.legalBusinessName,
+    postalAddress: config.postalAddress,
+    websiteUrl: config.websiteUrl,
+  });
 });
 
 module.exports = router;

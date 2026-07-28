@@ -1,5 +1,8 @@
 const integrationHub = require("./integrationHub");
 const IntegrationConnection = require("../models/IntegrationConnection");
+const Contact = require("../models/Contact");
+const WorkspaceConfig = require("../models/WorkspaceConfig");
+const { createUnsubscribeToken, publicBackendUrl } = require("../utils/unsubscribe");
 
 
 
@@ -39,11 +42,34 @@ async function sendEmail(outreachItem) {
 
 
 
-  const text = outreachItem.emailDraft || "";
-  const html = outreachItem.htmlBody || `<html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${text
+  const contact = outreachItem.contactId
+    ? await Contact.findById(outreachItem.contactId)
+    : await Contact.findOne({ email: String(recipient).toLowerCase() });
+  if (contact?.status === "unsubscribed" || contact?.emailPreferences?.marketingStatus === "unsubscribed") {
+    return { success: false, message: "This contact unsubscribed from campaign email." };
+  }
+  if (!contact) {
+    return { success: false, message: "A CRM contact is required before campaign email can be sent." };
+  }
+  const workspace = await WorkspaceConfig.findOne({ key: "primary" });
+  if (!workspace?.postalAddress?.trim()) {
+    return {
+      success: false,
+      message: "Add the business mailing address in Settings before sending campaign email.",
+    };
+  }
+  const token = createUnsubscribeToken(contact);
+  const unsubscribeUrl = `${publicBackendUrl()}/api/unsubscribe/${encodeURIComponent(token)}`;
+  const businessName = workspace?.legalBusinessName || workspace?.workspaceName || "Ellie's Coaching";
+  const postalAddress = workspace?.postalAddress || "";
+  const complianceText = `${businessName}${postalAddress ? ` · ${postalAddress}` : ""}\nUnsubscribe: ${unsubscribeUrl}`;
+  const footerHtml = `<div style="margin-top:36px;padding-top:20px;border-top:1px solid #ddd7ca;color:#737b77;font-size:12px;line-height:1.6;text-align:center"><div>${String(businessName).replace(/[<>&"]/g, "")}</div>${postalAddress ? `<div>${String(postalAddress).replace(/[<>&"]/g, "")}</div>` : ""}<div><a href="${unsubscribeUrl}" style="color:#506b63">Unsubscribe from campaign emails</a></div></div>`;
+  const text = `${outreachItem.emailDraft || ""}\n\n—\n${complianceText}`;
+  let html = outreachItem.htmlBody || `<html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${(outreachItem.emailDraft || "")
     .split(/\n{2,}/)
     .map((paragraph) => `<p>${String(paragraph).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replaceAll("\n", "<br>")}</p>`)
     .join("")}</body></html>`;
+  html = html.includes("</body>") ? html.replace("</body>", `${footerHtml}</body>`) : `${html}${footerHtml}`;
 
 
 
@@ -66,6 +92,10 @@ const response = await integrationHub.execute("resend", "sendEmail", {
   text,
   html,
   replyTo,
+  headers: {
+    "List-Unsubscribe": `<${unsubscribeUrl}>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  },
 });
 
 

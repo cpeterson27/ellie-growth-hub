@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Button from "./Button.jsx";
 import Modal from "./Modal.jsx";
-import { fetchContentBriefs } from "../services/api.js";
+import { fetchContentBriefs, uploadEventImage } from "../services/api.js";
 import "./CampaignModal.css";
 
 const EVENT_TEMPLATES = [
@@ -32,6 +32,7 @@ const createEmptyForm = (campaignKind = "event") => ({
   ticketGoal: "",
   audience: [],
   description: "",
+  brand: { logoUrl: "", websiteUrl: "", accentColor: "#173f36" },
   templateKey: campaignKind === "program" ? PROGRAM_TEMPLATES[0].key : EVENT_TEMPLATES[0].key,
 });
 
@@ -48,6 +49,7 @@ export default function CampaignModal({
   const [error, setError] = useState("");
   const [savedTemplates, setSavedTemplates] = useState([]);
   const [newAudience, setNewAudience] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const templateOptions = useMemo(
     () => (form.campaignKind === "program" ? PROGRAM_TEMPLATES : EVENT_TEMPLATES),
@@ -72,6 +74,7 @@ export default function CampaignModal({
         ticketGoal: initialData.ticketGoal ?? "",
         audience: initialData.audience || [],
         description: initialData.description || "",
+        brand: { logoUrl: initialData.brand?.logoUrl || "", websiteUrl: initialData.brand?.websiteUrl || "", accentColor: initialData.brand?.accentColor || "#173f36" },
         templateKey: initialData.templateKey || choices[0].key,
       });
     } else {
@@ -115,6 +118,29 @@ export default function CampaignModal({
     if (!value) return;
     setForm((current) => ({ ...current, audience: [...new Set([...current.audience, value])] }));
     setNewAudience("");
+  };
+
+  const uploadLogo = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 8 * 1024 * 1024) {
+      setError("Choose a PNG, JPG, or WEBP logo smaller than 8 MB.");
+      return;
+    }
+    try {
+      setLogoUploading(true);
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const uploaded = await uploadEventImage({ file: dataUrl, filename: file.name });
+      setForm((current) => ({ ...current, brand: { ...current.brand, logoUrl: uploaded.url } }));
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to upload the program logo.");
+    } finally {
+      setLogoUploading(false);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -177,10 +203,22 @@ export default function CampaignModal({
           </div>
 
           {isProgram ? (
-            <div className="form-field span-2">
-              <label htmlFor="program-name">What are you promoting?</label>
-              <input id="program-name" type="text" placeholder="e.g. Multifamily Mentorship on Skool" value={form.programName} onChange={handleChange("programName")} />
-            </div>
+            <>
+              <div className="form-field span-2">
+                <label htmlFor="program-name">What are you promoting?</label>
+                <input id="program-name" type="text" placeholder="e.g. Multifamily Mentorship on Skool" value={form.programName} onChange={handleChange("programName")} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="program-logo">Program logo</label>
+                <input id="program-logo" type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} />
+                <small>{logoUploading ? "Uploading…" : "Used in the workspace and program emails."}</small>
+              </div>
+              <div className="form-field">
+                <label htmlFor="program-site">Program website</label>
+                <input id="program-site" type="url" placeholder="https://" value={form.brand.websiteUrl} onChange={(event) => setForm((current) => ({ ...current, brand: { ...current.brand, websiteUrl: event.target.value } }))} />
+              </div>
+              {form.brand.logoUrl ? <div className="program-logo-preview span-2"><img src={form.brand.logoUrl} alt="Program logo preview" /><button type="button" onClick={() => setForm((current) => ({ ...current, brand: { ...current.brand, logoUrl: "" } }))}>Remove logo</button></div> : null}
+            </>
           ) : (
             <>
               <div className="form-field">

@@ -214,6 +214,18 @@ const contactSchema = new mongoose.Schema(
       default: "active",
       index: true,
     },
+    emailPreferences: {
+      marketingStatus: {
+        type: String,
+        enum: ["unknown", "subscribed", "unsubscribed"],
+        default: "unknown",
+        index: true,
+      },
+      consentSource: { type: String, default: "" },
+      consentAt: { type: Date, default: null },
+      unsubscribedAt: { type: Date, default: null },
+      unsubscribeSource: { type: String, default: "" },
+    },
 
 
   },

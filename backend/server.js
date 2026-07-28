@@ -24,6 +24,7 @@ const contentRouter = require("./routes/content");
 const developmentRequestsRouter = require("./routes/developmentRequests");
 const gmailRouter = require("./routes/gmail");
 const workspaceRouter = require("./routes/workspace");
+const unsubscribeRouter = require("./routes/unsubscribe");
 
 const app = express();
 
@@ -81,6 +82,7 @@ connectDatabase(mongoUri)
     app.use("/api/development-requests", developmentRequestsRouter);
     app.use("/api/gmail", gmailRouter);
     app.use("/api/workspace", workspaceRouter);
+    app.use("/api/unsubscribe", unsubscribeRouter);
 
     app.get("/api/health", (req, res) => {
       res.json({

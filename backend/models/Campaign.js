@@ -25,6 +25,11 @@ const campaignSchema = new mongoose.Schema(
   campaignKind: { type: String, enum: ["event", "program"], default: "event", index: true },
   programName: { type: String, default: "" },
   templateKey: { type: String, default: "event_investor" },
+  brand: {
+    logoUrl: { type: String, default: "" },
+    websiteUrl: { type: String, default: "" },
+    accentColor: { type: String, default: "#173f36" },
+  },
 
 
   audience: [

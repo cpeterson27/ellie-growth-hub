@@ -35,6 +35,9 @@ export const assignCampaignAudience = (campaignId) =>
 export const updateCampaignRegistrationLinks = (campaignId, links) =>
   api.patch(`/campaigns/${campaignId}/registration-links`, links).then((res) => res.data);
 
+export const updateCampaignBrand = (campaignId, brand) =>
+  api.patch(`/campaigns/${campaignId}/brand`, brand).then((res) => res.data);
+
 
 
 export const fetchMarketingCampaign = async (campaignId) => {

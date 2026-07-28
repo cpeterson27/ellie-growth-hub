@@ -99,9 +99,11 @@ function generateOutreachDraft(contact, campaign) {
     : "";
 
 
-  // Replace this later with Cloudinary flyer URL
-  const flyerUrl =
-    "https://res.cloudinary.com/de1vvqtp3/image/upload/v1784844473/deal-to-close-flyer.png_bmxmbw.png";
+  const flyerUrl = campaign.brand?.logoUrl || (
+    campaign.campaignKind === "program"
+      ? ""
+      : "https://res.cloudinary.com/de1vvqtp3/image/upload/v1784844473/deal-to-close-flyer.png_bmxmbw.png"
+  );
 
 
   const fallbackEmailDraft = `
@@ -157,7 +159,7 @@ Ellie's Coaching
 <html>
 <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
 ${textToHtml(fillTemplate(savedBody, variables))}
-${flyerUrl ? `<img src="${escapeHtml(flyerUrl)}" alt="Deal to Close Multifamily Bootcamp" style="width:100%;max-width:600px;border-radius:8px;">` : ""}
+${flyerUrl ? `<img src="${escapeHtml(flyerUrl)}" alt="${escapeHtml(campaign.programName || campaignName)}" style="display:block;max-height:110px;max-width:240px;object-fit:contain;margin:0 0 28px;">` : ""}
 ${eventLink ? `<p><a href="${escapeHtml(eventLink)}" style="display:inline-block;background:#000;color:#fff;padding:14px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">${escapeHtml(campaign.content?.callToAction || "Learn more")}</a></p>` : ""}
 ${meetupHtml}
 </body>

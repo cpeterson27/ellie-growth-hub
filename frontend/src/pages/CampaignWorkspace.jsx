@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { assignCampaignAudience, fetchCampaign, previewCampaignAudience } from "../services/api.js";
+import { assignCampaignAudience, fetchCampaign, previewCampaignAudience, updateCampaignBrand, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -19,6 +19,7 @@ export default function CampaignWorkspace() {
   const [audienceMatch, setAudienceMatch] = useState(null);
   const [matchingAudience, setMatchingAudience] = useState(false);
   const [matchPage, setMatchPage] = useState(1);
+  const [brandSaving, setBrandSaving] = useState(false);
 
   useEffect(() => {
     if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
@@ -43,6 +44,42 @@ export default function CampaignWorkspace() {
       setError(err.response?.data?.error || "Unable to match campaign contacts.");
     } finally {
       setMatchingAudience(false);
+    }
+  };
+
+  const updateBrandField = (field, value) => setCampaign((current) => ({
+    ...current,
+    brand: { ...current.brand, [field]: value },
+  }));
+
+  const uploadLogo = async (file) => {
+    if (!file) return;
+    try {
+      setBrandSaving(true);
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const uploaded = await uploadEventImage({ file: dataUrl, filename: file.name });
+      const updated = await updateCampaignBrand(id, { ...campaign.brand, logoUrl: uploaded.url });
+      setCampaign(updated);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to upload the program logo.");
+    } finally {
+      setBrandSaving(false);
+    }
+  };
+
+  const saveBrand = async () => {
+    try {
+      setBrandSaving(true);
+      setCampaign(await updateCampaignBrand(id, campaign.brand || {}));
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to save the program brand.");
+    } finally {
+      setBrandSaving(false);
     }
   };
 
@@ -91,6 +128,17 @@ export default function CampaignWorkspace() {
           <p><strong>Subject</strong><br />{campaign.content?.subject || "No subject set yet."}</p>
           <p className="campaign-workspace__body-preview">{campaign.content?.body || "Your outreach draft will appear here after it is prepared."}</p>
         </DashboardCard>
+
+        {isProgram && <DashboardCard title="Program brand">
+          <div className="program-brand-editor">
+            {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.programName || campaign.name} logo`} /> : <div className="program-brand-placeholder">Add the program logo</div>}
+            <label><span>Replace logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label>
+            <label><span>Program website</span><input type="url" value={campaign.brand?.websiteUrl || ""} placeholder="https://" onChange={(event) => updateBrandField("websiteUrl", event.target.value)} /></label>
+            <label><span>Brand color</span><input type="color" value={campaign.brand?.accentColor || "#173f36"} onChange={(event) => updateBrandField("accentColor", event.target.value)} /></label>
+            <Button loading={brandSaving} onClick={saveBrand}>Save program brand</Button>
+          </div>
+          <p className="campaign-workspace__empty">This logo and color are reused in every email for this program. Replace the asset here whenever the client’s branding changes.</p>
+        </DashboardCard>}
 
         {!isProgram && <DashboardCard title="Registration channels">
           {registrationLinks.length ? <div className="campaign-registration-links">

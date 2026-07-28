@@ -142,6 +142,29 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.patch("/:id/brand", async (req, res) => {
+  try {
+    const accentColor = /^#[0-9a-f]{6}$/i.test(String(req.body?.accentColor || ""))
+      ? req.body.accentColor
+      : "#173f36";
+    const campaign = await Campaign.findByIdAndUpdate(
+      req.params.id,
+      { $set: {
+        brand: {
+          logoUrl: String(req.body?.logoUrl || "").trim(),
+          websiteUrl: String(req.body?.websiteUrl || "").trim(),
+          accentColor,
+        },
+      } },
+      { new: true, runValidators: true },
+    );
+    if (!campaign) return res.status(404).json({ error: "Campaign not found." });
+    res.json(campaign);
+  } catch (error) {
+    res.status(400).json({ error: "Unable to save campaign branding." });
+  }
+});
+
 router.patch("/:id/registration-links", async (req, res) => {
   try {
     const campaign = await Campaign.findById(req.params.id);
@@ -370,6 +393,7 @@ router.post("/", async (req, res) => {
       programName = "",
       templateKey = "event_investor",
       contentBriefId = null,
+      brand = {},
     } = req.body;
 
 
@@ -437,6 +461,11 @@ router.post("/", async (req, res) => {
         campaignKind,
         programName,
         templateKey: savedTemplate ? `content:${savedTemplate._id}` : templateKey,
+        brand: {
+          logoUrl: String(brand.logoUrl || "").trim(),
+          websiteUrl: String(brand.websiteUrl || "").trim(),
+          accentColor: String(brand.accentColor || "#173f36").trim(),
+        },
 
         name:
           event?.name || name,

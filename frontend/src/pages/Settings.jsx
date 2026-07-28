@@ -8,19 +8,27 @@ import "./Settings.css";
 export default function Settings() {
   const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
   const [accountEmail, setAccountEmail] = useState("");
+  const [legalBusinessName, setLegalBusinessName] = useState("");
+  const [postalAddress, setPostalAddress] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchWorkspaceConfig().then((config) => setWorkspaceName(config.workspaceName)).catch(() => {});
+    fetchWorkspaceConfig().then((config) => {
+      setWorkspaceName(config.workspaceName);
+      setLegalBusinessName(config.legalBusinessName || "");
+      setPostalAddress(config.postalAddress || "");
+      setWebsiteUrl(config.websiteUrl || "");
+    }).catch(() => {});
     fetchGmailConnection().then((connection) => setAccountEmail(connection.email || "")).catch(() => {});
   }, []);
 
   const save = async () => {
     try {
       setSaving(true);
-      const config = await updateWorkspaceConfig({ workspaceName });
+      const config = await updateWorkspaceConfig({ workspaceName, legalBusinessName, postalAddress, websiteUrl });
       const local = { ...getWorkspaceSettings(), workspaceName: config.workspaceName };
       saveWorkspaceSettings(local);
       setWorkspaceName(config.workspaceName);
@@ -45,6 +53,9 @@ export default function Settings() {
         <header><p className="page-eyebrow">Organization profile</p><h2>Workspace identity</h2><p>This name appears in Ellie’s navigation and identifies the client account. Events, programs, and offers are selected separately from the workspace menu at the top of the application.</p></header>
         <div className="account-profile-form">
           <label className="form-field"><span>Workspace name</span><input value={workspaceName} onChange={(event) => { setWorkspaceName(event.target.value); setSaved(false); }} /><small>Example: Ellie’s Coaching</small></label>
+          <label className="form-field"><span>Legal business name</span><input value={legalBusinessName} onChange={(event) => { setLegalBusinessName(event.target.value); setSaved(false); }} /><small>Shown in required campaign email identification.</small></label>
+          <label className="form-field"><span>Business mailing address</span><textarea rows="3" value={postalAddress} onChange={(event) => { setPostalAddress(event.target.value); setSaved(false); }} placeholder="Street address, city, state, postal code" /><small>Included in marketing email footers. Enter a valid business postal address before sending campaigns.</small></label>
+          <label className="form-field"><span>Business website</span><input type="url" value={websiteUrl} onChange={(event) => { setWebsiteUrl(event.target.value); setSaved(false); }} placeholder="https://" /></label>
           <label className="form-field"><span>Connected account email</span><div className="account-readonly-field"><FiMail /> {accountEmail || "No Gmail account connected"}</div><small>Email connections are managed from Integrations.</small></label>
         </div>
         <footer><Button loading={saving} disabled={workspaceName.trim().length < 2} onClick={save}>Save organization profile</Button></footer>
