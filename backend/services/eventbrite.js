@@ -63,6 +63,28 @@ async function getEvents() {
 
 
   try {
+    const connection = await eventbriteOAuthService.status();
+    const organizationIds = (connection.organizations || []).map((organization) => organization.id);
+    if (connection.defaultOrganizationId && !organizationIds.includes(connection.defaultOrganizationId)) {
+      organizationIds.push(connection.defaultOrganizationId);
+    }
+    if (organizationIds.length) {
+      const events = [];
+      for (const organizationId of organizationIds) {
+        let page = 1;
+        let hasMore = true;
+        while (hasMore && page <= 100) {
+          const organizationResponse = await eventbriteApi.get(
+            `/organizations/${organizationId}/events/?time_filter=all&page=${page}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          events.push(...(organizationResponse.data.events || []));
+          hasMore = Boolean(organizationResponse.data.pagination?.has_more_items);
+          page += 1;
+        }
+      }
+      return events;
+    }
 
     const response = await eventbriteApi.get(
       "/users/me/owned_events/",

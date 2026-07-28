@@ -77,6 +77,19 @@ async function exchangeCode(code) {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   const user = profile.data || {};
+  let organizations = [];
+  try {
+    const organizationResponse = await axios.get(
+      "https://www.eventbriteapi.com/v3/users/me/organizations/",
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    organizations = (organizationResponse.data?.organizations || []).map((organization) => ({
+      id: String(organization.id),
+      name: organization.name || "Eventbrite organization",
+    }));
+  } catch (error) {
+    console.warn("EVENTBRITE ORGANIZATION LOOKUP WARNING:", error.response?.data || error.message);
+  }
   const encrypted = encryptCredentials({ accessToken });
   const connection = await IntegrationConnection.findOneAndUpdate(
     { provider: PROVIDER },
@@ -84,7 +97,11 @@ async function exchangeCode(code) {
       $set: {
         status: "connected",
         credentialsEncrypted: encrypted,
-        settings: { email: user.emails?.[0]?.email || "" },
+        settings: {
+          email: user.emails?.[0]?.email || "",
+          organizations,
+          defaultOrganizationId: organizations[0]?.id || "",
+        },
         "oauth.providerAccountId": String(user.id || ""),
         connectedAt: new Date(),
         lastVerifiedAt: new Date(),
@@ -121,7 +138,18 @@ async function status() {
     lastVerifiedAt: connection?.lastVerifiedAt || null,
     lastError: connection?.lastError || null,
     accountEmail: connection?.settings?.email || "",
+    organizations: connection?.settings?.organizations || [],
+    defaultOrganizationId: connection?.settings?.defaultOrganizationId ||
+      String(process.env.EVENTBRITE_ORGANIZATION_ID || "").trim(),
   };
+}
+
+async function organizationId(requestedId = "") {
+  if (requestedId) return String(requestedId);
+  const connection = await IntegrationConnection.findOne({ provider: PROVIDER });
+  return connection?.settings?.defaultOrganizationId ||
+    connection?.settings?.organizations?.[0]?.id ||
+    String(process.env.EVENTBRITE_ORGANIZATION_ID || "").trim();
 }
 
 async function disconnect() {
@@ -153,4 +181,5 @@ module.exports = {
   accessToken,
   status,
   disconnect,
+  organizationId,
 };

@@ -4,6 +4,7 @@ const Event = require("../models/Event");
 const { getEvent, getEvents } = require("../services/eventbrite");
 const eventbriteOAuthService = require("../services/eventbriteOAuthService");
 const eventbriteLogisticsService = require("../services/eventbriteLogisticsService");
+const eventbriteManagementService = require("../services/eventbriteManagementService");
 
 const router = express.Router();
 
@@ -60,6 +61,43 @@ router.post("/events/:eventId/sync", async (req, res) => {
     const status = error.message === "Event not found" ? 404 : 502;
     res.status(status).json({
       error: error.response?.data?.error_description || error.message || "Unable to synchronize Eventbrite",
+    });
+  }
+});
+
+router.post("/managed-events", async (req, res) => {
+  try {
+    const event = await eventbriteManagementService.createManagedEvent(req.body);
+    res.status(201).json({ success: true, event });
+  } catch (error) {
+    console.error("EVENTBRITE CREATE EVENT ERROR:", error.response?.data || error.message);
+    res.status(400).json({
+      error: error.response?.data?.error_description || error.message || "Unable to create Eventbrite event",
+    });
+  }
+});
+
+router.patch("/managed-events/:eventId", async (req, res) => {
+  try {
+    const event = await eventbriteManagementService.updateManagedEvent(req.params.eventId, req.body);
+    res.json({ success: true, event });
+  } catch (error) {
+    console.error("EVENTBRITE UPDATE EVENT ERROR:", error.response?.data || error.message);
+    const status = error.message === "Event not found" ? 404 : 400;
+    res.status(status).json({
+      error: error.response?.data?.error_description || error.message || "Unable to update Eventbrite event",
+    });
+  }
+});
+
+router.post("/managed-events/:eventId/publish", async (req, res) => {
+  try {
+    const event = await eventbriteManagementService.publishManagedEvent(req.params.eventId);
+    res.json({ success: true, event });
+  } catch (error) {
+    console.error("EVENTBRITE PUBLISH EVENT ERROR:", error.response?.data || error.message);
+    res.status(400).json({
+      error: error.response?.data?.error_description || error.message || "Unable to publish Eventbrite event",
     });
   }
 });

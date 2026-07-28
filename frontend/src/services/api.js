@@ -115,6 +115,15 @@ export const disconnectEventbrite = () =>
 export const syncEventbriteEvent = (eventId) =>
   api.post(`/eventbrite/events/${eventId}/sync`).then((res) => res.data);
 
+export const createManagedEventbriteEvent = (data) =>
+  api.post("/eventbrite/managed-events", data).then((res) => res.data);
+
+export const updateManagedEventbriteEvent = (eventId, data) =>
+  api.patch(`/eventbrite/managed-events/${eventId}`, data).then((res) => res.data);
+
+export const publishManagedEventbriteEvent = (eventId) =>
+  api.post(`/eventbrite/managed-events/${eventId}/publish`).then((res) => res.data);
+
 
 
 
