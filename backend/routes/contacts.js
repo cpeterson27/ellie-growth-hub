@@ -229,6 +229,17 @@ router.get("/email-verification/batches/:batchId", async (req, res) => {
 router.get("/overview", async (req, res) => {
   try {
     const active = { status: { $ne: "archived" } };
+    const audienceUnknownCriteria = {
+      $and: [
+        { $or: [{ audienceProfiles: { $exists: false } }, { audienceProfiles: { $size: 0 } }] },
+        { $or: [{ title: { $exists: false } }, { title: "" }] },
+        { $or: [{ industry: { $exists: false } }, { industry: "" }] },
+        { $or: [{ company: { $exists: false } }, { company: "" }] },
+        { $or: [{ seniority: { $exists: false } }, { seniority: "" }] },
+        { $or: [{ keywords: { $exists: false } }, { keywords: { $size: 0 } }] },
+        { $or: [{ lists: { $exists: false } }, { lists: { $size: 0 } }] },
+      ],
+    };
     const [
       total,
       approved,
@@ -239,6 +250,10 @@ router.get("/overview", async (req, res) => {
       needsResearch,
       readyForReview,
       qualified,
+      campaignAssigned,
+      audienceUnknown,
+      needsAttention,
+      readyToAssign,
       missingFields,
     ] = await Promise.all([
       Contact.countDocuments(active),
@@ -250,6 +265,24 @@ router.get("/overview", async (req, res) => {
       Contact.countDocuments({ ...active, researchStatus: "needs_research" }),
       Contact.countDocuments({ ...active, researchStatus: "ready_for_review" }),
       Contact.countDocuments({ ...active, researchStatus: "qualified", qualifyContact: true }),
+      Contact.countDocuments({ ...active, "campaignIds.0": { $exists: true } }),
+      Contact.countDocuments({ ...active, ...audienceUnknownCriteria }),
+      Contact.countDocuments({
+        ...active,
+        $or: [
+          { emailStatus: { $ne: "verified" } },
+          { email: { $exists: false } },
+          { email: "" },
+          audienceUnknownCriteria,
+        ],
+      }),
+      Contact.countDocuments({
+        ...active,
+        emailStatus: "verified",
+        email: { $type: "string", $ne: "" },
+        "campaignIds.0": { $exists: false },
+        $nor: [audienceUnknownCriteria],
+      }),
       Contact.aggregate([
         { $match: active },
         { $unwind: "$missingFields" },
@@ -269,6 +302,10 @@ router.get("/overview", async (req, res) => {
         needsResearch,
         readyForReview,
         qualified,
+        campaignAssigned,
+        audienceUnknown,
+        needsAttention,
+        readyToAssign,
         missingFields: Object.fromEntries(missingFields.map((item) => [item._id, item.count])),
       },
     });

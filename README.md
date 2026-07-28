@@ -119,11 +119,11 @@ Contacts may be entered manually or imported from a CSV. A usable name is enough
 to retain the relationship, and a verified email is enough for intentional
 manual campaign assignment. It is not enough for automatic audience matching.
 Ellie AI labels a name-and-email-only record **Audience unknown** and waits for
-a real targeting signal such as a title, company, industry, tag, form answer,
-event attendance, campaign response, LinkedIn profile, keyword, list, or note.
+a real targeting signal such as a title, company, industry, audience profile,
+seniority, keyword, or list.
 Ellie AI does not infer interests or profession from a person's name.
-to retain a record, so missing company, title, industry, or email information
-does not cause the person to disappear.
+Missing company, title, industry, or email information does not cause the person
+to disappear.
 
 Email readiness is tracked separately from research completeness:
 
@@ -139,17 +139,26 @@ Email readiness is tracked separately from research completeness:
 Verification does not automatically send an email. Importing a contact does not
 automatically add that person to a campaign.
 
-### 4. Contact readiness
+### 4. Built-in CRM workflow
 
-The contact views answer different operational questions:
+The Contacts page is Ellie AI's built-in CRM. Manual contacts, CSV imports, and
+contacts synchronized from another CRM enter this page directly. They do not
+need a second approval in Discovery. The CRM is organized around one clear next
+action:
 
-- **Approved Contacts:** contacts accepted into the working database.
-- **Verified Email:** contacts with an address that may be used for outreach.
-- **Needs Research:** useful records with missing context.
-- **Ready for Review:** research is sufficiently complete for a team decision.
-- **Campaign Ready:** contacts intentionally approved and assigned to a campaign.
-- **Email Review:** contacts whose email is missing or withheld.
-- **Archived:** records retained for history but removed from active work.
+- **All contacts:** every active relationship in the database.
+- **Needs attention:** an email must be reviewed or the contact needs real
+  audience information.
+- **Ready to assign:** the contact has a usable email and enough audience
+  context but has not been assigned to a campaign.
+- **Campaign assigned:** the contact is connected to at least one campaign.
+- **Archived:** the relationship is retained for history but removed from
+  active work.
+
+CSV import is a three-step flow: choose the file, verify email addresses, and
+save the contacts to the CRM. Verification does not send email, and saving does
+not assign a campaign. After import, the CRM shows the next action for each
+record.
 
 A contact does not need a company, title, and industry to join a campaign. A
 name plus a verified or owner-confirmed email is sufficient when the team knows
@@ -161,7 +170,10 @@ not delete the contact or erase their history.
 ### 5. Discovery
 
 Discovery is the review area for prospective people and organizations before
-they enter active outreach.
+they enter the CRM. It is for net-new prospects found through Apollo or another
+discovery source—not for CSV files or people the team already knows. Approving a
+discovered prospect adds that relationship to the CRM; all later work happens
+from Contacts.
 
 Apollo organization discovery can use configurable targeting such as:
 

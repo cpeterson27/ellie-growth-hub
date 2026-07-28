@@ -4,6 +4,44 @@
   gap: 0.8rem;
   margin-bottom: 1rem;
 }
+.contact-overview--workflow {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.crm-mode-banner {
+  align-items: center;
+  background: linear-gradient(120deg, #eef7f3 0%, #f7f5ef 100%);
+  border: 1px solid #cfddd7;
+  border-radius: 22px;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  padding: 22px 26px;
+}
+
+.crm-mode-banner__eyebrow {
+  color: #1f6758;
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.crm-mode-banner strong {
+  color: #15211f;
+  display: block;
+  font-size: 1.08rem;
+  margin-bottom: 5px;
+}
+
+.crm-mode-banner p {
+  color: #68726e;
+  margin: 0;
+  max-width: 760px;
+}
 
 .contact-overview button {
   display: grid;
@@ -127,11 +165,86 @@
 
 .contact-record__details {
   display: grid;
-  grid-template-columns: minmax(200px, 1.5fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(190px, 1.2fr);
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
   gap: 0.75rem;
   margin-top: 0.9rem;
   padding-top: 0.85rem;
   border-top: 1px solid var(--border);
+}
+.contact-next-action {
+  min-width: max-content;
+  padding: 0.48rem 0.68rem;
+  border: 1px solid #a9c9c0;
+  border-radius: 9px;
+  background: #f3f8f6;
+  color: #175848;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.contact-next-action--email,
+.contact-next-action--audience {
+  border-color: #dfc98e;
+  background: #fff8e8;
+  color: #755800;
+}
+.crm-tabs--simple {
+  grid-template-columns: repeat(5, minmax(max-content, 1fr));
+}
+.crm-import-start {
+  display: grid;
+  gap: 1rem;
+}
+.crm-import-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+}
+.crm-import-steps > div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: #f8f7f3;
+}
+.crm-import-steps > div.active {
+  border-color: #8dbbaf;
+  background: #edf8f4;
+}
+.crm-import-steps span {
+  color: var(--primary);
+  font-weight: 900;
+}
+.crm-import-steps small {
+  color: var(--text-muted);
+}
+.crm-file-drop {
+  display: grid;
+  place-items: center;
+  gap: 0.3rem;
+  min-height: 150px;
+  border: 2px dashed #9fc8bc;
+  border-radius: 14px;
+  background: #f4faf7;
+  color: #175848;
+  cursor: pointer;
+}
+.crm-file-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.crm-file-drop span,
+.crm-paste-option {
+  color: var(--text-muted);
+}
+.crm-paste-option textarea {
+  width: 100%;
+  min-height: 130px;
+  margin-top: 0.65rem;
 }
 
 .contact-record__details div {
@@ -221,6 +334,25 @@
 
   .contact-overview {
     grid-template-columns: 1fr;
+  }
+
+  .crm-mode-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .crm-mode-banner .button {
+    width: 100%;
+  }
+
+  .crm-import-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .crm-tabs--simple {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 6px;
   }
 
   .contact-record header {

@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const { connectDatabase } = require("./config/database");
+const Contact = require("./models/Contact");
 
 const campaignsRouter = require("./routes/campaigns");
 const outreachRouter = require("./routes/outreach");
@@ -38,8 +39,25 @@ if (!mongoUri) {
 }
 
 connectDatabase(mongoUri)
-  .then(() => {
+  .then(async () => {
     console.log("Connected to MongoDB");
+
+    const migratedImports = await Contact.updateMany(
+      {
+        status: "prospect",
+        $or: [
+          { sourceProvider: { $in: ["csv", "manual", "monday"] } },
+          { sources: { $in: ["csv", "manual", "monday"] } },
+        ],
+      },
+      { $set: { status: "active" } },
+    );
+
+    if (migratedImports.modifiedCount > 0) {
+      console.log(
+        `Moved ${migratedImports.modifiedCount} imported contacts into the CRM workflow.`,
+      );
+    }
 
     app.use("/api/campaigns", campaignsRouter);
     app.use("/api/outreach", outreachRouter);

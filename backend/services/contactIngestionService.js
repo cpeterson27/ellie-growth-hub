@@ -113,7 +113,9 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null }
         sources: [source],
         tags: [...new Set([source, ...(data.tags || [])])],
         type: "lead",
-        status: source === "manual" ? "active" : "prospect",
+        // Imported contacts already belong to the business's CRM. Only leads
+        // originating from an actual discovery workflow wait in Discovery.
+        status: ["discovery", "apollo_search"].includes(source) ? "prospect" : "active",
         importedAt: new Date(),
       });
     }

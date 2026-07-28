@@ -52,17 +52,6 @@ function fullContactName(contact = {}) {
 }
 
 function hasAudienceSignals(contact = {}) {
-  const systemTags = new Set([
-    "manual",
-    "needs-enrichment",
-    "csv-import",
-    "email-verified",
-    "owner-confirmed",
-    "verified-email",
-  ]);
-  const meaningfulTags = (contact.tags || []).filter(
-    (tag) => !systemTags.has(String(tag).trim().toLowerCase()),
-  );
   return Boolean(
     contact.audienceProfiles?.length ||
     contact.audienceSignals?.some((signal) => signal?.profile) ||
@@ -70,12 +59,38 @@ function hasAudienceSignals(contact = {}) {
     contact.industry ||
     contact.company ||
     contact.seniority ||
-    contact.linkedin ||
-    meaningfulTags.length ||
     contact.keywords?.length ||
-    contact.lists?.length ||
-    contact.notes
+    contact.lists?.length
   );
+}
+
+function contactWorkflowState(contact = {}) {
+  if (contact.emailStatus !== "verified" || !contact.email) {
+    return {
+      key: "email",
+      label: "Review email",
+      detail: "Confirm or correct the email before outreach.",
+    };
+  }
+  if (!hasAudienceSignals(contact)) {
+    return {
+      key: "audience",
+      label: "Add audience info",
+      detail: "Tell Ellie what this person is interested in.",
+    };
+  }
+  if (contact.campaignIds?.length) {
+    return {
+      key: "assigned",
+      label: "Manage assignment",
+      detail: "This contact is already assigned to a campaign.",
+    };
+  }
+  return {
+    key: "ready",
+    label: "Assign campaign",
+    detail: "Verified and ready for a campaign decision.",
+  };
 }
 
 export default function Contacts() {
@@ -102,7 +117,7 @@ export default function Contacts() {
   const [importHeaders, setImportHeaders] = useState([]);
   const [importCampaignId, setImportCampaignId] = useState("");
   const [savingContact, setSavingContact] = useState(false);
-  const [contactTab, setContactTab] = useState("approved");
+  const [contactTab, setContactTab] = useState("all");
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [actionMenu, setActionMenu] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -126,19 +141,14 @@ export default function Contacts() {
       const query = { limit: 500, ...(contactTab === "archived" ? { status: "archived" } : {}) };
       const response = await fetchContacts(query);
       const items = (response.data || []).filter((contact) => {
-        const tabMatches = contactTab === "approved"
-          ? contact.status === "active"
-          : contactTab === "verified"
-            ? contact.emailStatus === "verified"
-          : contactTab === "email_review"
-            ? contact.emailStatus !== "verified"
-            : contactTab === "research"
-              ? contact.researchStatus === "needs_research"
-              : contactTab === "ready"
-                ? contact.researchStatus === "ready_for_review"
-                : contactTab === "qualified"
-                  ? contact.researchStatus === "qualified" && contact.qualifyContact
-                  : true;
+        const workflow = contactWorkflowState(contact);
+        const tabMatches = contactTab === "attention"
+          ? workflow.key === "email" || workflow.key === "audience"
+          : contactTab === "ready"
+            ? workflow.key === "ready"
+            : contactTab === "assigned"
+              ? workflow.key === "assigned"
+              : true;
         return tabMatches &&
           (!campaignId || contact.campaignIds?.some((id) => String(id) === campaignId)) &&
           (!searchTerm || [contact.name, contact.company, contact.email, contact.title].join(" ").toLowerCase().includes(searchTerm.toLowerCase()));
@@ -432,8 +442,8 @@ export default function Contacts() {
     <div className="page-dashboard contacts-page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Contacts</h1>
-          <p className="page-subtitle">Import and manage outreach contacts.</p>
+          <h1 className="page-title">CRM</h1>
+          <p className="page-subtitle">Keep every relationship organized, understand the next action, and move the right people into campaigns.</p>
         </div>
         <div className="crm-header-actions">
           <Button onClick={() => { setError(""); setContactFormOpen(true); }}>+ New Contact</Button>
@@ -445,26 +455,37 @@ export default function Contacts() {
         </div>
       </div>
 
+      <section className="crm-mode-banner" aria-label="CRM connection options">
+        <div>
+          <span className="crm-mode-banner__eyebrow">Your contact system</span>
+          <strong>Ellie CRM is active.</strong>
+          <p>
+            Use this CRM on its own, or connect another CRM and keep the same
+            review, audience, and campaign workflow.
+          </p>
+        </div>
+        <Button variant="secondary" onClick={() => navigate("/integrations")}>
+          View CRM integrations
+        </Button>
+      </section>
+
       <DashboardCard title="Contacts">
         {error ? <p className="form-error">{error}</p> : null}
         {importSummary ? <div className={importSummary.failed ? "form-error" : "contact-modal-intro"}>
           <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated, {importSummary.failed || 0} failed.</p>
           {importSummary.failed && importSummary.errors?.[0]?.message ? <p>First failure: {importSummary.errors[0].message}</p> : null}
         </div> : null}
-        {contactOverview ? <section className="contact-overview" aria-label="Contact status overview">
-          <button onClick={() => setContactTab("all")}><span>Total contacts</span><strong>{contactOverview.total}</strong><small>Unique people in MongoDB</small></button>
-          <button className="is-safe" onClick={() => setContactTab("approved")}><span>Approved contacts</span><strong>{contactOverview.approved}</strong><small>Moved here from Discovery</small></button>
-          <button className="is-safe" onClick={() => setContactTab("verified")}><span>Verified emails</span><strong>{contactOverview.verified}</strong><small>Safe for reviewed outreach</small></button>
-          <button className="is-warning" onClick={() => setContactTab("email_review")}><span>Email review</span><strong>{contactOverview.withoutEmail}</strong><small>{contactOverview.risky} risky · {contactOverview.undeliverable} undeliverable</small></button>
-          <button onClick={() => setContactTab("research")}><span>Needs research</span><strong>{contactOverview.needsResearch}</strong><small>Missing company, title, or industry</small></button>
-          <button onClick={() => setContactTab("ready")}><span>Ready for review</span><strong>{contactOverview.readyForReview}</strong><small>Research complete; needs a decision</small></button>
-          <button onClick={() => setContactTab("qualified")}><span>Campaign ready</span><strong>{contactOverview.qualified}</strong><small>Verified and approved for targeting</small></button>
+        {contactOverview ? <section className="contact-overview contact-overview--workflow" aria-label="CRM workflow overview">
+          <button onClick={() => setContactTab("all")}><span>All relationships</span><strong>{contactOverview.total}</strong><small>Everyone stored in your CRM</small></button>
+          <button className="is-warning" onClick={() => setContactTab("attention")}><span>Needs attention</span><strong>{contactOverview.needsAttention || 0}</strong><small>Email or audience information needs a decision</small></button>
+          <button className="is-safe" onClick={() => setContactTab("ready")}><span>Ready to assign</span><strong>{contactOverview.readyToAssign || 0}</strong><small>Verified contacts not yet assigned</small></button>
+          <button className="is-safe" onClick={() => setContactTab("assigned")}><span>Campaign assigned</span><strong>{contactOverview.campaignAssigned || 0}</strong><small>Contacts already connected to an offer or event</small></button>
         </section> : null}
         {contactOverview ? <p className="contact-guidance">
-          <strong>What to do next:</strong> Start with Needs Research. Missing fields across the database: company {contactOverview.missingFields?.company || 0}, title {contactOverview.missingFields?.title || 0}, industry {contactOverview.missingFields?.industry || 0}. Email Review contains contacts whose address was withheld because it was risky, undeliverable, or absent.
+          <strong>How this CRM works:</strong> Imported contacts appear here immediately. Open <strong>Needs attention</strong> to correct an email or add an audience profile. When a verified contact is a fit, assign them to a campaign here. Discovery is only for finding new prospects you do not already have.
         </p> : null}
         <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
-        <div className="crm-tabs">{[["approved", "Approved Contacts"], ["verified", "Verified Email"], ["research", "Needs Research"], ["ready", "Ready for Review"], ["qualified", "Campaign Ready"], ["email_review", "Email Review"], ["all", "All Records"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
+        <div className="crm-tabs crm-tabs--simple">{[["all", "All contacts"], ["attention", "Needs attention"], ["ready", "Ready to assign"], ["assigned", "Campaign assigned"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
         {contacts.length && contactTab !== "archived" ? <section className="contact-bulk-actions" aria-label="Bulk contact actions">
           <label className="contact-select-all">
             <input type="checkbox" checked={contacts.some((contact) => contact.emailStatus === "verified") && contacts.filter((contact) => contact.emailStatus === "verified").every((contact) => selectedContactIds.includes(contact._id))} onChange={(event) => setSelectedContactIds(event.target.checked ? contacts.filter((contact) => contact.emailStatus === "verified").map((contact) => contact._id) : [])} />
@@ -480,7 +501,9 @@ export default function Contacts() {
         </section> : null}
         {bulkNotice ? <p className="contact-bulk-notice">{bulkNotice}</p> : null}
         {loading ? <div className="table-state">Loading contacts…</div> : contacts.length ? <div className="contact-record-list">
-          {contacts.map((contact) => <article className="contact-record" key={contact._id} onClick={() => setDetailContact(contact)}>
+          {contacts.map((contact) => {
+            const workflow = contactWorkflowState(contact);
+            return <article className="contact-record" key={contact._id} onClick={() => setDetailContact(contact)}>
             <header>
               <div className="contact-record__identity">
                 <input type="checkbox" aria-label={`Select ${contact.name}`} disabled={contact.emailStatus !== "verified"} checked={selectedContactIds.includes(contact._id)} onClick={(event) => event.stopPropagation()} onChange={(event) => setSelectedContactIds((current) => event.target.checked ? [...new Set([...current, contact._id])] : current.filter((id) => id !== contact._id))} />
@@ -499,6 +522,10 @@ export default function Contacts() {
                     Audience unknown
                   </span>
                 ) : null}
+                <button className={`contact-next-action contact-next-action--${workflow.key}`} onClick={(event) => {
+                  event.stopPropagation();
+                  setEditingContact({ ...contact, ...contactNameParts(contact) });
+                }}>{workflow.label}</button>
                 <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}>
                   <button className="crm-overflow" aria-label={`Actions for ${contact.name}`} onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>•••</button>
                   {actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View details</button><button onClick={() => setEditingContact({ ...contact, ...contactNameParts(contact) })}>Research, qualify & assign</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete permanently</button></div> : null}
@@ -510,13 +537,15 @@ export default function Contacts() {
               <div><span>Phone</span><strong>{contact.phone || "Not provided"}</strong></div>
               <div><span>Research status</span><strong>{String(contact.researchStatus || "needs_research").replaceAll("_", " ")}</strong></div>
               <div><span>Missing information</span><strong>{contact.missingFields?.length ? contact.missingFields.join(", ") : "None"}</strong></div>
+              <div><span>Next action</span><strong>{workflow.detail}</strong></div>
             </div>
-          </article>)}
+          </article>;
+          })}
         </div> : <div className="table-state table-state--empty">
-          {contactTab === "qualified"
-            ? "No contacts are campaign ready yet. Select verified contacts, choose a campaign, and use Qualify & assign selected."
-            : contactTab === "approved"
-              ? "No prospects have been approved from Discovery yet."
+          {contactTab === "ready"
+            ? "No verified contacts are waiting for a campaign assignment."
+            : contactTab === "attention"
+              ? "Nothing needs attention right now."
               : "No contacts match this view."}
         </div>}
       </DashboardCard>
@@ -593,12 +622,30 @@ export default function Contacts() {
         footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button>{importRows.length && pendingEmailCount > 0 ? <Button variant="outline" loading={savingContact} disabled={verifyingEmails} onClick={saveUploadedContactsWithoutEmails}>Save people without emails</Button> : null}<Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import verified contacts</Button></>}
       >
         {importError ? <p className="form-error" role="alert">{importError}</p> : null}
-        {!importRows.length ? <><p>Upload a CSV or paste comma- or tab-separated data. Excel files are not supported in this build.</p><input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} /><textarea className="select-input" style={{ width: "100%", marginTop: "0.75rem", minHeight: "130px" }} placeholder="Paste header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) prepareImport(event.target.value); }} /></> : <>
+        {!importRows.length ? <div className="crm-import-start">
+          <div className="crm-import-steps">
+            <div className="active"><span>1</span><strong>Choose CSV</strong><small>Upload your contact file</small></div>
+            <div><span>2</span><strong>Verify emails</strong><small>Review deliverability before saving</small></div>
+            <div><span>3</span><strong>Save to CRM</strong><small>Contacts appear here immediately</small></div>
+          </div>
+          <p>Select a CSV exported from a spreadsheet, Apollo, or another CRM. Ellie recognizes common contact columns automatically.</p>
+          <label className="crm-file-drop">
+            <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} />
+            <strong>Choose a CSV file</strong>
+            <span>or drag a file here</span>
+          </label>
+          <details className="crm-paste-option"><summary>Paste rows instead</summary><textarea className="select-input" placeholder="Paste the header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) prepareImport(event.target.value); }} /></details>
+        </div> : <>
+          <div className="crm-import-steps">
+            <div><span>✓</span><strong>CSV loaded</strong><small>{importRows.length} contacts found</small></div>
+            <div className="active"><span>2</span><strong>Verify emails</strong><small>Use Emailable only when needed</small></div>
+            <div><span>3</span><strong>Save to CRM</strong><small>No Discovery approval required</small></div>
+          </div>
           <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p><p>Duplicate candidates are checked by the shared ingestion service during import.</p>
           <p>Detected headers: {importHeaders.join(", ")}</p>
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
-          <p className="contact-modal-intro">Campaigns are assigned after research and qualification. This prevents incomplete contacts from entering outreach.</p>
+          <p className="contact-modal-intro"><strong>What happens next:</strong> These contacts will be saved directly to your CRM. Nothing is emailed and no campaign is assigned during import. Each contact will show its next recommended action afterward.</p>
           {pendingEmailCount > 0 ? <p className="contact-modal-intro"><strong>No-credit option:</strong> Save people without emails keeps every contact and removes every email address from the MongoDB import. Each record is tagged needs-email-verification.</p> : null}
           {emailsToVerify.length ? <div className="email-verification-panel">
             <div>

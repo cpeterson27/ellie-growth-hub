@@ -132,12 +132,17 @@ export default function Discovery() {
     <div className="page-dashboard discovery-page">
       <header className="discovery-header">
         <div>
-          <p className="discovery-kicker">Lead pipeline</p>
-          <h1 className="page-title">Discovery</h1>
-          <p className="page-subtitle">Bring in prospects, qualify the fit, and approve only the people ready for your CRM.</p>
+          <p className="discovery-kicker">Find new people and organizations</p>
+          <h1 className="page-title">Prospect Discovery</h1>
+          <p className="page-subtitle">Search for relationships you do not already have. CSV files and existing business contacts belong in the CRM, not here.</p>
         </div>
-        <Button onClick={() => setImportOpen(true)}>Import prospects</Button>
       </header>
+
+      <p className="discovery-notice">
+        <strong>Discovery and CRM have different jobs:</strong> Discovery finds
+        net-new prospects. The CRM stores contacts you already collected,
+        imported, met, or received from another system.
+      </p>
 
       <DashboardCard title="Apollo targeting">
         <p className="apollo-note">Choose who this search is for, then adjust the filters. Organization discovery works on the connected plan; People Search requires Apollo API access.</p>
@@ -159,7 +164,7 @@ export default function Discovery() {
       </DashboardCard>
 
       <section className="discovery-stats">
-        <DashboardCard title="New prospects"><strong>{prospects.length}</strong><span>Awaiting review</span></DashboardCard>
+        <DashboardCard title="Newly discovered"><strong>{prospects.length}</strong><span>Prospects found through discovery tools</span></DashboardCard>
         <DashboardCard title="Approved this week"><strong>—</strong><span>Live data appears after approvals</span></DashboardCard>
         <DashboardCard title="Imported this week"><strong>{prospects.filter((item) => item?.importedAt && Date.now() - new Date(item.importedAt) < 604800000).length}</strong><span>Across all import sources</span></DashboardCard>
         <DashboardCard title="Apollo status"><strong>Free plan</strong><span>CSV and organizations available</span></DashboardCard>
@@ -169,7 +174,7 @@ export default function Discovery() {
         <div className="discovery-workflow">
           <div><span>1</span><strong>Review verified emails</strong><small>Start with deliverable addresses only.</small></div>
           <div><span>2</span><strong>Complete missing research</strong><small>Confirm company, title, and industry.</small></div>
-          <div><span>3</span><strong>Approve the right fit</strong><small>Move only reviewed prospects into active Contacts.</small></div>
+          <div><span>3</span><strong>Add the right fit to CRM</strong><small>Only new prospects need this approval step.</small></div>
         </div>
         <div className="discovery-email-tabs" aria-label="Email safety filters">
           <button className={emailFilter === "verified" ? "active" : ""} onClick={() => setEmailFilter("verified")}><strong>{emailCounts.verified}</strong><span>Verified emails</span><small>Review these first</small></button>
@@ -199,7 +204,7 @@ export default function Discovery() {
               <div><span>Imported</span><strong>{prospect.importedAt ? new Date(prospect.importedAt).toLocaleDateString() : "Unknown"}</strong></div>
             </div>
             <footer className="discovery-actions">
-              <Button onClick={() => approve(prospect)}>Approve to Contacts</Button>
+              <Button onClick={() => approve(prospect)}>Add to CRM</Button>
               <Button variant="outline" onClick={() => setDeleteTarget(prospect)}>Delete prospect</Button>
             </footer>
           </article>)}
