@@ -13,6 +13,7 @@ router.get("/", async (_req, res) => {
     legalBusinessName: config.legalBusinessName,
     postalAddress: config.postalAddress,
     websiteUrl: config.websiteUrl,
+    organizationLogoUrl: config.organizationLogoUrl,
   });
 });
 
@@ -26,6 +27,7 @@ router.patch("/", async (req, res) => {
       legalBusinessName: String(req.body?.legalBusinessName || "").trim(),
       postalAddress: String(req.body?.postalAddress || "").trim(),
       websiteUrl: String(req.body?.websiteUrl || "").trim(),
+      organizationLogoUrl: String(req.body?.organizationLogoUrl || "").trim(),
     } },
     { upsert: true, new: true },
   );
@@ -34,6 +36,7 @@ router.patch("/", async (req, res) => {
     legalBusinessName: config.legalBusinessName,
     postalAddress: config.postalAddress,
     websiteUrl: config.websiteUrl,
+    organizationLogoUrl: config.organizationLogoUrl,
   });
 });
 

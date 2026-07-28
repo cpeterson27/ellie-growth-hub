@@ -6,6 +6,7 @@ const workspaceConfigSchema = new mongoose.Schema({
   legalBusinessName: { type: String, default: "Ellie's Coaching", trim: true, maxlength: 160 },
   postalAddress: { type: String, default: "", trim: true, maxlength: 300 },
   websiteUrl: { type: String, default: "", trim: true, maxlength: 300 },
+  organizationLogoUrl: { type: String, default: "", trim: true, maxlength: 600 },
 }, { timestamps: true });
 
 module.exports = mongoose.model("WorkspaceConfig", workspaceConfigSchema);

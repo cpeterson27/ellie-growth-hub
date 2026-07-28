@@ -69,6 +69,11 @@ async function sendEmail(outreachItem) {
     .split(/\n{2,}/)
     .map((paragraph) => `<p>${String(paragraph).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replaceAll("\n", "<br>")}</p>`)
     .join("")}</body></html>`;
+  const organizationLogo = String(workspace?.organizationLogoUrl || "").trim();
+  if (organizationLogo && !html.includes(organizationLogo)) {
+    const logoHtml = `<div style="margin:0 0 28px"><img src="${organizationLogo.replace(/"/g, "&quot;")}" alt="${String(businessName).replace(/[<>&"]/g, "")}" style="display:block;max-height:84px;max-width:220px;object-fit:contain"></div>`;
+    html = html.includes("<body") ? html.replace(/(<body[^>]*>)/i, `$1${logoHtml}`) : `${logoHtml}${html}`;
+  }
   html = html.includes("</body>") ? html.replace("</body>", `${footerHtml}</body>`) : `${html}${footerHtml}`;
 
 
