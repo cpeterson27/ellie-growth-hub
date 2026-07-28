@@ -52,13 +52,48 @@ Once an Eventbrite account is authorized, Ellie AI can:
 
 - Import an existing Eventbrite event.
 - Create and publish a managed Eventbrite event.
-- Update supported event details.
+- Display the summary, structured overview, organizer, media, category, format,
+  venue, policy, ticket classes, purchasing rules, and online-event status that
+  Eventbrite exposes through its public API.
+- Update supported basic event details after showing a field-by-field change
+  preview.
 - Synchronize tickets, orders, attendees, check-ins, and gross sales.
 - Preserve synchronization history so the team can see when data was refreshed.
 
 **Sync Eventbrite** does not create a second event or campaign. It refreshes the
 Ellie AI record with the latest information from the already-connected
 Eventbrite listing.
+
+Eventbrite's modern event description is stored as a short summary plus
+versioned structured-content modules. Ellie AI retrieves and normalizes those
+modules automatically. The user does not choose or increment version numbers.
+Modern Eventbrite features that are not exposed through the public API, such as
+some Agenda and Lineup configurations, remain in Eventbrite's authoritative
+editor. Ellie AI identifies those fields clearly and provides an **Edit advanced
+content on Eventbrite** link instead of presenting an incomplete editor.
+
+Eventbrite listing data and Ellie AI campaign strategy are intentionally
+separate:
+
+- **Eventbrite listing:** description, schedule, organizer, tickets, policy,
+  media, venue, and registration logistics.
+- **Ellie campaign strategy:** approved target audience, channels, prospect
+  filters, campaign assignment, and messaging.
+
+Ellie AI may suggest audience groups by finding the event's own “Who this event
+is for,” “Perfect for,” or “Ideal for” section. These are suggestions only. They
+do not become campaign filters until a team member selects them, confirms the
+audience, reviews the change, and saves it. Imports never seed a generic
+hardcoded audience.
+
+For near-real-time updates, an Eventbrite webhook can point to
+`https://<backend-host>/api/eventbrite/webhook?token=<EVENTBRITE_WEBHOOK_TOKEN>`.
+This is a one-time connection step in Eventbrite's developer dashboard. The
+token stays in secured backend environment settings and is never returned by a
+public setup endpoint. The webhook notifies Ellie AI of an event, order,
+attendee, check-in, or ticket-class change; Ellie AI then retrieves the
+authoritative record with its server-side OAuth token. The webhook payload
+itself is not trusted as the event record.
 
 The private-token connection supports the original account integration. OAuth
 is the professional connection method intended for a sellable, multi-client

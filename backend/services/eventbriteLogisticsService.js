@@ -2,6 +2,7 @@ const axios = require("axios");
 const Event = require("../models/Event");
 const EventbriteSyncHistory = require("../models/EventbriteSyncHistory");
 const { accessToken } = require("./eventbriteOAuthService");
+const { retrieveCompleteListing } = require("./eventbriteListingService");
 
 const api = axios.create({ baseURL: "https://www.eventbriteapi.com/v3" });
 
@@ -42,22 +43,12 @@ async function syncEvent(localEventId) {
   try {
     const token = await accessToken();
     if (!token) throw new Error("Connect Eventbrite before syncing");
-    const [event, ticketData, orderData, attendeeData] = await Promise.all([
-      request(token, `/events/${eventId}/?expand=venue,organizer,ticket_availability,category,format`),
-      requestAll(token, `/events/${eventId}/ticket_classes/`, "ticket_classes"),
+    const [{ event, ticketClasses, listing, audienceSuggestions }, orderData, attendeeData] = await Promise.all([
+      retrieveCompleteListing(eventId),
       requestAll(token, `/events/${eventId}/orders/?status=all_not_deleted`, "orders"),
       requestAll(token, `/events/${eventId}/attendees/`, "attendees"),
     ]);
 
-    const ticketClasses = ticketData.items.map((ticket) => ({
-      id: ticket.id,
-      name: ticket.name,
-      free: Boolean(ticket.free),
-      cost: money(ticket.cost?.major_value),
-      quantityTotal: Number(ticket.quantity_total || 0),
-      quantitySold: Number(ticket.quantity_sold || 0),
-      salesStatus: ticket.sales_status || "",
-    }));
     const orders = orderData.items;
     const attendees = attendeeData.items;
     const ticketsSold = ticketClasses.reduce((total, ticket) => total + ticket.quantitySold, 0);
@@ -69,7 +60,8 @@ async function syncEvent(localEventId) {
     const availability = event.ticket_availability || {};
 
     localEvent.name = event.name?.text || localEvent.name;
-    localEvent.description = event.description?.text || localEvent.description;
+    localEvent.summary = listing.summary || localEvent.summary;
+    localEvent.description = listing.descriptionText || localEvent.description;
     localEvent.startDate = event.start?.utc || localEvent.startDate;
     localEvent.endDate = event.end?.utc || localEvent.endDate;
     localEvent.timeZone = event.start?.timezone || localEvent.timeZone;
@@ -78,11 +70,28 @@ async function syncEvent(localEventId) {
     localEvent.locationType = event.online_event ? "online" : "venue";
     localEvent.location = event.online_event ? "Online" : event.venue?.name || localEvent.location;
     localEvent.onlineUrl = event.online_event ? event.url || localEvent.onlineUrl : localEvent.onlineUrl;
+    localEvent.category = listing.category?.name || localEvent.category;
+    localEvent.eventbriteListing = listing;
+    localEvent.audienceSuggestions = audienceSuggestions;
+    const legacyAudience = [
+      "Airbnb investors",
+      "Real estate investors",
+      "House flippers",
+      "Property management companies",
+      "Multifamily investors",
+    ];
+    if (legacyAudience.every((item) => localEvent.audience?.includes(item)) &&
+        localEvent.audience?.length === legacyAudience.length &&
+        !localEvent.audienceConfirmedAt) {
+      localEvent.audience = [];
+    }
     localEvent.eventbriteLogistics = {
       status: event.status || "",
       organizerName: event.organizer?.name || "",
       organizerId: String(event.organizer?.id || ""),
-      currency: availability.minimum_ticket_price?.currency || "USD",
+      currency: availability.minimum_ticket_price?.currency ||
+        ticketClasses.find((ticket) => ticket.currency)?.currency ||
+        "USD",
       minimumCheckoutPrice: money(availability.minimum_ticket_price?.major_value) || null,
       maximumCheckoutPrice: money(availability.maximum_ticket_price?.major_value) || null,
       ticketClassCount: ticketClasses.length,

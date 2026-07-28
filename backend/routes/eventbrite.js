@@ -1,12 +1,59 @@
 const express = require("express");
+const crypto = require("crypto");
 const Event = require("../models/Event");
 
 const { getEvent, getEvents } = require("../services/eventbrite");
 const eventbriteOAuthService = require("../services/eventbriteOAuthService");
 const eventbriteLogisticsService = require("../services/eventbriteLogisticsService");
 const eventbriteManagementService = require("../services/eventbriteManagementService");
+const { retrieveCompleteListing } = require("../services/eventbriteListingService");
 
 const router = express.Router();
+
+function webhookToken() {
+  return String(process.env.EVENTBRITE_WEBHOOK_TOKEN || "").trim();
+}
+
+router.post("/webhook", async (req, res) => {
+  const expected = webhookToken();
+  const provided = String(req.query.token || req.get("x-ellie-webhook-token") || "");
+  const expectedBuffer = Buffer.from(expected);
+  const providedBuffer = Buffer.from(provided);
+  if (!expected || providedBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(providedBuffer, expectedBuffer)) {
+    return res.status(401).json({ error: "Invalid webhook token" });
+  }
+
+  const apiUrl = String(req.body?.api_url || "");
+  let parsed;
+  try {
+    parsed = new URL(apiUrl);
+  } catch {
+    return res.status(400).json({ error: "Invalid Eventbrite resource URL" });
+  }
+  if (parsed.hostname !== "www.eventbriteapi.com") {
+    return res.status(400).json({ error: "Unexpected webhook source resource" });
+  }
+
+  res.status(202).json({ accepted: true });
+  setImmediate(async () => {
+    try {
+      let eventbriteId = parsed.pathname.match(/\/events\/(\d+)/)?.[1] || "";
+      if (!eventbriteId) {
+        const { get } = require("../services/eventbriteListingService");
+        const resource = await get(`${parsed.pathname}${parsed.search}`);
+        eventbriteId = String(resource.event_id || resource.event?.id || "");
+      }
+      if (!eventbriteId) return;
+      const localEvent = await Event.findOne({
+        "integrations.eventbrite.eventId": eventbriteId,
+      });
+      if (localEvent) await eventbriteLogisticsService.syncEvent(localEvent._id);
+    } catch (error) {
+      console.error("EVENTBRITE WEBHOOK SYNC ERROR:", error.response?.data || error.message);
+    }
+  });
+});
 
 router.get("/oauth/status", async (req, res) => {
   try {
@@ -137,8 +184,14 @@ router.post("/import/:eventId", async (req, res) => {
       });
     }
 
-    // Fetch event from Eventbrite
-    const eventbriteEvent = await getEvent(eventId);
+    // Fetch the complete listing. Audience is intentionally not imported as
+    // Eventbrite data because it is an Ellie campaign decision.
+    const {
+      event: eventbriteEvent,
+      ticketClasses,
+      listing,
+      audienceSuggestions,
+    } = await retrieveCompleteListing(eventId);
 
     // Prevent duplicate imports
     const existingEvent = await Event.findOne({
@@ -157,31 +210,25 @@ router.post("/import/:eventId", async (req, res) => {
     const newEvent = await Event.create({
       name: eventbriteEvent.name?.text || "Untitled Event",
 
-      description: eventbriteEvent.description?.text || "",
+      summary: listing.summary || "",
+
+      description: listing.descriptionText || "",
 
       startDate: eventbriteEvent.start?.utc || null,
 
       endDate: eventbriteEvent.end?.utc || null,
 
-      ticketPrice: 497,
+      ticketPrice: ticketClasses[0]?.basePrice || 0,
 
-      ticketGoal: 50,
+      ticketGoal: Number(eventbriteEvent.capacity || 0),
 
       ticketsSold: 0,
 
-      audience: [
-        "Airbnb investors",
+      audience: [],
 
-        "Real estate investors",
+      audienceSuggestions,
 
-        "House flippers",
-
-        "Property management companies",
-
-        "Multifamily investors",
-      ],
-
-      channels: ["Eventbrite", "Email", "Partners"],
+      channels: ["Eventbrite"],
 
       location: eventbriteEvent.online_event
         ? "Online"
@@ -198,12 +245,16 @@ router.post("/import/:eventId", async (req, res) => {
       },
 
       status: "active",
+
+      eventbriteListing: listing,
     });
+
+    const synchronizedEvent = await eventbriteLogisticsService.syncEvent(newEvent._id);
 
     return res.status(201).json({
       message: "Event imported successfully",
 
-      event: newEvent,
+      event: synchronizedEvent,
     });
   } catch (error) {
     console.error(

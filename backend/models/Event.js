@@ -104,12 +104,40 @@ const eventSchema = new mongoose.Schema(
       lastSyncError: { type: String, default: "" },
     },
 
+    // Read-only mirror of the Eventbrite listing. Marketing strategy lives
+    // separately below and is never inferred as authoritative Eventbrite data.
+    eventbriteListing: {
+      summary: { type: String, default: "" },
+      descriptionHtml: { type: String, default: "" },
+      descriptionText: { type: String, default: "" },
+      structuredContent: { type: mongoose.Schema.Types.Mixed, default: {} },
+      agenda: { type: [mongoose.Schema.Types.Mixed], default: [] },
+      presenters: { type: [mongoose.Schema.Types.Mixed], default: [] },
+      faqs: { type: [mongoose.Schema.Types.Mixed], default: [] },
+      organizer: { type: mongoose.Schema.Types.Mixed, default: {} },
+      refundPolicy: { type: mongoose.Schema.Types.Mixed, default: {} },
+      highlights: { type: [String], default: [] },
+      durationMinutes: { type: Number, default: 0 },
+      image: { type: mongoose.Schema.Types.Mixed, default: {} },
+      category: { type: mongoose.Schema.Types.Mixed, default: {} },
+      subcategory: { type: mongoose.Schema.Types.Mixed, default: {} },
+      format: { type: mongoose.Schema.Types.Mixed, default: {} },
+      venue: { type: mongoose.Schema.Types.Mixed, default: {} },
+      onlineAccess: { type: mongoose.Schema.Types.Mixed, default: {} },
+      publishSettings: { type: mongoose.Schema.Types.Mixed, default: {} },
+      sourceUpdatedAt: { type: Date, default: null },
+      lastRetrievedAt: { type: Date, default: null },
+    },
+
     // Audience + marketing
     audience: [
       {
         type: String,
       },
     ],
+
+    audienceSuggestions: [{ type: String }],
+    audienceConfirmedAt: { type: Date, default: null },
 
     channels: [
       {

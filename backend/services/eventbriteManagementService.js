@@ -21,7 +21,7 @@ async function post(path, payload = {}) {
   return response.data || {};
 }
 
-function eventPayload(input) {
+function eventPayload(input, { includeCurrency = false } = {}) {
   const payload = {};
   if (input.name) payload.name = { html: input.name };
   if (input.summary !== undefined) payload.summary = String(input.summary).slice(0, 140);
@@ -42,7 +42,7 @@ function eventPayload(input) {
   if (input.capacity || input.ticketGoal) {
     payload.capacity = Number(input.capacity || input.ticketGoal);
   }
-  payload.currency = input.currency || "USD";
+  if (includeCurrency || input.currency) payload.currency = input.currency || "USD";
   return payload;
 }
 
@@ -56,7 +56,7 @@ async function createManagedEvent(input) {
   }
 
   const externalEvent = await post(`/organizations/${orgId}/events/`, {
-    event: eventPayload(input),
+    event: eventPayload(input, { includeCurrency: true }),
   });
 
   if (Number(input.ticketGoal) > 0) {
@@ -106,7 +106,12 @@ async function updateManagedEvent(localEventId, input) {
   const localEvent = await Event.findById(localEventId);
   if (!localEvent) throw new Error("Event not found");
   const externalId = localEvent.integrations?.eventbrite?.eventId;
-  if (externalId) {
+  const eventbriteFields = [
+    "name", "summary", "startDate", "endDate", "timeZone",
+    "locationType", "capacity", "ticketGoal", "currency",
+  ];
+  const changesEventbrite = eventbriteFields.some((field) => input[field] !== undefined);
+  if (externalId && changesEventbrite) {
     await post(`/events/${externalId}/`, { event: eventPayload(input) });
   }
 
@@ -118,6 +123,8 @@ async function updateManagedEvent(localEventId, input) {
     if (input[field] !== undefined) localEvent[field] = input[field];
   });
   if (input.ticketGoal !== undefined) localEvent.capacity = Number(input.ticketGoal);
+  if (input.audienceConfirmed === true) localEvent.audienceConfirmedAt = new Date();
+  if (input.audienceConfirmed === false) localEvent.audienceConfirmedAt = null;
   await localEvent.save();
   return externalId ? syncEvent(localEvent._id) : localEvent;
 }
