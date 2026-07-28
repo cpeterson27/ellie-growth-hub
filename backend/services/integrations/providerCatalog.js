@@ -30,7 +30,11 @@ const providers = [
     category: "events",
     description: "Event data",
     capabilities: ["syncAttendees", "normalizeContacts"],
-    environmentKeys: ["EVENTBRITE_PRIVATE_TOKEN", "EVENTBRITE_API_KEY"],
+    environmentKeys: [
+      "EVENTBRITE_PRIVATE_TOKEN",
+      "EVENTBRITE_CLIENT_ID",
+      "EVENTBRITE_CLIENT_SECRET",
+    ],
   },
   {
     id: "meetup",

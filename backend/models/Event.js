@@ -82,6 +82,28 @@ const eventSchema = new mongoose.Schema(
       default: 0,
     },
 
+    eventbriteLogistics: {
+      status: { type: String, default: "" },
+      organizerName: { type: String, default: "" },
+      organizerId: { type: String, default: "" },
+      currency: { type: String, default: "USD" },
+      minimumCheckoutPrice: { type: Number, default: null },
+      maximumCheckoutPrice: { type: Number, default: null },
+      ticketClassCount: { type: Number, default: 0 },
+      ticketsSold: { type: Number, default: 0 },
+      ticketsRemaining: { type: Number, default: 0 },
+      orderCount: { type: Number, default: 0 },
+      attendeeCount: { type: Number, default: 0 },
+      checkedInCount: { type: Number, default: 0 },
+      grossRevenue: { type: Number, default: 0 },
+      isSoldOut: { type: Boolean, default: false },
+      hasAvailableTickets: { type: Boolean, default: false },
+      ticketClasses: { type: [mongoose.Schema.Types.Mixed], default: [] },
+      lastSyncedAt: { type: Date, default: null },
+      lastSyncStatus: { type: String, default: "" },
+      lastSyncError: { type: String, default: "" },
+    },
+
     // Audience + marketing
     audience: [
       {

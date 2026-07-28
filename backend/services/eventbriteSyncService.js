@@ -4,9 +4,9 @@
  */
 
 const integrationHub = require("./integrationHub");
-const IntegrationConnection = require("../models/IntegrationConnection");
 const EventbriteSyncHistory = require("../models/EventbriteSyncHistory");
 const contactService = require("./contactService");
+const eventbriteOAuthService = require("./eventbriteOAuthService");
 
 class EventbriteSyncService {
   /**
@@ -114,17 +114,7 @@ class EventbriteSyncService {
    */
   async getEventbriteCredentials() {
     try {
-      // Try to get from IntegrationConnection
-      const connection = await IntegrationConnection.findOne({
-        provider: "eventbrite",
-      }).select("credentials");
-
-      if (connection && connection.credentials) {
-        return connection.credentials;
-      }
-
-      // Fall back to environment variables
-      const apiKey = process.env.EVENTBRITE_PRIVATE_TOKEN;
+      const apiKey = await eventbriteOAuthService.accessToken();
       const eventIds = process.env.EVENTBRITE_EVENT_IDS?.split(",") || [];
 
       if (apiKey) {

@@ -103,6 +103,18 @@ export const importEventbriteEvent = (eventId) =>
     .post(`/eventbrite/import/${eventId}`)
     .then((res) => res.data);
 
+export const fetchEventbriteConnection = () =>
+  api.get("/eventbrite/oauth/status").then((res) => res.data);
+
+export const beginEventbriteConnection = () =>
+  api.get("/eventbrite/oauth/start").then((res) => res.data);
+
+export const disconnectEventbrite = () =>
+  api.post("/eventbrite/oauth/disconnect").then((res) => res.data);
+
+export const syncEventbriteEvent = (eventId) =>
+  api.post(`/eventbrite/events/${eventId}/sync`).then((res) => res.data);
+
 
 
 

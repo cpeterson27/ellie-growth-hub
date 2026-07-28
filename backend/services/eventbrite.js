@@ -1,7 +1,8 @@
 const axios = require("axios");
+const eventbriteOAuthService = require("./eventbriteOAuthService");
 
-function getEventbriteToken() {
-  return process.env.EVENTBRITE_PRIVATE_TOKEN;
+async function getEventbriteToken() {
+  return eventbriteOAuthService.accessToken();
 }
 
 
@@ -17,7 +18,7 @@ const eventbriteApi = axios.create({
 // ==================================
 async function getEvent(eventId) {
 
-  const token = getEventbriteToken();
+  const token = await getEventbriteToken();
 
 
   if (!token) {
@@ -28,7 +29,7 @@ async function getEvent(eventId) {
 
 
   const response = await eventbriteApi.get(
-    `/events/${eventId}/`,
+    `/events/${eventId}/?expand=venue,organizer,ticket_availability,category,format`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -50,7 +51,7 @@ async function getEvent(eventId) {
 // ==================================
 async function getEvents() {
 
-  const token = getEventbriteToken();
+  const token = await getEventbriteToken();
 
 
   if (!token) {
@@ -64,7 +65,7 @@ async function getEvents() {
   try {
 
     const response = await eventbriteApi.get(
-      "/users/me/events/",
+      "/users/me/owned_events/",
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -77,15 +78,17 @@ async function getEvents() {
 
 
   } catch (error) {
-
-
     console.error(
       "EVENTBRITE GET EVENTS ERROR:",
       error.response?.data || error.message
     );
 
-
-    throw error;
+    const configuredIds = String(process.env.EVENTBRITE_EVENT_IDS || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    if (!configuredIds.length) throw error;
+    return Promise.all(configuredIds.map((eventId) => getEvent(eventId)));
 
   }
 

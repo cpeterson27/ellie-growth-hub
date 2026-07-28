@@ -2,8 +2,67 @@ const express = require("express");
 const Event = require("../models/Event");
 
 const { getEvent, getEvents } = require("../services/eventbrite");
+const eventbriteOAuthService = require("../services/eventbriteOAuthService");
+const eventbriteLogisticsService = require("../services/eventbriteLogisticsService");
 
 const router = express.Router();
+
+router.get("/oauth/status", async (req, res) => {
+  try {
+    res.json(await eventbriteOAuthService.status());
+  } catch (error) {
+    console.error("EVENTBRITE OAUTH STATUS ERROR:", error.message);
+    res.status(500).json({ error: "Unable to read the Eventbrite connection status" });
+  }
+});
+
+router.get("/oauth/start", async (req, res) => {
+  try {
+    res.json({ authorizationUrl: eventbriteOAuthService.authorizationUrl() });
+  } catch (error) {
+    console.error("EVENTBRITE OAUTH START ERROR:", error.message);
+    res.status(503).json({
+      error: "Eventbrite OAuth is not configured yet. Add the Eventbrite app credentials to the backend.",
+    });
+  }
+});
+
+router.get("/oauth/callback", async (req, res) => {
+  const frontendUrl = String(process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+  try {
+    if (req.query.error) throw new Error("authorization_denied");
+    if (!req.query.code || !eventbriteOAuthService.verifyState(req.query.state)) {
+      throw new Error("invalid_oauth_response");
+    }
+    await eventbriteOAuthService.exchangeCode(String(req.query.code));
+    res.redirect(`${frontendUrl}/events?eventbrite=connected`);
+  } catch (error) {
+    console.error("EVENTBRITE OAUTH CALLBACK ERROR:", error.response?.data || error.message);
+    res.redirect(`${frontendUrl}/events?eventbrite=error`);
+  }
+});
+
+router.post("/oauth/disconnect", async (req, res) => {
+  try {
+    res.json(await eventbriteOAuthService.disconnect());
+  } catch (error) {
+    console.error("EVENTBRITE DISCONNECT ERROR:", error.message);
+    res.status(500).json({ error: "Unable to disconnect Eventbrite" });
+  }
+});
+
+router.post("/events/:eventId/sync", async (req, res) => {
+  try {
+    const event = await eventbriteLogisticsService.syncEvent(req.params.eventId);
+    res.json({ success: true, event });
+  } catch (error) {
+    console.error("EVENTBRITE EVENT SYNC ERROR:", error.response?.data || error.message);
+    const status = error.message === "Event not found" ? 404 : 502;
+    res.status(status).json({
+      error: error.response?.data?.error_description || error.message || "Unable to synchronize Eventbrite",
+    });
+  }
+});
 
 // ==================================
 // GET AVAILABLE EVENTBRITE EVENTS
