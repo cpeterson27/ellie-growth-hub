@@ -32,6 +32,25 @@ const importCopy = {
   },
 };
 
+function contactNameParts(contact = {}) {
+  const firstName = String(contact.firstName || "").trim();
+  const lastName = String(contact.lastName || "").trim();
+  if (firstName || lastName) return { firstName, lastName };
+
+  const parts = String(contact.name || "").trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts.shift() || "",
+    lastName: parts.join(" "),
+  };
+}
+
+function fullContactName(contact = {}) {
+  return [contact.firstName, contact.lastName]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
 export default function Contacts() {
   const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
@@ -51,7 +70,7 @@ export default function Contacts() {
   const [importSummary, setImportSummary] = useState(null);
   const [isContactFormOpen, setContactFormOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
-  const [manualContact, setManualContact] = useState({ name: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", confirmEmailManually: false });
+  const [manualContact, setManualContact] = useState({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", confirmEmailManually: false });
   const [importRows, setImportRows] = useState([]);
   const [importHeaders, setImportHeaders] = useState([]);
   const [importCampaignId, setImportCampaignId] = useState("");
@@ -225,9 +244,10 @@ export default function Contacts() {
   }
 
   async function saveManualContact() {
-    if (!manualContact.name.trim()) { setError("Enter a name to save this contact."); return; }
-    const saved = await saveIngestion([{ ...manualContact, city: manualContact.location, tags: manualContact.tags.split(",").map((tag) => tag.trim()).filter(Boolean) }], "manual", importCampaignId);
-    if (saved) { setContactFormOpen(false); setManualContact({ name: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", confirmEmailManually: false }); }
+    const name = fullContactName(manualContact);
+    if (!name) { setError("Enter a first or last name to save this contact."); return; }
+    const saved = await saveIngestion([{ ...manualContact, name, city: manualContact.location, tags: manualContact.tags.split(",").map((tag) => tag.trim()).filter(Boolean) }], "manual", importCampaignId);
+    if (saved) { setContactFormOpen(false); setManualContact({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", confirmEmailManually: false }); }
   }
 
   async function saveUploadedContacts() {
@@ -440,7 +460,7 @@ export default function Contacts() {
                 <span className={`contact-status-badge contact-status-badge--${contact.emailStatus || "missing"}`}>{contact.emailStatus === "verified" ? "Verified email" : contact.emailStatus === "risky" ? "Risky — withheld" : contact.emailStatus === "undeliverable" ? "Undeliverable — withheld" : "No verified email"}</span>
                 <div className="crm-menu-wrap" onClick={(event) => event.stopPropagation()}>
                   <button className="crm-overflow" aria-label={`Actions for ${contact.name}`} onClick={() => setActionMenu(actionMenu === contact._id ? null : contact._id)}>•••</button>
-                  {actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View details</button><button onClick={() => setEditingContact({ ...contact })}>Research, qualify & assign</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete permanently</button></div> : null}
+                  {actionMenu === contact._id ? <div className="crm-menu"><button onClick={() => setDetailContact(contact)}>View details</button><button onClick={() => setEditingContact({ ...contact, ...contactNameParts(contact) })}>Research, qualify & assign</button><button onClick={() => archiveContact(contact._id).then(loadContacts)}>Archive</button><button className="danger" onClick={() => setDeleteTarget(contact)}>Delete permanently</button></div> : null}
                 </div>
               </div>
             </header>
@@ -515,7 +535,7 @@ export default function Contacts() {
       >
         <p className="contact-modal-intro">Only a usable name is required. Ellie AI saves this contact directly to MongoDB.</p>
         <div className="contact-form-grid">
-          {[["name", "Name *"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /></label>)}
+          {[["firstName", "First Name *"], ["lastName", "Last Name"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /></label>)}
           <label className="form-field"><span>Campaign</span><select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
           {manualContact.email ? <label className="contact-qualify-choice span-2">
             <input type="checkbox" checked={manualContact.confirmEmailManually} onChange={(event) => setManualContact({ ...manualContact, confirmEmailManually: event.target.checked })} />
@@ -566,10 +586,10 @@ export default function Contacts() {
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete Contact Permanently" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={async () => { try { await deleteContact(deleteTarget._id); setDeleteTarget(null); await loadContacts(); } catch (err) { setError(err.response?.data?.message || "Unable to delete contact"); } }}>Delete permanently</Button></>}><p>Related outreach is protected. If outreach exists, deletion is blocked and its count is shown.</p>{deleteTarget ? <p>Source: {deleteTarget.sourceProvider || deleteTarget.sources?.join(", ") || "manual"}; created: {deleteTarget.createdAt ? new Date(deleteTarget.createdAt).toLocaleDateString() : "unknown"}; campaign: {deleteTarget.campaignIds?.length ? "associated" : "none"}.</p> : null}</Modal>
       <Modal isOpen={Boolean(detailContact)} onClose={() => setDetailContact(null)} title="Contact Details"><div style={{ display: "grid", gap: "0.75rem" }}>{detailContact ? [["Basic", ["name", "firstName", "lastName", "title"]], ["Company", ["company", "industry", "employeeCount", "website", "companyCity", "companyState", "companyCountry"]], ["Contact", ["email", "phone", "workDirectPhone", "mobilePhone", "linkedin"]], ["Research", ["researchStatus", "missingFields", "qualifyContact", "stage", "tags", "lists"]], ["Apollo", ["apolloContactId", "apolloAccountId", "apolloRecordId", "emailStatus", "seniority", "departments"]], ["Marketing", ["keywords", "lastContacted", "notes"]], ["Additional Fields", ["additionalFields"]]].map(([group, fields]) => <section key={group}><strong>{group}</strong>{fields.map((field) => <p key={field}>{field.replace(/([A-Z])/g, " $1")}: {typeof detailContact[field] === "object" ? (Array.isArray(detailContact[field]) ? detailContact[field].join(", ") : field === "additionalFields" ? Object.entries(detailContact[field] || {}).map(([key, value]) => `${key}: ${value}`).join("; ") : "—") : typeof detailContact[field] === "boolean" ? (detailContact[field] ? "Yes" : "No") : detailContact[field] || "—"}</p>)}</section>) : null}</div></Modal>
-      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Prepare Contact for a Campaign" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? <>
+      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title="Prepare Contact for a Campaign" footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, name: fullContactName(editingContact), tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? <>
         <p className="contact-modal-intro"><strong>A name and a confirmed email are enough to add someone to a campaign.</strong> Company, title, and industry are optional and can be completed later.</p>
         <div className="contact-form-grid">
-          {["name", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}
+          {["firstName", "lastName", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}
           <fieldset className="contact-decision-panel span-2">
             <legend>Three steps to add this contact</legend>
             <div className="contact-decision-step">

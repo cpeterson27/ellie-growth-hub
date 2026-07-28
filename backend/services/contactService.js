@@ -516,7 +516,21 @@ class ContactService {
 
 
 
-    if (updates.name) {
+    if (updates.firstName !== undefined || updates.lastName !== undefined) {
+      const firstName = cleanName(
+        updates.firstName !== undefined ? updates.firstName : contact.firstName
+      );
+      const lastName = cleanName(
+        updates.lastName !== undefined ? updates.lastName : contact.lastName
+      );
+      const fullName = [firstName, lastName].filter(Boolean).join(" ");
+      if (!fullName) {
+        throw new Error("A first or last name is required");
+      }
+      updates.firstName = firstName;
+      updates.lastName = lastName;
+      updates.name = fullName;
+    } else if (updates.name) {
 
       updates.name =
         cleanName(updates.name);
