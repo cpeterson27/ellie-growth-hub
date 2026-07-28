@@ -14,7 +14,7 @@ export default function Settings() {
   const [postalAddress, setPostalAddress] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState("");
-  const [programs, setPrograms] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -29,7 +29,7 @@ export default function Settings() {
       setOrganizationLogoUrl(config.organizationLogoUrl || "");
     }).catch(() => {});
     fetchGmailConnection().then((connection) => setAccountEmail(connection.email || "")).catch(() => {});
-    fetchCampaigns().then((items) => setPrograms((items || []).filter((item) => item.campaignKind === "program"))).catch(() => {});
+    fetchCampaigns().then((items) => setCampaigns(items || [])).catch(() => {});
   }, []);
 
   const save = async () => {
@@ -107,8 +107,8 @@ export default function Settings() {
         </section>
 
         <section className="settings-section">
-          <div className="settings-section__heading"><FiImage /><div><h3>Program brands</h3><p>Each offer has its own replaceable logo, website, and email color.</p></div></div>
-          <div className="program-brand-links">{programs.length ? programs.map((program) => <button key={program._id} onClick={() => navigate(`/campaigns/${program._id}`)}><span>{program.brand?.logoUrl ? <img src={program.brand.logoUrl} alt="" /> : <FiImage />}<strong>{program.programName || program.name}</strong></span><em>Manage brand <FiArrowUpRight /></em></button>) : <p>No program campaigns yet. Create an Offer / program campaign first.</p>}</div>
+          <div className="settings-section__heading"><FiImage /><div><h3>Campaign brands</h3><p>Give each event or program its own replaceable logo, website, and email color.</p></div></div>
+          <div className="program-brand-links">{campaigns.length ? campaigns.map((campaign) => <button key={campaign._id} onClick={() => navigate(`/campaigns/${campaign._id}`)}><span>{campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt="" /> : <FiImage />}<span className="campaign-brand-name"><small>{campaign.campaignKind === "program" ? "Program" : "Event"}</small><strong>{campaign.programName || campaign.name}</strong></span></span><em>Manage brand <FiArrowUpRight /></em></button>) : <p>No campaigns yet. Create an event or program campaign first.</p>}</div>
         </section>
 
         <footer><Button loading={saving} disabled={workspaceName.trim().length < 2} onClick={save}>Save organization profile</Button></footer>

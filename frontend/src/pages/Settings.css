@@ -83,6 +83,7 @@
 .program-brand-links>button>span{align-items:center;display:flex;gap:12px}
 .program-brand-links img,.program-brand-links>button>span>svg{height:28px;object-fit:contain;width:42px}
 .program-brand-links em{align-items:center;color:#77643d;display:flex;font-size:.78rem;font-style:normal;gap:5px}
+.campaign-brand-name{align-items:flex-start!important;display:grid!important;gap:2px!important}.campaign-brand-name small{color:#9a8048;font-size:.62rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase}
 .account-settings-panel--refined>footer{background:#fff;padding:24px 38px}
 
 .settings-card-note {

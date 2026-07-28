@@ -129,7 +129,7 @@ export default function CampaignWorkspace() {
           <p className="campaign-workspace__body-preview">{campaign.content?.body || "Your outreach draft will appear here after it is prepared."}</p>
         </DashboardCard>
 
-        {isProgram && <DashboardCard title="Program brand">
+        <DashboardCard title={isProgram ? "Program brand" : "Event brand"}>
           <div className="program-brand-editor">
             {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.programName || campaign.name} logo`} /> : <div className="program-brand-placeholder">Add the program logo</div>}
             <label><span>Replace logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label>
@@ -137,8 +137,8 @@ export default function CampaignWorkspace() {
             <label><span>Brand color</span><input type="color" value={campaign.brand?.accentColor || "#173f36"} onChange={(event) => updateBrandField("accentColor", event.target.value)} /></label>
             <Button loading={brandSaving} onClick={saveBrand}>Save program brand</Button>
           </div>
-          <p className="campaign-workspace__empty">This logo and color are reused in every email for this program. Replace the asset here whenever the client’s branding changes.</p>
-        </DashboardCard>}
+          <p className="campaign-workspace__empty">This logo and color are reused in every email for this {isProgram ? "program" : "event"}. Replace the asset here whenever the campaign branding changes.</p>
+        </DashboardCard>
 
         {!isProgram && <DashboardCard title="Registration channels">
           {registrationLinks.length ? <div className="campaign-registration-links">
