@@ -11,7 +11,7 @@ export default function Settings() {
   const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
   const [accountEmail, setAccountEmail] = useState("");
   const [legalBusinessName, setLegalBusinessName] = useState("");
-  const [postalAddress, setPostalAddress] = useState("");
+  const [address, setAddress] = useState({ line1: "", line2: "", city: "", region: "", postalCode: "", country: "United States" });
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState("");
   const [campaigns, setCampaigns] = useState([]);
@@ -24,7 +24,14 @@ export default function Settings() {
     fetchWorkspaceConfig().then((config) => {
       setWorkspaceName(config.workspaceName);
       setLegalBusinessName(config.legalBusinessName || "");
-      setPostalAddress(config.postalAddress || "");
+      setAddress({
+        line1: config.addressLine1 || (!config.addressCity ? config.postalAddress || "" : ""),
+        line2: config.addressLine2 || "",
+        city: config.addressCity || "",
+        region: config.addressRegion || "",
+        postalCode: config.addressPostalCode || "",
+        country: config.addressCountry || "United States",
+      });
       setWebsiteUrl(config.websiteUrl || "");
       setOrganizationLogoUrl(config.organizationLogoUrl || "");
     }).catch(() => {});
@@ -35,7 +42,26 @@ export default function Settings() {
   const save = async () => {
     try {
       setSaving(true);
-      const config = await updateWorkspaceConfig({ workspaceName, legalBusinessName, postalAddress, websiteUrl, organizationLogoUrl });
+      const cityLine = [address.city, address.region].filter(Boolean).join(", ");
+      const postalAddress = [
+        address.line1,
+        address.line2,
+        [cityLine, address.postalCode].filter(Boolean).join(" "),
+        address.country,
+      ].map((part) => part.trim()).filter(Boolean).join(", ");
+      const config = await updateWorkspaceConfig({
+        workspaceName,
+        legalBusinessName,
+        postalAddress,
+        addressLine1: address.line1,
+        addressLine2: address.line2,
+        addressCity: address.city,
+        addressRegion: address.region,
+        addressPostalCode: address.postalCode,
+        addressCountry: address.country,
+        websiteUrl,
+        organizationLogoUrl,
+      });
       const local = { ...getWorkspaceSettings(), workspaceName: config.workspaceName };
       saveWorkspaceSettings(local);
       setWorkspaceName(config.workspaceName);
@@ -71,7 +97,7 @@ export default function Settings() {
 
   return <div className="page-dashboard account-page">
     <div className="page-header"><div><p className="page-eyebrow">Account</p><h1 className="page-title">Settings</h1><p className="page-subtitle">Manage the account and organization behind this Ellie workspace.</p></div></div>
-    {saved ? <p className="discovery-notice">Workspace name saved across Ellie.</p> : null}
+    {saved ? <p className="discovery-notice">Organization profile saved. Campaign email footers now use these details.</p> : null}
     {error ? <p className="form-error">{error}</p> : null}
     <section className="account-layout">
       <nav className="account-settings-nav" aria-label="Settings sections">
@@ -97,7 +123,16 @@ export default function Settings() {
             <label className="form-field"><span>Workspace name</span><input value={workspaceName} onChange={(event) => { setWorkspaceName(event.target.value); setSaved(false); }} /></label>
             <label className="form-field"><span>Legal business name</span><input value={legalBusinessName} onChange={(event) => { setLegalBusinessName(event.target.value); setSaved(false); }} /></label>
             <label className="form-field"><span>Business website</span><input type="url" value={websiteUrl} onChange={(event) => { setWebsiteUrl(event.target.value); setSaved(false); }} placeholder="https://elliescoaching.com" /></label>
-            <label className="form-field"><span>Business mailing address</span><textarea rows="2" value={postalAddress} onChange={(event) => { setPostalAddress(event.target.value); setSaved(false); }} placeholder="Street, city, state, postal code" /><small>Required in campaign email footers.</small></label>
+            <fieldset className="settings-address-fields">
+              <legend>Business mailing address</legend>
+              <p>Saved automatically in the compliance footer of campaign emails.</p>
+              <label className="form-field settings-address-fields__wide"><span>Street address</span><input value={address.line1} onChange={(event) => { setAddress({ ...address, line1: event.target.value }); setSaved(false); }} placeholder="123 Main Street" /></label>
+              <label className="form-field settings-address-fields__wide"><span>Unit, suite, or mailbox</span><input value={address.line2} onChange={(event) => { setAddress({ ...address, line2: event.target.value }); setSaved(false); }} placeholder="Suite 200 (optional)" /></label>
+              <label className="form-field"><span>City</span><input value={address.city} onChange={(event) => { setAddress({ ...address, city: event.target.value }); setSaved(false); }} /></label>
+              <label className="form-field"><span>State / region</span><input value={address.region} onChange={(event) => { setAddress({ ...address, region: event.target.value }); setSaved(false); }} /></label>
+              <label className="form-field"><span>Postal code</span><input value={address.postalCode} onChange={(event) => { setAddress({ ...address, postalCode: event.target.value }); setSaved(false); }} /></label>
+              <label className="form-field"><span>Country</span><input value={address.country} onChange={(event) => { setAddress({ ...address, country: event.target.value }); setSaved(false); }} /></label>
+            </fieldset>
           </div>
         </section>
 
