@@ -44,7 +44,14 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: "12mb" }));
+app.use(express.json({
+  limit: "12mb",
+  verify(req, _res, buffer) {
+    if (req.originalUrl === "/api/webhooks/resend") {
+      req.rawBody = buffer.toString("utf8");
+    }
+  },
+}));
 app.use(express.urlencoded({ extended: false }));
 
 const PORT = process.env.PORT || 5001;

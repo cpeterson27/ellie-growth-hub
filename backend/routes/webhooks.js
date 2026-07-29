@@ -1,9 +1,27 @@
 const express = require("express");
+const { Resend } = require("resend");
 const Outreach = require("../models/Outreach");
 const Campaign = require("../models/Campaign");
 
 const router = express.Router();
 
+function verifyResendEvent(req) {
+  const webhookSecret = String(process.env.RESEND_WEBHOOK_SECRET || "").trim();
+  if (!webhookSecret) {
+    throw new Error("RESEND_WEBHOOK_SECRET is not configured");
+  }
+
+  const resend = new Resend(String(process.env.RESEND_API_KEY || "").trim());
+  return resend.webhooks.verify({
+    payload: req.rawBody || JSON.stringify(req.body),
+    headers: {
+      id: req.get("svix-id"),
+      timestamp: req.get("svix-timestamp"),
+      signature: req.get("svix-signature"),
+    },
+    webhookSecret,
+  });
+}
 
 // ======================================
 // RESEND WEBHOOK
@@ -14,7 +32,13 @@ router.post("/resend", async (req, res) => {
 
   try {
 
-    const event = req.body;
+    let event;
+    try {
+      event = verifyResendEvent(req);
+    } catch (error) {
+      console.warn("[Resend webhook] rejected", { message: error.message });
+      return res.status(400).json({ error: "Invalid Resend webhook signature" });
+    }
 
 
     console.log("[Resend webhook] received", { type: event.type || "unknown" });
@@ -28,7 +52,8 @@ router.post("/resend", async (req, res) => {
       if (outreach) {
         const field = event.type === "email.delivered" ? "deliveredAt" : "openedAt";
         if (!outreach[field]) {
-          outreach[field] = new Date();
+          const eventTime = new Date(event.created_at);
+          outreach[field] = Number.isNaN(eventTime.getTime()) ? new Date() : eventTime;
           await outreach.save();
           await Campaign.updateOne(
             { _id: outreach.campaignId },
