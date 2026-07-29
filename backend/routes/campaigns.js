@@ -3,7 +3,8 @@ const Campaign = require("../models/Campaign");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 const Event = require("../models/Event");
 const Outreach = require("../models/Outreach");
-const { generateOutreachSuggestions } = require("../utils/outreachGenerator");
+const WorkspaceConfig = require("../models/WorkspaceConfig");
+const { generateOutreachDraft } = require("../utils/outreachGenerator");
 const { getCampaignTemplate } = require("../services/campaignTemplates");
 const ContentBrief = require("../models/ContentBrief");
 const { assignCampaignMatches, getCampaignMatches } = require("../services/campaignAudienceService");
@@ -152,6 +153,35 @@ router.get("/:id/email-template", async (req, res) => {
     .sort({ version: -1 })
     .select("version subject topic approvedAt approvedByUserId");
   return res.json({ template: effectiveTemplate(campaign), versions });
+});
+
+router.post("/:id/email-template/preview", async (req, res) => {
+  const campaign = await Campaign.findById(req.params.id);
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+  const template = {
+    ...effectiveTemplate(campaign),
+    subject: String(req.body?.subject || effectiveTemplate(campaign).subject).trim(),
+    body: String(req.body?.body || effectiveTemplate(campaign).body).trim(),
+    callToAction: String(req.body?.callToAction || effectiveTemplate(campaign).callToAction).trim(),
+    callToActionUrl: String(req.body?.callToActionUrl || effectiveTemplate(campaign).callToActionUrl).trim(),
+  };
+  const previewCampaign = campaign.toObject();
+  previewCampaign.content = template;
+  const draft = generateOutreachDraft(
+    { firstName: "Cassandra", lastName: "", name: "Cassandra", email: "preview@example.com", sources: ["preview"] },
+    previewCampaign,
+  );
+  const workspace = await WorkspaceConfig.findOne({ key: "primary" }).lean();
+  const businessName = workspace?.legalBusinessName || workspace?.workspaceName || "Ellie's Coaching";
+  const postalAddress = workspace?.postalAddress || "Business postal address from Settings";
+  const websiteUrl = workspace?.websiteUrl || "";
+  const footerHtml = `<div style="margin-top:36px;padding-top:20px;border-top:1px solid #ddd7ca;color:#737b77;font-size:12px;line-height:1.6;text-align:center"><div style="margin-bottom:8px">This promotional message was sent because we believed this opportunity may be relevant to your professional work.</div><div><strong>${String(businessName).replace(/[<>&"]/g, "")}</strong></div><div>${String(postalAddress).replace(/[<>&"]/g, "")}</div>${websiteUrl ? `<div>${String(websiteUrl).replace(/[<>&"]/g, "")}</div>` : ""}<div style="margin-top:8px"><span style="color:#506b63;text-decoration:underline">Unsubscribe from campaign emails</span></div></div>`;
+  const html = draft.htmlBody.includes("</body>")
+    ? draft.htmlBody.replace("</body>", `${footerHtml}</body>`)
+    : `${draft.htmlBody}${footerHtml}`;
+
+  return res.json({ subject: draft.subject, html });
 });
 
 router.put("/:id/email-template", requireRole("owner", "admin", "member"), async (req, res) => {

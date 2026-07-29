@@ -305,6 +305,9 @@ export const approveAllOutreach = (campaignId) =>
 export const recordCampaignConsent = (campaignId, details) =>
   api.post("/outreach/record-consent", { campaignId, ...details }).then((res) => res.data);
 
+export const previewCampaignEmailTemplate = (campaignId, template) =>
+  api.post(`/campaigns/${campaignId}/email-template/preview`, template).then((res) => res.data);
+
 
 
 

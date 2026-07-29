@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchImageUploadStatus, previewCampaignAudience, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -24,6 +24,7 @@ export default function CampaignWorkspace() {
   const [emailTemplate, setEmailTemplate] = useState(null);
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [emailPreview, setEmailPreview] = useState(null);
 
   useEffect(() => {
     if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
@@ -122,6 +123,17 @@ export default function CampaignWorkspace() {
       setTemplateSaving(false);
     }
   };
+  const previewTemplate = async () => {
+    try {
+      setTemplateSaving(true);
+      setError("");
+      setEmailPreview(await previewCampaignEmailTemplate(id, emailTemplate));
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to prepare the email preview.");
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
   if (loading) return <div className="page-dashboard"><p>Loading campaign…</p></div>;
   if (error || !campaign) return <div className="page-dashboard"><p className="form-error">{error || "Campaign not found."}</p><Button variant="outline" onClick={() => navigate("/campaigns")}>Back to Campaigns</Button></div>;
 
@@ -168,9 +180,12 @@ export default function CampaignWorkspace() {
             <label><span>Email topic</span><select value={emailTemplate.topic} onChange={(event) => updateTemplateField("topic", event.target.value)}><option value="event_invitations">Event invitations</option><option value="program_offers">Program offers</option><option value="educational_newsletter">Educational newsletter</option></select></label>
             <label><span>Master subject</span><input value={emailTemplate.subject} onChange={(event) => updateTemplateField("subject", event.target.value)} /></label>
             <label><span>Master message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
+            <label><span>Button text</span><input value={emailTemplate.callToAction || ""} onChange={(event) => updateTemplateField("callToAction", event.target.value)} placeholder="Register now" /></label>
+            <label><span>Button link</span><input type="url" value={emailTemplate.callToActionUrl || ""} onChange={(event) => updateTemplateField("callToActionUrl", event.target.value)} placeholder="https://" /></label>
             <p className="campaign-template-help">Use {"{{firstName}}"}, {"{{campaignName}}"}, {"{{programName}}"}, and {"{{eventLink}}"} for personalization.</p>
             <div className="campaign-auto-footer"><strong>Added automatically to every sent email</strong><span>Your business name and postal address from Settings</span><span className="campaign-unsubscribe-preview">Unsubscribe from campaign emails</span></div>
-            <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
+            <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={previewTemplate}>Preview complete email</Button><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
+            {emailPreview ? <div className="campaign-email-preview"><div><strong>Subject:</strong> {emailPreview.subject}<button type="button" onClick={() => setEmailPreview(null)}>Close preview</button></div><iframe title="Complete campaign email preview" srcDoc={emailPreview.html} sandbox="allow-popups allow-popups-to-escape-sandbox" /></div> : null}
             {templateVersions.length ? <small>{templateVersions.length} immutable approved version{templateVersions.length === 1 ? "" : "s"} saved.</small> : null}
           </div> : <p>Loading the master template…</p>}
         </DashboardCard>
