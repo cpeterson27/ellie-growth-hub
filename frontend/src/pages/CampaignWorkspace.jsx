@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchImageUploadStatus, previewCampaignAudience, recordCampaignConsent, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchImageUploadStatus, previewCampaignAudience, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -24,8 +24,6 @@ export default function CampaignWorkspace() {
   const [emailTemplate, setEmailTemplate] = useState(null);
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateSaving, setTemplateSaving] = useState(false);
-  const [consentAttested, setConsentAttested] = useState(false);
-  const [consentResult, setConsentResult] = useState("");
 
   useEffect(() => {
     if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
@@ -124,21 +122,6 @@ export default function CampaignWorkspace() {
       setTemplateSaving(false);
     }
   };
-  const recordPermission = async () => {
-    try {
-      setTemplateSaving(true);
-      setError("");
-      const result = await recordCampaignConsent(id, {
-        attested: consentAttested,
-      });
-      setConsentResult(result.message);
-    } catch (err) {
-      setError(err.response?.data?.error || "Unable to record campaign permission.");
-    } finally {
-      setTemplateSaving(false);
-    }
-  };
-
   if (loading) return <div className="page-dashboard"><p>Loading campaign…</p></div>;
   if (error || !campaign) return <div className="page-dashboard"><p className="form-error">{error || "Campaign not found."}</p><Button variant="outline" onClick={() => navigate("/campaigns")}>Back to Campaigns</Button></div>;
 
@@ -174,9 +157,9 @@ export default function CampaignWorkspace() {
       </section>
 
       <section className="campaign-workspace__grid">
-        <DashboardCard title="Campaign brief">
+        <DashboardCard title="Campaign details">
           <div className="campaign-overview-list">{overview.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
-          {campaign.description ? <p className="campaign-workspace__description">{campaign.description}</p> : <p className="campaign-workspace__empty">Add a campaign brief to guide your messaging and team.</p>}
+          {campaign.description ? <p className="campaign-workspace__description">{campaign.description}</p> : null}
         </DashboardCard>
 
         <DashboardCard title="Campaign master email">
@@ -186,24 +169,17 @@ export default function CampaignWorkspace() {
             <label><span>Master subject</span><input value={emailTemplate.subject} onChange={(event) => updateTemplateField("subject", event.target.value)} /></label>
             <label><span>Master message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
             <p className="campaign-template-help">Use {"{{firstName}}"}, {"{{campaignName}}"}, {"{{programName}}"}, and {"{{eventLink}}"} for personalization.</p>
+            <div className="campaign-auto-footer"><strong>Added automatically to every sent email</strong><span>Your business name and postal address from Settings</span><span className="campaign-unsubscribe-preview">Unsubscribe from campaign emails</span></div>
             <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
             {templateVersions.length ? <small>{templateVersions.length} immutable approved version{templateVersions.length === 1 ? "" : "s"} saved.</small> : null}
           </div> : <p>Loading the master template…</p>}
         </DashboardCard>
 
-        <DashboardCard title="Audience email permission">
-          <div className="campaign-consent">
-            <p>One confirmation makes the active contacts prepared for this campaign eligible for its email topic.</p>
-            <label className="campaign-consent__attestation"><input type="checkbox" checked={consentAttested} onChange={(event) => setConsentAttested(event.target.checked)} /><span>These campaign contacts gave permission to receive this email.</span></label>
-            <Button loading={templateSaving} disabled={!consentAttested} onClick={recordPermission}>Allow campaign email</Button>
-            {consentResult ? <p className="campaign-consent__success">{consentResult}</p> : null}
-          </div>
-        </DashboardCard>
-
         <DashboardCard title={isProgram ? "Program brand" : "Event brand"}>
           <div className="program-brand-editor">
             {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.programName || campaign.name} logo`} /> : <div className="program-brand-placeholder">Add the program logo</div>}
-            {imageUpload.configured ? <label><span>Replace logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label> : <p className="image-hosting-note"><strong>Logo upload is not configured yet.</strong> Connect Cloudinary before choosing a file. Nothing will be uploaded or stored until image hosting is connected.</p>}
+            <label><span>Logo image URL</span><input type="url" value={campaign.brand?.logoUrl || ""} placeholder="https://your-site.com/logo.png" onChange={(event) => updateBrandField("logoUrl", event.target.value)} /></label>
+            {imageUpload.configured ? <label><span>Or upload a new logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label> : <p className="image-hosting-note"><strong>Direct file upload is optional and not connected.</strong> For the fastest setup, paste an existing hosted image URL above. Cloudinary is only needed if you want Ellie to upload files for you.</p>}
             <label><span>Program website</span><input type="url" value={campaign.brand?.websiteUrl || ""} placeholder="https://" onChange={(event) => updateBrandField("websiteUrl", event.target.value)} /></label>
             <label><span>Brand color</span><input type="color" value={campaign.brand?.accentColor || "#173f36"} onChange={(event) => updateBrandField("accentColor", event.target.value)} /></label>
             <Button loading={brandSaving} onClick={saveBrand}>Save program brand</Button>
