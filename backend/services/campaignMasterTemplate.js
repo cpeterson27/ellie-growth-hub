@@ -28,7 +28,7 @@ Ellie's Coaching`;
 function effectiveTemplate(campaign) {
   const saved = campaign.emailTemplate || {};
   const content = campaign.content || {};
-  const isDealToClose = /deal\\s*to\\s*close/i.test(String(campaign.name || ""));
+  const isDealToClose = /deal\s*to\s*close/i.test(String(campaign.name || ""));
   const subject = String(saved.subject || "").trim()
     || (!PLACEHOLDER_SUBJECTS.has(String(content.subject || "").trim()) ? content.subject : "")
     || (isDealToClose ? "Partner With Deal to Close: Multifamily Bootcamp" : `An invitation to ${campaign.name}`);

@@ -176,6 +176,20 @@ router.post("/images", async (req, res) => {
   }
 });
 
+router.get("/images/status", (_req, res) => {
+  let configured = Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME?.trim()
+    && process.env.CLOUDINARY_API_KEY?.trim()
+    && process.env.CLOUDINARY_API_SECRET?.trim(),
+  );
+  if (process.env.CLOUDINARY_URL?.trim()) configured = true;
+  res.json({
+    configured,
+    provider: configured ? "cloudinary" : null,
+    folder: configured ? "ellie-ai/events" : null,
+  });
+});
+
 
 
 

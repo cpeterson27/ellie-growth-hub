@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, previewCampaignAudience, recordCampaignConsent, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchImageUploadStatus, previewCampaignAudience, recordCampaignConsent, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -20,6 +20,7 @@ export default function CampaignWorkspace() {
   const [matchingAudience, setMatchingAudience] = useState(false);
   const [matchPage, setMatchPage] = useState(1);
   const [brandSaving, setBrandSaving] = useState(false);
+  const [imageUpload, setImageUpload] = useState({ configured: false, loaded: false });
   const [emailTemplate, setEmailTemplate] = useState(null);
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateSaving, setTemplateSaving] = useState(false);
@@ -45,6 +46,7 @@ export default function CampaignWorkspace() {
   useEffect(() => {
     if (!id) return;
     previewCampaignAudience(id).then(setAudienceMatch).catch(() => setAudienceMatch(null));
+    fetchImageUploadStatus().then((status) => setImageUpload({ ...status, loaded: true })).catch(() => setImageUpload({ configured: false, loaded: true }));
   }, [id]);
 
   const refreshAudience = async () => {
@@ -201,7 +203,7 @@ export default function CampaignWorkspace() {
         <DashboardCard title={isProgram ? "Program brand" : "Event brand"}>
           <div className="program-brand-editor">
             {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.programName || campaign.name} logo`} /> : <div className="program-brand-placeholder">Add the program logo</div>}
-            <label><span>Replace logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label>
+            {imageUpload.configured ? <label><span>Replace logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label> : <p className="image-hosting-note"><strong>Logo upload is not configured yet.</strong> Connect Cloudinary before choosing a file. Nothing will be uploaded or stored until image hosting is connected.</p>}
             <label><span>Program website</span><input type="url" value={campaign.brand?.websiteUrl || ""} placeholder="https://" onChange={(event) => updateBrandField("websiteUrl", event.target.value)} /></label>
             <label><span>Brand color</span><input type="color" value={campaign.brand?.accentColor || "#173f36"} onChange={(event) => updateBrandField("accentColor", event.target.value)} /></label>
             <Button loading={brandSaving} onClick={saveBrand}>Save program brand</Button>

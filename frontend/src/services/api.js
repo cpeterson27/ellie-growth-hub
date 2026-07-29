@@ -115,6 +115,9 @@ export const recommendEventAudience = (eventData) =>
 export const uploadEventImage = (imageData) =>
   api.post("/events/images", imageData).then((res) => res.data);
 
+export const fetchImageUploadStatus = () =>
+  api.get("/events/images/status").then((res) => res.data);
+
 
 
 // ======================================

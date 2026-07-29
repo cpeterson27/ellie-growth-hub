@@ -658,10 +658,10 @@ export default function Contacts() {
             <input type="checkbox" checked={manualContact.confirmEmailManually} onChange={(event) => setManualContact({ ...manualContact, confirmEmailManually: event.target.checked })} />
             <span><strong>I personally confirmed this email address</strong><small>Use this only when the person gave you the address directly or you already confirmed it. Ellie records this as owner-confirmed, not Emailable-verified.</small></span>
           </label> : null}
-          {manualContact.email ? <label className="contact-qualify-choice span-2">
-            <input type="checkbox" checked={manualContact.canReceiveCampaignEmail} onChange={(event) => setManualContact({ ...manualContact, canReceiveCampaignEmail: event.target.checked })} />
-            <span><strong>Can receive campaign email</strong><small>Turn this on when this person gave permission. Ellie will include unsubscribe options automatically.</small></span>
-          </label> : null}
+          <label className="contact-qualify-choice span-2">
+            <input type="checkbox" disabled={!manualContact.email} checked={manualContact.canReceiveCampaignEmail} onChange={(event) => setManualContact({ ...manualContact, canReceiveCampaignEmail: event.target.checked })} />
+            <span><strong>Can receive campaign email</strong><small>{manualContact.email ? "Turn this on when this person gave permission. Ellie will include unsubscribe options automatically." : "Enter an email address above to enable this setting."}</small></span>
+          </label>
         </div>
         <label className="form-field contact-notes"><span>Notes</span><textarea className="select-input" value={manualContact.notes} onChange={(event) => setManualContact({ ...manualContact, notes: event.target.value })} /></label>
       </Modal>
