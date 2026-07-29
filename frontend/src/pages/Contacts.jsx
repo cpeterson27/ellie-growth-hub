@@ -786,7 +786,6 @@ export default function Contacts() {
             <strong>Choose a CSV file</strong>
             <span>or drag a file here</span>
           </label>
-          <details className="crm-paste-option"><summary>Paste rows instead</summary><textarea className="select-input" placeholder="Paste the header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) { setImportFileName("Pasted CSV"); prepareImport(event.target.value); } }} /></details>
         </div> : <>
           <div className="crm-import-steps">
             <div><span>✓</span><strong>CSV loaded</strong><small>{importRows.length} contacts found</small></div>
@@ -836,11 +835,16 @@ export default function Contacts() {
             <Button size="sm" onClick={() => { setContactEditMode("full"); setEditingContact({ ...detailContact, ...contactNameParts(detailContact) }); setDetailContact(null); }}>Edit contact</Button>
           </div>
           {contactDetailGroups.map(([group, fields]) => {
-            const visible = fields.map(([field, label]) => [field, label, detailValue(detailContact[field])]).filter(([, , value]) => value);
-            if (!visible.length) return null;
-            return <section className="contact-detail__group" key={group}><h3>{group}</h3><dl>{visible.map(([field, label, value]) => <div key={field}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>;
+            const rows = fields.map(([field, label]) => [field, label, detailValue(detailContact[field])]);
+            return <section className="contact-detail__group" key={group}><h3>{group}</h3><dl>{rows.map(([field, label, value]) => {
+              const isLink = value && ["linkedin", "website", "companyLinkedinUrl"].includes(field);
+              return <div key={field}><dt>{label}</dt><dd className={value ? "" : "is-empty"}>{isLink ? <a href={value} target="_blank" rel="noreferrer">{value}</a> : value || "Not added"}</dd></div>;
+            })}</dl></section>;
           })}
-          <section className="contact-detail__group"><h3>Campaigns</h3><p>{detailContact.campaignIds?.length ? `${detailContact.campaignIds.length} campaign assignment${detailContact.campaignIds.length === 1 ? "" : "s"}` : "Not assigned to a campaign yet."}</p></section>
+          <section className="contact-detail__group"><h3>Campaigns</h3>{detailContact.campaignIds?.length ? <ul className="contact-campaign-list">{detailContact.campaignIds.map((id) => {
+            const campaign = campaigns.find((item) => String(item._id) === String(id?._id || id));
+            return <li key={String(id?._id || id)}>{campaign?.name || id?.name || "Assigned campaign"}</li>;
+          })}</ul> : <p>Not assigned to a campaign yet.</p>}</section>
         </div> : null}
       </Modal>
       <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title={contactEditMode === "audience" ? "Tell Ellie who this contact is" : "Edit contact & campaign"} footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const commaFields = ["tags", "lists", "departments", "keywords", "audienceProfiles"]; const payload = { ...editingContact, name: fullContactName(editingContact), lastResearchedAt: new Date().toISOString() }; commaFields.forEach((field) => { payload[field] = Array.isArray(editingContact[field]) ? editingContact[field] : String(editingContact[field] || "").split(",").map((item) => item.trim()).filter(Boolean); }); await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{contactEditMode === "audience" ? "Save audience information" : editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? contactEditMode === "audience" ? <>
