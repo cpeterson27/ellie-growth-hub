@@ -27,6 +27,8 @@ const canonicalFieldMap = Object.fromEntries([
   ["Company Address", "companyAddress"], ["Company City", "companyCity"], ["Company State", "companyState"], ["Company Country", "companyCountry"], ["Company Phone", "companyPhone"],
   ["Latest Funding", "latestFunding"], ["Apollo Account ID", "apolloAccountId"], ["Secondary Email Status", "secondaryEmailStatus"], ["Tertiary Email Status", "tertiaryEmailStatus"], ["Qualify Contact", "qualifyContact"],
   ["Name", "name"], ["Phone", "phone"], ["LinkedIn", "linkedin"], ["Notes", "notes"], ["Tags", "tags"], ["Audience Profiles", "audienceProfiles"],
+  ["Job Title", "title"], ["Company", "company"], ["Location", "location"],
+  ["Company Employees", "employeeCount"], ["Industries", "industry"], ["Status", "stage"],
   ["Apollo Contact ID", "apolloContactId"], ["Apollo Record ID", "apolloRecordId"], ["Secondary Email Source", "secondaryEmailSource"], ["Secondary Email Verification Source", "secondaryEmailVerificationSource"], ["Tertiary Email Source", "tertiaryEmailSource"], ["Tertiary Email Verification Source", "tertiaryEmailVerificationSource"],
 ]);
 
@@ -77,6 +79,13 @@ function normalizeIncoming(row, source = "manual") {
     mapped.primaryEmailLastVerifiedAt = new Date();
   }
   mapped.linkedin = normalizeUrl(mapped.linkedin || mapped.linkedinUrl);
+  if (mapped.location) {
+    const [city = "", state = "", ...countryParts] = String(mapped.location).split(",").map((part) => part.trim());
+    if (!mapped.city) mapped.city = city;
+    if (!mapped.state) mapped.state = state;
+    if (!mapped.country && countryParts.length) mapped.country = countryParts.join(", ");
+    delete mapped.location;
+  }
   if (!mapped.title && mapped.seniority && !/^[+()\d\s.-]{7,}$/.test(String(mapped.seniority))) mapped.title = mapped.seniority;
   mapped.name = String(mapped.name || `${mapped.firstName || ""} ${mapped.lastName || ""}`).trim();
   mapped.sourceProvider = source === "apollo" ? "apollo" : mapped.sourceProvider || source;
