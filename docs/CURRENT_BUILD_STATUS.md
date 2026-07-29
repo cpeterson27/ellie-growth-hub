@@ -23,6 +23,24 @@
 - Added Gmail OAuth start, callback, status, encrypted token storage, refresh, disconnect, inbox thread listing, and approved sending.
 - Added `/integrations/gmail` for Gmail connection, inbox search, and compose/approve/send.
 - Added Gmail setup status to Integrations.
+- Added invitation-only user accounts, server-side sessions, secure cookies, CSRF
+  protection, workspace memberships, and owner/admin/member/viewer roles.
+- Protected application API routes and added a login screen. There is no public
+  signup endpoint.
+
+## Authentication setup
+
+Create the first owner deliberately from the backend directory:
+
+`npm run create-owner -- owner@example.com "Owner Name"`
+
+The command prompts for the password without displaying or storing it in shell
+history. Then open `/login` in the frontend and sign in with that email and
+password.
+
+The current release supports one locked workspace. Do not provision unrelated
+client workspaces yet: all existing business records still need `workspaceId`
+backfill and query-level tenant enforcement before multi-client use.
 
 ## Gmail setup still required
 
@@ -58,6 +76,16 @@ The current application does not yet have client authentication or tenant IDs.
 CRM preferences are customizable but remain browser-workspace preferences.
 Before selling the platform to multiple unrelated clients, add authentication,
 workspace membership, roles, and tenant-scoped backend settings/data.
+
+## Deal to Close send-readiness audit
+
+- The database contains 45 pending Deal to Close drafts and 2 sent records.
+- The campaign record still contains the legacy placeholder subject and body.
+- The CRM contains 100 CSV-imported contacts and one manual contact.
+- No contacts currently have recorded marketing consent or topic subscriptions.
+- Resend currently prohibits unsolicited or cold outreach and requires explicit
+  opt-in. Do not send the 45-message batch until the consent source is confirmed
+  and recorded.
 
 ## Validation
 

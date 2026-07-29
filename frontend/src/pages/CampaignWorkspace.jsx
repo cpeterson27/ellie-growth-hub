@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { assignCampaignAudience, fetchCampaign, previewCampaignAudience, updateCampaignBrand, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, previewCampaignAudience, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -20,6 +20,9 @@ export default function CampaignWorkspace() {
   const [matchingAudience, setMatchingAudience] = useState(false);
   const [matchPage, setMatchPage] = useState(1);
   const [brandSaving, setBrandSaving] = useState(false);
+  const [emailTemplate, setEmailTemplate] = useState(null);
+  const [templateVersions, setTemplateVersions] = useState([]);
+  const [templateSaving, setTemplateSaving] = useState(false);
 
   useEffect(() => {
     if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
@@ -27,6 +30,14 @@ export default function CampaignWorkspace() {
       .then(setCampaign)
       .catch((err) => setError(err.response?.data?.error || "Unable to load campaign."))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchCampaignEmailTemplate(id).then(({ template, versions }) => {
+      setEmailTemplate(template);
+      setTemplateVersions(versions || []);
+    }).catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -83,6 +94,33 @@ export default function CampaignWorkspace() {
     }
   };
 
+  const updateTemplateField = (field, value) => setEmailTemplate((current) => ({ ...current, [field]: value, status: "draft" }));
+  const saveTemplate = async () => {
+    try {
+      setTemplateSaving(true);
+      setError("");
+      setEmailTemplate(await saveCampaignEmailTemplate(id, emailTemplate));
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to save the campaign email.");
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
+  const approveTemplate = async () => {
+    try {
+      setTemplateSaving(true);
+      setError("");
+      await saveCampaignEmailTemplate(id, emailTemplate);
+      const result = await approveCampaignEmailTemplate(id);
+      setEmailTemplate(result.template);
+      setTemplateVersions((current) => [result.version, ...current]);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to approve the campaign email.");
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
+
   if (loading) return <div className="page-dashboard"><p>Loading campaign…</p></div>;
   if (error || !campaign) return <div className="page-dashboard"><p className="form-error">{error || "Campaign not found."}</p><Button variant="outline" onClick={() => navigate("/campaigns")}>Back to Campaigns</Button></div>;
 
@@ -123,10 +161,16 @@ export default function CampaignWorkspace() {
           {campaign.description ? <p className="campaign-workspace__description">{campaign.description}</p> : <p className="campaign-workspace__empty">Add a campaign brief to guide your messaging and team.</p>}
         </DashboardCard>
 
-        <DashboardCard title="Email starting point">
-          <p className="campaign-template-name">{campaign.templateKey?.replaceAll("_", " ") || "Campaign template"}</p>
-          <p><strong>Subject</strong><br />{campaign.content?.subject || "No subject set yet."}</p>
-          <p className="campaign-workspace__body-preview">{campaign.content?.body || "Your outreach draft will appear here after it is prepared."}</p>
+        <DashboardCard title="Campaign master email">
+          {emailTemplate ? <div className="campaign-template-editor">
+            <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Approved version ${emailTemplate.currentVersion}` : "Draft — approval required"}</strong></div>
+            <label><span>Email topic</span><select value={emailTemplate.topic} onChange={(event) => updateTemplateField("topic", event.target.value)}><option value="event_invitations">Event invitations</option><option value="program_offers">Program offers</option><option value="educational_newsletter">Educational newsletter</option></select></label>
+            <label><span>Master subject</span><input value={emailTemplate.subject} onChange={(event) => updateTemplateField("subject", event.target.value)} /></label>
+            <label><span>Master message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
+            <p className="campaign-template-help">Use {"{{firstName}}"}, {"{{campaignName}}"}, {"{{programName}}"}, and {"{{eventLink}}"} for personalization.</p>
+            <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
+            {templateVersions.length ? <small>{templateVersions.length} immutable approved version{templateVersions.length === 1 ? "" : "s"} saved.</small> : null}
+          </div> : <p>Loading the master template…</p>}
         </DashboardCard>
 
         <DashboardCard title={isProgram ? "Program brand" : "Event brand"}>

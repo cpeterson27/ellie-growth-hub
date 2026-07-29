@@ -25,11 +25,27 @@ const developmentRequestsRouter = require("./routes/developmentRequests");
 const gmailRouter = require("./routes/gmail");
 const workspaceRouter = require("./routes/workspace");
 const unsubscribeRouter = require("./routes/unsubscribe");
+const authRouter = require("./routes/auth");
+const { requireAuth } = require("./middleware/auth");
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = (process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+if (process.env.NODE_ENV !== "production") {
+  allowedOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
+}
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Origin is not allowed"));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: "12mb" }));
+app.use(express.urlencoded({ extended: false }));
 
 const PORT = process.env.PORT || 5001;
 const mongoUri = process.env.MONGO_URI;
@@ -61,6 +77,18 @@ connectDatabase(mongoUri)
         `Moved ${migratedImports.modifiedCount} imported contacts into the CRM workflow.`,
       );
     }
+
+    app.use("/api/auth", authRouter);
+    app.use("/api", (req, res, next) => {
+      const publicRequest =
+        req.path === "/health" ||
+        req.path.startsWith("/unsubscribe/") ||
+        req.path === "/webhooks/resend" ||
+        req.path === "/eventbrite/webhook" ||
+        req.path === "/eventbrite/oauth/callback" ||
+        req.path === "/gmail/oauth/callback";
+      return publicRequest ? next() : requireAuth(req, res, next);
+    });
 
     app.use("/api/campaigns", campaignsRouter);
     app.use("/api/outreach", outreachRouter);

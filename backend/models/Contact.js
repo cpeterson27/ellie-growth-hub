@@ -225,6 +225,11 @@ const contactSchema = new mongoose.Schema(
       consentAt: { type: Date, default: null },
       unsubscribedAt: { type: Date, default: null },
       unsubscribeSource: { type: String, default: "" },
+      topics: {
+        eventInvitations: { type: Boolean, default: false },
+        programOffers: { type: Boolean, default: false },
+        educationalNewsletter: { type: Boolean, default: false },
+      },
     },
 
 

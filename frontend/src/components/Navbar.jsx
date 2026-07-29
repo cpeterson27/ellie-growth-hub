@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FiSearch, FiMenu, FiCpu } from "react-icons/fi";
+import { FiSearch, FiMenu, FiCpu, FiLogOut } from "react-icons/fi";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import { useInitiative } from "../context/InitiativeContext.jsx";
 import { fetchWorkspaceConfig } from "../services/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 import "./Navbar.css";
 
 export default function Navbar({ onMenuClick }) {
   const navigate = useNavigate();
+  const { logout, session } = useAuth();
   const location = useLocation();
   const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
   const { campaigns, selected, selectedId, setSelectedId } = useInitiative();
@@ -79,6 +81,9 @@ export default function Navbar({ onMenuClick }) {
         </button>
         <button className="navbar__jarvis" type="button" onClick={() => navigate("/jarvis")}>
           <FiCpu /><span>Jarvis</span><i />
+        </button>
+        <button className="navbar__logout" type="button" onClick={logout} title={`Sign out ${session?.user?.email || ""}`} aria-label="Sign out">
+          <FiLogOut />
         </button>
       </div>
     </header>

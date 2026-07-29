@@ -69,6 +69,20 @@ const campaignSchema = new mongoose.Schema(
     },
 
   },
+  emailTemplate: {
+    subject: { type: String, default: "", trim: true, maxlength: 300 },
+    body: { type: String, default: "", maxlength: 30000 },
+    callToAction: { type: String, default: "", trim: true, maxlength: 120 },
+    callToActionUrl: { type: String, default: "", trim: true, maxlength: 1000 },
+    topic: {
+      type: String,
+      enum: ["event_invitations", "program_offers", "educational_newsletter"],
+      default: function() { return this.campaignKind === "program" ? "program_offers" : "event_invitations"; },
+    },
+    status: { type: String, enum: ["draft", "approved"], default: "draft" },
+    currentVersion: { type: Number, default: 0 },
+    approvedAt: { type: Date, default: null },
+  },
 
   registrationLinks: {
     eventbrite: {

@@ -1,11 +1,14 @@
 const express = require("express");
 const Campaign = require("../models/Campaign");
+const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 const Event = require("../models/Event");
 const Outreach = require("../models/Outreach");
 const { generateOutreachSuggestions } = require("../utils/outreachGenerator");
 const { getCampaignTemplate } = require("../services/campaignTemplates");
 const ContentBrief = require("../models/ContentBrief");
 const { assignCampaignMatches, getCampaignMatches } = require("../services/campaignAudienceService");
+const { effectiveTemplate } = require("../services/campaignMasterTemplate");
+const { requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -140,6 +143,61 @@ router.get("/:id", async (req, res) => {
     });
 
   }
+});
+
+router.get("/:id/email-template", async (req, res) => {
+  const campaign = await Campaign.findById(req.params.id);
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+  const versions = await CampaignTemplateVersion.find({ campaignId: campaign._id })
+    .sort({ version: -1 })
+    .select("version subject topic approvedAt approvedByUserId");
+  return res.json({ template: effectiveTemplate(campaign), versions });
+});
+
+router.put("/:id/email-template", requireRole("owner", "admin", "member"), async (req, res) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+    const subject = String(req.body?.subject || "").trim();
+    const body = String(req.body?.body || "").trim();
+    if (!subject || !body) return res.status(400).json({ error: "Subject and message body are required" });
+    campaign.emailTemplate = {
+      subject,
+      body,
+      callToAction: String(req.body?.callToAction || "").trim(),
+      callToActionUrl: String(req.body?.callToActionUrl || "").trim(),
+      topic: req.body?.topic || (campaign.campaignKind === "program" ? "program_offers" : "event_invitations"),
+      status: "draft",
+      currentVersion: campaign.emailTemplate?.currentVersion || 0,
+      approvedAt: null,
+    };
+    await campaign.save();
+    return res.json(effectiveTemplate(campaign));
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Unable to save campaign template" });
+  }
+});
+
+router.post("/:id/email-template/approve", requireRole("owner", "admin"), async (req, res) => {
+  const campaign = await Campaign.findById(req.params.id);
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+  const template = effectiveTemplate(campaign);
+  if (!template.subject || !template.body) return res.status(400).json({ error: "Complete the template before approval" });
+  const version = (await CampaignTemplateVersion.findOne({ campaignId: campaign._id }).sort({ version: -1 }).select("version"))?.version + 1 || 1;
+  const approved = await CampaignTemplateVersion.create({
+    campaignId: campaign._id,
+    version,
+    subject: template.subject,
+    body: template.body,
+    callToAction: template.callToAction,
+    callToActionUrl: template.callToActionUrl,
+    topic: template.topic,
+    approvedByUserId: req.auth.user._id,
+    approvedAt: new Date(),
+  });
+  campaign.emailTemplate = { ...template, status: "approved", currentVersion: version, approvedAt: approved.approvedAt };
+  await campaign.save();
+  return res.json({ template: effectiveTemplate(campaign), version: approved });
 });
 
 router.patch("/:id/brand", async (req, res) => {

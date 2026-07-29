@@ -51,6 +51,17 @@ async function sendEmail(outreachItem) {
   if (!contact) {
     return { success: false, message: "A CRM contact is required before campaign email can be sent." };
   }
+  if (contact.emailPreferences?.marketingStatus !== "subscribed" || !contact.emailPreferences?.consentAt) {
+    return { success: false, message: "This contact has no recorded marketing opt-in. Verified email is not the same as permission to send." };
+  }
+  const topicField = {
+    event_invitations: "eventInvitations",
+    program_offers: "programOffers",
+    educational_newsletter: "educationalNewsletter",
+  }[outreachItem.emailTopic || "event_invitations"];
+  if (!topicField || contact.emailPreferences?.topics?.[topicField] !== true) {
+    return { success: false, message: `This contact has not subscribed to ${String(outreachItem.emailTopic || "this email topic").replaceAll("_", " ")}.` };
+  }
   const workspace = await WorkspaceConfig.findOne({ key: "primary" });
   if (!workspace?.postalAddress?.trim()) {
     return {

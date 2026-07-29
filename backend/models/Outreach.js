@@ -103,6 +103,12 @@ const outreachSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    templateVersion: { type: Number, default: 0 },
+    emailTopic: {
+      type: String,
+      enum: ["event_invitations", "program_offers", "educational_newsletter"],
+      default: "event_invitations",
+    },
 
 
     // ======================================

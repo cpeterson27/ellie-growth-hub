@@ -4,6 +4,13 @@ const api = axios.create({
   baseURL:
     import.meta.env.VITE_API_BASE_URL ||
     "http://localhost:5001/api",
+  withCredentials: true,
+});
+
+api.interceptors.request.use((config) => {
+  const csrfToken = sessionStorage.getItem("ellie-csrf-token");
+  if (csrfToken) config.headers["X-CSRF-Token"] = csrfToken;
+  return config;
 });
 
 export const fetchWorkspaceConfig = () =>
@@ -37,6 +44,15 @@ export const updateCampaignRegistrationLinks = (campaignId, links) =>
 
 export const updateCampaignBrand = (campaignId, brand) =>
   api.patch(`/campaigns/${campaignId}/brand`, brand).then((res) => res.data);
+
+export const fetchCampaignEmailTemplate = (campaignId) =>
+  api.get(`/campaigns/${campaignId}/email-template`).then((res) => res.data);
+
+export const saveCampaignEmailTemplate = (campaignId, template) =>
+  api.put(`/campaigns/${campaignId}/email-template`, template).then((res) => res.data);
+
+export const approveCampaignEmailTemplate = (campaignId) =>
+  api.post(`/campaigns/${campaignId}/email-template/approve`).then((res) => res.data);
 
 
 

@@ -70,6 +70,8 @@ button {
   min-height: 100vh;
 }
 
+.auth-loading{align-items:center;background:#f4f3ef;color:#1f5c50;display:flex;font-weight:750;justify-content:center;min-height:100vh}
+
 .page-title {
   margin: 0;
   font-size: clamp(1.75rem, 2vw, 2.5rem);

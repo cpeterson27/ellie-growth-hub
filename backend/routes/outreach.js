@@ -5,6 +5,7 @@ const Campaign = require("../models/Campaign");
 const Contact = require("../models/Contact");
 
 const { sendEmail } = require("../services/email");
+const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 
 const {
   generateOutreachDraft,
@@ -122,6 +123,23 @@ router.post("/generate", async (req,res)=>{
 
     }
 
+    if (campaign.emailTemplate?.status !== "approved" || !campaign.emailTemplate?.currentVersion) {
+      return res.status(409).json({ error: "Approve the campaign master template before preparing recipient drafts." });
+    }
+    const approvedTemplate = await CampaignTemplateVersion.findOne({
+      campaignId: campaign._id,
+      version: campaign.emailTemplate.currentVersion,
+    });
+    if (!approvedTemplate) {
+      return res.status(409).json({ error: "The approved campaign template version could not be found." });
+    }
+    campaign.content = {
+      subject: approvedTemplate.subject,
+      body: approvedTemplate.body,
+      callToAction: approvedTemplate.callToAction,
+      callToActionUrl: approvedTemplate.callToActionUrl,
+    };
+
 
 
     const contacts =
@@ -228,6 +246,8 @@ router.post("/generate", async (req,res)=>{
           exists.htmlBody = draft.htmlBody || "";
           exists.eventLink = draft.eventLink || "";
           exists.flyerUrl = draft.flyerUrl || "";
+          exists.templateVersion = approvedTemplate.version;
+          exists.emailTopic = approvedTemplate.topic;
           exists.status = "pending";
           exists.errorMessage = "";
           await exists.save();
@@ -273,6 +293,10 @@ router.post("/generate", async (req,res)=>{
 
   flyerUrl:
     draft.flyerUrl || "",
+
+  templateVersion: approvedTemplate.version,
+
+  emailTopic: approvedTemplate.topic,
 
   status:
     "pending"
