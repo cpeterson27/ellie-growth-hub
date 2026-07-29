@@ -814,7 +814,19 @@ export default function Contacts() {
             </p> : null}
           </div> : null}
           <div className="import-preview-heading"><p><strong>Previewing {showAllImportRows ? importRows.length : Math.min(5, importRows.length)} of {importRows.length} contacts.</strong> All {importRows.length} will be imported.</p>{importRows.length > 5 ? <Button size="sm" variant="outline" onClick={() => setShowAllImportRows((current) => !current)}>{showAllImportRows ? "Show first 5" : `Show all ${importRows.length}`}</Button> : null}</div>
-          <div className="email-import-preview"><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, showAllImportRows ? importRows.length : 5).map((row, index) => { const result = effectiveVerificationResults[String(row.Email || "").toLowerCase()]; const phone = row["Work Direct Phone"] || row.Phone; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state === "deliverable" ? "verified" : result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{/request phone number/i.test(phone || "") ? "—" : phone || "—"}</td><td>{row["Company Name"] || row.Company || "—"}</td><td>{row.Title || "—"}</td><td>{[row.City, row.State].filter(Boolean).join(", ") || "—"}</td><td>CSV import</td></tr>; })}</tbody></table></div>
+          <div className="email-import-preview">{importRows.slice(0, showAllImportRows ? importRows.length : 5).map((row, index) => {
+            const result = effectiveVerificationResults[String(row.Email || "").toLowerCase()];
+            const phone = row["Work Direct Phone"] || row.Phone;
+            const name = row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim();
+            return <article className="import-contact-preview" key={`${row.Email || name}-${index}`}>
+              <div><span>Name</span><strong>{name || "—"}</strong></div>
+              <div className="import-contact-preview__email"><span>Email</span><strong>{row.Email || "—"}</strong>{row.Email ? <><i className={`verification-badge ${result?.state || "pending"}`}>{result?.state === "deliverable" ? "verified" : result?.state || "not verified"}</i>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</div>
+              <div><span>Title</span><strong>{row.Title || "—"}</strong></div>
+              <div><span>Company</span><strong>{row["Company Name"] || row.Company || "—"}</strong></div>
+              <div><span>City / State</span><strong>{[row.City, row.State].filter(Boolean).join(", ") || "—"}</strong></div>
+              <div><span>Phone</span><strong>{/request phone number/i.test(phone || "") ? "—" : phone || "—"}</strong></div>
+            </article>;
+          })}</div>
           <p>{importRows.length} rows ready. Deliverable emails are saved. Risky, unknown, and undeliverable addresses are removed while the contact is retained and tagged for review.</p>
         </>}
       </Modal>
