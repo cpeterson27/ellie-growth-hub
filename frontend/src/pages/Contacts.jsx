@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Papa from "papaparse";
 import { FiMoreHorizontal } from "react-icons/fi";
 import "./Contacts.css";
@@ -111,6 +111,7 @@ function contactWorkflowState(contact = {}) {
 
 export default function Contacts() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { selectedId: initiativeId } = useInitiative();
   const workspaceSettings = getWorkspaceSettings();
   const [contacts, setContacts] = useState([]);
@@ -121,7 +122,7 @@ export default function Contacts() {
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState("");
   const [campaigns, setCampaigns] = useState([]);
-  const [campaignId, setCampaignId] = useState(() => initiativeId === "all" ? "" : initiativeId);
+  const [campaignId, setCampaignId] = useState(() => searchParams.get("allCampaigns") === "true" ? "" : searchParams.get("campaignId") || (initiativeId === "all" ? "" : initiativeId));
   const [filters, setFilters] = useState({ title: "", location: "", industry: "", employeeSize: "" });
   const [apolloResults, setApolloResults] = useState([]);
   const [selectedLeads, setSelectedLeads] = useState([]);
@@ -136,7 +137,7 @@ export default function Contacts() {
   const [importCampaignId, setImportCampaignId] = useState("");
   const [importMarketingPermission, setImportMarketingPermission] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
-  const [contactTab, setContactTab] = useState("all");
+  const [contactTab, setContactTab] = useState(() => searchParams.get("tab") || "all");
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [actionMenu, setActionMenu] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -164,6 +165,7 @@ export default function Contacts() {
       const response = await fetchContacts(query);
       const items = (response.data || []).filter((contact) => {
         const workflow = contactWorkflowState(contact);
+        const requestedResearchStatus = searchParams.get("researchStatus");
         const tabMatches = contactTab === "attention"
           ? workflow.key === "email" || workflow.key === "audience"
           : contactTab === "ready"
@@ -172,6 +174,7 @@ export default function Contacts() {
               ? workflow.key === "assigned"
               : true;
         return tabMatches &&
+          (!requestedResearchStatus || contact.researchStatus === requestedResearchStatus) &&
           (!campaignId || contact.campaignIds?.some((id) => String(id) === campaignId)) &&
           (!searchTerm || [contact.name, contact.company, contact.email, contact.title].join(" ").toLowerCase().includes(searchTerm.toLowerCase()));
       });
@@ -190,7 +193,7 @@ export default function Contacts() {
 
   useEffect(() => {
     loadContacts();
-  }, [contactTab, campaignId, searchTerm]);
+  }, [contactTab, campaignId, searchTerm, searchParams]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -203,8 +206,9 @@ export default function Contacts() {
   }, []);
 
   useEffect(() => {
-    setCampaignId(initiativeId === "all" ? "" : initiativeId);
-  }, [initiativeId]);
+    setCampaignId(searchParams.get("allCampaigns") === "true" ? "" : searchParams.get("campaignId") || (initiativeId === "all" ? "" : initiativeId));
+    if (searchParams.get("tab")) setContactTab(searchParams.get("tab"));
+  }, [initiativeId, searchParams]);
 
   function openImportConfirmation(source) {
     setError("");

@@ -223,8 +223,8 @@ export default function CampaignWorkspace() {
             <div className="campaign-audience-counts">
               <div><strong>{audienceMatch.matched || 0}</strong><span>safe matches</span></div>
               <div><strong>{audienceMatch.alreadyAssigned || 0}</strong><span>already assigned</span></div>
-              <div><strong>{audienceMatch.needsResearch || 0}</strong><span>need research</span></div>
-              <div><strong>{audienceMatch.readyForReview || 0}</strong><span>ready for review</span></div>
+              <button type="button" onClick={() => navigate("/contacts?allCampaigns=true&researchStatus=needs_research")}><strong>{audienceMatch.needsResearch || 0}</strong><span>need research</span></button>
+              <button type="button" onClick={() => navigate("/contacts?allCampaigns=true&researchStatus=ready_for_review")}><strong>{audienceMatch.readyForReview || 0}</strong><span>ready for review</span></button>
             </div>
             {matchedContacts.length ? <>
               <div className="campaign-match-table">
