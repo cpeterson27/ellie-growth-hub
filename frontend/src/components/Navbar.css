@@ -136,3 +136,4 @@
 .navbar__menu{border-radius:50%;box-shadow:0 8px 24px rgba(14,40,34,.18),inset 0 0 0 1px rgba(255,255,255,.07)}
 .navbar__menu:hover{transform:translateY(-1px) rotate(4deg);box-shadow:0 12px 28px rgba(15,55,46,.22)}
 .navbar__jarvis{border-radius:999px;background:linear-gradient(120deg,#173b32,#0e2923);box-shadow:0 8px 24px rgba(14,40,34,.14)}
+.navbar__new-program{align-items:center;background:#fff;border:1px solid #d8d0bf;color:#173f36;cursor:pointer;display:inline-flex;font:inherit;font-size:.76rem;font-weight:800;gap:.35rem;height:44px;padding:0 .75rem}.navbar__new-program:hover{border-color:#b9954b}@media(max-width:1180px){.navbar__new-program span{display:none}.navbar__new-program{justify-content:center;padding:0;width:44px}}@media(max-width:900px){.navbar__new-program{display:none}}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { FiArrowRight, FiCalendar, FiTarget, FiUsers } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import Modal from "../components/Modal.jsx";
@@ -13,6 +13,7 @@ const audienceOptions = ["Airbnb investors", "Real estate investors", "House fli
 
 export default function Campaigns() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { selectedId } = useInitiative();
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,7 @@ export default function Campaigns() {
   const [deletePreview, setDeletePreview] = useState(null);
   const [deleteOptions, setDeleteOptions] = useState({ deleteOutreach: false, deleteEvent: false });
   const [deleting, setDeleting] = useState(false);
-  const [defaultCampaignKind] = useState(() => getWorkspaceSettings().defaultCampaignKind);
+  const [defaultCampaignKind, setDefaultCampaignKind] = useState(() => getWorkspaceSettings().defaultCampaignKind);
 
   const loadCampaigns = async () => {
     try { setLoading(true); setCampaigns(await fetchCampaigns()); }
@@ -31,6 +32,12 @@ export default function Campaigns() {
     finally { setLoading(false); }
   };
   useEffect(() => { loadCampaigns(); }, []);
+  useEffect(() => {
+    if (searchParams.get("create") !== "program") return;
+    setDefaultCampaignKind("program");
+    setIsOpen(true);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const openDeleteModal = async (campaign) => {
     setError("");
@@ -65,7 +72,7 @@ export default function Campaigns() {
   const totalSold = visibleCampaigns.reduce((sum, campaign) => sum + Number(campaign.eventId?.eventbriteLogistics?.ticketsSold ?? campaign.ticketsSold ?? 0), 0);
 
   return <div className="page-dashboard campaigns-page">
-    <div className="page-header"><div><p className="page-eyebrow">Campaign portfolio</p><h1 className="page-title">Campaigns</h1><p className="page-subtitle">See the objective, audience, progress, and next action for every campaign.</p></div><Button onClick={() => { setError(""); setIsOpen(true); }}>+ New campaign</Button></div>
+    <div className="page-header"><div><p className="page-eyebrow">Campaign portfolio</p><h1 className="page-title">Campaigns</h1><p className="page-subtitle">See the objective, audience, progress, and next action for every campaign.</p></div><div className="campaign-create-actions"><Button variant="outline" onClick={() => { setError(""); setDefaultCampaignKind("event"); setIsOpen(true); }}>+ Event</Button><Button onClick={() => { setError(""); setDefaultCampaignKind("program"); setIsOpen(true); }}>+ Program</Button></div></div>
     <section className="campaign-summary">
       <div><FiTarget /><span><strong>{visibleCampaigns.length}</strong>{selectedId === "all" ? "Total campaigns" : "Selected workspace"}</span></div>
       <div><FiCalendar /><span><strong>{activeCount}</strong>Active now</span></div>

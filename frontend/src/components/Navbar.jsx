@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FiSearch, FiMenu, FiCpu, FiLogOut } from "react-icons/fi";
+import { FiSearch, FiMenu, FiCpu, FiLogOut, FiPlus } from "react-icons/fi";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import { useInitiative } from "../context/InitiativeContext.jsx";
 import { fetchWorkspaceConfig } from "../services/api.js";
@@ -61,7 +61,7 @@ export default function Navbar({ onMenuClick }) {
           <h1 className="navbar__title">{pageMeta[1]}</h1>
         </div>
         <label className="initiative-switcher">
-          <span>Current workspace</span>
+          <span>Current campaign</span>
           <select value={selectedId} onChange={(event) => changeInitiative(event.target.value)}>
             <option value="all">All business activity</option>
             <optgroup label="Events">
@@ -73,6 +73,7 @@ export default function Navbar({ onMenuClick }) {
           </select>
           {selected ? <i className={selected.campaignKind === "program" ? "is-offer" : "is-event"} /> : null}
         </label>
+        <button className="navbar__new-program" type="button" onClick={() => navigate("/campaigns?create=program")} title="Create a program campaign"><FiPlus /><span>Program</span></button>
       </div>
 
       <div className="navbar__actions">

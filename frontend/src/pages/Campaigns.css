@@ -40,3 +40,4 @@
   .campaign-card__meta { grid-template-columns: 1fr; }
   .campaign-card footer { align-items: stretch; flex-direction: column; gap: 12px; }
 }
+.campaign-create-actions{display:flex;gap:.65rem;flex-wrap:wrap}
