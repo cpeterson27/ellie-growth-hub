@@ -104,6 +104,8 @@ const outreachSchema = new mongoose.Schema(
       trim: true,
     },
     templateVersion: { type: Number, default: 0 },
+    templateAudienceKey: { type: String, default: "general" },
+    templateAudienceLabel: { type: String, default: "All campaign contacts" },
     emailTopic: {
       type: String,
       enum: ["event_invitations", "program_offers", "educational_newsletter"],

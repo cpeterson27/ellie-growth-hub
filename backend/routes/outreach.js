@@ -7,6 +7,7 @@ const Contact = require("../models/Contact");
 const { renderEmailContent, sendEmail } = require("../services/email");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 const { requireRole } = require("../middleware/auth");
+const { matchReasons } = require("../services/campaignAudienceService");
 
 const {
   generateOutreachDraft,
@@ -184,20 +185,16 @@ router.post("/generate", async (req,res)=>{
 
     }
 
-    const activeTemplateKey = campaign.activeAudienceTemplateKey || "general";
-    const activeTemplate = activeTemplateKey === "general"
-      ? campaign.emailTemplate
-      : campaign.emailAudienceTemplates?.[activeTemplateKey];
-    let approvedTemplate = activeTemplate?.currentVersion
+    let generalTemplate = campaign.emailTemplate?.currentVersion
       ? await CampaignTemplateVersion.findOne({
         campaignId: campaign._id,
-        version: activeTemplate.currentVersion,
+        version: campaign.emailTemplate.currentVersion,
       })
       : null;
-    if (!approvedTemplate) {
+    if (!generalTemplate) {
       const template = require("../services/campaignMasterTemplate").effectiveTemplate(campaign);
       const version = (await CampaignTemplateVersion.findOne({ campaignId: campaign._id }).sort({ version: -1 }).select("version"))?.version + 1 || 1;
-      approvedTemplate = await CampaignTemplateVersion.create({
+      generalTemplate = await CampaignTemplateVersion.create({
         campaignId: campaign._id,
         version,
         subject: template.subject,
@@ -208,16 +205,23 @@ router.post("/generate", async (req,res)=>{
         approvedByUserId: req.auth.user._id,
         approvedAt: new Date(),
       });
-      campaign.emailTemplate = { ...template, status: "approved", currentVersion: version, approvedAt: approvedTemplate.approvedAt };
+      campaign.emailTemplate = { ...template, status: "approved", currentVersion: version, approvedAt: generalTemplate.approvedAt };
       campaign.activeAudienceTemplateKey = "general";
       await campaign.save();
     }
-    campaign.content = {
-      subject: approvedTemplate.subject,
-      body: approvedTemplate.body,
-      callToAction: approvedTemplate.callToAction,
-      callToActionUrl: approvedTemplate.callToActionUrl,
-    };
+    const audienceTemplateDefinitions = Object.entries(campaign.emailAudienceTemplates || {})
+      .filter(([, template]) => template?.status === "approved" && template?.currentVersion && template?.audienceLabel);
+    const audienceTemplateVersions = await CampaignTemplateVersion.find({
+      campaignId: campaign._id,
+      version: { $in: audienceTemplateDefinitions.map(([, template]) => template.currentVersion) },
+    });
+    const audienceTemplates = audienceTemplateDefinitions
+      .map(([key, definition]) => ({
+        key,
+        label: definition.audienceLabel,
+        template: audienceTemplateVersions.find((version) => version.version === definition.currentVersion),
+      }))
+      .filter((item) => item.template);
 
 
 
@@ -296,6 +300,29 @@ router.post("/generate", async (req,res)=>{
 
       };
 
+      const normalizedProfiles = (cleanedContact.audienceProfiles || [])
+        .map((profile) => String(profile).toLowerCase().trim());
+      const routedTemplate = audienceTemplates
+        .map((candidate) => {
+          const reasons = matchReasons(cleanedContact, [candidate.label]);
+          const exactProfile = normalizedProfiles.includes(String(candidate.label).toLowerCase().trim());
+          return {
+            ...candidate,
+            score: (exactProfile ? 100 : 0) + (reasons[0]?.terms?.length || 0),
+          };
+        })
+        .filter((candidate) => candidate.score > 0)
+        .sort((left, right) => right.score - left.score)[0];
+      const recipientTemplate = routedTemplate?.template || generalTemplate;
+      const recipientAudienceKey = routedTemplate?.key || "general";
+      const recipientAudienceLabel = routedTemplate?.label || "All Deal to Close contacts";
+      campaign.content = {
+        subject: recipientTemplate.subject,
+        body: recipientTemplate.body,
+        callToAction: recipientTemplate.callToAction,
+        callToActionUrl: recipientTemplate.callToActionUrl,
+      };
+
 
 
       const draft =
@@ -319,8 +346,10 @@ router.post("/generate", async (req,res)=>{
           exists.htmlBody = draft.htmlBody || "";
           exists.eventLink = draft.eventLink || "";
           exists.flyerUrl = draft.flyerUrl || "";
-          exists.templateVersion = approvedTemplate.version;
-          exists.emailTopic = approvedTemplate.topic;
+          exists.templateVersion = recipientTemplate.version;
+          exists.templateAudienceKey = recipientAudienceKey;
+          exists.templateAudienceLabel = recipientAudienceLabel;
+          exists.emailTopic = recipientTemplate.topic;
           exists.status = "pending";
           exists.errorMessage = "";
           await exists.save();
@@ -367,9 +396,13 @@ router.post("/generate", async (req,res)=>{
   flyerUrl:
     draft.flyerUrl || "",
 
-  templateVersion: approvedTemplate.version,
+  templateVersion: recipientTemplate.version,
 
-  emailTopic: approvedTemplate.topic,
+  templateAudienceKey: recipientAudienceKey,
+
+  templateAudienceLabel: recipientAudienceLabel,
+
+  emailTopic: recipientTemplate.topic,
 
   status:
     "pending"

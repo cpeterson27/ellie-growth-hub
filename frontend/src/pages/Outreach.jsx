@@ -304,6 +304,9 @@ export default function Outreach() {
                 <p className="outreach-item__subject">
                   {item.subject || "No subject"}
                 </p>
+                <p className="outreach-item__template">
+                  Template: {item.templateAudienceLabel || "All Deal to Close contacts"}
+                </p>
                 <div className="outreach-item__actions">
                   <Button
                     variant="outline"
@@ -382,6 +385,10 @@ export default function Outreach() {
             </p>
             <p>
               <strong>Subject</strong> {preview.subject || "No subject"}
+            </p>
+            <p>
+              <strong>Audience template</strong>{" "}
+              {preview.templateAudienceLabel || "All Deal to Close contacts"}
             </p>
             {preview.htmlBody ? (
               <>
