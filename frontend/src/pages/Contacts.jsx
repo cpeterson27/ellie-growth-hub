@@ -187,6 +187,8 @@ export default function Contacts() {
   const [bulkCampaignId, setBulkCampaignId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkNotice, setBulkNotice] = useState("");
+  const [importBatches, setImportBatches] = useState([]);
+  const [importBatchId, setImportBatchId] = useState("");
   const [recentImport, setRecentImport] = useState(() => {
     try { return JSON.parse(localStorage.getItem("ellie-recent-contact-import") || "null"); }
     catch { return null; }
@@ -198,7 +200,22 @@ export default function Contacts() {
       setLoading(true);
       const query = { limit: 500, ...(contactTab === "archived" ? { status: "archived" } : {}) };
       const response = await fetchContacts(query);
-      const items = (response.data || []).filter((contact) => {
+      const allContacts = response.data || [];
+      const batchMap = new Map();
+      allContacts.forEach((contact) => {
+        if (!contact.lastImportBatchId) return;
+        const current = batchMap.get(contact.lastImportBatchId);
+        const importedAt = contact.lastImportedAt || contact.importedAt || contact.createdAt;
+        if (!current || new Date(importedAt) > new Date(current.importedAt)) {
+          batchMap.set(contact.lastImportBatchId, {
+            id: contact.lastImportBatchId,
+            fileName: contact.lastImportFileName || "CSV import",
+            importedAt,
+          });
+        }
+      });
+      setImportBatches([...batchMap.values()].sort((a, b) => new Date(b.importedAt) - new Date(a.importedAt)));
+      const items = allContacts.filter((contact) => {
         const workflow = contactWorkflowState(contact);
         const requestedResearchStatus = searchParams.get("researchStatus");
         const tabMatches = contactTab === "attention"
@@ -207,11 +224,10 @@ export default function Contacts() {
             ? workflow.key === "ready"
             : contactTab === "assigned"
               ? workflow.key === "assigned"
-              : contactTab === "recent"
-                ? Boolean(recentImport?.id) && contact.lastImportBatchId === recentImport.id
               : true;
         return tabMatches &&
           (!requestedResearchStatus || contact.researchStatus === requestedResearchStatus) &&
+          (!importBatchId || contact.lastImportBatchId === importBatchId) &&
           (!campaignId || contact.campaignIds?.some((id) => String(id) === campaignId)) &&
           (!searchTerm || [contact.name, contact.company, contact.email, contact.title].join(" ").toLowerCase().includes(searchTerm.toLowerCase()));
       });
@@ -230,11 +246,11 @@ export default function Contacts() {
 
   useEffect(() => {
     loadContacts();
-  }, [contactTab, campaignId, searchTerm, searchParams, recentImport]);
+  }, [contactTab, campaignId, importBatchId, searchTerm, searchParams]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [contactTab, campaignId, searchTerm]);
+  }, [contactTab, campaignId, importBatchId, searchTerm]);
 
   useEffect(() => {
     fetchCampaigns().then((items) => {
@@ -407,7 +423,8 @@ export default function Contacts() {
     if (saved) {
       setRecentImport(batch);
       localStorage.setItem("ellie-recent-contact-import", JSON.stringify(batch));
-      setContactTab("recent");
+      setImportBatchId(batch.id);
+      setContactTab("all");
       setCampaignId("");
       setUploadOpen(false); setImportRows([]); setImportHeaders([]); setImportFileName(""); setVerificationResults({}); setVerificationProgress(null); setImportMarketingPermission(false);
     }
@@ -441,7 +458,8 @@ export default function Contacts() {
     if (saved) {
       setRecentImport(batch);
       localStorage.setItem("ellie-recent-contact-import", JSON.stringify(batch));
-      setContactTab("recent");
+      setImportBatchId(batch.id);
+      setContactTab("all");
       setCampaignId("");
       setUploadOpen(false);
       setImportRows([]);
@@ -595,16 +613,20 @@ export default function Contacts() {
         {contactOverview ? <p className="contact-guidance">
           <strong>How this CRM works:</strong> Imported contacts appear here immediately. Open <strong>Needs attention</strong> to correct an email or add an audience profile. When a verified contact is a fit, assign them to a campaign here. Discovery is only for finding new prospects you do not already have.
         </p> : null}
-        <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
+        <div className="crm-toolbar">
+          <label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
+          <label>CSV batch <select value={importBatchId} onChange={(event) => setImportBatchId(event.target.value)}><option value="">All CSV imports</option>{recentImport?.id && !importBatches.some((batch) => batch.id === recentImport.id) ? <option value={recentImport.id}>{recentImport.fileName} · newest</option> : null}{importBatches.map((batch, index) => <option key={batch.id} value={batch.id}>{batch.fileName} · {batch.importedAt ? new Date(batch.importedAt).toLocaleDateString() : "date unavailable"}{index === 0 ? " · newest" : ""}</option>)}</select></label>
+          <input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+          {(campaignId || importBatchId || searchTerm) ? <Button variant="outline" onClick={() => { setCampaignId(""); setImportBatchId(""); setSearchTerm(""); }}>Clear filters</Button> : null}
+        </div>
         <div className="crm-tabs crm-tabs--simple">{[
           ["all", "All contacts"],
-          ...(recentImport?.id ? [["recent", `Just imported · ${recentImport.fileName}`]] : []),
           ["attention", "Needs attention"],
           ["ready", "Ready to assign"],
           ["assigned", "Campaign assigned"],
           ["archived", "Archived"],
         ].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
-        {contactTab === "recent" && recentImport ? <p className="contact-import-banner"><strong>Showing only the latest CSV:</strong> {recentImport.fileName}. You can select this entire view and assign it without searching through older contacts.</p> : null}
+        {importBatchId ? <p className="contact-import-banner"><strong>Filtered to one CSV upload:</strong> {(importBatches.find((batch) => batch.id === importBatchId) || recentImport)?.fileName || "Imported contacts"}. Campaign assignment will not mix older contacts into this view.</p> : null}
         {contacts.length && contactTab !== "archived" ? <section className="contact-bulk-actions" aria-label="Bulk contact actions">
           <label className="contact-select-all">
             <input type="checkbox" checked={contacts.some((contact) => contact.emailStatus === "verified") && contacts.filter((contact) => contact.emailStatus === "verified").every((contact) => selectedContactIds.includes(contact._id))} onChange={(event) => setSelectedContactIds(event.target.checked ? contacts.filter((contact) => contact.emailStatus === "verified").map((contact) => contact._id) : [])} />
