@@ -159,7 +159,7 @@ Ellie's Coaching
 <html>
 <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
 ${textToHtml(fillTemplate(savedBody, variables))}
-${flyerUrl ? `<img src="${escapeHtml(flyerUrl)}" alt="${escapeHtml(campaign.programName || campaignName)}" style="display:block;max-height:110px;max-width:240px;object-fit:contain;margin:0 0 28px;">` : ""}
+${flyerUrl ? `<img src="${escapeHtml(flyerUrl)}" alt="${escapeHtml(campaign.programName || campaignName)}" style="display:block;width:100%;max-width:600px;height:auto;border-radius:8px;margin:28px 0;">` : ""}
 ${eventLink ? `<p><a href="${escapeHtml(eventLink)}" style="display:inline-block;background:#000;color:#fff;padding:14px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">${escapeHtml(campaign.content?.callToAction || "Learn more")}</a></p>` : ""}
 ${meetupHtml}
 </body>
