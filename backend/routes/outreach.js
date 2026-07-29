@@ -6,6 +6,7 @@ const Contact = require("../models/Contact");
 
 const { sendEmail } = require("../services/email");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
+const { requireRole } = require("../middleware/auth");
 
 const {
   generateOutreachDraft,
@@ -79,6 +80,67 @@ router.get("/", async (req, res) => {
 
   }
 
+});
+
+router.post("/record-consent", requireRole("owner", "admin"), async (req, res) => {
+  try {
+    const { campaignId, consentSource, consentAt, attested } = req.body || {};
+    const allowedSources = [
+      "event_registration",
+      "website_form",
+      "written_permission",
+      "existing_customer_permission",
+      "imported_consent_record",
+    ];
+    if (!campaignId) return res.status(400).json({ error: "Campaign is required." });
+    if (!allowedSources.includes(consentSource)) {
+      return res.status(400).json({ error: "Choose how these contacts gave marketing permission." });
+    }
+    if (attested !== true) {
+      return res.status(400).json({ error: "Confirm that every campaign contact included in this update gave permission." });
+    }
+    const recordedAt = new Date(consentAt);
+    if (Number.isNaN(recordedAt.getTime()) || recordedAt > new Date()) {
+      return res.status(400).json({ error: "Enter a valid consent date that is not in the future." });
+    }
+    const campaign = await Campaign.findById(campaignId).select("campaignKind emailTemplate");
+    if (!campaign) return res.status(404).json({ error: "Campaign not found." });
+    const outreach = await Outreach.find({
+      campaignId,
+      status: { $in: ["pending", "approved", "failed"] },
+      contactId: { $ne: null },
+    }).select("contactId");
+    const contactIds = [...new Set(outreach.map((item) => String(item.contactId)))];
+    const topic = campaign.emailTemplate?.topic
+      || (campaign.campaignKind === "program" ? "program_offers" : "event_invitations");
+    const topicField = {
+      event_invitations: "eventInvitations",
+      program_offers: "programOffers",
+      educational_newsletter: "educationalNewsletter",
+    }[topic];
+    const result = await Contact.updateMany(
+      { _id: { $in: contactIds }, status: { $nin: ["archived", "invalid"] } },
+      {
+        $set: {
+          status: "active",
+          "emailPreferences.marketingStatus": "subscribed",
+          "emailPreferences.consentSource": consentSource,
+          "emailPreferences.consentAt": recordedAt,
+          "emailPreferences.unsubscribedAt": null,
+          "emailPreferences.unsubscribeSource": "",
+          [`emailPreferences.topics.${topicField}`]: true,
+        },
+      },
+    );
+    return res.json({
+      updatedCount: result.modifiedCount || 0,
+      eligibleCount: result.matchedCount || 0,
+      topic,
+      message: `Recorded permission for ${result.modifiedCount || 0} campaign contact${result.modifiedCount === 1 ? "" : "s"}.`,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Unable to record campaign permission." });
+  }
 });
 
 

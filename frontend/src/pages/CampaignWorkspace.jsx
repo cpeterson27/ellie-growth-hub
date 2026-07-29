@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, previewCampaignAudience, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, previewCampaignAudience, recordCampaignConsent, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -23,6 +23,10 @@ export default function CampaignWorkspace() {
   const [emailTemplate, setEmailTemplate] = useState(null);
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [consentSource, setConsentSource] = useState("");
+  const [consentAt, setConsentAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [consentAttested, setConsentAttested] = useState(false);
+  const [consentResult, setConsentResult] = useState("");
 
   useEffect(() => {
     if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
@@ -120,6 +124,22 @@ export default function CampaignWorkspace() {
       setTemplateSaving(false);
     }
   };
+  const recordPermission = async () => {
+    try {
+      setTemplateSaving(true);
+      setError("");
+      const result = await recordCampaignConsent(id, {
+        consentSource,
+        consentAt,
+        attested: consentAttested,
+      });
+      setConsentResult(result.message);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to record campaign permission.");
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
 
   if (loading) return <div className="page-dashboard"><p>Loading campaign…</p></div>;
   if (error || !campaign) return <div className="page-dashboard"><p className="form-error">{error || "Campaign not found."}</p><Button variant="outline" onClick={() => navigate("/campaigns")}>Back to Campaigns</Button></div>;
@@ -171,6 +191,17 @@ export default function CampaignWorkspace() {
             <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
             {templateVersions.length ? <small>{templateVersions.length} immutable approved version{templateVersions.length === 1 ? "" : "s"} saved.</small> : null}
           </div> : <p>Loading the master template…</p>}
+        </DashboardCard>
+
+        <DashboardCard title="Audience email permission">
+          <div className="campaign-consent">
+            <p>Record permission only when every active contact prepared for this campaign actually agreed to receive this type of email. Email verification alone is not permission.</p>
+            <label><span>How permission was given</span><select value={consentSource} onChange={(event) => setConsentSource(event.target.value)}><option value="">Choose a source</option><option value="event_registration">Event registration</option><option value="website_form">Website form</option><option value="written_permission">Written or emailed permission</option><option value="existing_customer_permission">Existing customer permission</option><option value="imported_consent_record">Imported consent record</option></select></label>
+            <label><span>Date permission was obtained</span><input type="date" max={new Date().toISOString().slice(0, 10)} value={consentAt} onChange={(event) => setConsentAt(event.target.value)} /></label>
+            <label className="campaign-consent__attestation"><input type="checkbox" checked={consentAttested} onChange={(event) => setConsentAttested(event.target.checked)} /><span>I confirm that every active contact prepared for this campaign gave permission, and I am authorized to record it.</span></label>
+            <Button loading={templateSaving} disabled={!consentSource || !consentAttested} onClick={recordPermission}>Record permission for campaign contacts</Button>
+            {consentResult ? <p className="campaign-consent__success">{consentResult}</p> : null}
+          </div>
         </DashboardCard>
 
         <DashboardCard title={isProgram ? "Program brand" : "Event brand"}>

@@ -299,6 +299,9 @@ export const updateOutreach = (id, updateData) =>
 export const approveAllOutreach = (campaignId) =>
   api.patch("/outreach/bulk/approve", { campaignId }).then((res) => res.data);
 
+export const recordCampaignConsent = (campaignId, details) =>
+  api.post("/outreach/record-consent", { campaignId, ...details }).then((res) => res.data);
+
 
 
 
