@@ -84,25 +84,13 @@ router.get("/", async (req, res) => {
 
 router.post("/record-consent", requireRole("owner", "admin"), async (req, res) => {
   try {
-    const { campaignId, consentSource, consentAt, attested } = req.body || {};
-    const allowedSources = [
-      "event_registration",
-      "website_form",
-      "written_permission",
-      "existing_customer_permission",
-      "imported_consent_record",
-    ];
+    const { campaignId, attested } = req.body || {};
     if (!campaignId) return res.status(400).json({ error: "Campaign is required." });
-    if (!allowedSources.includes(consentSource)) {
-      return res.status(400).json({ error: "Choose how these contacts gave marketing permission." });
-    }
     if (attested !== true) {
       return res.status(400).json({ error: "Confirm that every campaign contact included in this update gave permission." });
     }
-    const recordedAt = new Date(consentAt);
-    if (Number.isNaN(recordedAt.getTime()) || recordedAt > new Date()) {
-      return res.status(400).json({ error: "Enter a valid consent date that is not in the future." });
-    }
+    const consentSource = "campaign_owner_confirmation";
+    const recordedAt = new Date();
     const campaign = await Campaign.findById(campaignId).select("campaignKind emailTemplate");
     if (!campaign) return res.status(404).json({ error: "Campaign not found." });
     const outreach = await Outreach.find({

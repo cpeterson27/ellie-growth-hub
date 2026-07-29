@@ -84,7 +84,7 @@ function normalizeIncoming(row, source = "manual") {
   return mapped;
 }
 
-async function ingestContacts({ contacts, source = "manual", campaignId = null }) {
+async function ingestContacts({ contacts, source = "manual", campaignId = null, marketingPermission = false }) {
   if (!Array.isArray(contacts) || !contacts.length || contacts.length > 500) throw new Error("Provide between 1 and 500 contacts");
   let campaign = null;
   if (campaignId) { campaign = await Campaign.findById(campaignId).select("_id name"); if (!campaign) throw new Error("Campaign not found"); }
@@ -120,6 +120,19 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null }
       });
     }
     applyResearchClassification(contact);
+    if (marketingPermission === true && contact.email) {
+      contact.status = "active";
+      contact.emailPreferences.marketingStatus = "subscribed";
+      contact.emailPreferences.consentSource = `${source}_owner_confirmed`;
+      contact.emailPreferences.consentAt = new Date();
+      contact.emailPreferences.unsubscribedAt = null;
+      contact.emailPreferences.unsubscribeSource = "";
+      contact.emailPreferences.topics = {
+        eventInvitations: true,
+        programOffers: true,
+        educationalNewsletter: true,
+      };
+    }
     if (campaign && !contact.campaignIds.some((id) => String(id) === String(campaign._id))) { contact.campaignIds.push(campaign._id); summary.campaignAssociated += 1; }
     try {
       await contact.save();

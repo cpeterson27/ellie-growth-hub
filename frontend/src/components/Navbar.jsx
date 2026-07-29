@@ -82,7 +82,7 @@ export default function Navbar({ onMenuClick }) {
         <button className="navbar__jarvis" type="button" onClick={() => navigate("/jarvis")}>
           <FiCpu /><span>Jarvis</span><i />
         </button>
-        <button className="navbar__logout" type="button" onClick={logout} title={`Sign out ${session?.user?.email || ""}`} aria-label="Sign out">
+        <button className="navbar__logout" type="button" onClick={async () => { await logout(); window.location.assign("/"); }} title={`Sign out ${session?.user?.email || ""}`} aria-label="Sign out">
           <FiLogOut />
         </button>
       </div>

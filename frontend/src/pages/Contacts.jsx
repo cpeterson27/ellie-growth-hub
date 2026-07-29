@@ -130,10 +130,11 @@ export default function Contacts() {
   const [importSummary, setImportSummary] = useState(null);
   const [isContactFormOpen, setContactFormOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
-  const [manualContact, setManualContact] = useState({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false });
+  const [manualContact, setManualContact] = useState({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false, canReceiveCampaignEmail: false });
   const [importRows, setImportRows] = useState([]);
   const [importHeaders, setImportHeaders] = useState([]);
   const [importCampaignId, setImportCampaignId] = useState("");
+  const [importMarketingPermission, setImportMarketingPermission] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
   const [contactTab, setContactTab] = useState("all");
   const [importMenuOpen, setImportMenuOpen] = useState(false);
@@ -300,10 +301,10 @@ export default function Contacts() {
     }, error: () => setImportError("Unable to parse contact file.") });
   }
 
-  async function saveIngestion(contactsToSave, source, selectedCampaignId) {
+  async function saveIngestion(contactsToSave, source, selectedCampaignId, marketingPermission = false) {
     try {
       setSavingContact(true); setError("");
-      const response = await ingestContacts({ contacts: contactsToSave, source, campaignId: selectedCampaignId || null });
+      const response = await ingestContacts({ contacts: contactsToSave, source, campaignId: selectedCampaignId || null, marketingPermission });
       setImportSummary(response.data); await loadContacts(); return true;
     } catch (err) { setError(err.response?.data?.message || "Unable to save contacts"); return false; }
     finally { setSavingContact(false); }
@@ -318,8 +319,8 @@ export default function Contacts() {
       city: manualContact.location,
       tags: manualContact.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
       audienceProfiles: manualContact.audienceProfiles.split(",").map((profile) => profile.trim()).filter(Boolean),
-    }], "manual", importCampaignId);
-    if (saved) { setContactFormOpen(false); setManualContact({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false }); }
+    }], "manual", importCampaignId, manualContact.canReceiveCampaignEmail);
+    if (saved) { setContactFormOpen(false); setManualContact({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false, canReceiveCampaignEmail: false }); }
   }
 
   async function saveUploadedContacts() {
@@ -340,8 +341,8 @@ export default function Contacts() {
       )].join(",");
       return { ...row, Email: "", "Email Status": result?.state || "unverified", Tags: tags };
     });
-    const saved = await saveIngestion(sanitizedRows, "csv", null);
-    if (saved) { setUploadOpen(false); setImportRows([]); setImportHeaders([]); setVerificationResults({}); setVerificationProgress(null); }
+    const saved = await saveIngestion(sanitizedRows, "csv", null, importMarketingPermission);
+    if (saved) { setUploadOpen(false); setImportRows([]); setImportHeaders([]); setVerificationResults({}); setVerificationProgress(null); setImportMarketingPermission(false); }
   }
 
   async function saveUploadedContactsWithoutEmails() {
@@ -657,6 +658,10 @@ export default function Contacts() {
             <input type="checkbox" checked={manualContact.confirmEmailManually} onChange={(event) => setManualContact({ ...manualContact, confirmEmailManually: event.target.checked })} />
             <span><strong>I personally confirmed this email address</strong><small>Use this only when the person gave you the address directly or you already confirmed it. Ellie records this as owner-confirmed, not Emailable-verified.</small></span>
           </label> : null}
+          {manualContact.email ? <label className="contact-qualify-choice span-2">
+            <input type="checkbox" checked={manualContact.canReceiveCampaignEmail} onChange={(event) => setManualContact({ ...manualContact, canReceiveCampaignEmail: event.target.checked })} />
+            <span><strong>Can receive campaign email</strong><small>Turn this on when this person gave permission. Ellie will include unsubscribe options automatically.</small></span>
+          </label> : null}
         </div>
         <label className="form-field contact-notes"><span>Notes</span><textarea className="select-input" value={manualContact.notes} onChange={(event) => setManualContact({ ...manualContact, notes: event.target.value })} /></label>
       </Modal>
@@ -692,6 +697,10 @@ export default function Contacts() {
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p className="contact-modal-intro"><strong>What happens next:</strong> These contacts will be saved directly to your CRM. Nothing is emailed and no campaign is assigned during import. Each contact will show its next recommended action afterward.</p>
+          <label className="contact-qualify-choice">
+            <input type="checkbox" checked={importMarketingPermission} onChange={(event) => setImportMarketingPermission(event.target.checked)} />
+            <span><strong>These imported contacts can receive campaign email</strong><small>One setting applies to this entire CSV. Ellie adds unsubscribe options automatically.</small></span>
+          </label>
           {pendingEmailCount > 0 ? <p className="contact-modal-intro"><strong>No-credit option:</strong> Save people without emails keeps every contact and removes every email address from the MongoDB import. Each record is tagged needs-email-verification.</p> : null}
           {emailsToVerify.length ? <div className="email-verification-panel">
             <div>

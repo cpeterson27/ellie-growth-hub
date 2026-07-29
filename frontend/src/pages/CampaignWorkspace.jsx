@@ -23,8 +23,6 @@ export default function CampaignWorkspace() {
   const [emailTemplate, setEmailTemplate] = useState(null);
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateSaving, setTemplateSaving] = useState(false);
-  const [consentSource, setConsentSource] = useState("");
-  const [consentAt, setConsentAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [consentAttested, setConsentAttested] = useState(false);
   const [consentResult, setConsentResult] = useState("");
 
@@ -129,8 +127,6 @@ export default function CampaignWorkspace() {
       setTemplateSaving(true);
       setError("");
       const result = await recordCampaignConsent(id, {
-        consentSource,
-        consentAt,
         attested: consentAttested,
       });
       setConsentResult(result.message);
@@ -195,11 +191,9 @@ export default function CampaignWorkspace() {
 
         <DashboardCard title="Audience email permission">
           <div className="campaign-consent">
-            <p>Record permission only when every active contact prepared for this campaign actually agreed to receive this type of email. Email verification alone is not permission.</p>
-            <label><span>How permission was given</span><select value={consentSource} onChange={(event) => setConsentSource(event.target.value)}><option value="">Choose a source</option><option value="event_registration">Event registration</option><option value="website_form">Website form</option><option value="written_permission">Written or emailed permission</option><option value="existing_customer_permission">Existing customer permission</option><option value="imported_consent_record">Imported consent record</option></select></label>
-            <label><span>Date permission was obtained</span><input type="date" max={new Date().toISOString().slice(0, 10)} value={consentAt} onChange={(event) => setConsentAt(event.target.value)} /></label>
-            <label className="campaign-consent__attestation"><input type="checkbox" checked={consentAttested} onChange={(event) => setConsentAttested(event.target.checked)} /><span>I confirm that every active contact prepared for this campaign gave permission, and I am authorized to record it.</span></label>
-            <Button loading={templateSaving} disabled={!consentSource || !consentAttested} onClick={recordPermission}>Record permission for campaign contacts</Button>
+            <p>One confirmation makes the active contacts prepared for this campaign eligible for its email topic.</p>
+            <label className="campaign-consent__attestation"><input type="checkbox" checked={consentAttested} onChange={(event) => setConsentAttested(event.target.checked)} /><span>These campaign contacts gave permission to receive this email.</span></label>
+            <Button loading={templateSaving} disabled={!consentAttested} onClick={recordPermission}>Allow campaign email</Button>
             {consentResult ? <p className="campaign-consent__success">{consentResult}</p> : null}
           </div>
         </DashboardCard>
