@@ -10,6 +10,7 @@ import {
   fetchOutreach,
   fetchOutreachPreview,
   generateOutreach,
+  sendOutreachTestEmail,
   sendEmails,
   syncGmailOutreachReplies,
   updateOutreach,
@@ -47,7 +48,9 @@ export default function Outreach() {
   const [approveAllOpen, setApproveAllOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testSending, setTestSending] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const loadItems = useCallback(async (campaign) => {
     if (!campaign?._id) {
       setItems([]);
@@ -179,6 +182,20 @@ export default function Outreach() {
       setSaving(false);
     }
   };
+  const sendTest = async () => {
+    if (!preview?._id) return;
+    try {
+      setTestSending(true);
+      setError("");
+      setNotice("");
+      const result = await sendOutreachTestEmail(preview._id);
+      setNotice(result.message || "Test email sent to team@elliescoaching.com.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to send the test email.");
+    } finally {
+      setTestSending(false);
+    }
+  };
   const send = async () => {
     const ids = items.filter((x) => x.status === "approved").map((x) => x._id);
     if (!ids.length)
@@ -235,6 +252,7 @@ export default function Outreach() {
         </div>
       </header>
       {error ? <p className="form-error">{error}</p> : null}
+      {notice ? <p className="outreach-notice">{notice}</p> : null}
       <section className="outreach-controls">
         <label>
           Campaign
@@ -361,20 +379,29 @@ export default function Outreach() {
         onClose={() => setPreview(null)}
         title="Review outreach email"
         footer={
-          preview?.status === "pending" ? (
+          <>
             <Button
-              onClick={() => {
-                approve(preview);
-                setPreview(null);
-              }}
+              variant="outline"
+              loading={testSending}
+              onClick={sendTest}
             >
-              Approve draft
+              Send test to team@elliescoaching.com
             </Button>
-          ) : (
-            <Button variant="outline" onClick={() => setPreview(null)}>
-              Close
-            </Button>
-          )
+            {preview?.status === "pending" ? (
+              <Button
+                onClick={() => {
+                  approve(preview);
+                  setPreview(null);
+                }}
+              >
+                Approve draft
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setPreview(null)}>
+                Close
+              </Button>
+            )}
+          </>
         }
       >
         {preview ? (

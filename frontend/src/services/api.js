@@ -229,6 +229,9 @@ export const fetchOutreach = (campaignId) =>
 export const fetchOutreachPreview = (outreachId) =>
   api.get(`/outreach/${outreachId}/preview`).then((res) => res.data);
 
+export const sendOutreachTestEmail = (outreachId) =>
+  api.post(`/outreach/${outreachId}/test`).then((res) => res.data);
+
 
 export const fetchContacts = (params = {}) =>
   api

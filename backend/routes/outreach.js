@@ -4,7 +4,7 @@ const Outreach = require("../models/Outreach");
 const Campaign = require("../models/Campaign");
 const Contact = require("../models/Contact");
 
-const { renderEmailContent, sendEmail } = require("../services/email");
+const { renderEmailContent, sendEmail, sendTestEmail } = require("../services/email");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 const { requireRole } = require("../middleware/auth");
 const { matchReasons } = require("../services/campaignAudienceService");
@@ -91,6 +91,26 @@ router.get("/:id/preview", async (req, res) => {
     return res.json({ subject: outreach.subject, html: rendered.html });
   } catch (error) {
     return res.status(500).json({ error: error.message || "Unable to preview outreach email." });
+  }
+});
+
+router.post("/:id/test", requireRole("owner", "admin"), async (req, res) => {
+  try {
+    const outreach = await Outreach.findById(req.params.id);
+    if (!outreach) {
+      return res.status(404).json({ error: "Outreach email not found." });
+    }
+    const result = await sendTestEmail(outreach);
+    if (!result.success) {
+      return res.status(400).json({ error: result.message || "Unable to send test email." });
+    }
+    return res.json({
+      message: result.message,
+      messageId: result.id,
+      recipient: result.recipient,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Unable to send test email." });
   }
 });
 

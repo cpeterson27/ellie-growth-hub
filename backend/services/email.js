@@ -173,9 +173,43 @@ error.message
 
 }
 
+async function sendTestEmail(outreachItem, recipient = "team@elliescoaching.com") {
+  if (!outreachItem) {
+    return { success: false, message: "Missing outreach item." };
+  }
+
+  try {
+    const { text, html } = await renderEmailContent(outreachItem, { preview: true });
+    const gmailConnection = await IntegrationConnection.findOne({
+      provider: "gmail",
+      status: "connected",
+    }).select("settings");
+    const replyTo =
+      String(process.env.EMAIL_REPLY_TO || "").trim() ||
+      String(gmailConnection?.settings?.email || "").trim();
+    const response = await integrationHub.execute("resend", "sendEmail", {
+      from: process.env.EMAIL_FROM || "Ellie AI <onboarding@resend.dev>",
+      to: recipient,
+      subject: `[TEST] ${outreachItem.subject || "A message from Ellie's Coaching"}`,
+      text,
+      html,
+      replyTo,
+    });
+    return {
+      success: true,
+      message: `Test email sent to ${recipient}.`,
+      id: response.messageId,
+      recipient,
+    };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+}
+
 
 
 module.exports = {
   renderEmailContent,
   sendEmail,
+  sendTestEmail,
 };
