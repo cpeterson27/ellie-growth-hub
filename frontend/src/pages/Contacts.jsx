@@ -134,6 +134,7 @@ export default function Contacts() {
   const [manualContact, setManualContact] = useState({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false, canReceiveCampaignEmail: false });
   const [importRows, setImportRows] = useState([]);
   const [importHeaders, setImportHeaders] = useState([]);
+  const [importFileName, setImportFileName] = useState("");
   const [importCampaignId, setImportCampaignId] = useState("");
   const [importMarketingPermission, setImportMarketingPermission] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
@@ -156,6 +157,10 @@ export default function Contacts() {
   const [bulkCampaignId, setBulkCampaignId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkNotice, setBulkNotice] = useState("");
+  const [recentImport, setRecentImport] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("ellie-recent-contact-import") || "null"); }
+    catch { return null; }
+  });
   const pageSize = 15;
 
   async function loadContacts() {
@@ -172,6 +177,8 @@ export default function Contacts() {
             ? workflow.key === "ready"
             : contactTab === "assigned"
               ? workflow.key === "assigned"
+              : contactTab === "recent"
+                ? Boolean(recentImport?.id) && contact.lastImportBatchId === recentImport.id
               : true;
         return tabMatches &&
           (!requestedResearchStatus || contact.researchStatus === requestedResearchStatus) &&
@@ -193,7 +200,7 @@ export default function Contacts() {
 
   useEffect(() => {
     loadContacts();
-  }, [contactTab, campaignId, searchTerm, searchParams]);
+  }, [contactTab, campaignId, searchTerm, searchParams, recentImport]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -214,6 +221,12 @@ export default function Contacts() {
     setError("");
     setSelectedSource(source);
     setConfirmOpen(true);
+  }
+
+  function openCsvImport() {
+    setImportCampaignId(campaignId || (initiativeId === "all" ? "" : initiativeId));
+    setUploadOpen(true);
+    setImportMenuOpen(false);
   }
 
   async function assignSelectedContacts() {
@@ -305,10 +318,16 @@ export default function Contacts() {
     }, error: () => setImportError("Unable to parse contact file.") });
   }
 
-  async function saveIngestion(contactsToSave, source, selectedCampaignId, marketingPermission = false) {
+  async function saveIngestion(contactsToSave, source, selectedCampaignId, marketingPermission = false, importMeta = {}) {
     try {
       setSavingContact(true); setError("");
-      const response = await ingestContacts({ contacts: contactsToSave, source, campaignId: selectedCampaignId || null, marketingPermission });
+      const response = await ingestContacts({
+        contacts: contactsToSave,
+        source,
+        campaignId: selectedCampaignId || null,
+        marketingPermission,
+        ...importMeta,
+      });
       setImportSummary(response.data); await loadContacts(); return true;
     } catch (err) { setError(err.response?.data?.message || "Unable to save contacts"); return false; }
     finally { setSavingContact(false); }
@@ -345,8 +364,21 @@ export default function Contacts() {
       )].join(",");
       return { ...row, Email: "", "Email Status": result?.state || "unverified", Tags: tags };
     });
-    const saved = await saveIngestion(sanitizedRows, "csv", null, importMarketingPermission);
-    if (saved) { setUploadOpen(false); setImportRows([]); setImportHeaders([]); setVerificationResults({}); setVerificationProgress(null); setImportMarketingPermission(false); }
+    const batch = {
+      id: `csv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fileName: importFileName || "Pasted CSV",
+    };
+    const saved = await saveIngestion(sanitizedRows, "csv", importCampaignId, importMarketingPermission, {
+      importBatchId: batch.id,
+      importFileName: batch.fileName,
+    });
+    if (saved) {
+      setRecentImport(batch);
+      localStorage.setItem("ellie-recent-contact-import", JSON.stringify(batch));
+      setContactTab("recent");
+      setCampaignId("");
+      setUploadOpen(false); setImportRows([]); setImportHeaders([]); setImportFileName(""); setVerificationResults({}); setVerificationProgress(null); setImportMarketingPermission(false);
+    }
   }
 
   async function saveUploadedContactsWithoutEmails() {
@@ -366,11 +398,23 @@ export default function Contacts() {
       };
     });
 
-    const saved = await saveIngestion(contactsWithoutEmails, "csv", null);
+    const batch = {
+      id: `csv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fileName: importFileName || "Pasted CSV",
+    };
+    const saved = await saveIngestion(contactsWithoutEmails, "csv", importCampaignId, false, {
+      importBatchId: batch.id,
+      importFileName: batch.fileName,
+    });
     if (saved) {
+      setRecentImport(batch);
+      localStorage.setItem("ellie-recent-contact-import", JSON.stringify(batch));
+      setContactTab("recent");
+      setCampaignId("");
       setUploadOpen(false);
       setImportRows([]);
       setImportHeaders([]);
+      setImportFileName("");
       setVerificationResults({});
       setVerificationProgress(null);
     }
@@ -484,7 +528,7 @@ export default function Contacts() {
           <Button variant="outline" onClick={() => navigate("/contacts/fields")}>Customize fields</Button>
           <div className="crm-menu-wrap">
             <Button variant="outline" onClick={() => setImportMenuOpen((open) => !open)}>Import ▾</Button>
-            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Apollo CSV</button><button onClick={() => { setUploadOpen(true); setImportMenuOpen(false); }}>Standard CSV</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
+            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={openCsvImport}>Apollo CSV</button><button onClick={openCsvImport}>Standard CSV</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
           </div>
           <Button variant="outline" onClick={() => navigate("/discovery")}>Discover New Prospects</Button>
         </div>
@@ -520,7 +564,15 @@ export default function Contacts() {
           <strong>How this CRM works:</strong> Imported contacts appear here immediately. Open <strong>Needs attention</strong> to correct an email or add an audience profile. When a verified contact is a fit, assign them to a campaign here. Discovery is only for finding new prospects you do not already have.
         </p> : null}
         <div className="crm-toolbar"><label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All Contacts</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></div>
-        <div className="crm-tabs crm-tabs--simple">{[["all", "All contacts"], ["attention", "Needs attention"], ["ready", "Ready to assign"], ["assigned", "Campaign assigned"], ["archived", "Archived"]].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
+        <div className="crm-tabs crm-tabs--simple">{[
+          ["all", "All contacts"],
+          ...(recentImport?.id ? [["recent", `Just imported · ${recentImport.fileName}`]] : []),
+          ["attention", "Needs attention"],
+          ["ready", "Ready to assign"],
+          ["assigned", "Campaign assigned"],
+          ["archived", "Archived"],
+        ].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
+        {contactTab === "recent" && recentImport ? <p className="contact-import-banner"><strong>Showing only the latest CSV:</strong> {recentImport.fileName}. You can select this entire view and assign it without searching through older contacts.</p> : null}
         {contacts.length && contactTab !== "archived" ? <section className="contact-bulk-actions" aria-label="Bulk contact actions">
           <label className="contact-select-all">
             <input type="checkbox" checked={contacts.some((contact) => contact.emailStatus === "verified") && contacts.filter((contact) => contact.emailStatus === "verified").every((contact) => selectedContactIds.includes(contact._id))} onChange={(event) => setSelectedContactIds(event.target.checked ? contacts.filter((contact) => contact.emailStatus === "verified").map((contact) => contact._id) : [])} />
@@ -602,7 +654,7 @@ export default function Contacts() {
       </DashboardCard>
 
       {false ? <DashboardCard title="Find Leads">
-        <div className="apollo-locked"><p>🔒 Apollo prospect search requires a paid Apollo plan. Export your contacts from Apollo and import the CSV here.</p><p><small>Apollo connection: configured · Plan: Free · People search: unavailable · Credits: no people-search API access.</small></p><Button onClick={() => setUploadOpen(true)}>Import Apollo CSV</Button><Button variant="outline" onClick={() => navigate("/marketing")}>Open Organization Discovery</Button><small>Direct Apollo people search can be enabled later when the account has API access.</small></div>
+        <div className="apollo-locked"><p>🔒 Apollo prospect search requires a paid Apollo plan. Export your contacts from Apollo and import the CSV here.</p><p><small>Apollo connection: configured · Plan: Free · People search: unavailable · Credits: no people-search API access.</small></p><Button onClick={openCsvImport}>Import Apollo CSV</Button><Button variant="outline" onClick={() => navigate("/marketing")}>Open Organization Discovery</Button><small>Direct Apollo people search can be enabled later when the account has API access.</small></div>
         <div style={{ display: "none" }}>
           <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)} className="select-input">
             <option value="">Select campaign</option>
@@ -685,11 +737,11 @@ export default function Contacts() {
           </div>
           <p>Select a CSV exported from a spreadsheet, Apollo, or another CRM. Ellie recognizes common contact columns automatically.</p>
           <label className="crm-file-drop">
-            <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} />
+            <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setImportFileName(file.name); const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} />
             <strong>Choose a CSV file</strong>
             <span>or drag a file here</span>
           </label>
-          <details className="crm-paste-option"><summary>Paste rows instead</summary><textarea className="select-input" placeholder="Paste the header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) prepareImport(event.target.value); }} /></details>
+          <details className="crm-paste-option"><summary>Paste rows instead</summary><textarea className="select-input" placeholder="Paste the header row and contacts here" onChange={(event) => { if (event.target.value.includes("\n")) { setImportFileName("Pasted CSV"); prepareImport(event.target.value); } }} /></details>
         </div> : <>
           <div className="crm-import-steps">
             <div><span>✓</span><strong>CSV loaded</strong><small>{importRows.length} contacts found</small></div>
@@ -700,7 +752,8 @@ export default function Contacts() {
           <p>Detected headers: {importHeaders.join(", ")}</p>
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
-          <p className="contact-modal-intro"><strong>What happens next:</strong> These contacts will be saved directly to your CRM. Nothing is emailed and no campaign is assigned during import. Each contact will show its next recommended action afterward.</p>
+          <label className="form-field"><span>Assign this CSV to a campaign</span><select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">Do not assign yet</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
+          <p className="contact-modal-intro"><strong>What happens next:</strong> Ellie will open a “Just imported” view containing only this CSV. {importCampaignId ? "These contacts will also be assigned to the selected campaign." : "You can assign the whole batch there later."} Nothing is emailed during import.</p>
           <label className="contact-qualify-choice">
             <input type="checkbox" checked={importMarketingPermission} onChange={(event) => setImportMarketingPermission(event.target.checked)} />
             <span><strong>These imported contacts can receive campaign email</strong><small>One setting applies to this entire CSV. Ellie adds unsubscribe options automatically.</small></span>

@@ -84,11 +84,32 @@ function normalizeIncoming(row, source = "manual") {
   return mapped;
 }
 
-async function ingestContacts({ contacts, source = "manual", campaignId = null, marketingPermission = false }) {
+async function ingestContacts({
+  contacts,
+  source = "manual",
+  campaignId = null,
+  marketingPermission = false,
+  importBatchId = "",
+  importFileName = "",
+}) {
   if (!Array.isArray(contacts) || !contacts.length || contacts.length > 500) throw new Error("Provide between 1 and 500 contacts");
+  const cleanBatchId = String(importBatchId || "").trim().slice(0, 100);
+  const cleanFileName = String(importFileName || "").trim().slice(0, 200);
+  const importedNow = new Date();
   let campaign = null;
   if (campaignId) { campaign = await Campaign.findById(campaignId).select("_id name"); if (!campaign) throw new Error("Campaign not found"); }
-  const summary = { requested: contacts.length, mongoCreated: 0, mongoUpdated: 0, mongoSkipped: 0, campaignAssociated: 0, failed: 0, errors: [] };
+  const summary = {
+    requested: contacts.length,
+    mongoCreated: 0,
+    mongoUpdated: 0,
+    mongoSkipped: 0,
+    campaignAssociated: 0,
+    failed: 0,
+    errors: [],
+    importBatchId: cleanBatchId || null,
+    importFileName: cleanFileName || null,
+    campaignName: campaign?.name || null,
+  };
   for (let index = 0; index < contacts.length; index += 1) {
     const data = normalizeIncoming(contacts[index], source);
     if (!data.name) { summary.failed += 1; summary.errors.push({ index, message: "Name is required" }); continue; }
@@ -120,6 +141,11 @@ async function ingestContacts({ contacts, source = "manual", campaignId = null, 
       });
     }
     applyResearchClassification(contact);
+    if (cleanBatchId) {
+      contact.lastImportBatchId = cleanBatchId;
+      contact.lastImportFileName = cleanFileName;
+      contact.lastImportedAt = importedNow;
+    }
     if (marketingPermission === true && contact.email) {
       contact.status = "active";
       contact.emailPreferences.marketingStatus = "subscribed";

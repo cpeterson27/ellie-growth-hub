@@ -142,6 +142,9 @@ const contactSchema = new mongoose.Schema(
     country: { type: String, default: "", trim: true },
     employeeCount: { type: Number, default: null },
     importedAt: { type: Date, default: null },
+    lastImportBatchId: { type: String, default: "", index: true },
+    lastImportFileName: { type: String, default: "", trim: true },
+    lastImportedAt: { type: Date, default: null },
 
     campaignIds: [{
       type: mongoose.Schema.Types.ObjectId,
