@@ -182,7 +182,6 @@ export default function Contacts() {
   const [verificationProgress, setVerificationProgress] = useState(null);
   const [verificationResults, setVerificationResults] = useState({});
   const [importError, setImportError] = useState("");
-  const [existingBatchId, setExistingBatchId] = useState(() => localStorage.getItem("ellie-email-verification-batch") || "");
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [bulkCampaignId, setBulkCampaignId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -450,7 +449,7 @@ export default function Contacts() {
         return;
       }
     }
-    throw new Error("Email verification is taking longer than expected. Resume this batch again shortly.");
+    throw new Error("Email verification is taking longer than expected. Keep this window open and click Verify again shortly; Ellie will reuse the existing check.");
   }
 
   async function verifyImportedEmails() {
@@ -469,34 +468,10 @@ export default function Contacts() {
       const created = await createEmailVerificationBatch(plausibleEmails);
       const batchId = created.data?.id;
       if (!batchId) throw new Error("Emailable did not return a batch ID");
-      setExistingBatchId(batchId);
-      localStorage.setItem("ellie-email-verification-batch", batchId);
       await pollEmailVerificationBatch(batchId, invalidResults);
     } catch (err) {
       setVerificationProgress(null);
       setImportError(err.response?.data?.message || err.message || "Unable to verify emails");
-    } finally {
-      setVerifyingEmails(false);
-    }
-  }
-
-  async function resumeImportedEmailVerification() {
-    const batchId = existingBatchId.trim();
-    if (!batchId) {
-      setImportError("Paste the batch ID from the original verification request.");
-      return;
-    }
-    try {
-      setVerifyingEmails(true);
-      setImportError("");
-      localStorage.setItem("ellie-email-verification-batch", batchId);
-      const invalidResults = getLocalInvalidResults();
-      setVerificationResults(invalidResults);
-      setVerificationProgress({ processed: 0, total: emailsToVerify.length });
-      await pollEmailVerificationBatch(batchId, invalidResults);
-    } catch (err) {
-      setVerificationProgress(null);
-      setImportError(err.response?.data?.message || err.message || "Unable to resume this verification batch.");
     } finally {
       setVerifyingEmails(false);
     }
@@ -765,14 +740,6 @@ export default function Contacts() {
             <Button variant="outline" loading={verifyingEmails} disabled={verifyingEmails} onClick={verifyImportedEmails}>
               {pendingEmailCount ? `Verify ${emailsToVerify.length} emails` : "Verify again"}
             </Button>
-            <details className="verification-resume">
-              <summary>Resume a verification that was already started</summary>
-              <div>
-                <input className="select-input" value={existingBatchId} onChange={(event) => setExistingBatchId(event.target.value)} placeholder="Emailable batch ID" />
-                <Button variant="outline" disabled={verifyingEmails || !existingBatchId.trim()} onClick={resumeImportedEmailVerification}>Resume existing verification</Button>
-              </div>
-              <small>Use this only if this exact CSV verification was interrupted. It retrieves existing results and does not start a new paid check.</small>
-            </details>
             {verificationProgress ? <div className="verification-progress">
               <span style={{ width: `${Math.min(100, Math.round((verificationProgress.processed / Math.max(1, verificationProgress.total)) * 100))}%` }} />
             </div> : null}
