@@ -168,6 +168,17 @@ router.post("/:id/email-template/preview", async (req, res) => {
   };
   const previewCampaign = campaign.toObject();
   previewCampaign.content = template;
+  if (req.body?.meetupEnabled !== undefined || req.body?.meetupUrl !== undefined) {
+    previewCampaign.registrationLinks = {
+      ...previewCampaign.registrationLinks,
+      meetup: {
+        ...previewCampaign.registrationLinks?.meetup,
+        enabled: req.body.meetupEnabled === true,
+        url: String(req.body.meetupUrl || "").trim(),
+        label: String(req.body.meetupLabel || "View on Meetup").trim(),
+      },
+    };
+  }
   const draft = generateOutreachDraft(
     { firstName: "Cassandra", lastName: "", name: "Cassandra", email: "preview@example.com", sources: ["preview"] },
     previewCampaign,
@@ -271,7 +282,7 @@ router.patch("/:id/registration-links", async (req, res) => {
       meetup: {
         enabled: Boolean(meetupUrl),
         url: meetupUrl,
-        label: "View on Meetup",
+        label: String(req.body?.meetupLabel || "View on Meetup").trim(),
         eventId: meetupEventId,
       },
     };

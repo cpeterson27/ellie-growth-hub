@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, updateCampaignRegistrationLinks, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -98,10 +98,26 @@ export default function CampaignWorkspace() {
   };
 
   const updateTemplateField = (field, value) => setEmailTemplate((current) => ({ ...current, [field]: value, status: "draft" }));
+  const updateMeetupButton = (field, value) => setCampaign((current) => ({
+    ...current,
+    registrationLinks: {
+      ...current.registrationLinks,
+      meetup: { ...current.registrationLinks?.meetup, [field]: value },
+    },
+  }));
+  const saveButtonLinks = async () => {
+    const updated = await updateCampaignRegistrationLinks(id, {
+      eventbriteUrl: campaign.registrationLinks?.eventbrite?.url || "",
+      meetupUrl: campaign.registrationLinks?.meetup?.enabled ? campaign.registrationLinks?.meetup?.url || "" : "",
+      meetupLabel: campaign.registrationLinks?.meetup?.label || "View on Meetup",
+    });
+    setCampaign(updated);
+  };
   const saveTemplate = async () => {
     try {
       setTemplateSaving(true);
       setError("");
+      await saveButtonLinks();
       setEmailTemplate(await saveCampaignEmailTemplate(id, emailTemplate));
     } catch (err) {
       setError(err.response?.data?.error || "Unable to save the campaign email.");
@@ -113,6 +129,7 @@ export default function CampaignWorkspace() {
     try {
       setTemplateSaving(true);
       setError("");
+      await saveButtonLinks();
       await saveCampaignEmailTemplate(id, emailTemplate);
       const result = await approveCampaignEmailTemplate(id);
       setEmailTemplate(result.template);
@@ -127,7 +144,12 @@ export default function CampaignWorkspace() {
     try {
       setTemplateSaving(true);
       setError("");
-      setEmailPreview(await previewCampaignEmailTemplate(id, emailTemplate));
+      setEmailPreview(await previewCampaignEmailTemplate(id, {
+        ...emailTemplate,
+        meetupEnabled: campaign.registrationLinks?.meetup?.enabled === true,
+        meetupUrl: campaign.registrationLinks?.meetup?.url || "",
+        meetupLabel: campaign.registrationLinks?.meetup?.label || "View on Meetup",
+      }));
     } catch (err) {
       setError(err.response?.data?.error || "Unable to prepare the email preview.");
     } finally {
@@ -182,6 +204,13 @@ export default function CampaignWorkspace() {
             <label><span>Master message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
             <label><span>Button text</span><input value={emailTemplate.callToAction || ""} onChange={(event) => updateTemplateField("callToAction", event.target.value)} placeholder="Register now" /></label>
             <label><span>Button link</span><input type="url" value={emailTemplate.callToActionUrl || ""} onChange={(event) => updateTemplateField("callToActionUrl", event.target.value)} placeholder="https://" /></label>
+            <div className="campaign-secondary-button">
+              <label className="campaign-secondary-button__toggle"><input type="checkbox" checked={campaign.registrationLinks?.meetup?.enabled === true} onChange={(event) => updateMeetupButton("enabled", event.target.checked)} /><span>Include a second Meetup button</span></label>
+              {campaign.registrationLinks?.meetup?.enabled ? <>
+                <label><span>Meetup button text</span><input value={campaign.registrationLinks?.meetup?.label || "View on Meetup"} onChange={(event) => updateMeetupButton("label", event.target.value)} /></label>
+                <label><span>Meetup button link</span><input type="url" value={campaign.registrationLinks?.meetup?.url || ""} onChange={(event) => updateMeetupButton("url", event.target.value)} placeholder="https://www.meetup.com/..." /></label>
+              </> : null}
+            </div>
             <p className="campaign-template-help">Use {"{{firstName}}"}, {"{{campaignName}}"}, {"{{programName}}"}, and {"{{eventLink}}"} for personalization.</p>
             <div className="campaign-auto-footer"><strong>Added automatically to every sent email</strong><span>Your business name and postal address from Settings</span><span className="campaign-unsubscribe-preview">Unsubscribe from campaign emails</span></div>
             <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={previewTemplate}>Preview complete email</Button><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
