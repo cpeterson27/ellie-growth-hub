@@ -55,11 +55,41 @@ function fullContactName(contact = {}) {
 }
 
 const contactDetailGroups = [
-  ["Contact", [["name", "Name"], ["email", "Email"], ["phone", "Phone"], ["title", "Job title"], ["linkedin", "LinkedIn"]]],
-  ["Company", [["company", "Company"], ["industry", "Industry"], ["website", "Website"], ["employeeCount", "Company size"]]],
-  ["CRM", [["stage", "Lifecycle stage"], ["type", "Relationship type"], ["audienceProfiles", "Audience / interests"], ["tags", "Tags"], ["lists", "Lists"], ["sources", "Source"]]],
+  ["Contact", [["name", "Name"], ["email", "Email"], ["secondaryEmail", "Secondary email"], ["phone", "Phone"], ["mobilePhone", "Mobile phone"], ["workDirectPhone", "Work direct phone"], ["title", "Job title"], ["seniority", "Seniority"], ["linkedin", "LinkedIn"]]],
+  ["Company", [["company", "Company"], ["industry", "Industry"], ["website", "Website"], ["employeeCount", "Company size"], ["companyLinkedinUrl", "Company LinkedIn"], ["companyPhone", "Company phone"], ["companyAddress", "Company address"]]],
+  ["Location", [["city", "City"], ["state", "State"], ["country", "Country"]]],
+  ["CRM", [["stage", "Lifecycle stage"], ["type", "Relationship type"], ["audienceProfiles", "Audience / interests"], ["departments", "Departments"], ["keywords", "Keywords"], ["tags", "Tags"], ["lists", "Lists"], ["sources", "Source"]]],
   ["History", [["lastContacted", "Last contacted"], ["notes", "Notes"]]],
 ];
+
+const contactEditorSections = [
+  ["Contact information", [
+    ["firstName", "First name"], ["lastName", "Last name"], ["email", "Email"],
+    ["secondaryEmail", "Secondary email"], ["phone", "Phone"], ["mobilePhone", "Mobile phone"],
+    ["workDirectPhone", "Work direct phone"], ["linkedin", "LinkedIn URL"],
+  ]],
+  ["Role and company", [
+    ["title", "Job title"], ["seniority", "Seniority"], ["company", "Company"],
+    ["industry", "Industry"], ["website", "Company website"], ["employeeCount", "Company size"],
+    ["companyLinkedinUrl", "Company LinkedIn URL"], ["companyPhone", "Company phone"],
+  ]],
+  ["Location", [
+    ["city", "City"], ["state", "State"], ["country", "Country"], ["companyAddress", "Company address"],
+  ]],
+  ["Organization and CRM", [
+    ["departments", "Departments (comma-separated)"], ["keywords", "Keywords (comma-separated)"],
+    ["lists", "Lists (comma-separated)"], ["stage", "Lifecycle stage"],
+    ["tags", "Tags (comma-separated)"], ["notes", "Notes"],
+  ]],
+];
+
+const manualContactDefaults = {
+  firstName: "", lastName: "", email: "", secondaryEmail: "", phone: "", mobilePhone: "",
+  workDirectPhone: "", company: "", title: "", seniority: "", industry: "", website: "",
+  employeeCount: "", linkedin: "", companyLinkedinUrl: "", companyPhone: "", companyAddress: "",
+  city: "", state: "", country: "", tags: "", lists: "", departments: "", keywords: "",
+  notes: "", audienceProfiles: "", confirmEmailManually: false, canReceiveCampaignEmail: false,
+};
 
 function detailValue(value) {
   if (Array.isArray(value)) return value.filter(Boolean).join(", ");
@@ -131,7 +161,7 @@ export default function Contacts() {
   const [importSummary, setImportSummary] = useState(null);
   const [isContactFormOpen, setContactFormOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
-  const [manualContact, setManualContact] = useState({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false, canReceiveCampaignEmail: false });
+  const [manualContact, setManualContact] = useState(manualContactDefaults);
   const [importRows, setImportRows] = useState([]);
   const [importHeaders, setImportHeaders] = useState([]);
   const [importFileName, setImportFileName] = useState("");
@@ -339,11 +369,13 @@ export default function Contacts() {
     const saved = await saveIngestion([{
       ...manualContact,
       name,
-      city: manualContact.location,
       tags: manualContact.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      lists: manualContact.lists.split(",").map((item) => item.trim()).filter(Boolean),
+      departments: manualContact.departments.split(",").map((item) => item.trim()).filter(Boolean),
+      keywords: manualContact.keywords.split(",").map((item) => item.trim()).filter(Boolean),
       audienceProfiles: manualContact.audienceProfiles.split(",").map((profile) => profile.trim()).filter(Boolean),
     }], "manual", importCampaignId, manualContact.canReceiveCampaignEmail);
-    if (saved) { setContactFormOpen(false); setManualContact({ firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", linkedin: "", location: "", tags: "", audienceProfiles: "", confirmEmailManually: false, canReceiveCampaignEmail: false }); }
+    if (saved) { setContactFormOpen(false); setManualContact(manualContactDefaults); }
   }
 
   async function saveUploadedContacts() {
@@ -707,8 +739,14 @@ export default function Contacts() {
         footer={<><Button variant="outline" disabled={savingContact} onClick={() => setContactFormOpen(false)}>Cancel</Button><Button loading={savingContact} onClick={saveManualContact}>Save Contact</Button></>}
       >
         <p className="contact-modal-intro">Only a usable name is required. Ellie AI saves this contact directly to MongoDB.</p>
+        {contactEditorSections.map(([section, fields]) => <fieldset className="contact-editor-section" key={section}>
+          <legend>{section}</legend>
+          <div className="contact-form-grid">
+            {fields.map(([key, label]) => <label className={key === "notes" ? "form-field span-2" : "form-field"} key={key}><span>{label}</span>{key === "notes" ? <textarea className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /> : <input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} />}</label>)}
+          </div>
+        </fieldset>)}
         <div className="contact-form-grid">
-          {[["firstName", "First Name *"], ["lastName", "Last Name"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Title"], ["linkedin", "LinkedIn"], ["location", "Location"], ["tags", "Tags (comma-separated)"], ["audienceProfiles", "Audience & interests (comma-separated)"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={manualContact[key]} onChange={(event) => setManualContact({ ...manualContact, [key]: event.target.value })} /></label>)}
+          <label className="form-field span-2"><span>Audience &amp; interests (comma-separated)</span><input className="select-input" value={manualContact.audienceProfiles} onChange={(event) => setManualContact({ ...manualContact, audienceProfiles: event.target.value })} /></label>
           <label className="form-field"><span>Campaign</span><select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">No campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
           {manualContact.email ? <label className="contact-qualify-choice span-2">
             <input type="checkbox" checked={manualContact.confirmEmailManually} onChange={(event) => setManualContact({ ...manualContact, confirmEmailManually: event.target.checked })} />
@@ -719,7 +757,6 @@ export default function Contacts() {
             <span><strong>Can receive campaign email</strong><small>{manualContact.email ? "Turn this on when this person gave permission. Ellie will include unsubscribe options automatically." : "Enter an email address above to enable this setting."}</small></span>
           </label>
         </div>
-        <label className="form-field contact-notes"><span>Notes</span><textarea className="select-input" value={manualContact.notes} onChange={(event) => setManualContact({ ...manualContact, notes: event.target.value })} /></label>
       </Modal>
 
       <Modal
@@ -729,11 +766,19 @@ export default function Contacts() {
         footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button>{importRows.length && pendingEmailCount > 0 ? <Button variant="outline" loading={savingContact} disabled={verifyingEmails} onClick={saveUploadedContactsWithoutEmails}>Save people without emails</Button> : null}<Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import verified contacts</Button></>}
       >
         {importError ? <p className="form-error" role="alert">{importError}</p> : null}
+        <section className="csv-campaign-first">
+          <span className="csv-campaign-first__step">Step 1</span>
+          <div><strong>Choose where these contacts belong</strong><small>Selecting a campaign now keeps this CSV together and removes a later assignment step.</small></div>
+          <select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}>
+            <option value="">Do not assign yet</option>
+            {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
+          </select>
+        </section>
         {!importRows.length ? <div className="crm-import-start">
           <div className="crm-import-steps">
-            <div className="active"><span>1</span><strong>Choose CSV</strong><small>Upload your contact file</small></div>
-            <div><span>2</span><strong>Verify emails</strong><small>Review deliverability before saving</small></div>
-            <div><span>3</span><strong>Save to CRM</strong><small>Contacts appear here immediately</small></div>
+            <div className="active"><span>2</span><strong>Choose CSV</strong><small>Upload your contact file</small></div>
+            <div><span>3</span><strong>Verify emails</strong><small>Review deliverability before saving</small></div>
+            <div><span>4</span><strong>Save to CRM</strong><small>Contacts appear here immediately</small></div>
           </div>
           <p>Select a CSV exported from a spreadsheet, Apollo, or another CRM. Ellie recognizes common contact columns automatically.</p>
           <label className="crm-file-drop">
@@ -745,14 +790,13 @@ export default function Contacts() {
         </div> : <>
           <div className="crm-import-steps">
             <div><span>✓</span><strong>CSV loaded</strong><small>{importRows.length} contacts found</small></div>
-            <div className="active"><span>2</span><strong>Verify emails</strong><small>Use Emailable only when needed</small></div>
-            <div><span>3</span><strong>Save to CRM</strong><small>No Discovery approval required</small></div>
+            <div className="active"><span>3</span><strong>Verify emails</strong><small>Use Emailable only when needed</small></div>
+            <div><span>4</span><strong>Save to CRM</strong><small>No Discovery approval required</small></div>
           </div>
           <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p><p>Duplicate candidates are checked by the shared ingestion service during import.</p>
           <p>Detected headers: {importHeaders.join(", ")}</p>
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
-          <label className="form-field"><span>Assign this CSV to a campaign</span><select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}><option value="">Do not assign yet</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
           <p className="contact-modal-intro"><strong>What happens next:</strong> Ellie will open a “Just imported” view containing only this CSV. {importCampaignId ? "These contacts will also be assigned to the selected campaign." : "You can assign the whole batch there later."} Nothing is emailed during import.</p>
           <label className="contact-qualify-choice">
             <input type="checkbox" checked={importMarketingPermission} onChange={(event) => setImportMarketingPermission(event.target.checked)} />
@@ -799,7 +843,7 @@ export default function Contacts() {
           <section className="contact-detail__group"><h3>Campaigns</h3><p>{detailContact.campaignIds?.length ? `${detailContact.campaignIds.length} campaign assignment${detailContact.campaignIds.length === 1 ? "" : "s"}` : "Not assigned to a campaign yet."}</p></section>
         </div> : null}
       </Modal>
-      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title={contactEditMode === "audience" ? "Tell Ellie who this contact is" : "Edit contact & campaign"} footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const payload = { ...editingContact, name: fullContactName(editingContact), tags: Array.isArray(editingContact.tags) ? editingContact.tags : String(editingContact.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), audienceProfiles: Array.isArray(editingContact.audienceProfiles) ? editingContact.audienceProfiles : String(editingContact.audienceProfiles || "").split(",").map((profile) => profile.trim()).filter(Boolean), lastResearchedAt: new Date().toISOString() }; await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{contactEditMode === "audience" ? "Save audience information" : editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? contactEditMode === "audience" ? <>
+      <Modal isOpen={Boolean(editingContact)} onClose={() => setEditingContact(null)} title={contactEditMode === "audience" ? "Tell Ellie who this contact is" : "Edit contact & campaign"} footer={<><Button variant="outline" onClick={() => setEditingContact(null)}>Cancel</Button><Button onClick={async () => { const commaFields = ["tags", "lists", "departments", "keywords", "audienceProfiles"]; const payload = { ...editingContact, name: fullContactName(editingContact), lastResearchedAt: new Date().toISOString() }; commaFields.forEach((field) => { payload[field] = Array.isArray(editingContact[field]) ? editingContact[field] : String(editingContact[field] || "").split(",").map((item) => item.trim()).filter(Boolean); }); await updateContact(editingContact._id, payload); setEditingContact(null); await loadContacts(); }}>{contactEditMode === "audience" ? "Save audience information" : editingContact?.qualifyContact && editingContact?.campaignIds?.length && (editingContact?.emailStatus === "verified" || editingContact?.confirmEmailManually) ? "Save & Add to Campaign" : "Save Changes"}</Button></>}>{editingContact ? contactEditMode === "audience" ? <>
         <div className="audience-editor-intro">
           <span>Audience unknown</span>
           <h3>What would make {editingContact.firstName || editingContact.name} relevant to a future campaign?</h3>
@@ -821,8 +865,13 @@ export default function Contacts() {
         </div>
       </> : <>
         <p className="contact-modal-intro"><strong>A name and a confirmed email are enough to add someone to a campaign.</strong> Company, title, and industry are optional and can be completed later.</p>
+        {contactEditorSections.map(([section, fields]) => <fieldset className="contact-editor-section" key={section}>
+          <legend>{section}</legend>
+          <div className="contact-form-grid">
+            {fields.map(([field, label]) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{label}</span>{field === "notes" ? <textarea className="select-input" value={editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /> : <input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} />}</label>)}
+          </div>
+        </fieldset>)}
         <div className="contact-form-grid">
-          {["firstName", "lastName", "email", "phone", "company", "title", "industry", "city", "state", "stage", "tags", "notes"].map((field) => <label className={field === "notes" ? "form-field span-2" : "form-field"} key={field}><span>{field.replace(/([A-Z])/g, " $1")}</span><input className="select-input" value={Array.isArray(editingContact[field]) ? editingContact[field].join(", ") : editingContact[field] || ""} onChange={(event) => setEditingContact({ ...editingContact, [field]: event.target.value })} /></label>)}
           <label className="form-field span-2">
             <span>Audience &amp; interests</span>
             <input className="select-input"
