@@ -190,6 +190,7 @@ export default function Contacts() {
   const [verificationProgress, setVerificationProgress] = useState(null);
   const [verificationResults, setVerificationResults] = useState({});
   const [emailVerificationMode, setEmailVerificationMode] = useState("emailable");
+  const [showAllImportRows, setShowAllImportRows] = useState(false);
   const [importError, setImportError] = useState("");
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [bulkCampaignId, setBulkCampaignId] = useState("");
@@ -265,6 +266,7 @@ export default function Contacts() {
     setVerificationResults({});
     setVerificationProgress(null);
     setEmailVerificationMode("emailable");
+    setShowAllImportRows(false);
     setImportMarketingPermission(false);
     setImportError("");
     setUploadOpen(true);
@@ -357,7 +359,7 @@ export default function Contacts() {
       const valid = rows.filter((row) => row.Name || row["First Name"] || row["Last Name"]).length;
       const emails = rows.filter((row) => !row.Email).length;
       const hasImportedEmailStatus = (meta.fields || []).includes("Email Status") && rows.some((row) => importedEmailState(row["Email Status"]));
-      setEmailVerificationMode(hasImportedEmailStatus ? "source" : "emailable"); setImportHeaders(meta.fields || []); setImportRows(rows); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setImportError(errors.length ? "Some rows have malformed column counts." : ""); setError(""); setUploadOpen(true);
+      setEmailVerificationMode(hasImportedEmailStatus ? "source" : "emailable"); setShowAllImportRows(false); setImportHeaders(meta.fields || []); setImportRows(rows); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setImportError(errors.length ? "Some rows have malformed column counts." : ""); setError(""); setUploadOpen(true);
     }, error: () => setImportError("Unable to parse contact file.") });
   }
 
@@ -811,8 +813,8 @@ export default function Contacts() {
               Deliverable: {verificationCounts.deliverable || 0} · Risky: {verificationCounts.risky || 0} · Undeliverable: {verificationCounts.undeliverable || 0} · Unknown: {verificationCounts.unknown || 0} · Pending: {pendingEmailCount}
             </p> : null}
           </div> : null}
-          <p className="contact-modal-intro">Showing the first {Math.min(5, importRows.length)} rows as a preview. The selected verification method applies to all {importRows.length} rows.</p>
-          <div className="email-import-preview"><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => { const result = effectiveVerificationResults[String(row.Email || "").toLowerCase()]; const phone = row["Work Direct Phone"] || row.Phone; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state === "deliverable" ? "verified" : result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{/request phone number/i.test(phone || "") ? "—" : phone || "—"}</td><td>{row["Company Name"] || row.Company || "—"}</td><td>{row.Title || "—"}</td><td>{[row.City, row.State].filter(Boolean).join(", ") || "—"}</td><td>CSV import</td></tr>; })}</tbody></table></div>
+          <div className="import-preview-heading"><p><strong>Previewing {showAllImportRows ? importRows.length : Math.min(5, importRows.length)} of {importRows.length} contacts.</strong> All {importRows.length} will be imported.</p>{importRows.length > 5 ? <Button size="sm" variant="outline" onClick={() => setShowAllImportRows((current) => !current)}>{showAllImportRows ? "Show first 5" : `Show all ${importRows.length}`}</Button> : null}</div>
+          <div className="email-import-preview"><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, showAllImportRows ? importRows.length : 5).map((row, index) => { const result = effectiveVerificationResults[String(row.Email || "").toLowerCase()]; const phone = row["Work Direct Phone"] || row.Phone; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state === "deliverable" ? "verified" : result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{/request phone number/i.test(phone || "") ? "—" : phone || "—"}</td><td>{row["Company Name"] || row.Company || "—"}</td><td>{row.Title || "—"}</td><td>{[row.City, row.State].filter(Boolean).join(", ") || "—"}</td><td>CSV import</td></tr>; })}</tbody></table></div>
           <p>{importRows.length} rows ready. Deliverable emails are saved. Risky, unknown, and undeliverable addresses are removed while the contact is retained and tagged for review.</p>
         </>}
       </Modal>
