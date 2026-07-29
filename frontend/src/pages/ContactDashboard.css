@@ -632,20 +632,37 @@
   font-weight: 750;
 }
 .contact-bulk-actions {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 0.8fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
   margin: 1rem 0;
-  padding: 0.9rem;
+  padding: 1rem;
   border: 1px solid #b9d8ce;
   border-radius: 14px;
   background: #edf9f4;
 }
 
 .contact-bulk-actions small {
-  grid-column: 1 / -1;
+  flex: 0 0 100%;
   color: var(--text-muted);
+}
+
+.contact-bulk-actions > strong {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.contact-bulk-actions > .select-input {
+  flex: 1 1 260px;
+  min-width: 240px;
+  width: auto;
+}
+
+.contact-bulk-actions > .btn {
+  flex: 0 0 auto;
+  min-width: 150px;
+  white-space: nowrap;
 }
 
 .contact-select-all,
@@ -656,6 +673,7 @@
 }
 
 .contact-select-all {
+  flex: 1 1 300px;
   align-items: center;
   font-weight: 800;
 }
@@ -679,4 +697,19 @@
   background: #eaf6f1;
   color: #125646;
   font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .contact-bulk-actions > .select-input {
+    flex-basis: calc(100% - 180px);
+  }
+}
+
+@media (max-width: 720px) {
+  .contact-select-all,
+  .contact-bulk-actions > .select-input,
+  .contact-bulk-actions > .btn {
+    flex-basis: 100%;
+    width: 100%;
+  }
 }

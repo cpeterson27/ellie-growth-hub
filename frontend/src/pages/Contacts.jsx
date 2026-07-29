@@ -596,7 +596,7 @@ export default function Contacts() {
             <option value="">Choose campaign or event</option>
             {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
           </select>
-          <Button loading={bulkSaving} disabled={!selectedContactIds.length || !bulkCampaignId} onClick={assignSelectedContacts}>Qualify & assign selected</Button>
+          <Button loading={bulkSaving} disabled={!selectedContactIds.length || !bulkCampaignId} onClick={assignSelectedContacts}>Assign selected</Button>
           <small>This assigns the audience only. It does not generate or send emails.</small>
         </section> : null}
         {bulkNotice ? <p className="contact-bulk-notice">{bulkNotice}</p> : null}
