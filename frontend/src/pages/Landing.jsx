@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { FiArrowRight, FiCheck, FiLayers, FiLock, FiMail, FiSearch, FiStar, FiUsers, FiZap } from "react-icons/fi";
+import { useAuth } from "../context/AuthContext.jsx";
 import "./Landing.css";
 
 const features = [
@@ -12,6 +13,9 @@ const features = [
 ];
 
 export default function Landing() {
+  const { loading, session } = useAuth();
+  const signedIn = !loading && Boolean(session);
+
   return (
     <div className="ellie-site">
       <header className="ellie-site__nav">
@@ -21,7 +25,15 @@ export default function Landing() {
           <a href="#how-it-works">How it works</a>
           <a href="#pricing">Pricing</a>
         </nav>
-        <div className="ellie-site__nav-actions"><Link className="text-link" to="/login">Client login</Link><a className="site-button site-button--small" href="#pricing">Start Ellie</a></div>
+        <div className="ellie-site__nav-actions">
+          {loading ? <span className="text-link" aria-live="polite">Checking session…</span> : signedIn ? <>
+            <span className="text-link">You’re signed in</span>
+            <Link className="site-button site-button--small" to="/dashboard">Open Ellie AI</Link>
+          </> : <>
+            <Link className="text-link" to="/login">Client login</Link>
+            <a className="site-button site-button--small" href="#pricing">Start Ellie</a>
+          </>}
+        </div>
       </header>
 
       <main>
@@ -68,11 +80,11 @@ export default function Landing() {
 
         <section className="ellie-pricing" id="pricing">
           <div><p className="site-kicker">Founding customer access</p><h2>Build your growth system with Ellie.</h2><p>Early customers receive a private workspace, guided setup, campaign configuration, and direct onboarding while self-service subscriptions are prepared.</p><ul><li><FiCheck /> Private owner account and workspace</li><li><FiCheck /> CRM and campaign setup</li><li><FiCheck /> Integrations and outreach configuration</li><li><FiCheck /> Team members added by invitation</li></ul></div>
-          <article><p>Early access</p><h3>Founding workspace</h3><span>Custom onboarding</span><a className="site-button" href="mailto:team@elliescoaching.com?subject=Ellie%20AI%20Founding%20Access">Request founding access <FiArrowRight /></a><small>Already a client? <Link to="/login">Sign in to Ellie</Link></small></article>
+          <article><p>Early access</p><h3>Founding workspace</h3><span>Custom onboarding</span><a className="site-button" href="mailto:team@elliescoaching.com?subject=Ellie%20AI%20Founding%20Access">Request founding access <FiArrowRight /></a><small>{signedIn ? <>Your session is active. <Link to="/dashboard">Open Ellie AI</Link></> : <>Already a client? <Link to="/login">Sign in to Ellie</Link></>}</small></article>
         </section>
       </main>
 
-      <footer className="ellie-site__footer"><Link className="ellie-wordmark" to="/"><span>E</span><strong>Ellie AI</strong></Link><p>Intelligent growth, operated with intention.</p><div><Link to="/login">Client login</Link><a href="mailto:team@elliescoaching.com">Contact</a></div></footer>
+      <footer className="ellie-site__footer"><Link className="ellie-wordmark" to="/"><span>E</span><strong>Ellie AI</strong></Link><p>Intelligent growth, operated with intention.</p><div><Link to={signedIn ? "/dashboard" : "/login"}>{signedIn ? "Open Ellie AI" : "Client login"}</Link><a href="mailto:team@elliescoaching.com">Contact</a></div></footer>
     </div>
   );
 }
