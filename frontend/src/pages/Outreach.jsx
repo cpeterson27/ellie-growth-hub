@@ -391,11 +391,6 @@ export default function Outreach() {
                   srcDoc={preview.htmlBody}
                   sandbox="allow-popups allow-popups-to-escape-sandbox"
                 />
-                <div className="outreach-preview__footer-note">
-                  <strong>Final email footer</strong><br />
-                  Business name · postal address from Settings<br />
-                  <u>Unsubscribe from campaign emails</u>
-                </div>
               </>
             ) : (
               <div className="outreach-preview__body">

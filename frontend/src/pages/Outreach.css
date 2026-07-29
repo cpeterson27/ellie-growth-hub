@@ -175,15 +175,6 @@
   border-radius: 10px;
   background: #fff;
 }
-.outreach-preview__footer-note {
-  background: #f8f6f1;
-  border-top: 1px solid #ddd7ca;
-  color: #737b77;
-  font-size: 0.76rem;
-  line-height: 1.55;
-  padding: 1rem;
-  text-align: center;
-}
 @media (max-width: 760px) {
   .outreach-header {
     align-items: flex-start;
