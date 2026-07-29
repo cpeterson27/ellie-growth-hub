@@ -258,6 +258,15 @@ export default function Contacts() {
 
   function openCsvImport() {
     setImportCampaignId(campaignId || (initiativeId === "all" ? "" : initiativeId));
+    setImportRows([]);
+    setImportHeaders([]);
+    setImportFileName("");
+    setPreviewStats(null);
+    setVerificationResults({});
+    setVerificationProgress(null);
+    setEmailVerificationMode("emailable");
+    setImportMarketingPermission(false);
+    setImportError("");
     setUploadOpen(true);
     setImportMenuOpen(false);
   }
@@ -390,7 +399,16 @@ export default function Contacts() {
       if (!email) return row;
       const result = effectiveVerificationResults[email.toLowerCase()];
       if (result?.state === "deliverable") {
-        return { ...row, Email: email, "Email Status": "verified" };
+        return {
+          ...row,
+          Email: email,
+          "Email Status": "verified",
+          "Primary Email Verification Source": result.reason === "owner_skipped_verification"
+            ? "owner_accepted_without_verification"
+            : result.reason === "imported_email_status"
+              ? "csv_import_status"
+              : "emailable",
+        };
       }
       const tags = [...new Set(
         [String(row.Tags || "").split(","), ["needs-email-verification"]]
@@ -423,8 +441,20 @@ export default function Contacts() {
       return email && state ? [email, { email, state, reason: "imported_email_status" }] : null;
     })
     .filter(Boolean));
+  const skippedVerificationResults = Object.fromEntries(emailsToVerify.map((email) => [
+    email,
+    {
+      email,
+      state: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? "deliverable" : "undeliverable",
+      reason: "owner_skipped_verification",
+    },
+  ]));
   const hasImportedVerification = Object.keys(importedVerificationResults).length > 0;
-  const effectiveVerificationResults = emailVerificationMode === "source" ? importedVerificationResults : verificationResults;
+  const effectiveVerificationResults = emailVerificationMode === "source"
+    ? importedVerificationResults
+    : emailVerificationMode === "skip"
+      ? skippedVerificationResults
+      : verificationResults;
   const pendingEmailCount = emailsToVerify.filter((email) => !effectiveVerificationResults[email]).length;
   const verificationCounts = Object.values(effectiveVerificationResults).reduce((counts, result) => {
     const state = result.state || "unknown";
@@ -509,7 +539,7 @@ export default function Contacts() {
           <Button variant="outline" onClick={() => navigate("/contacts/fields")}>Customize fields</Button>
           <div className="crm-menu-wrap">
             <Button variant="outline" onClick={() => setImportMenuOpen((open) => !open)}>Import ▾</Button>
-            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={openCsvImport}>Apollo CSV</button><button onClick={openCsvImport}>Standard CSV</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
+            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={openCsvImport}>Import CSV</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
           </div>
           <Button variant="outline" onClick={() => navigate("/discovery")}>Discover New Prospects</Button>
         </div>
@@ -714,7 +744,7 @@ export default function Contacts() {
         isOpen={isUploadOpen}
         onClose={() => !savingContact && !verifyingEmails && setUploadOpen(false)}
         title="Import Contacts"
-        footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import verified contacts</Button></>}
+        footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import contacts</Button></>}
       >
         {importError ? <p className="form-error" role="alert">{importError}</p> : null}
         <section className="csv-campaign-first">
@@ -760,8 +790,12 @@ export default function Contacts() {
             <div className="email-verification-choices">
               {hasImportedVerification ? <label className={emailVerificationMode === "source" ? "active" : ""}>
                 <input type="radio" name="email-verification-mode" value="source" checked={emailVerificationMode === "source"} onChange={() => setEmailVerificationMode("source")} />
-                <span><strong>Use Apollo’s email statuses</strong><small>No Emailable credits. {Object.values(importedVerificationResults).filter((result) => result.state === "deliverable").length} addresses are marked verified by Apollo.</small></span>
+                <span><strong>Use verification from this CSV</strong><small>No Emailable credits. {Object.values(importedVerificationResults).filter((result) => result.state === "deliverable").length} addresses are marked verified in the file.</small></span>
               </label> : null}
+              <label className={emailVerificationMode === "skip" ? "active" : ""}>
+                <input type="radio" name="email-verification-mode" value="skip" checked={emailVerificationMode === "skip"} onChange={() => { setEmailVerificationMode("skip"); setVerificationProgress(null); }} />
+                <span><strong>Skip email verification</strong><small>No credits. Accept syntactically valid addresses as provided; this can increase bounce risk.</small></span>
+              </label>
               <label className={emailVerificationMode === "emailable" ? "active" : ""}>
                 <input type="radio" name="email-verification-mode" value="emailable" checked={emailVerificationMode === "emailable"} onChange={() => setEmailVerificationMode("emailable")} />
                 <span><strong>Reverify with Emailable</strong><small>Optional fresh check. Uses {emailsToVerify.length} live credit{emailsToVerify.length === 1 ? "" : "s"} when started.</small></span>
@@ -769,7 +803,7 @@ export default function Contacts() {
             </div>
             {emailVerificationMode === "emailable" ? <Button variant="outline" loading={verifyingEmails} disabled={verifyingEmails} onClick={verifyImportedEmails}>
               {Object.keys(verificationResults).length ? "Verify again" : `Verify ${emailsToVerify.length} emails`}
-            </Button> : <p className="source-verification-note">Using the verification statuses already included in this CSV.</p>}
+            </Button> : <p className="source-verification-note">{emailVerificationMode === "source" ? "Using the verification statuses already included in this CSV." : "No external email verification will run."}</p>}
             {verificationProgress ? <div className="verification-progress">
               <span style={{ width: `${Math.min(100, Math.round((verificationProgress.processed / Math.max(1, verificationProgress.total)) * 100))}%` }} />
             </div> : null}
