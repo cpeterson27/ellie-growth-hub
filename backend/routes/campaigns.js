@@ -128,6 +128,15 @@ router.get("/:id", async (req, res) => {
     }
 
 
+    const legacySent = await Outreach.countDocuments({
+      campaignId: campaign._id,
+      status: { $in: ["sent", "replied"] },
+    });
+    if (legacySent > Number(campaign.metrics?.sent || 0)) {
+      campaign.metrics.sent = legacySent;
+      if (!campaign.metrics.delivered) campaign.metrics.delivered = legacySent;
+      await campaign.save();
+    }
     res.json(campaign);
 
 

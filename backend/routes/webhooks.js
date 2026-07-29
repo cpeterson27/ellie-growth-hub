@@ -1,5 +1,6 @@
 const express = require("express");
 const Outreach = require("../models/Outreach");
+const Campaign = require("../models/Campaign");
 
 const router = express.Router();
 
@@ -20,7 +21,25 @@ router.post("/resend", async (req, res) => {
 
 
 
-    // Only handle received emails
+    const data = event.data || {};
+    const messageId = String(data.email_id || data.id || "");
+    if (["email.delivered", "email.opened"].includes(event.type) && messageId) {
+      const outreach = await Outreach.findOne({ messageId });
+      if (outreach) {
+        const field = event.type === "email.delivered" ? "deliveredAt" : "openedAt";
+        if (!outreach[field]) {
+          outreach[field] = new Date();
+          await outreach.save();
+          await Campaign.updateOne(
+            { _id: outreach.campaignId },
+            { $inc: { [event.type === "email.delivered" ? "metrics.delivered" : "metrics.opened"]: 1 } },
+          );
+        }
+      }
+      return res.json({ received: true });
+    }
+
+    // Reply handling uses Resend's inbound email event.
     if (
       event.type !== "email.received"
     ) {
@@ -30,10 +49,6 @@ router.post("/resend", async (req, res) => {
       });
 
     }
-
-
-
-    const data = event.data || {};
 
 
 

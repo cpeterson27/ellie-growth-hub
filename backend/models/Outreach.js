@@ -133,6 +133,8 @@ const outreachSchema = new mongoose.Schema(
       default: "pending",
       index: true,
     },
+    deliveredAt: { type: Date, default: null },
+    openedAt: { type: Date, default: null },
 
 
     // ======================================

@@ -26,6 +26,7 @@ export default function CampaignWorkspace() {
   const [templateSaving, setTemplateSaving] = useState(false);
   const [emailPreview, setEmailPreview] = useState(null);
   const [templateAudience, setTemplateAudience] = useState("general");
+  const [activeSection, setActiveSection] = useState("email");
 
   useEffect(() => {
     if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
@@ -165,8 +166,8 @@ export default function CampaignWorkspace() {
   const isProgram = campaign.campaignKind === "program";
   const metrics = campaign.metrics || {};
   const overview = isProgram
-    ? [["Offer", campaign.programName || "Premium program"], ["Audience", campaign.audience?.join(", ") || "Not specified"], ["Campaign type", "Program enrollment"]]
-    : [["Event date", formatDate(campaign.startDate)], ["Ticket price", formatMoney(campaign.ticketPrice)], ["Registration goal", campaign.ticketGoal || "Not specified"], ["Audience", campaign.audience?.join(", ") || "Not specified"]];
+    ? [["Offer", campaign.programName || "Premium program"], ["Target groups", campaign.audience?.length || 0], ["Campaign type", "Program enrollment"]]
+    : [["Event date", formatDate(campaign.startDate)], ["Ticket price", formatMoney(campaign.ticketPrice)], ["Registration goal", campaign.ticketGoal || "Not specified"], ["Target groups", campaign.audience?.length || 0]];
   const registrationLinks = [
     ["Eventbrite", campaign.registrationLinks?.eventbrite],
     ["Meetup", campaign.registrationLinks?.meetup],
@@ -193,13 +194,19 @@ export default function CampaignWorkspace() {
         {[['Sent', metrics.sent], ['Delivered', metrics.delivered], ['Opened', metrics.opened], ['Converted', metrics.converted]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value || 0}</strong></div>)}
       </section>
 
+      <nav className="campaign-workspace__tabs" aria-label="Campaign workspace sections">
+        <button className={activeSection === "email" ? "active" : ""} onClick={() => setActiveSection("email")}>Email design</button>
+        <button className={activeSection === "audience" ? "active" : ""} onClick={() => setActiveSection("audience")}>Target audience</button>
+        <button className={activeSection === "overview" ? "active" : ""} onClick={() => setActiveSection("overview")}>Campaign setup</button>
+      </nav>
+
       <section className="campaign-workspace__grid">
-        <DashboardCard title="Campaign details">
+        {activeSection === "overview" ? <DashboardCard title="Campaign details">
           <div className="campaign-overview-list">{overview.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
           {campaign.description ? <p className="campaign-workspace__description">{campaign.description}</p> : null}
-        </DashboardCard>
+        </DashboardCard> : null}
 
-        <DashboardCard title="Campaign master email">
+        {activeSection === "email" ? <DashboardCard title="Campaign master email">
           {emailTemplate ? <div className="campaign-template-editor">
             <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Saved version ${emailTemplate.currentVersion}` : "Editing master template"}</strong></div>
             <label><span>Template for target audience</span><select value={templateAudience} onChange={(event) => setTemplateAudience(event.target.value)}><option value="general">All Deal to Close contacts</option>{(campaign.audience || []).map((audience, index) => <option value={`audience-${index}`} key={`${audience}-${index}`}>{audience}</option>)}</select></label>
@@ -226,9 +233,9 @@ export default function CampaignWorkspace() {
             {emailPreview ? <div className="campaign-email-preview"><div><strong>Subject:</strong> {emailPreview.subject}<button type="button" onClick={() => setEmailPreview(null)}>Close preview</button></div><iframe title="Complete campaign email preview" srcDoc={emailPreview.html} sandbox="allow-popups allow-popups-to-escape-sandbox" /></div> : null}
             {templateVersions.length ? <small>{templateVersions.length} immutable approved version{templateVersions.length === 1 ? "" : "s"} saved.</small> : null}
           </div> : <p>Loading the master template…</p>}
-        </DashboardCard>
+        </DashboardCard> : null}
 
-        <DashboardCard title={isProgram ? "Program brand" : "Event brand"}>
+        {activeSection === "email" ? <DashboardCard title={isProgram ? "Program brand" : "Event brand"}>
           <div className="program-brand-editor">
             {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.programName || campaign.name} logo`} /> : <div className="program-brand-placeholder">Add the program logo</div>}
             <label><span>Logo image URL</span><input type="url" value={campaign.brand?.logoUrl || ""} placeholder="https://your-site.com/logo.png" onChange={(event) => updateBrandField("logoUrl", event.target.value)} /></label>
@@ -238,9 +245,9 @@ export default function CampaignWorkspace() {
             <Button loading={brandSaving} onClick={saveBrand}>Save program brand</Button>
           </div>
           <p className="campaign-workspace__empty">This logo and color are reused in every email for this {isProgram ? "program" : "event"}. Replace the asset here whenever the campaign branding changes.</p>
-        </DashboardCard>
+        </DashboardCard> : null}
 
-        {!isProgram && <DashboardCard title="Registration channels">
+        {activeSection === "overview" && !isProgram && <DashboardCard title="Registration channels">
           {registrationLinks.length ? <div className="campaign-registration-links">
             {registrationLinks.map(([provider, link], index) => <a href={link.url} target="_blank" rel="noreferrer" key={provider}>
               <span>{index === 0 ? "Primary registration" : "Additional listing"}</span>
@@ -250,8 +257,16 @@ export default function CampaignWorkspace() {
           </div> : <p className="campaign-workspace__empty">No registration channels connected yet.</p>}
         </DashboardCard>}
 
-        <DashboardCard title="Audience matching">
+        {activeSection === "audience" ? <DashboardCard title="Confirmed target audience">
           {audienceMatch ? <>
+            <div className="campaign-audience-source">
+              <div><strong>Source of truth</strong><p>The confirmed target audience below is the audience Ellie uses for matching, templates, and future searches.</p></div>
+              {eventId ? <Button variant="outline" size="sm" onClick={() => navigate(`/events?eventId=${eventId}&tab=strategy`)}>Edit target audience</Button> : null}
+            </div>
+            <div className="campaign-audience-groups">
+              {(campaign.audience || []).map((audience) => <span key={audience}>{audience}</span>)}
+            </div>
+            {campaign.eventId?.audienceSuggestions?.length ? <details className="campaign-audience-suggestions"><summary>Suggestions found in the Eventbrite listing</summary><p>These are suggestions only. They do not become active unless you select and save them in Event strategy.</p><div>{campaign.eventId.audienceSuggestions.map((audience) => <span key={audience}>{audience}</span>)}</div></details> : null}
             <div className="audience-flow">
               <div><span>1</span><p><strong>Confirm the targeting brief</strong>Ellie can suggest segments from the event, but you decide the official audience for this campaign.</p></div>
               <div><span>2</span><p><strong>Use real contact sources</strong>Contacts come from Ellie CRM, CSV uploads, Apollo imports/searches, manual entry, and future CRM/Gmail integrations.</p></div>
@@ -273,7 +288,7 @@ export default function CampaignWorkspace() {
             </> : <p className="campaign-workspace__empty">No safe matches yet. Add audience information to contacts, then qualify them for outreach.</p>}
             <div className="campaign-audience-actions"><Button variant="outline" onClick={() => navigate("/contacts")}>Review contacts</Button><Button loading={matchingAudience} onClick={refreshAudience}>Refresh and assign safe matches</Button></div>
           </> : <p>Checking qualified contacts…</p>}
-        </DashboardCard>
+        </DashboardCard> : null}
       </section>
     </div>
   );

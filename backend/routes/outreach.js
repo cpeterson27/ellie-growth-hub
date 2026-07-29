@@ -601,6 +601,13 @@ router.post("/send", async(req,res)=>{
 
     }
 
+    if (sentCount > 0 && items[0]?.campaignId) {
+      await Campaign.updateOne(
+        { _id: items[0].campaignId },
+        { $inc: { "metrics.sent": sentCount } },
+      );
+    }
+
 
 
     res.json({
