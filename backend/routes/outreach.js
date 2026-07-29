@@ -184,15 +184,33 @@ router.post("/generate", async (req,res)=>{
 
     }
 
-    if (campaign.emailTemplate?.status !== "approved" || !campaign.emailTemplate?.currentVersion) {
-      return res.status(409).json({ error: "Approve the campaign master template before preparing recipient drafts." });
-    }
-    const approvedTemplate = await CampaignTemplateVersion.findOne({
-      campaignId: campaign._id,
-      version: campaign.emailTemplate.currentVersion,
-    });
+    const activeTemplateKey = campaign.activeAudienceTemplateKey || "general";
+    const activeTemplate = activeTemplateKey === "general"
+      ? campaign.emailTemplate
+      : campaign.emailAudienceTemplates?.[activeTemplateKey];
+    let approvedTemplate = activeTemplate?.currentVersion
+      ? await CampaignTemplateVersion.findOne({
+        campaignId: campaign._id,
+        version: activeTemplate.currentVersion,
+      })
+      : null;
     if (!approvedTemplate) {
-      return res.status(409).json({ error: "The approved campaign template version could not be found." });
+      const template = require("../services/campaignMasterTemplate").effectiveTemplate(campaign);
+      const version = (await CampaignTemplateVersion.findOne({ campaignId: campaign._id }).sort({ version: -1 }).select("version"))?.version + 1 || 1;
+      approvedTemplate = await CampaignTemplateVersion.create({
+        campaignId: campaign._id,
+        version,
+        subject: template.subject,
+        body: template.body,
+        callToAction: template.callToAction,
+        callToActionUrl: template.callToActionUrl,
+        topic: template.topic,
+        approvedByUserId: req.auth.user._id,
+        approvedAt: new Date(),
+      });
+      campaign.emailTemplate = { ...template, status: "approved", currentVersion: version, approvedAt: approvedTemplate.approvedAt };
+      campaign.activeAudienceTemplateKey = "general";
+      await campaign.save();
     }
     campaign.content = {
       subject: approvedTemplate.subject,

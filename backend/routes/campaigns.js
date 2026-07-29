@@ -149,10 +149,12 @@ router.get("/:id", async (req, res) => {
 router.get("/:id/email-template", async (req, res) => {
   const campaign = await Campaign.findById(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+  const audienceKey = String(req.query?.audienceKey || "general");
+  const audienceTemplate = audienceKey === "general" ? null : campaign.emailAudienceTemplates?.[audienceKey];
   const versions = await CampaignTemplateVersion.find({ campaignId: campaign._id })
     .sort({ version: -1 })
     .select("version subject topic approvedAt approvedByUserId");
-  return res.json({ template: effectiveTemplate(campaign), versions });
+  return res.json({ template: audienceTemplate || effectiveTemplate(campaign), versions });
 });
 
 router.post("/:id/email-template/preview", async (req, res) => {
@@ -202,7 +204,8 @@ router.put("/:id/email-template", requireRole("owner", "admin", "member"), async
     const subject = String(req.body?.subject || "").trim();
     const body = String(req.body?.body || "").trim();
     if (!subject || !body) return res.status(400).json({ error: "Subject and message body are required" });
-    campaign.emailTemplate = {
+    const audienceKey = String(req.body?.audienceKey || "general");
+    const nextTemplate = {
       subject,
       body,
       callToAction: String(req.body?.callToAction || "").trim(),
@@ -212,8 +215,17 @@ router.put("/:id/email-template", requireRole("owner", "admin", "member"), async
       currentVersion: campaign.emailTemplate?.currentVersion || 0,
       approvedAt: null,
     };
+    if (audienceKey === "general") {
+      campaign.emailTemplate = nextTemplate;
+    } else {
+      campaign.emailAudienceTemplates = {
+        ...(campaign.emailAudienceTemplates || {}),
+        [audienceKey]: { ...nextTemplate, audienceLabel: String(req.body?.audienceLabel || "").trim() },
+      };
+      campaign.markModified("emailAudienceTemplates");
+    }
     await campaign.save();
-    return res.json(effectiveTemplate(campaign));
+    return res.json(nextTemplate);
   } catch (error) {
     return res.status(400).json({ error: error.message || "Unable to save campaign template" });
   }
@@ -222,7 +234,11 @@ router.put("/:id/email-template", requireRole("owner", "admin", "member"), async
 router.post("/:id/email-template/approve", requireRole("owner", "admin"), async (req, res) => {
   const campaign = await Campaign.findById(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
-  const template = effectiveTemplate(campaign);
+  const audienceKey = String(req.body?.audienceKey || "general");
+  const template = audienceKey === "general"
+    ? effectiveTemplate(campaign)
+    : campaign.emailAudienceTemplates?.[audienceKey];
+  if (!template) return res.status(404).json({ error: "Save this audience template before approving it." });
   if (!template.subject || !template.body) return res.status(400).json({ error: "Complete the template before approval" });
   const version = (await CampaignTemplateVersion.findOne({ campaignId: campaign._id }).sort({ version: -1 }).select("version"))?.version + 1 || 1;
   const approved = await CampaignTemplateVersion.create({
@@ -236,9 +252,16 @@ router.post("/:id/email-template/approve", requireRole("owner", "admin"), async 
     approvedByUserId: req.auth.user._id,
     approvedAt: new Date(),
   });
-  campaign.emailTemplate = { ...template, status: "approved", currentVersion: version, approvedAt: approved.approvedAt };
+  const approvedTemplate = { ...template, status: "approved", currentVersion: version, approvedAt: approved.approvedAt };
+  if (audienceKey === "general") {
+    campaign.emailTemplate = approvedTemplate;
+  } else {
+    campaign.emailAudienceTemplates = { ...(campaign.emailAudienceTemplates || {}), [audienceKey]: approvedTemplate };
+    campaign.markModified("emailAudienceTemplates");
+  }
+  campaign.activeAudienceTemplateKey = audienceKey;
   await campaign.save();
-  return res.json({ template: effectiveTemplate(campaign), version: approved });
+  return res.json({ template: approvedTemplate, version: approved });
 });
 
 router.patch("/:id/brand", async (req, res) => {

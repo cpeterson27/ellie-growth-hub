@@ -45,14 +45,14 @@ export const updateCampaignRegistrationLinks = (campaignId, links) =>
 export const updateCampaignBrand = (campaignId, brand) =>
   api.patch(`/campaigns/${campaignId}/brand`, brand).then((res) => res.data);
 
-export const fetchCampaignEmailTemplate = (campaignId) =>
-  api.get(`/campaigns/${campaignId}/email-template`).then((res) => res.data);
+export const fetchCampaignEmailTemplate = (campaignId, audienceKey = "general") =>
+  api.get(`/campaigns/${campaignId}/email-template`, { params: { audienceKey } }).then((res) => res.data);
 
 export const saveCampaignEmailTemplate = (campaignId, template) =>
   api.put(`/campaigns/${campaignId}/email-template`, template).then((res) => res.data);
 
-export const approveCampaignEmailTemplate = (campaignId) =>
-  api.post(`/campaigns/${campaignId}/email-template/approve`).then((res) => res.data);
+export const approveCampaignEmailTemplate = (campaignId, audienceKey = "general") =>
+  api.post(`/campaigns/${campaignId}/email-template/approve`, { audienceKey }).then((res) => res.data);
 
 
 

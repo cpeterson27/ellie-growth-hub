@@ -25,6 +25,7 @@ export default function CampaignWorkspace() {
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [emailPreview, setEmailPreview] = useState(null);
+  const [templateAudience, setTemplateAudience] = useState("general");
 
   useEffect(() => {
     if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
@@ -36,11 +37,11 @@ export default function CampaignWorkspace() {
 
   useEffect(() => {
     if (!id) return;
-    fetchCampaignEmailTemplate(id).then(({ template, versions }) => {
+    fetchCampaignEmailTemplate(id, templateAudience).then(({ template, versions }) => {
       setEmailTemplate(template);
       setTemplateVersions(versions || []);
     }).catch(() => {});
-  }, [id]);
+  }, [id, templateAudience]);
 
   useEffect(() => {
     if (!id) return;
@@ -118,7 +119,8 @@ export default function CampaignWorkspace() {
       setTemplateSaving(true);
       setError("");
       await saveButtonLinks();
-      setEmailTemplate(await saveCampaignEmailTemplate(id, emailTemplate));
+      const audienceLabel = templateAudience === "general" ? "All Deal to Close contacts" : campaign.audience?.[Number(templateAudience.replace("audience-", ""))] || "";
+      setEmailTemplate(await saveCampaignEmailTemplate(id, { ...emailTemplate, audienceKey: templateAudience, audienceLabel }));
     } catch (err) {
       setError(err.response?.data?.error || "Unable to save the campaign email.");
     } finally {
@@ -130,8 +132,9 @@ export default function CampaignWorkspace() {
       setTemplateSaving(true);
       setError("");
       await saveButtonLinks();
-      await saveCampaignEmailTemplate(id, emailTemplate);
-      const result = await approveCampaignEmailTemplate(id);
+      const audienceLabel = templateAudience === "general" ? "All Deal to Close contacts" : campaign.audience?.[Number(templateAudience.replace("audience-", ""))] || "";
+      await saveCampaignEmailTemplate(id, { ...emailTemplate, audienceKey: templateAudience, audienceLabel });
+      const result = await approveCampaignEmailTemplate(id, templateAudience);
       setEmailTemplate(result.template);
       setTemplateVersions((current) => [result.version, ...current]);
     } catch (err) {
@@ -198,8 +201,14 @@ export default function CampaignWorkspace() {
 
         <DashboardCard title="Campaign master email">
           {emailTemplate ? <div className="campaign-template-editor">
-            <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Approved version ${emailTemplate.currentVersion}` : "Draft — approval required"}</strong></div>
-            <label><span>Email topic</span><select value={isProgram ? "program_offers" : "event_invitations"} disabled><option value={isProgram ? "program_offers" : "event_invitations"}>{isProgram ? "Program offers" : "Event invitations"}</option></select></label>
+            <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Saved version ${emailTemplate.currentVersion}` : "Editing master template"}</strong></div>
+            <label><span>Template for target audience</span><select value={templateAudience} onChange={(event) => setTemplateAudience(event.target.value)}><option value="general">All Deal to Close contacts</option>{(campaign.audience || []).map((audience, index) => <option value={`audience-${index}`} key={`${audience}-${index}`}>{audience}</option>)}</select></label>
+            <div className="campaign-flyer-editor">
+              <span>Email flyer</span>
+              {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.name} flyer`} /> : null}
+              {imageUpload.configured ? <label className="campaign-file-button">Choose or replace flyer<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label> : <p className="image-hosting-note">Add the rotated Cloudinary URL to the Render backend environment to enable direct upload.</p>}
+              <small>The flyer is placed above the registration buttons in every email.</small>
+            </div>
             <label><span>Master subject</span><input value={emailTemplate.subject} onChange={(event) => updateTemplateField("subject", event.target.value)} /></label>
             <label><span>Master message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
             <label><span>Button text</span><input value={emailTemplate.callToAction || ""} onChange={(event) => updateTemplateField("callToAction", event.target.value)} placeholder="Register now" /></label>

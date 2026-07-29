@@ -83,6 +83,8 @@ const campaignSchema = new mongoose.Schema(
     currentVersion: { type: Number, default: 0 },
     approvedAt: { type: Date, default: null },
   },
+  emailAudienceTemplates: { type: mongoose.Schema.Types.Mixed, default: {} },
+  activeAudienceTemplateKey: { type: String, default: "general" },
 
   registrationLinks: {
     eventbrite: {
