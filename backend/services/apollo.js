@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const APOLLO_BASE = "https://api.apollo.io/v1";
+const APOLLO_BASE = "https://api.apollo.io/api/v1";
 
 /**
  * Returns the configured API key or throws if missing.
@@ -61,9 +61,9 @@ function buildContactSearchBody({ titles = [], keywords = [], domains = [], loca
   const cleanedKeywords = nonBlankStrings(keywords);
   const cleanedDomains = nonBlankStrings(domains);
   const cleanedLocations = nonBlankStrings(locations);
-  if (cleanedTitles.length) body.q_person_titles = cleanedTitles;
+  if (cleanedTitles.length) body.person_titles = cleanedTitles;
   if (cleanedKeywords.length) body.q_keywords = cleanedKeywords.join(" ");
-  if (cleanedDomains.length) body.q_organization_domains = cleanedDomains;
+  if (cleanedDomains.length) body.q_organization_domains_list = cleanedDomains;
   if (cleanedLocations.length) body.person_locations = cleanedLocations;
   return body;
 }
@@ -72,10 +72,10 @@ function contactSearchDiagnostic({ status, data }) {
   const payload = data && typeof data === "object" ? data : {};
   const firstError = Array.isArray(payload.errors) ? payload.errors[0] : payload.error;
   return {
-    endpoint: "/v1/contacts/search",
+    endpoint: "/api/v1/mixed_people/api_search",
     status,
     topLevelKeys: Object.keys(payload),
-    resultCount: Array.isArray(payload.contacts) ? payload.contacts.length : 0,
+    resultCount: Array.isArray(payload.people) ? payload.people.length : 0,
     apolloCode: payload.code || payload.error_code || firstError?.code || null,
     apolloMessage: payload.message || (typeof payload.error === "string" ? payload.error : firstError?.message) || null,
     pagination: payload.pagination ? { page: payload.pagination.page, perPage: payload.pagination.per_page, totalEntries: payload.pagination.total_entries, totalPages: payload.pagination.total_pages } : null,
@@ -356,6 +356,7 @@ module.exports = {
   searchContacts,
   buildContactSearchBody,
   contactSearchDiagnostic,
+  enrichContacts,
 };
 
 // ---------------------------------------------------------------------------
@@ -408,37 +409,32 @@ async function searchContacts({
 
     const body = buildContactSearchBody({ titles, keywords, domains, locations, page, perPage });
 
-    const response = await apolloClient().post("/contacts/search", body, {
+    const { page: searchPage, per_page: perPageValue, ...filters } = body;
+    const response = await apolloClient().post("/mixed_people/api_search", null, {
+      params: { ...filters, page: searchPage, per_page: perPageValue },
       headers: { "x-api-key": key },
     });
 
     const diagnostic = contactSearchDiagnostic({ status: response.status, data: response.data });
     console.info("[Apollo] search diagnostic", diagnostic);
-    const raw = response.data?.contacts ?? [];
+    const raw = response.data?.people ?? [];
     const total = response.data?.pagination?.total_entries ?? raw.length;
 
-    // /contacts/search queries contacts already saved in Apollo, not the
-    // prospect-database people-search product. Do not call an empty workspace
-    // contact response a successful lead discovery.
-    if (raw.length === 0 && total === 0) {
-      return {
-        success: false,
-        error: "people_search_unavailable",
-        errorCode: "people_search_unavailable",
-        status: response.status,
-        contacts: [],
-        message: "Apollo people search is unavailable on the connected plan or is not configured. Use organization discovery or CSV import.",
-      };
-    }
-
     const contacts = raw.map((person) => ({
-      apolloPersonId: person.id ?? null,
+      apolloPersonId: person.id ?? person.person_id ?? null,
       name: [person.first_name, person.last_name].filter(Boolean).join(" "),
       firstName: person.first_name ?? "",
       lastName: person.last_name ?? "",
       title: person.title ?? "",
-      company: person.organization?.name ?? person.account?.name ?? "",
+      company: person.organization?.name ?? person.company_name ?? "",
       email: person.email ?? "",
+      emailStatus: person.email_status ?? "",
+      industry: person.organization?.industry ?? "",
+      employeeCount: person.organization?.estimated_num_employees ?? null,
+      seniority: person.seniority ?? "",
+      departments: person.departments ?? [],
+      keywords: person.organization?.keywords ?? [],
+      website: person.organization?.website_url ?? "",
       location: [person.city, person.state, person.country]
         .filter(Boolean)
         .join(", "),
@@ -451,4 +447,50 @@ async function searchContacts({
     console.info("[Apollo] search diagnostic", contactSearchDiagnostic({ status: error.response?.status || null, data: error.response?.data }));
     return { ...formatError(error), contacts: [] };
   }
+}
+
+async function enrichContacts(leads = []) {
+  const key = getApiKey();
+  const enriched = [];
+
+  for (let index = 0; index < leads.length; index += 10) {
+    const batch = leads.slice(index, index + 10);
+    const details = batch.map((lead) => ({
+      id: lead.apolloPersonId || lead.apolloContactId || undefined,
+      first_name: lead.firstName || undefined,
+      last_name: lead.lastName || undefined,
+      organization_name: lead.company || undefined,
+      linkedin_url: lead.linkedinUrl || lead.linkedin || undefined,
+    }));
+    const response = await apolloClient().post(
+      "/people/bulk_match",
+      { details },
+      {
+        params: { reveal_personal_emails: false, reveal_phone_number: false },
+        headers: { "x-api-key": key },
+      },
+    );
+    const matches = response.data?.matches || response.data?.people || [];
+    enriched.push(...batch.map((lead, matchIndex) => {
+      const person = matches[matchIndex] || {};
+      const organization = person.organization || {};
+      return {
+        ...lead,
+        apolloPersonId: person.id || lead.apolloPersonId || null,
+        firstName: person.first_name || lead.firstName || "",
+        lastName: person.last_name || lead.lastName || "",
+        name: person.name || lead.name || [person.first_name, person.last_name].filter(Boolean).join(" "),
+        title: person.title || lead.title || "",
+        company: organization.name || person.company_name || lead.company || "",
+        email: person.email || lead.email || "",
+        emailStatus: person.email_status || lead.emailStatus || "",
+        industry: organization.industry || lead.industry || "",
+        employeeCount: organization.estimated_num_employees ?? lead.employeeCount ?? null,
+        website: organization.website_url || lead.website || "",
+        linkedinUrl: person.linkedin_url || lead.linkedinUrl || "",
+      };
+    }));
+  }
+
+  return enriched;
 }

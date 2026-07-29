@@ -530,14 +530,15 @@ router.post("/sync", async (req, res) => {
  */
 router.post("/apollo/search", async (req, res) => {
   try {
-    const { titles = [], locations = [], keywords = [], page = 1, perPage = 25 } = req.body;
-    if (!Array.isArray(titles) || !Array.isArray(locations) || !Array.isArray(keywords)) {
+    const { titles = [], locations = [], keywords = [], domains = [], page = 1, perPage = 25 } = req.body;
+    if (!Array.isArray(titles) || !Array.isArray(locations) || !Array.isArray(keywords) || !Array.isArray(domains)) {
       return res.status(400).json({ success: false, code: "invalid_request", message: "Apollo search filters must be arrays" });
     }
     const result = await integrationHub.execute("apollo", "searchLeads", {
       titles: Array.isArray(titles) ? titles.slice(0, 10) : [],
       locations: Array.isArray(locations) ? locations.slice(0, 10) : [],
       keywords: Array.isArray(keywords) ? keywords.slice(0, 10) : [],
+      domains: Array.isArray(domains) ? domains.slice(0, 10) : [],
       page: Math.max(1, Number(page) || 1),
       perPage: Math.min(100, Math.max(1, Number(perPage) || 25)),
     });
