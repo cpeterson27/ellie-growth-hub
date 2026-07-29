@@ -40,6 +40,8 @@ function truthy(value) { return ["true", "yes", "1"].includes(String(value).trim
 function split(value) { return Array.isArray(value) ? value : String(value || "").split(/[;,|]/).map((item) => item.trim()).filter(Boolean); }
 function cleanPlaceholder(field, value) {
   const text = String(value || "").trim();
+  if (["phone", "workDirectPhone", "corporatePhone", "mobilePhone", "homePhone", "otherPhone"].includes(field)
+    && /^(request phone number|phone unavailable|not available|n\/a|-)$/i.test(text)) return "";
   if (field === "title" && /^[+()\d\s.-]{7,}$/.test(text) && text.replace(/\D/g, "").length >= 7) return "";
   if (text.toLowerCase() !== "stage = needs research") return value;
   if (field === "stage") return "Needs Research";

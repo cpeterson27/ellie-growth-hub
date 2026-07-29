@@ -789,7 +789,7 @@ export default function Contacts() {
           <p>Detected headers: {importHeaders.join(", ")}</p>
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
-          <p className="contact-modal-intro"><strong>What happens next:</strong> Ellie will open a “Just imported” view containing only this CSV. {importCampaignId ? "These contacts will also be assigned to the selected campaign." : "You can assign the whole batch there later."} Nothing is emailed during import.</p>
+          <p className="contact-modal-intro"><strong>What happens next:</strong> {importCampaignId ? "These contacts will be saved and assigned to the selected campaign." : "These contacts will be saved to Contacts without a campaign assignment."} Nothing is emailed during import.</p>
           <label className="contact-qualify-choice">
             <input type="checkbox" checked={importMarketingPermission} onChange={(event) => setImportMarketingPermission(event.target.checked)} />
             <span><strong>These imported contacts can receive campaign email</strong><small>One setting applies to this entire CSV. Ellie adds unsubscribe options automatically.</small></span>
@@ -803,11 +803,14 @@ export default function Contacts() {
             <Button variant="outline" loading={verifyingEmails} disabled={verifyingEmails} onClick={verifyImportedEmails}>
               {pendingEmailCount ? `Verify ${emailsToVerify.length} emails` : "Verify again"}
             </Button>
-            <div className="verification-resume">
-              <input className="select-input" value={existingBatchId} onChange={(event) => setExistingBatchId(event.target.value)} placeholder="Existing Emailable batch ID" />
-              <Button variant="outline" disabled={verifyingEmails || !existingBatchId.trim()} onClick={resumeImportedEmailVerification}>Resume paid batch</Button>
-              <small>This retrieves existing results and does not start a new paid verification.</small>
-            </div>
+            <details className="verification-resume">
+              <summary>Resume a verification that was already started</summary>
+              <div>
+                <input className="select-input" value={existingBatchId} onChange={(event) => setExistingBatchId(event.target.value)} placeholder="Emailable batch ID" />
+                <Button variant="outline" disabled={verifyingEmails || !existingBatchId.trim()} onClick={resumeImportedEmailVerification}>Resume existing verification</Button>
+              </div>
+              <small>Use this only if this exact CSV verification was interrupted. It retrieves existing results and does not start a new paid check.</small>
+            </details>
             {verificationProgress ? <div className="verification-progress">
               <span style={{ width: `${Math.min(100, Math.round((verificationProgress.processed / Math.max(1, verificationProgress.total)) * 100))}%` }} />
             </div> : null}
@@ -816,7 +819,7 @@ export default function Contacts() {
             </p> : null}
           </div> : null}
           <p className="contact-modal-intro">Showing the first {Math.min(5, importRows.length)} rows as a preview. Verification applies to all {importRows.length} rows.</p>
-          <div style={{ overflowX: "auto", marginTop: "0.75rem" }}><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => { const result = verificationResults[String(row.Email || "").toLowerCase()]; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{row["Work Direct Phone"] || row.Phone}</td><td>{row["Company Name"] || row.Company}</td><td>{row.Title}</td><td>{[row.City, row.State].filter(Boolean).join(", ")}</td><td>CSV import</td></tr>; })}</tbody></table></div>
+          <div className="email-import-preview"><table><thead><tr>{["Name", "Email", "Phone", "Company", "Title", "City/State", "Source"].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, 5).map((row, index) => { const result = verificationResults[String(row.Email || "").toLowerCase()]; const phone = row["Work Direct Phone"] || row.Phone; return <tr key={index}><td>{row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`.trim()}</td><td>{row.Email || "—"}{row.Email ? <><span className={`verification-badge ${result?.state || "pending"}`}>{result?.state || "not verified"}</span>{result?.didYouMean ? <small className="email-suggestion">Did you mean {result.didYouMean}?</small> : null}</> : null}</td><td>{/request phone number/i.test(phone || "") ? "—" : phone || "—"}</td><td>{row["Company Name"] || row.Company || "—"}</td><td>{row.Title || "—"}</td><td>{[row.City, row.State].filter(Boolean).join(", ") || "—"}</td><td>CSV import</td></tr>; })}</tbody></table></div>
           <p>{importRows.length} rows ready. Deliverable emails are saved. Risky, unknown, and undeliverable addresses are removed while the contact is retained and tagged for review.</p>
         </>}
       </Modal>
