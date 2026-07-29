@@ -4,7 +4,7 @@ const Outreach = require("../models/Outreach");
 const Campaign = require("../models/Campaign");
 const Contact = require("../models/Contact");
 
-const { sendEmail } = require("../services/email");
+const { renderEmailContent, sendEmail } = require("../services/email");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 const { requireRole } = require("../middleware/auth");
 
@@ -80,6 +80,17 @@ router.get("/", async (req, res) => {
 
   }
 
+});
+
+router.get("/:id/preview", async (req, res) => {
+  try {
+    const outreach = await Outreach.findById(req.params.id);
+    if (!outreach) return res.status(404).json({ error: "Outreach email not found." });
+    const rendered = await renderEmailContent(outreach, { preview: true });
+    return res.json({ subject: outreach.subject, html: rendered.html });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Unable to preview outreach email." });
+  }
 });
 
 router.post("/record-consent", requireRole("owner", "admin"), async (req, res) => {

@@ -8,6 +8,7 @@ import {
   approveAllOutreach,
   fetchCampaigns,
   fetchOutreach,
+  fetchOutreachPreview,
   generateOutreach,
   sendEmails,
   syncGmailOutreachReplies,
@@ -113,6 +114,18 @@ export default function Outreach() {
       ),
     [items, filter, search],
   );
+  const review = async (item) => {
+    try {
+      setSaving(true);
+      setError("");
+      const rendered = await fetchOutreachPreview(item._id);
+      setPreview({ ...item, htmlBody: rendered.html, subject: rendered.subject || item.subject });
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to prepare the complete email preview.");
+    } finally {
+      setSaving(false);
+    }
+  };
   const counts = {
     active: items.filter((x) =>
       ["pending", "approved", "failed"].includes(x.status),
@@ -295,7 +308,7 @@ export default function Outreach() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPreview(item)}
+                    onClick={() => review(item)}
                   >
                     <FiEye />
                     Review

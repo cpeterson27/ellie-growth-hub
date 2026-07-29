@@ -199,7 +199,7 @@ export default function CampaignWorkspace() {
         <DashboardCard title="Campaign master email">
           {emailTemplate ? <div className="campaign-template-editor">
             <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Approved version ${emailTemplate.currentVersion}` : "Draft — approval required"}</strong></div>
-            <label><span>Email topic</span><select value={emailTemplate.topic} onChange={(event) => updateTemplateField("topic", event.target.value)}><option value="event_invitations">Event invitations</option><option value="program_offers">Program offers</option><option value="educational_newsletter">Educational newsletter</option></select></label>
+            <label><span>Email topic</span><select value={isProgram ? "program_offers" : "event_invitations"} disabled><option value={isProgram ? "program_offers" : "event_invitations"}>{isProgram ? "Program offers" : "Event invitations"}</option></select></label>
             <label><span>Master subject</span><input value={emailTemplate.subject} onChange={(event) => updateTemplateField("subject", event.target.value)} /></label>
             <label><span>Master message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
             <label><span>Button text</span><input value={emailTemplate.callToAction || ""} onChange={(event) => updateTemplateField("callToAction", event.target.value)} placeholder="Register now" /></label>

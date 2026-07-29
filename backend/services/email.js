@@ -4,6 +4,36 @@ const Contact = require("../models/Contact");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
 const { createUnsubscribeToken, publicBackendUrl } = require("../utils/unsubscribe");
 
+async function renderEmailContent(outreachItem, { contact = null, preview = false } = {}) {
+  const workspace = await WorkspaceConfig.findOne({ key: "primary" });
+  if (!workspace?.postalAddress?.trim() && !preview) {
+    throw new Error("Add the business mailing address in Settings before sending campaign email.");
+  }
+  const resolvedContact = contact || (outreachItem.contactId
+    ? await Contact.findById(outreachItem.contactId)
+    : await Contact.findOne({ email: String(outreachItem.contactEmail || "").toLowerCase() }));
+  const unsubscribeUrl = resolvedContact
+    ? `${publicBackendUrl()}/api/unsubscribe/${encodeURIComponent(createUnsubscribeToken(resolvedContact))}`
+    : "#";
+  const businessName = workspace?.legalBusinessName || workspace?.workspaceName || "Ellie's Coaching";
+  const postalAddress = workspace?.postalAddress || (preview ? "Business postal address from Settings" : "");
+  const websiteUrl = String(workspace?.websiteUrl || "").trim();
+  const complianceText = `This promotional message was sent because we believed this opportunity may be relevant to your professional work.\n${businessName}${postalAddress ? ` · ${postalAddress}` : ""}${websiteUrl ? ` · ${websiteUrl}` : ""}\nUnsubscribe: ${unsubscribeUrl}`;
+  const footerHtml = `<div style="margin-top:36px;padding-top:20px;border-top:1px solid #ddd7ca;color:#737b77;font-size:12px;line-height:1.6;text-align:center"><div style="margin-bottom:8px">This promotional message was sent because we believed this opportunity may be relevant to your professional work.</div><div><strong>${String(businessName).replace(/[<>&"]/g, "")}</strong></div>${postalAddress ? `<div>${String(postalAddress).replace(/[<>&"]/g, "")}</div>` : ""}${websiteUrl ? `<div><a href="${websiteUrl.replace(/"/g, "&quot;")}" style="color:#506b63">${websiteUrl.replace(/[<>&"]/g, "")}</a></div>` : ""}<div style="margin-top:8px"><a href="${unsubscribeUrl}" style="color:#506b63">Unsubscribe from campaign emails</a></div></div>`;
+  const text = `${outreachItem.emailDraft || ""}\n\n—\n${complianceText}`;
+  let html = outreachItem.htmlBody || `<html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${(outreachItem.emailDraft || "")
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${String(paragraph).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replaceAll("\n", "<br>")}</p>`)
+    .join("")}</body></html>`;
+  const organizationLogo = String(workspace?.organizationLogoUrl || "").trim();
+  if (organizationLogo && !html.includes(organizationLogo)) {
+    const logoHtml = `<div style="margin:0 0 28px"><img src="${organizationLogo.replace(/"/g, "&quot;")}" alt="${String(businessName).replace(/[<>&"]/g, "")}" style="display:block;max-height:84px;max-width:220px;object-fit:contain"></div>`;
+    html = html.includes("<body") ? html.replace(/(<body[^>]*>)/i, `$1${logoHtml}`) : `${logoHtml}${html}`;
+  }
+  html = html.includes("</body>") ? html.replace("</body>", `${footerHtml}</body>`) : `${html}${footerHtml}`;
+  return { text, html, unsubscribeUrl };
+}
+
 
 
 // ======================================
@@ -62,31 +92,13 @@ async function sendEmail(outreachItem) {
   if (!topicField || contact.emailPreferences?.topics?.[topicField] !== true) {
     return { success: false, message: `This contact has not subscribed to ${String(outreachItem.emailTopic || "this email topic").replaceAll("_", " ")}.` };
   }
-  const workspace = await WorkspaceConfig.findOne({ key: "primary" });
-  if (!workspace?.postalAddress?.trim()) {
-    return {
-      success: false,
-      message: "Add the business mailing address in Settings before sending campaign email.",
-    };
+  let rendered;
+  try {
+    rendered = await renderEmailContent(outreachItem, { contact });
+  } catch (error) {
+    return { success: false, message: error.message };
   }
-  const token = createUnsubscribeToken(contact);
-  const unsubscribeUrl = `${publicBackendUrl()}/api/unsubscribe/${encodeURIComponent(token)}`;
-  const businessName = workspace?.legalBusinessName || workspace?.workspaceName || "Ellie's Coaching";
-  const postalAddress = workspace?.postalAddress || "";
-  const websiteUrl = String(workspace?.websiteUrl || "").trim();
-  const complianceText = `This promotional message was sent because we believed this opportunity may be relevant to your professional work.\n${businessName}${postalAddress ? ` · ${postalAddress}` : ""}${websiteUrl ? ` · ${websiteUrl}` : ""}\nUnsubscribe: ${unsubscribeUrl}`;
-  const footerHtml = `<div style="margin-top:36px;padding-top:20px;border-top:1px solid #ddd7ca;color:#737b77;font-size:12px;line-height:1.6;text-align:center"><div style="margin-bottom:8px">This promotional message was sent because we believed this opportunity may be relevant to your professional work.</div><div><strong>${String(businessName).replace(/[<>&"]/g, "")}</strong></div>${postalAddress ? `<div>${String(postalAddress).replace(/[<>&"]/g, "")}</div>` : ""}${websiteUrl ? `<div><a href="${websiteUrl.replace(/"/g, "&quot;")}" style="color:#506b63">${websiteUrl.replace(/[<>&"]/g, "")}</a></div>` : ""}<div style="margin-top:8px"><a href="${unsubscribeUrl}" style="color:#506b63">Unsubscribe from campaign emails</a></div></div>`;
-  const text = `${outreachItem.emailDraft || ""}\n\n—\n${complianceText}`;
-  let html = outreachItem.htmlBody || `<html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${(outreachItem.emailDraft || "")
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${String(paragraph).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replaceAll("\n", "<br>")}</p>`)
-    .join("")}</body></html>`;
-  const organizationLogo = String(workspace?.organizationLogoUrl || "").trim();
-  if (organizationLogo && !html.includes(organizationLogo)) {
-    const logoHtml = `<div style="margin:0 0 28px"><img src="${organizationLogo.replace(/"/g, "&quot;")}" alt="${String(businessName).replace(/[<>&"]/g, "")}" style="display:block;max-height:84px;max-width:220px;object-fit:contain"></div>`;
-    html = html.includes("<body") ? html.replace(/(<body[^>]*>)/i, `$1${logoHtml}`) : `${logoHtml}${html}`;
-  }
-  html = html.includes("</body>") ? html.replace("</body>", `${footerHtml}</body>`) : `${html}${footerHtml}`;
+  const { text, html, unsubscribeUrl } = rendered;
 
 
 
@@ -164,5 +176,6 @@ error.message
 
 
 module.exports = {
+  renderEmailContent,
   sendEmail,
 };
