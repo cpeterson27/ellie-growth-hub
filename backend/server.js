@@ -91,6 +91,7 @@ connectDatabase(mongoUri)
         req.path === "/health" ||
         req.path.startsWith("/unsubscribe/") ||
         req.path === "/webhooks/resend" ||
+        req.path === "/jarvis/memory/sync" ||
         req.path === "/eventbrite/webhook" ||
         req.path === "/eventbrite/oauth/callback" ||
         req.path === "/gmail/oauth/callback";

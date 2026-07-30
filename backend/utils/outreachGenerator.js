@@ -38,7 +38,21 @@ function escapeHtml(value = "") {
   return String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function emailButton(url, label, backgroundColor) {
+  if (!url) return "";
+  return `
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:12px 0 0;">
+  <tr>
+    <td align="center" bgcolor="${backgroundColor}" style="background-color:${backgroundColor};border-radius:6px;padding:14px 24px;">
+      <a href="${escapeHtml(url)}" target="_blank" style="color:#ffffff;display:block;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:20px;text-decoration:none;white-space:nowrap;">&nbsp;${escapeHtml(label)}&nbsp;</a>
+    </td>
+  </tr>
+</table>`.trim();
 }
 
 function fillTemplate(value = "", variables = {}) {
@@ -95,7 +109,11 @@ function generateOutreachDraft(contact, campaign) {
     : "";
 
   const meetupHtml = meetupLink
-    ? `<p style="margin-top:12px;"><a href="${escapeHtml(meetupLink)}" style="display:inline-block;background:#e0393e;color:#fff;padding:14px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">${escapeHtml(campaign.registrationLinks?.meetup?.label || "View on Meetup")}</a></p>`
+    ? emailButton(
+      meetupLink,
+      campaign.registrationLinks?.meetup?.label || "View on Meetup",
+      "#e0393e",
+    )
     : "";
 
 
@@ -160,7 +178,7 @@ Ellie's Coaching
 <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
 ${textToHtml(fillTemplate(savedBody, variables))}
 ${flyerUrl ? `<img src="${escapeHtml(flyerUrl)}" alt="${escapeHtml(campaign.programName || campaignName)}" style="display:block;width:100%;max-width:600px;height:auto;border-radius:8px;margin:28px 0;">` : ""}
-${eventLink ? `<p><a href="${escapeHtml(eventLink)}" style="display:inline-block;background:#000;color:#fff;padding:14px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">${escapeHtml(campaign.content?.callToAction || "Learn more")}</a></p>` : ""}
+${emailButton(eventLink, campaign.content?.callToAction || "Learn more", "#000000")}
 ${meetupHtml}
 </body>
 </html>
@@ -201,19 +219,7 @@ Saturday, August 22, 2026<br>
 </p>
 
 
-<a 
-href="${eventLink}"
-style="
-display:inline-block;
-background:#000;
-color:#fff;
-padding:14px 24px;
-text-decoration:none;
-border-radius:6px;
-font-weight:bold;
-">
-Reserve Your Spot
-</a>
+${emailButton(eventLink, "Reserve Your Spot", "#000000")}
 
 ${meetupHtml}
 
