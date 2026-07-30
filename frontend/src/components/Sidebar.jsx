@@ -12,6 +12,7 @@ import {
   FiLink,
   FiCpu,
   FiCode,
+  FiCheckCircle,
 } from "react-icons/fi";
 import "./Sidebar.css";
 
@@ -19,6 +20,7 @@ const navItems = [
   { label: "Dashboard", path: "/dashboard", icon: <FiActivity /> },
   { label: "Events", path: "/events", icon: <FiFolder /> },
   { label: "Campaigns", path: "/campaigns", icon: <FiZap /> },
+  { label: "Launch Campaign", path: "/launch", icon: <FiCheckCircle /> },
   { label: "Discovery", path: "/discovery", icon: <FiTrendingUp /> },
   { label: "Contacts", path: "/contacts", icon: <FiUsers /> },
   { label: "Outreach", path: "/outreach", icon: <FiSend /> },

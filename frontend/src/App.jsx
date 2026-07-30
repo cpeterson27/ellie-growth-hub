@@ -24,6 +24,7 @@ import { InitiativeProvider } from "./context/InitiativeContext.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import Login from "./pages/Login.jsx";
 import Landing from "./pages/Landing.jsx";
+import CampaignLaunch from "./pages/CampaignLaunch.jsx";
 
 function ProtectedApp() {
   const { loading, session } = useAuth();
@@ -37,6 +38,7 @@ function ProtectedApp() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/events" element={<Events />} />
           <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/launch" element={<CampaignLaunch />} />
           <Route path="/campaigns/:id" element={<CampaignWorkspace />} />
           <Route path="/marketing-campaigns/:id" element={<CampaignWorkspace />} />
           <Route path="/marketing" element={<Marketing />} />

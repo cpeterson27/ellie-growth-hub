@@ -3,6 +3,7 @@ const express = require("express");
 const Outreach = require("../models/Outreach");
 const Campaign = require("../models/Campaign");
 const Contact = require("../models/Contact");
+const EmailEvent = require("../models/EmailEvent");
 
 const { renderEmailContent, sendEmail, sendTestEmail } = require("../services/email");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
@@ -81,6 +82,53 @@ router.get("/", async (req, res) => {
 
   }
 
+});
+
+router.get("/analytics/summary", async (_req, res) => {
+  try {
+    const [campaigns, outreach, latestEvent] = await Promise.all([
+      Campaign.find().select("name metrics status").sort({ createdAt: -1 }).lean(),
+      Outreach.find({ status: { $in: ["sent", "replied"] } })
+        .select("campaignId status deliveryStatus sentAt deliveredAt openedAt clickedAt bouncedAt complainedAt repliedAt replyCategory")
+        .lean(),
+      EmailEvent.findOne().sort({ occurredAt: -1 }).select("occurredAt type").lean(),
+    ]);
+    const totals = outreach.reduce((result, item) => {
+      result.sent += 1;
+      if (item.deliveredAt) result.delivered += 1;
+      if (item.openedAt) result.opened += 1;
+      if (item.clickedAt) result.clicked += 1;
+      if (item.bouncedAt) result.bounced += 1;
+      if (item.complainedAt) result.complained += 1;
+      if (item.status === "replied") result.replied += 1;
+      return result;
+    }, { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0, complained: 0 });
+    const byCampaign = campaigns.map((campaign) => {
+      const rows = outreach.filter((item) => String(item.campaignId) === String(campaign._id));
+      return {
+        id: campaign._id,
+        name: campaign.name,
+        status: campaign.status,
+        sent: rows.length,
+        delivered: rows.filter((item) => item.deliveredAt).length,
+        opened: rows.filter((item) => item.openedAt).length,
+        clicked: rows.filter((item) => item.clickedAt).length,
+        replied: rows.filter((item) => item.status === "replied").length,
+        bounced: rows.filter((item) => item.bouncedAt).length,
+      };
+    });
+    return res.json({
+      totals,
+      byCampaign,
+      webhook: {
+        lastEventAt: latestEvent?.occurredAt || null,
+        lastEventType: latestEvent?.type || "",
+        healthy: Boolean(latestEvent),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Unable to load outreach analytics." });
+  }
 });
 
 router.get("/:id/preview", async (req, res) => {
@@ -630,6 +678,7 @@ router.post("/send", async(req,res)=>{
 
         item.messageId =
           result.id || "";
+        item.deliveryStatus = "accepted";
 
 
         sentCount++;
@@ -637,6 +686,8 @@ router.post("/send", async(req,res)=>{
       } else {
 
         item.status="failed";
+        item.deliveryStatus = "failed";
+        item.failedAt = new Date();
 
         item.errorMessage =
           result.message;

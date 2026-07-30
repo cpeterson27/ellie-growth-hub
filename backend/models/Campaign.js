@@ -127,6 +127,18 @@ const campaignSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    bounced: {
+      type: Number,
+      default: 0,
+    },
+    complained: {
+      type: Number,
+      default: 0,
+    },
+    replied: {
+      type: Number,
+      default: 0,
+    },
 
   },
 

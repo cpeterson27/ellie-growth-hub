@@ -1,7 +1,10 @@
 const express = require("express");
 const IntegrationConnection = require("../models/IntegrationConnection");
 const Outreach = require("../models/Outreach");
+const Campaign = require("../models/Campaign");
+const Contact = require("../models/Contact");
 const gmail = require("../services/gmailOAuthService");
+const { classifyReply, draftReply } = require("../services/replyIntelligence");
 const router = express.Router();
 
 router.get("/status", async (_req, res) => {
@@ -72,11 +75,41 @@ router.post("/sync-outreach-replies", async (_req, res) => {
       const sender = String(thread.from || "").match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0]?.toLowerCase();
       if (!sender || !emails.includes(sender)) continue;
       const receivedAt = thread.date ? new Date(thread.date) : new Date();
-      const result = await Outreach.updateMany(
+      const matching = await Outreach.find(
         { contactEmail: sender, status: "sent", sentAt: { $lte: receivedAt } },
-        { $set: { status: "replied", repliedAt: receivedAt, replyText: thread.snippet || "" } },
-      );
-      repliesFound += result.modifiedCount;
+      ).populate("campaignId", "name");
+      const intelligence = classifyReply(thread.snippet || "");
+      for (const item of matching) {
+        item.status = "replied";
+        item.repliedAt = receivedAt;
+        item.replyText = thread.snippet || "";
+        item.replyCategory = intelligence.category;
+        item.replyUrgency = intelligence.urgency;
+        item.aiReplyDraft = draftReply({
+          contactName: item.contactName,
+          category: intelligence.category,
+          campaignName: item.campaignId?.name,
+        });
+        await item.save();
+        if (intelligence.category === "unsubscribe" && item.contactId) {
+          await Contact.updateOne(
+            { _id: item.contactId },
+            {
+              $set: {
+                status: "unsubscribed",
+                "emailPreferences.marketingStatus": "unsubscribed",
+                "emailPreferences.unsubscribedAt": receivedAt,
+                "emailPreferences.unsubscribeSource": "reply_request",
+                "emailPreferences.topics.eventInvitations": false,
+                "emailPreferences.topics.programOffers": false,
+                "emailPreferences.topics.educationalNewsletter": false,
+              },
+            },
+          );
+        }
+        await Campaign.updateOne({ _id: item.campaignId?._id }, { $inc: { "metrics.replied": 1 } });
+        repliesFound += 1;
+      }
     }
     res.json({ success: true, repliesFound });
   } catch (error) { res.status(400).json({ error: error.message }); }
@@ -101,6 +134,13 @@ router.get("/contact-history", async (req, res) => {
         sentAt: item.sentAt,
         repliedAt: item.repliedAt,
         replyText: item.replyText,
+        replyCategory: item.replyCategory,
+        replyUrgency: item.replyUrgency,
+        aiReplyDraft: item.aiReplyDraft,
+        deliveryStatus: item.deliveryStatus,
+        deliveredAt: item.deliveredAt,
+        openedAt: item.openedAt,
+        clickedAt: item.clickedAt,
       })),
     });
   } catch (error) { res.status(400).json({ error: error.message }); }
@@ -124,6 +164,13 @@ router.get("/outreach-history", async (_req, res) => {
         sentAt: item.sentAt,
         repliedAt: item.repliedAt,
         replyText: item.replyText,
+        replyCategory: item.replyCategory,
+        replyUrgency: item.replyUrgency,
+        aiReplyDraft: item.aiReplyDraft,
+        deliveryStatus: item.deliveryStatus,
+        deliveredAt: item.deliveredAt,
+        openedAt: item.openedAt,
+        clickedAt: item.clickedAt,
       })),
     });
   } catch (error) { res.status(400).json({ error: error.message }); }

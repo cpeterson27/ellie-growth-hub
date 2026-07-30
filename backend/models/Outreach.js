@@ -137,6 +137,17 @@ const outreachSchema = new mongoose.Schema(
     },
     deliveredAt: { type: Date, default: null },
     openedAt: { type: Date, default: null },
+    clickedAt: { type: Date, default: null },
+    bouncedAt: { type: Date, default: null },
+    complainedAt: { type: Date, default: null },
+    failedAt: { type: Date, default: null },
+    lastEmailEventAt: { type: Date, default: null },
+    deliveryStatus: {
+      type: String,
+      enum: ["", "accepted", "delivered", "delayed", "bounced", "failed", "complained", "suppressed"],
+      default: "",
+      index: true,
+    },
 
 
     // ======================================
@@ -174,6 +185,17 @@ const outreachSchema = new mongoose.Schema(
 
     aiReplyDraft: {
       type: String,
+      default: "",
+    },
+    replyCategory: {
+      type: String,
+      enum: ["", "interested", "partnership", "not_now", "not_interested", "unsubscribe", "out_of_office", "needs_review"],
+      default: "",
+      index: true,
+    },
+    replyUrgency: {
+      type: String,
+      enum: ["", "low", "medium", "high"],
       default: "",
     },
 
@@ -226,11 +248,6 @@ outreachSchema.index({
   status: 1,
   sentAt: -1,
 });
-
-// A recipient has one lifecycle record per campaign. Refreshing drafts must
-// never create a second send record for the same email address.
-outreachSchema.index({ campaignId: 1, contactEmail: 1 }, { unique: true });
-
 
 // Resend message lookup
 outreachSchema.index(

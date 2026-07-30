@@ -226,6 +226,9 @@ export const fetchOutreach = (campaignId) =>
     })
     .then((res) => res.data);
 
+export const fetchOutreachAnalytics = () =>
+  api.get("/outreach/analytics/summary").then((res) => res.data);
+
 export const fetchOutreachPreview = (outreachId) =>
   api.get(`/outreach/${outreachId}/preview`).then((res) => res.data);
 
