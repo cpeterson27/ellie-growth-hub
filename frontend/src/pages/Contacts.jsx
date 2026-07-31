@@ -201,6 +201,9 @@ export default function Contacts() {
   const [bulkNotice, setBulkNotice] = useState("");
   const pageSize = 15;
   const importCampaignTargetId = String(importSummary?.campaignId || campaigns.find((campaign) => campaign.name === importSummary?.campaignName)?._id || "");
+  const selectedContacts = contacts.filter((contact) => selectedContactIds.includes(String(contact._id)));
+  const selectedCampaignIds = [...new Set(selectedContacts.flatMap((contact) => (contact.campaignIds || []).map(String)))];
+  const commonSelectedCampaignId = selectedCampaignIds.length === 1 && selectedContacts.every((contact) => contact.campaignIds?.some((id) => String(id) === selectedCampaignIds[0])) ? selectedCampaignIds[0] : "";
 
   async function loadContacts() {
     try {
@@ -224,7 +227,7 @@ export default function Contacts() {
           (!searchTerm || [contact.name, contact.company, contact.email, contact.title].join(" ").toLowerCase().includes(searchTerm.toLowerCase()));
       });
       setContacts(items);
-      setSelectedContactIds((current) => current.filter((id) => items.some((contact) => contact._id === id)));
+      setSelectedContactIds((current) => current.filter((id) => items.some((contact) => String(contact._id) === String(id))));
       if (contactTab !== "archived") {
         const overview = await fetchContactOverview();
         setContactOverview(overview.data);
@@ -299,6 +302,30 @@ export default function Contacts() {
     } finally {
       setBulkSaving(false);
     }
+  }
+
+  function exportSelectedContacts() {
+    if (!selectedContacts.length) return;
+    const fields = [["Name", "name"], ["Email", "email"], ["Title", "title"], ["Company", "company"], ["Phone", "phone"], ["LinkedIn", "linkedin"], ["Email Status", "emailStatus"]];
+    const escapeCsv = (value) => `"${String(value || "").replaceAll('"', '""')}"`;
+    const csv = [fields.map(([label]) => escapeCsv(label)).join(","), ...selectedContacts.map((contact) => fields.map(([, field]) => escapeCsv(contact[field])).join(","))].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url; link.download = `ellie-selected-contacts-${new Date().toISOString().slice(0, 10)}.csv`; link.click();
+    URL.revokeObjectURL(url);
+    setBulkNotice(`${selectedContacts.length} selected contact${selectedContacts.length === 1 ? "" : "s"} exported. No CRM records were changed.`);
+  }
+
+  async function archiveSelectedContacts() {
+    if (!selectedContacts.length || !window.confirm(`Archive ${selectedContacts.length} selected contact${selectedContacts.length === 1 ? "" : "s"}? They can be restored from the Archived tab.`)) return;
+    try {
+      setBulkSaving(true);
+      await Promise.all(selectedContacts.map((contact) => archiveContact(contact._id)));
+      setBulkNotice(`${selectedContacts.length} contact${selectedContacts.length === 1 ? "" : "s"} archived.`);
+      setSelectedContactIds([]);
+      await loadContacts();
+    } catch (err) { setError(err.response?.data?.message || "Unable to archive the selected contacts."); }
+    finally { setBulkSaving(false); }
   }
 
   function closeImportConfirmation() {
@@ -635,18 +662,9 @@ export default function Contacts() {
           ["assigned", "Campaign assigned"],
           ["archived", "Archived"],
         ].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
-        {contacts.length && contactTab !== "archived" && !importSummary?.campaignName ? <section className="contact-bulk-actions" aria-label="Bulk contact actions">
-          <label className="contact-select-all">
-            <input type="checkbox" checked={contacts.some((contact) => contact.emailStatus === "verified") && contacts.filter((contact) => contact.emailStatus === "verified").every((contact) => selectedContactIds.includes(contact._id))} onChange={(event) => setSelectedContactIds(event.target.checked ? contacts.filter((contact) => contact.emailStatus === "verified").map((contact) => contact._id) : [])} />
-            <span>Select all verified contacts in this view</span>
-          </label>
-          <strong>{selectedContactIds.length} selected</strong>
-          <select className="select-input" value={bulkCampaignId} onChange={(event) => setBulkCampaignId(event.target.value)}>
-            <option value="">Choose campaign or event</option>
-            {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
-          </select>
-          <Button loading={bulkSaving} disabled={!selectedContactIds.length || !bulkCampaignId} onClick={assignSelectedContacts}>Assign selected</Button>
-          <small>This assigns the audience only. It does not generate or send emails.</small>
+        {contacts.length && contactTab !== "archived" ? <section className={`contact-bulk-actions ${selectedContactIds.length ? "has-selection" : ""}`} aria-label="Selected contact actions">
+          <div className="contact-bulk-actions__selection"><label className="contact-select-all"><input type="checkbox" checked={contacts.length > 0 && contacts.every((contact) => selectedContactIds.includes(String(contact._id)))} onChange={(event) => setSelectedContactIds(event.target.checked ? contacts.map((contact) => String(contact._id)) : [])} /><span>Select all contacts in this view</span></label><strong>{selectedContactIds.length} selected</strong></div>
+          {selectedContactIds.length ? <div className="contact-bulk-actions__workspace"><div><small>Selection actions</small><strong>Choose what to do with these contacts</strong></div>{commonSelectedCampaignId ? <><Button variant="outline" size="sm" onClick={() => navigate(`/campaigns/${commonSelectedCampaignId}`)}>Open campaign</Button><Button variant="outline" size="sm" onClick={() => navigate(`/outreach?campaignId=${commonSelectedCampaignId}`)}>Open outreach</Button></> : null}<select className="select-input" value={bulkCampaignId} onChange={(event) => setBulkCampaignId(event.target.value)}><option value="">Add to another campaign…</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select><Button loading={bulkSaving} disabled={!bulkCampaignId} onClick={assignSelectedContacts}>Add to campaign</Button><Button variant="outline" size="sm" onClick={exportSelectedContacts}>Export CSV</Button><Button variant="outline" size="sm" loading={bulkSaving} onClick={archiveSelectedContacts}>Archive</Button><Button variant="ghost" size="sm" onClick={() => setSelectedContactIds([])}>Clear selection</Button></div> : <p className="contact-bulk-actions__help">Select one or more contacts to open campaign, outreach, export, assignment, and archive options. Selecting never sends an email.</p>}
         </section> : null}
         {bulkNotice ? <p className="contact-bulk-notice">{bulkNotice}</p> : null}
         {!loading && contacts.length ? <div className="crm-results-summary" id="contact-results">
@@ -664,7 +682,7 @@ export default function Contacts() {
             return <article className="contact-record" key={contact._id} onClick={() => setDetailContact(contact)}>
             <header>
               <div className="contact-record__identity">
-                <input type="checkbox" aria-label={`Select ${contact.name}`} disabled={contact.emailStatus !== "verified"} checked={selectedContactIds.includes(contact._id)} onClick={(event) => event.stopPropagation()} onChange={(event) => setSelectedContactIds((current) => event.target.checked ? [...new Set([...current, contact._id])] : current.filter((id) => id !== contact._id))} />
+                <input type="checkbox" aria-label={`Select ${contact.name}`} checked={selectedContactIds.includes(String(contact._id))} onClick={(event) => event.stopPropagation()} onChange={(event) => setSelectedContactIds((current) => event.target.checked ? [...new Set([...current, String(contact._id)])] : current.filter((id) => id !== String(contact._id)))} />
                 <div>
                 <h3>{contact.name}</h3>
                 <p>{contact.title || "Title missing"}{contact.company ? ` · ${contact.company}` : " · Company missing"}</p>

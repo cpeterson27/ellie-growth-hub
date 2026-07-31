@@ -643,6 +643,8 @@
   background: #edf9f4;
 }
 
+.contact-bulk-actions{align-items:stretch;background:#f3f5f2;border-color:#cfd8d2;display:grid;gap:.65rem;padding:.75rem}.contact-bulk-actions.has-selection{background:#eef5f2;border-color:#9fc5b8}.contact-bulk-actions__selection{align-items:center;display:flex;gap:12px;justify-content:space-between}.contact-bulk-actions__selection .contact-select-all{background:transparent;padding:.45rem .55rem}.contact-bulk-actions__selection>strong{background:#173f37;color:#fff;font-size:.72rem;padding:6px 9px}.contact-bulk-actions__help{color:var(--text-muted);font-size:.75rem;margin:0;padding:0 .55rem .35rem}.contact-bulk-actions__workspace{align-items:end;background:#fff;border:1px solid #d5ddd8;display:flex;flex-wrap:wrap;gap:7px;padding:10px}.contact-bulk-actions__workspace>div{display:grid;margin-right:auto;min-width:190px}.contact-bulk-actions__workspace>div small{color:#8a713d;font-size:.62rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.contact-bulk-actions__workspace>div strong{font-size:.78rem}.contact-bulk-actions__workspace .select-input{min-width:210px;width:auto}.contact-bulk-actions__workspace .btn{font-size:.7rem;min-height:36px;padding:.5rem .65rem;white-space:nowrap}
+
 .contact-bulk-actions small {
   flex: 0 0 100%;
   color: var(--text-muted);
