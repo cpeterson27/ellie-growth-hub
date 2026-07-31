@@ -1,8 +1,8 @@
 import './DashboardCard.css'
 
-export default function DashboardCard({ title, children, action }) {
+export default function DashboardCard({ title, children, action, className = "" }) {
   return (
-    <section className="dashboard-card">
+    <section className={`dashboard-card ${className}`.trim()}>
       <div className="dashboard-card__header">
         <div>
           <h2>{title}</h2>
