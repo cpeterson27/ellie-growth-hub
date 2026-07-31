@@ -23,6 +23,7 @@
   font-size: 0.8rem;
   font-weight: 700;
 }
+.apollo-target-topline label small{color:var(--text-muted);font-size:.68rem;font-weight:500;line-height:1.35}
 
 .apollo-target-topline input,
 .apollo-target-topline select,
