@@ -37,9 +37,7 @@ export default function Discovery() {
   const [campaigns, setCampaigns] = useState([]);
   const [query, setQuery] = useState("");
   const [campaignId, setCampaignId] = useState("");
-  const [source, setSource] = useState("");
   const [emailFilter, setEmailFilter] = useState("verified");
-  const [importOpen, setImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [notice, setNotice] = useState("");
   const [searchMode, setSearchMode] = useState("organizations");
@@ -96,13 +94,12 @@ export default function Discovery() {
     const searchText = [item?.name, item?.company, item?.email].filter(Boolean).join(" ").toLowerCase();
     return (!query || searchText.includes(query.toLowerCase()))
       && (!campaignId || item?.campaignIds?.some((id) => String(id) === campaignId))
-      && (!source || item?.sourceProvider === source || item?.sources?.includes(source))
       && (emailFilter === "verified"
         ? item?.emailStatus === "verified"
         : emailFilter === "review"
           ? item?.emailStatus !== "verified"
           : true);
-  }), [prospects, query, campaignId, source, emailFilter]);
+  }), [prospects, query, campaignId, emailFilter]);
 
   const emailCounts = useMemo(() => ({
     verified: prospects.filter((item) => item?.emailStatus === "verified").length,
@@ -313,7 +310,7 @@ export default function Discovery() {
         <div>
           <p className="discovery-kicker">Find new people and organizations</p>
           <h1 className="page-title">Prospect Discovery</h1>
-          <p className="page-subtitle">Search for relationships you do not already have. CSV files and existing business contacts belong in the CRM, not here.</p>
+          <p className="page-subtitle">Find new people and companies through Apollo, then review the best matches before adding them to your CRM.</p>
         </div>
       </header>
 
@@ -396,7 +393,6 @@ export default function Discovery() {
         </div>
         <div className="discovery-filters">
           <input className="select-input" placeholder="Search name, company, or email" value={query} onChange={(event) => setQuery(event.target.value)} />
-          <select value={source} onChange={(event) => setSource(event.target.value)}><option value="">All sources</option><option value="apollo">Apollo</option><option value="csv">CSV</option></select>
           <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select>
         </div>
         {notice ? <p className="discovery-notice">{notice}</p> : null}
@@ -411,7 +407,6 @@ export default function Discovery() {
             </header>
             <div className="prospect-review-card__details">
               <div><span>Email</span><strong>{prospect.email || "Withheld or unavailable"}</strong></div>
-              <div><span>Source</span><strong>{prospect.sourceProvider || prospect.sources?.join(", ") || "Unknown"}</strong></div>
               <div><span>Research status</span><strong>{String(prospect.researchStatus || "needs_research").replaceAll("_", " ")}</strong></div>
               <div><span>Missing information</span><strong>{prospect.missingFields?.length ? prospect.missingFields.join(", ") : "None"}</strong></div>
               <div><span>Imported</span><strong>{prospect.importedAt ? new Date(prospect.importedAt).toLocaleDateString() : "Unknown"}</strong></div>
@@ -427,18 +422,9 @@ export default function Discovery() {
       <section className="discovery-stats">
         <DashboardCard title="Waiting for review"><strong>{prospects.length}</strong><span>Prospects currently in your work queue</span></DashboardCard>
         <DashboardCard title="Approved this week"><strong>—</strong><span>Live data appears after approvals</span></DashboardCard>
-        <DashboardCard title="Imported this week"><strong>{prospects.filter((item) => item?.importedAt && Date.now() - new Date(item.importedAt) < 604800000).length}</strong><span>Across all import sources</span></DashboardCard>
+        <DashboardCard title="Added this week"><strong>{prospects.filter((item) => item?.importedAt && Date.now() - new Date(item.importedAt) < 604800000).length}</strong><span>Apollo prospects added to review</span></DashboardCard>
         <DashboardCard title="Apollo account"><strong>{apolloStatus.state === "connected" ? "Ready" : "Check account"}</strong><span>Search access and permissions</span></DashboardCard>
       </section>
-
-      <Modal isOpen={importOpen} onClose={() => setImportOpen(false)} title="Import prospects" footer={<Button variant="outline" onClick={() => setImportOpen(false)}>Close</Button>}>
-        <div className="import-modal">
-          <p>Choose how you want to add prospects. Imported records stay in Discovery until you approve them.</p>
-          <button onClick={() => setNotice("Use Contacts → Import → Apollo CSV to upload your Apollo export.")}><strong>Apollo CSV</strong><span>Import a downloaded Apollo export</span></button>
-          <button onClick={() => setNotice("Use Contacts → Import → Standard CSV to upload a spreadsheet export.")}><strong>Standard CSV</strong><span>Import contacts from a spreadsheet export</span></button>
-          <button onClick={() => setNotice("Organization discovery will use Apollo Organization Search when that workflow is enabled.")}><strong>Organization discovery</strong><span>Search organizations before People Search is upgraded</span></button>
-        </div>
-      </Modal>
 
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete prospect" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}>
         <p>Delete this prospect permanently? This action cannot be undone.</p>
