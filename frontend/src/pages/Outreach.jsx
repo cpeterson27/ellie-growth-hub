@@ -319,11 +319,11 @@ export default function Outreach() {
                 <div className="outreach-item__main">
                   <div className="outreach-item__recipient">
                     <strong>{item.contactName || item.contactEmail || "Contact"}</strong>
-                    <span>{item.contactEmail || "No email"}{item.organization ? ` · ${item.organization}` : ""}</span>
+                    <span>{item.contactEmail || "No email"}{item.organization && item.organization.toLowerCase() !== String(item.contactName || "").toLowerCase() ? ` · ${item.organization}` : ""}</span>
                   </div>
                   <div className="outreach-item__message">
                     <strong>{item.subject || "No subject"}</strong>
-                    <span>{item.templateAudienceLabel || "All Deal to Close contacts"}{item.sentAt ? ` · Sent ${new Date(item.sentAt).toLocaleString()}` : ""}</span>
+                    {item.sentAt ? <span>Sent {new Date(item.sentAt).toLocaleString()}</span> : null}
                   </div>
                 </div>
                 <div className="outreach-item__state">
