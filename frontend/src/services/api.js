@@ -295,6 +295,12 @@ export const createAudienceDefinition = (payload) =>
 export const discoverAudienceOrganizations = (audienceId) =>
   api.post(`/audience/${audienceId}/discover`).then((res) => res.data);
 
+export const previewApolloOrganizationImport = (rows) =>
+  api.post("/audience/imports/organizations/preview", { rows }).then((res) => res.data);
+
+export const importApolloOrganizations = (rows, name) =>
+  api.post("/audience/imports/organizations", { rows, name }).then((res) => res.data);
+
 export const importContactsFromApollo = (payload) =>
   api
     .post("/contacts/import/apollo", payload)

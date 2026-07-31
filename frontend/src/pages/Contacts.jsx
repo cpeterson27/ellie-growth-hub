@@ -10,6 +10,7 @@ import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
+import { downloadApolloTemplate, normalizeApolloRows } from "../utils/apolloImport.js";
 import {
   fetchContacts,
   fetchContactOverview,
@@ -228,6 +229,8 @@ export default function Contacts() {
   const [importRows, setImportRows] = useState([]);
   const [importHeaders, setImportHeaders] = useState([]);
   const [importFileName, setImportFileName] = useState("");
+  const [importPasteText, setImportPasteText] = useState("");
+  const [importSource, setImportSource] = useState("csv");
   const [importCampaignId, setImportCampaignId] = useState("");
   const [importMarketingPermission, setImportMarketingPermission] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
@@ -433,6 +436,19 @@ export default function Contacts() {
     if (searchParams.get("search") !== null) setSearchTerm(searchParams.get("search") || "");
   }, [initiativeId, searchParams]);
 
+  useEffect(() => {
+    if (searchParams.get("import") !== "apollo-people") return;
+    const pasted = sessionStorage.getItem("ellie.apolloPeoplePaste") || "";
+    openCsvImport();
+    setImportPasteText(pasted);
+    if (pasted) {
+      setImportFileName("Apollo people pasted into Ellie");
+      prepareImport(pasted, "apollo");
+      sessionStorage.removeItem("ellie.apolloPeoplePaste");
+    }
+    navigate("/contacts", { replace: true });
+  }, [navigate, searchParams]);
+
   function openImportConfirmation(source) {
     setError("");
     setSelectedSource(source);
@@ -444,6 +460,8 @@ export default function Contacts() {
     setImportRows([]);
     setImportHeaders([]);
     setImportFileName("");
+    setImportPasteText("");
+    setImportSource("csv");
     setPreviewStats(null);
     setVerificationResults({});
     setVerificationProgress(null);
@@ -551,9 +569,12 @@ export default function Contacts() {
       : [...current, lead]);
   }
 
-  function prepareImport(text) {
+  function prepareImport(text, source = "csv") {
+    setImportSource(source);
     Papa.parse(String(text || ""), { header: true, skipEmptyLines: "greedy", delimiter: String(text || "").includes("\t") ? "\t" : "", transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(), complete: async ({ data, meta, errors }) => {
-      const rows = data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => {
+      const normalizedData = normalizeApolloRows(data, "people");
+      const normalizedHeaders = [...new Set(normalizedData.flatMap((row) => Object.keys(row)))];
+      const rows = normalizedData.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => {
         const cleaned = String(value ?? "").trim();
         if (key === "Title" && /^[+()\d\s.-]{7,}$/.test(cleaned) && cleaned.replace(/\D/g, "").length >= 7) return [key, ""];
         if (cleaned.toLowerCase() !== "stage = needs research") return [key, cleaned];
@@ -564,10 +585,10 @@ export default function Contacts() {
       })));
       const valid = rows.filter((row) => row.Name || row["First Name"] || row["Last Name"]).length;
       const emails = rows.filter((row) => !row.Email).length;
-      const hasImportedEmailStatus = (meta.fields || []).includes("Email Status") && rows.some((row) => importedEmailState(row["Email Status"]));
-      setEmailVerificationMode(hasImportedEmailStatus ? "source" : "emailable"); setShowAllImportRows(false); setImportHeaders(meta.fields || []); setImportRows(rows); setDuplicatePreview(null); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setImportError(errors.length ? "Some rows have malformed column counts." : ""); setError(""); setUploadOpen(true);
+      const hasImportedEmailStatus = normalizedHeaders.includes("Email Status") && rows.some((row) => importedEmailState(row["Email Status"]));
+      setEmailVerificationMode(hasImportedEmailStatus ? "source" : "emailable"); setShowAllImportRows(false); setImportHeaders(normalizedHeaders); setImportRows(rows); setDuplicatePreview(null); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setImportError(errors.length ? "Some rows have malformed column counts." : ""); setError(""); setUploadOpen(true);
       try {
-        const preview = await previewContactIngestion({ contacts: rows, source: "csv" });
+        const preview = await previewContactIngestion({ contacts: rows, source });
         setDuplicatePreview(preview.data);
       } catch (previewError) {
         setImportError(previewError.response?.data?.message || "Ellie could not check this CSV for duplicates. Import is paused.");
@@ -636,14 +657,14 @@ export default function Contacts() {
       id: `csv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       fileName: importFileName || "Pasted CSV",
     };
-    const saved = await saveIngestion(sanitizedRows, "csv", importCampaignId, importMarketingPermission, {
+    const saved = await saveIngestion(sanitizedRows, importSource, importCampaignId, importMarketingPermission, {
       importBatchId: batch.id,
       importFileName: batch.fileName,
     });
     if (saved) {
       setContactTab("all");
       setCampaignId("");
-      setUploadOpen(false); setImportRows([]); setImportHeaders([]); setImportFileName(""); setDuplicatePreview(null); setVerificationResults({}); setVerificationProgress(null); setEmailVerificationMode("emailable"); setImportMarketingPermission(false);
+      setUploadOpen(false); setImportRows([]); setImportHeaders([]); setImportFileName(""); setImportPasteText(""); setDuplicatePreview(null); setVerificationResults({}); setVerificationProgress(null); setEmailVerificationMode("emailable"); setImportMarketingPermission(false);
     }
   }
 
@@ -783,7 +804,7 @@ export default function Contacts() {
           <Button variant="outline" onClick={() => navigate("/contacts/fields")}>Customize fields</Button>
           <div className="crm-menu-wrap">
             <Button variant="outline" onClick={() => setImportMenuOpen((open) => !open)}>Import ▾</Button>
-            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={openCsvImport}>Import CSV</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
+            {importMenuOpen ? <div className="crm-menu crm-import-menu"><button onClick={openCsvImport}>Import people</button><button onClick={() => { navigate("/discovery"); setImportMenuOpen(false); }}>Organization Discovery</button></div> : null}
           </div>
           <Button variant="outline" onClick={() => navigate("/discovery")}>Discover New Prospects</Button>
         </div>
@@ -1010,13 +1031,13 @@ export default function Contacts() {
       <Modal
         isOpen={isUploadOpen}
         onClose={() => !savingContact && !verifyingEmails && setUploadOpen(false)}
-        title="Import Contacts"
+        title="Import people"
         footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length || !duplicatePreview || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>{duplicatePreview?.existingContacts ? `Add ${duplicatePreview.newContacts} new & update ${duplicatePreview.existingContacts}` : "Import new contacts"}</Button></>}
       >
         {importError ? <p className="form-error" role="alert">{importError}</p> : null}
         <section className="csv-campaign-first">
           <span className="csv-campaign-first__step">Step 1</span>
-          <div><strong>Choose where these contacts belong</strong><small>Selecting a campaign now keeps this CSV together and removes a later assignment step.</small></div>
+          <div><strong>Choose where these people belong</strong><small>Selecting a campaign now keeps this import together and removes a later assignment step.</small></div>
           <select className="select-input" value={importCampaignId} onChange={(event) => setImportCampaignId(event.target.value)}>
             <option value="">Do not assign yet</option>
             {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
@@ -1024,28 +1045,34 @@ export default function Contacts() {
         </section>
         {!importRows.length ? <div className="crm-import-start">
           <div className="crm-import-steps">
-            <div className="active"><span>2</span><strong>Choose CSV</strong><small>Upload your contact file</small></div>
+            <div className="active"><span>2</span><strong>Add people</strong><small>Paste Apollo results or upload a file</small></div>
             <div><span>3</span><strong>Verify emails</strong><small>Review deliverability before saving</small></div>
             <div><span>4</span><strong>Save to CRM</strong><small>Contacts appear here immediately</small></div>
           </div>
-          <p>Select a CSV exported from a spreadsheet, Apollo, or another CRM. Ellie recognizes common contact columns automatically.</p>
+          <section className="apollo-paste-intake">
+            <header><div><span>Fastest on Apollo Free</span><strong>Paste Apollo people directly</strong><small>Copy the column headings and people rows from Apollo or a spreadsheet. Ellie maps Apollo’s names to the CRM fields automatically.</small></div><Button variant="ghost" size="sm" onClick={() => downloadApolloTemplate("people")}>Download people template</Button></header>
+            <textarea value={importPasteText} onChange={(event) => setImportPasteText(event.target.value)} placeholder={"Paste Apollo people here, including the header row\nExample: First Name    Last Name    Title    Company    Email"} />
+            <Button disabled={!importPasteText.trim()} onClick={() => { setImportFileName("Apollo people pasted into Ellie"); prepareImport(importPasteText, "apollo"); }}>Review pasted people</Button>
+          </section>
+          <div className="apollo-import-divider"><span>or upload a file</span></div>
+          <p>Upload a CSV exported from Apollo, a spreadsheet, or another CRM. Ellie recognizes common people columns automatically.</p>
           <label className="crm-file-drop">
-            <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setImportFileName(file.name); const reader = new FileReader(); reader.onload = () => prepareImport(reader.result); reader.readAsText(file); } }} />
+            <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setImportFileName(file.name); const reader = new FileReader(); reader.onload = () => prepareImport(reader.result, /apollo/i.test(file.name) ? "apollo" : "csv"); reader.readAsText(file); } }} />
             <strong>Choose a CSV file</strong>
             <span>or drag a file here</span>
           </label>
         </div> : <>
           <div className="crm-import-steps">
-            <div><span>✓</span><strong>CSV loaded</strong><small>{importRows.length} contacts found</small></div>
+            <div><span>✓</span><strong>People loaded</strong><small>{importRows.length} contacts found</small></div>
             <div className="active"><span>3</span><strong>Verify emails</strong><small>Use Emailable only when needed</small></div>
             <div><span>4</span><strong>Save to CRM</strong><small>No Discovery approval required</small></div>
           </div>
           <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p>
           {duplicatePreview ? <section className="duplicate-preflight">
-            <header><div><span>Duplicate protection complete</span><h3>{duplicatePreview.newContacts} new · {duplicatePreview.existingContacts} already in Ellie · {duplicatePreview.duplicatesInFile} repeated in this CSV</h3></div><strong>{duplicatePreview.newContacts ? `${duplicatePreview.newContacts} new shown below` : "No new contacts"}</strong></header>
+            <header><div><span>Duplicate protection complete</span><h3>{duplicatePreview.newContacts} new · {duplicatePreview.existingContacts} already in Ellie · {duplicatePreview.duplicatesInFile} repeated in this import</h3></div><strong>{duplicatePreview.newContacts ? `${duplicatePreview.newContacts} new shown below` : "No new contacts"}</strong></header>
             <p>Ellie will never create another contact for a matched row. Existing contacts are updated with useful new information. Repeated rows in this file resolve to the same contact.</p>
             {duplicatePreview.rows.some((row) => row.status === "new") ? <section className="duplicate-preflight__new"><h4>New contacts — these will be created</h4>{duplicatePreview.rows.filter((row) => row.status === "new").map((row) => <article key={`new-${row.index}`}><span className="duplicate-preflight__status is-new">New</span><div><strong>{row.name || row.email || `CSV row ${row.rowNumber}`}</strong><small>{row.email || "No email"}{row.company ? ` · ${row.company}` : ""}</small></div><p>No matching contact was found in Ellie.</p></article>)}</section> : null}
-            {duplicatePreview.rows.some((row) => row.status !== "new") ? <details className="duplicate-preflight__matches"><summary>Review {duplicatePreview.existingContacts + duplicatePreview.duplicatesInFile} existing or repeated rows</summary><div className="duplicate-preflight__list">{duplicatePreview.rows.filter((row) => row.status !== "new").map((row) => <article key={`${row.status}-${row.index}`}><span className={`duplicate-preflight__status is-${row.status}`}>{row.status === "existing" ? "Already in Ellie" : "Repeated in CSV"}</span><div><strong>{row.name || row.email || `CSV row ${row.rowNumber}`}</strong><small>{row.email || row.company || "No email or company"}</small></div><p>{row.status === "existing" ? `Matches ${row.existingContact?.name || "an existing contact"} by ${row.matchReason}. This record will be updated, not copied.` : `Matches CSV row ${row.duplicateOfRow} by ${row.matchReason}.`}</p></article>)}</div></details> : null}
+            {duplicatePreview.rows.some((row) => row.status !== "new") ? <details className="duplicate-preflight__matches"><summary>Review {duplicatePreview.existingContacts + duplicatePreview.duplicatesInFile} existing or repeated rows</summary><div className="duplicate-preflight__list">{duplicatePreview.rows.filter((row) => row.status !== "new").map((row) => <article key={`${row.status}-${row.index}`}><span className={`duplicate-preflight__status is-${row.status}`}>{row.status === "existing" ? "Already in Ellie" : "Repeated in import"}</span><div><strong>{row.name || row.email || `Row ${row.rowNumber}`}</strong><small>{row.email || row.company || "No email or company"}</small></div><p>{row.status === "existing" ? `Matches ${row.existingContact?.name || "an existing contact"} by ${row.matchReason}. This record will be updated, not copied.` : `Matches row ${row.duplicateOfRow} by ${row.matchReason}.`}</p></article>)}</div></details> : null}
           </section> : <section className="duplicate-preflight is-checking"><strong>Checking every row against Ellie…</strong><span>Import stays disabled until duplicate protection finishes.</span></section>}
           <p>Detected headers: {importHeaders.join(", ")}</p>
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
@@ -1053,7 +1080,7 @@ export default function Contacts() {
           <p className="contact-modal-intro"><strong>What happens next:</strong> {importCampaignId ? "These contacts will be saved and assigned to the selected campaign." : "These contacts will be saved to Contacts without a campaign assignment."} Nothing is emailed during import.</p>
           <label className="contact-qualify-choice">
             <input type="checkbox" checked={importMarketingPermission} onChange={(event) => setImportMarketingPermission(event.target.checked)} />
-            <span><strong>Approve this CSV for campaign email</strong><small>Turn this on when everyone in this file is eligible to receive this campaign. Ellie applies it to the whole CSV and adds unsubscribe options automatically.</small></span>
+            <span><strong>Approve these people for campaign email</strong><small>Turn this on only when everyone in this import is eligible to receive this campaign. Ellie applies it to the whole group and adds unsubscribe options automatically.</small></span>
           </label>
           {emailsToVerify.length ? <div className="email-verification-panel">
             <div className="email-verification-heading">

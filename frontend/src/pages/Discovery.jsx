@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Papa from "papaparse";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
@@ -14,10 +16,13 @@ import {
   fetchApolloHistory,
   estimateApolloEnrichment,
   importContactsFromApollo,
+  importApolloOrganizations,
+  previewApolloOrganizationImport,
   saveDiscoveryTemplates,
   searchApolloLeads,
   updateContact,
 } from "../services/api.js";
+import { downloadApolloTemplate, normalizeApolloRows } from "../utils/apolloImport.js";
 import "./Discovery.css";
 import "./DiscoveryTargeting.css";
 import "./DiscoveryReview.css";
@@ -117,6 +122,7 @@ const campaignSearchSuggestions = (campaign) => {
 };
 
 export default function Discovery() {
+  const navigate = useNavigate();
   const [prospects, setProspects] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [query, setQuery] = useState("");
@@ -146,6 +152,64 @@ export default function Discovery() {
   const [enrichmentEstimate, setEnrichmentEstimate] = useState(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [recheckingApollo, setRecheckingApollo] = useState(false);
+  const [apolloPasteOpen, setApolloPasteOpen] = useState(false);
+  const [apolloPasteMode, setApolloPasteMode] = useState("people");
+  const [apolloPasteText, setApolloPasteText] = useState("");
+  const [apolloOrganizationRows, setApolloOrganizationRows] = useState([]);
+  const [apolloOrganizationPreview, setApolloOrganizationPreview] = useState(null);
+  const [apolloPasteError, setApolloPasteError] = useState("");
+  const [apolloPasteSaving, setApolloPasteSaving] = useState(false);
+
+  const openApolloPaste = () => {
+    setApolloPasteMode(searchMode);
+    setApolloPasteText("");
+    setApolloOrganizationRows([]);
+    setApolloOrganizationPreview(null);
+    setApolloPasteError("");
+    setApolloPasteOpen(true);
+  };
+
+  const continueApolloPaste = async () => {
+    if (!apolloPasteText.trim()) return setApolloPasteError("Paste the Apollo header row and at least one result.");
+    if (apolloPasteMode === "people") {
+      sessionStorage.setItem("ellie.apolloPeoplePaste", apolloPasteText);
+      setApolloPasteOpen(false);
+      navigate("/contacts?import=apollo-people");
+      return;
+    }
+    Papa.parse(apolloPasteText, {
+      header: true,
+      skipEmptyLines: "greedy",
+      delimiter: apolloPasteText.includes("\t") ? "\t" : "",
+      transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(),
+      complete: async ({ data, errors }) => {
+        const rows = normalizeApolloRows(data, "organizations").filter((row) => Object.values(row).some(Boolean));
+        if (!rows.length) return setApolloPasteError("Ellie could not find any organization rows. Include Apollo’s column headings in the first row.");
+        try {
+          setApolloPasteSaving(true);
+          const result = await previewApolloOrganizationImport(rows);
+          setApolloOrganizationRows(rows);
+          setApolloOrganizationPreview(result.data);
+          setApolloPasteError(errors.length ? "Some pasted rows have uneven columns. Review the flagged rows before importing." : "");
+        } catch (error) {
+          setApolloPasteError(error.response?.data?.error || "Ellie could not review these organizations.");
+        } finally { setApolloPasteSaving(false); }
+      },
+      error: () => setApolloPasteError("Ellie could not read the pasted Apollo table."),
+    });
+  };
+
+  const saveApolloOrganizationPaste = async () => {
+    try {
+      setApolloPasteSaving(true);
+      const result = await importApolloOrganizations(apolloOrganizationRows, target.name || selectedEventCampaign?.name || "Apollo organization import");
+      setApolloPasteOpen(false);
+      setApolloResult({ organizationsFound: result.data.organizationsImported, organizationsCreated: result.data.created, organizationsUpdated: result.data.updated });
+      setNotice(`${result.data.created} new organizations added and ${result.data.updated} existing organizations updated. ${result.data.duplicatesSkipped} repeated rows were safely skipped.`);
+    } catch (error) {
+      setApolloPasteError(error.response?.data?.error || "Ellie could not import these organizations.");
+    } finally { setApolloPasteSaving(false); }
+  };
 
   const loadProspects = async () => {
     const response = await fetchContacts({ status: "prospect", limit: 500 });
@@ -468,6 +532,7 @@ export default function Discovery() {
           <h1 className="page-title">Prospect Discovery</h1>
           <p className="page-subtitle">Find new people and companies through Apollo, then review the best matches before adding them to your CRM.</p>
         </div>
+        <Button onClick={openApolloPaste}>Bring in Apollo results</Button>
       </header>
 
       <p className="discovery-notice">
@@ -594,6 +659,24 @@ export default function Discovery() {
           <div className="apollo-suggestion-source"><strong>How Ellie built these</strong><p>These are transparent, curated audience playbooks chosen from the event name and program type—not results pulled from Apollo and not an AI guess hidden from you. Choosing one only loads editable filters.</p></div>
           <p>Nothing is saved and no Apollo search runs until you review the filters and choose the next action.</p>
           {eventSuggestions.map((suggestion) => <article key={suggestion.id}><div><span>Suggested by Ellie</span><h4>{suggestion.label}</h4><p>{suggestion.description}</p><small><strong>Why:</strong> {suggestion.why}</small><small>{splitFilters(suggestion.target.titles).length || 0} titles · {splitLocations(suggestion.target.locations).length || 0} locations · {(suggestion.target.employeeRanges || []).map(employeeRangeLabel).join(", ")} employees</small></div><Button onClick={() => applySuggestedSearch(suggestion)}>Use &amp; review</Button></article>)}
+        </div>
+      </Modal>
+      <Modal
+        isOpen={apolloPasteOpen}
+        onClose={() => !apolloPasteSaving && setApolloPasteOpen(false)}
+        title="Bring Apollo results into Ellie"
+        footer={<><Button variant="outline" disabled={apolloPasteSaving} onClick={() => setApolloPasteOpen(false)}>Cancel</Button>{apolloPasteMode === "organizations" && apolloOrganizationPreview ? <Button loading={apolloPasteSaving} disabled={!apolloOrganizationPreview.newOrganizations && !apolloOrganizationPreview.existingOrganizations} onClick={saveApolloOrganizationPaste}>Import reviewed organizations</Button> : <Button loading={apolloPasteSaving} disabled={!apolloPasteText.trim()} onClick={continueApolloPaste}>{apolloPasteMode === "people" ? "Continue to people review" : "Review organizations"}</Button>}</>}
+      >
+        <div className="apollo-paste-workflow">
+          <section className="apollo-paste-mode" aria-label="Apollo result type">
+            <button className={apolloPasteMode === "people" ? "active" : ""} onClick={() => { setApolloPasteMode("people"); setApolloOrganizationPreview(null); setApolloPasteError(""); }}><strong>People results</strong><span>Names, job titles, companies, emails, and person details go to the CRM import review.</span></button>
+            <button className={apolloPasteMode === "organizations" ? "active" : ""} onClick={() => { setApolloPasteMode("organizations"); setApolloOrganizationPreview(null); setApolloPasteError(""); }}><strong>Organization results</strong><span>Company records go to Discovery for company-first research and prioritization.</span></button>
+          </section>
+          <section className="apollo-paste-instructions"><strong>Copy once—no spreadsheet cleanup</strong><ol><li>In Apollo, include the column headings with the selected results.</li><li>Copy the table and paste it below.</li><li>Ellie maps the Apollo columns and checks existing records before anything is saved.</li></ol></section>
+          <div className="apollo-paste-template"><span>The template is only a fallback when copied results do not include headings.</span><Button variant="ghost" size="sm" onClick={() => downloadApolloTemplate(apolloPasteMode)}>Download {apolloPasteMode === "people" ? "people" : "organization"} template</Button></div>
+          <label className="apollo-paste-field"><span>Paste Apollo {apolloPasteMode === "people" ? "people" : "organization"} results</span><textarea value={apolloPasteText} onChange={(event) => { setApolloPasteText(event.target.value); setApolloOrganizationPreview(null); setApolloPasteError(""); }} placeholder={`Paste the Apollo header row and ${apolloPasteMode === "people" ? "people" : "company"} rows here`} /></label>
+          {apolloPasteError ? <p className="form-error" role="alert">{apolloPasteError}</p> : null}
+          {apolloOrganizationPreview ? <section className="apollo-paste-preview"><header><strong>Safe to import</strong><span>{apolloOrganizationPreview.total} rows reviewed</span></header><div><span><b>{apolloOrganizationPreview.newOrganizations}</b> New companies</span><span><b>{apolloOrganizationPreview.existingOrganizations}</b> Existing matches</span><span><b>{apolloOrganizationPreview.duplicatesInFile}</b> Repeated rows</span><span><b>{apolloOrganizationPreview.invalidRows}</b> Missing company name</span></div><p>Existing companies will be updated, not copied. Repeated rows are skipped automatically.</p></section> : null}
         </div>
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete prospect" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}>
