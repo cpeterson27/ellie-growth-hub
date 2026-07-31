@@ -175,29 +175,30 @@ export default function GmailIntegration() {
 
   return <div className="page-dashboard inbox-page inbox-page--compact">
     <div className="page-header">
-      <div><p className="page-eyebrow">Client correspondence</p><h1 className="page-title">Conversations</h1><p className="page-subtitle">A complete record of campaign delivery, incoming replies, and personal follow-up.</p></div>
+      <div><p className="page-eyebrow">Correspondence desk</p><h1 className="page-title">Conversations</h1><p className="page-subtitle">One place to see what was sent, what came back, and what needs your response.</p></div>
       <div className="crm-header-actions"><Button variant="outline" onClick={load}><FiRefreshCw /> Refresh</Button><Button variant="outline" onClick={() => navigate("/integrations")}>Connection settings</Button></div>
     </div>
     {error ? <p className="form-error">{error}</p> : null}
     {notice ? <p className="inbox-success-notice">{notice}</p> : null}
-    <section className="delivery-legend">
-      <p><span>Campaign delivery</span><strong>Resend</strong></p>
-      <i />
-      <p><span>Replies and personal follow-up</span><strong>{status?.email || "Connected Gmail"}</strong></p>
+    <section className="conversation-signal-rail">
+      <div><span className="conversation-signal-dot" /><p><small>Mailbox ready</small><strong>{status?.email || "Google account connected"}</strong></p></div>
+      <div><small>Campaign messages</small><strong>Delivered by Resend</strong><span>Delivery history appears under Campaign history.</span></div>
+      <div><small>Replies and direct email</small><strong>Handled through Gmail</strong><span>Inbox, replies, sent mail, and Trash stay synchronized.</span></div>
     </section>
     {needsModifyPermission ? <section className="inbox-permission-notice"><div><strong>Approve conversation management</strong><p>Reconnect once to let Ellie archive, mark, and move Gmail conversations to Trash. Google will show the updated permission request.</p></div><Button onClick={reconnect}>Approve Gmail access</Button></section> : null}
     <section className="inbox-shell">
       <aside className="inbox-folders">
-        <button className={mailbox === "inbox" ? "is-active" : ""} onClick={() => { setMailbox("inbox"); setSearch(""); setSelectedThread(null); }}><FiMail /> Inbox</button>
-        <button className={mailbox === "unread" ? "is-active" : ""} onClick={() => { setMailbox("unread"); setSearch(""); setSelectedThread(null); }}>Unread</button>
-        <button className={mailbox === "sent" ? "is-active" : ""} onClick={() => { setMailbox("sent"); setSearch(""); setSelectedThread(null); }}><FiSend /> Sent</button>
-        <button className={mailbox === "campaign" ? "is-active" : ""} onClick={() => { setMailbox("campaign"); setSearch(""); setSelectedThread(null); }}><FiSend /> Campaign sends</button>
-        <button className={mailbox === "trash" ? "is-active" : ""} onClick={() => { setMailbox("trash"); setSearch(""); setSelectedThread(null); }}><FiTrash2 /> Trash</button>
+        <p className="inbox-folders__label">Mailboxes</p>
+        <button className={mailbox === "inbox" ? "is-active" : ""} onClick={() => { setMailbox("inbox"); setSearch(""); setSelectedThread(null); }}><FiMail /><span><strong>Inbox</strong><small>All incoming mail</small></span></button>
+        <button className={mailbox === "unread" ? "is-active" : ""} onClick={() => { setMailbox("unread"); setSearch(""); setSelectedThread(null); }}><FiEyeOff /><span><strong>Needs attention</strong><small>Unread messages</small></span></button>
+        <button className={mailbox === "sent" ? "is-active" : ""} onClick={() => { setMailbox("sent"); setSearch(""); setSelectedThread(null); }}><FiSend /><span><strong>Sent by you</strong><small>Direct Gmail mail</small></span></button>
+        <button className={mailbox === "campaign" ? "is-active" : ""} onClick={() => { setMailbox("campaign"); setSearch(""); setSelectedThread(null); }}><FiArchive /><span><strong>Campaign history</strong><small>Messages via Resend</small></span></button>
+        <button className={mailbox === "trash" ? "is-active" : ""} onClick={() => { setMailbox("trash"); setSearch(""); setSelectedThread(null); }}><FiTrash2 /><span><strong>Trash</strong><small>Deleted Gmail mail</small></span></button>
         <hr />
         <button onClick={async () => { await disconnectGmail(); setStatus({ configured: true, connected: false }); }}>Disconnect Gmail</button>
       </aside>
       <div className="inbox-main">
-        <form className="inbox-search" onSubmit={(event) => { event.preventDefault(); load(); }}><FiSearch /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sender, recipient, subject, or Gmail query" /><Button size="sm" type="submit">Search</Button></form>
+        <form className="inbox-search" onSubmit={(event) => { event.preventDefault(); load(); }}><FiSearch /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a person, company, subject, or message" /><Button size="sm" type="submit">Search mail</Button></form>
         {selectedOutreach ? <div className="correspondence-detail">
           <header><Button variant="ghost" size="sm" onClick={() => setSelectedOutreach(null)}><FiArrowLeft /> Back to correspondence</Button><span className={`outreach-status outreach-status--${selectedOutreach.status}`}>{selectedOutreach.status}</span></header>
           <p className="correspondence-detail__eyebrow">{selectedOutreach.campaignName}</p>

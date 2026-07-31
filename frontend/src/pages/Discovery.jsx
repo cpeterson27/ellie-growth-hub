@@ -325,7 +325,7 @@ export default function Discovery() {
 
       <div className="apollo-workbench">
       <DashboardCard title="Filters" className="apollo-filter-panel" action={<span className="apollo-filter-count">{searchMode === "people" ? "People" : "Companies"}</span>}>
-        <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? "Apollo connected" : apolloStatus.state === "checking" ? "Checking Apollo" : "Apollo needs attention"}</strong><p>{apolloStatus.message}</p></div><Button variant="ghost" size="sm" onClick={() => { setApolloStatus({ state: "checking", message: "Checking Apollo connection…" }); fetchApolloStatus().then((status) => setApolloStatus({ ...status, state: status.connected ? "connected" : "error" })).catch((error) => setApolloStatus({ state: "error", message: error.response?.data?.message || "Unable to verify Apollo." })); }}>Check connection</Button></div>
+        <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? "Apollo account ready" : apolloStatus.state === "checking" ? "Checking Apollo account" : "Apollo account needs attention"}</strong><p>{apolloStatus.state === "connected" ? "Search access verified" : apolloStatus.message}</p></div><Button variant="ghost" size="sm" onClick={() => { setApolloStatus({ state: "checking", message: "Checking Apollo connection…" }); fetchApolloStatus().then((status) => setApolloStatus({ ...status, state: status.connected ? "connected" : "error" })).catch((error) => setApolloStatus({ state: "error", message: error.response?.data?.message || "Unable to verify Apollo." })); }}>Recheck</Button></div>
         <p className="apollo-note">Choose a saved filter set or build a new one. Saved searches here are reusable Ellie filters for searching Apollo.</p>
         <div className="apollo-target-topline">
           <label>Saved search template<select value={targetPreset} onChange={(event) => selectPreset(event.target.value)}><option value="custom">New custom search</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
@@ -383,13 +383,6 @@ export default function Discovery() {
       </div>
       </div>
 
-      <section className="discovery-stats">
-        <DashboardCard title="Newly discovered"><strong>{prospects.length}</strong><span>Prospects found through discovery tools</span></DashboardCard>
-        <DashboardCard title="Approved this week"><strong>—</strong><span>Live data appears after approvals</span></DashboardCard>
-        <DashboardCard title="Imported this week"><strong>{prospects.filter((item) => item?.importedAt && Date.now() - new Date(item.importedAt) < 604800000).length}</strong><span>Across all import sources</span></DashboardCard>
-        <DashboardCard title="Apollo status"><strong>{apolloStatus.state === "connected" ? "Connected" : "Needs attention"}</strong><span>People and company search monitored</span></DashboardCard>
-      </section>
-
       <DashboardCard title="Prospect review">
         <div className="discovery-workflow">
           <div><span>1</span><strong>Review verified emails</strong><small>Start with deliverable addresses only.</small></div>
@@ -430,6 +423,13 @@ export default function Discovery() {
           </article>)}
         </div> : <div className="table-state table-state--empty">No prospects are waiting for review.</div>}
       </DashboardCard>
+
+      <section className="discovery-stats">
+        <DashboardCard title="Waiting for review"><strong>{prospects.length}</strong><span>Prospects currently in your work queue</span></DashboardCard>
+        <DashboardCard title="Approved this week"><strong>—</strong><span>Live data appears after approvals</span></DashboardCard>
+        <DashboardCard title="Imported this week"><strong>{prospects.filter((item) => item?.importedAt && Date.now() - new Date(item.importedAt) < 604800000).length}</strong><span>Across all import sources</span></DashboardCard>
+        <DashboardCard title="Apollo account"><strong>{apolloStatus.state === "connected" ? "Ready" : "Check account"}</strong><span>Search access and permissions</span></DashboardCard>
+      </section>
 
       <Modal isOpen={importOpen} onClose={() => setImportOpen(false)} title="Import prospects" footer={<Button variant="outline" onClick={() => setImportOpen(false)}>Close</Button>}>
         <div className="import-modal">
