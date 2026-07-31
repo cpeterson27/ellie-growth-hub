@@ -61,6 +61,19 @@ const buildApolloPeopleUrl = (target) => {
   if (target.revenueMax) params.set("revenueRange[max]", target.revenueMax);
   return `https://app.apollo.io/#/people?${params.toString()}`;
 };
+const campaignSearchSuggestions = (campaign) => {
+  if (!campaign) return [];
+  const isMultifamily = /multifamily|deal to close/i.test(`${campaign.name || ""} ${campaign.programName || ""}`);
+  if (isMultifamily) return [
+    { id: "deal-team", label: "Deal team professionals", description: "People actively evaluating and structuring multifamily acquisitions.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · deal team · FL + TX`, titles: "Acquisitions Manager, Underwriter, Managing Partner", keywords: "Multifamily, Syndication, Rent Roll", locations: "Florida, US; Texas, US", employeeRanges: ["1,10"], emailStatuses: ["verified"] } },
+    { id: "operators", label: "Multifamily operators", description: "Owners and operators who may attend, sponsor, or share the event.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · operators · FL + TX`, titles: "Owner, Founder, Principal, Managing Partner", keywords: "Multifamily, Apartment Investing, Syndication", locations: "Florida, US; Texas, US", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"], seniorities: ["owner", "founder", "partner"] } },
+    { id: "referral-partners", label: "Referral partners", description: "Professionals with audiences or client relationships relevant to the bootcamp.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · referral partners · US`, titles: "Real Estate Broker, Mortgage Broker, Property Manager", keywords: "Multifamily, Real Estate Investing, Investor Education", locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"] } },
+  ];
+  return [
+    { id: "decision-makers", label: "Event decision-makers", description: "Owners and leaders likely to evaluate or share this offer.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · decision-makers`, titles: "Owner, Founder, Managing Partner", keywords: campaign.programName || campaign.name, locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"] } },
+    { id: "companies", label: "Matching companies", description: "Companies aligned with the event topic for later contact discovery.", target: { ...EMPTY_TARGET, mode: "organizations", name: `${campaign.name} · matching companies`, industries: campaign.programName || campaign.name, keywords: campaign.programName || campaign.name, locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"] } },
+  ];
+};
 
 export default function Discovery() {
   const [prospects, setProspects] = useState([]);
@@ -90,6 +103,7 @@ export default function Discovery() {
   const [apolloListName, setApolloListName] = useState("");
   const [apolloHistory, setApolloHistory] = useState([]);
   const [enrichmentEstimate, setEnrichmentEstimate] = useState(null);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   const loadProspects = async () => {
     const response = await fetchContacts({ status: "prospect", limit: 500 });
@@ -107,12 +121,7 @@ export default function Discovery() {
       .catch(() => setNotice("Unable to load campaigns for filtering."));
     fetchDiscoveryTemplates()
       .then((data) => {
-        const savedTemplates = data.templates || [];
-        setTemplates(savedTemplates);
-        if (savedTemplates[0]) {
-          setTargetPreset(savedTemplates[0].id);
-          setTarget({ ...savedTemplates[0] });
-        }
+        setTemplates(data.templates || []);
       })
       .catch(() => setNotice("Unable to load saved search templates."));
     fetchApolloStatus()
@@ -170,6 +179,8 @@ export default function Discovery() {
     ["Employees", (target.employeeRanges || []).map(employeeRangeLabel)],
   ].filter(([, values]) => values.length) : [];
   const currentFilterCount = currentFilterGroups.reduce((total, [, values]) => total + values.length, 0);
+  const selectedEventCampaign = campaigns.find((item) => item._id === eventCampaignId);
+  const eventSuggestions = campaignSearchSuggestions(selectedEventCampaign);
 
   const approve = async (row) => {
     await updateContact(row._id, { status: "active" });
@@ -219,31 +230,12 @@ export default function Discovery() {
     await persistTemplates([...templates, { ...namedTarget, id }], id);
   };
 
-  const buildEventAudience = () => {
-    const campaign = campaigns.find((item) => item._id === eventCampaignId);
-    if (!campaign) return setNotice("Choose an event or campaign first.");
-    const isMultifamily = /multifamily|deal to close/i.test(`${campaign.name || ""} ${campaign.programName || ""}`);
-    const next = isMultifamily ? {
-      ...EMPTY_TARGET,
-      name: `${campaign.name} · acquisitions & underwriting · FL + TX`,
-      titles: "Acquisitions Manager, Underwriter, Managing Partner",
-      keywords: "Multifamily, Syndication, Rent Roll",
-      locations: "Florida, US; Texas, US",
-      employeeRanges: ["1,10"],
-      emailStatuses: ["verified"],
-    } : {
-      ...EMPTY_TARGET,
-      name: `${campaign.name} · event prospects`,
-      titles: "Owner, Founder, Managing Partner",
-      keywords: campaign.programName || campaign.name,
-      locations: "United States",
-      employeeRanges: ["1,10", "11,20", "21,50"],
-      emailStatuses: ["verified"],
-    };
-    setSearchMode("people");
+  const useSuggestedSearch = (suggestion) => {
+    setSearchMode(suggestion.target.mode || "people");
     setTargetPreset("custom");
-    setTarget(next);
-    setNotice("Event audience prepared. Review the filters, save the search, then open it in Apollo.");
+    setTarget({ ...suggestion.target });
+    setSuggestionsOpen(false);
+    setNotice(`“${suggestion.label}” loaded as an unsaved search. Review it, then save only if you want to keep it.`);
   };
 
   const openApolloPeopleSearch = () => {
@@ -420,14 +412,14 @@ export default function Discovery() {
           <div><span className="is-unavailable">Not in API</span><p><strong>Buyer intent:</strong> available in Apollo’s product experience, but not through the connected public search endpoints.</p></div>
           <footer><strong>Recommended server key:</strong> paid-plan scoped key with People Search, Company Search, labels/lists, contact creation, and bulk people enrichment—or a master API key. Store it only as <code>APOLLO_API_KEY</code> on Render; never in frontend code.</footer>
         </details>
-        <div className="apollo-event-builder"><label>Build an audience for<select value={eventCampaignId} onChange={(event) => setEventCampaignId(event.target.value)}><option value="">Choose event or campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><Button variant="outline" size="sm" onClick={buildEventAudience}>Generate event search</Button></div>
+        <div className="apollo-event-builder"><label>Build an audience for<select value={eventCampaignId} onChange={(event) => setEventCampaignId(event.target.value)}><option value="">Choose event or campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><Button variant="outline" size="sm" disabled={!eventCampaignId} onClick={() => setSuggestionsOpen(true)}>View suggested searches</Button></div>
         <p className="apollo-note">Choose a saved filter set or build a new one. Saved searches here are reusable Ellie filters for searching Apollo.</p>
         <div className="apollo-target-topline">
-          <label>Saved search template<select value={targetPreset} onChange={(event) => selectPreset(event.target.value)}><option value="custom">New custom search</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
+          <label>My saved searches<select value={targetPreset} onChange={(event) => selectPreset(event.target.value)}><option value="custom">Unsaved search</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
           <label>Search mode<select value={searchMode} onChange={(event) => setSearchMode(event.target.value)}><option value="organizations">Organizations</option><option value="people">People</option></select></label>
         </div>
         <div className="apollo-target-grid">
-          <label>Search name<input value={target.name} onChange={(event) => setTarget({ ...target, name: event.target.value })} placeholder={suggestedSearchName(target, campaigns.find((item) => item._id === eventCampaignId)?.name) || "Example: Multifamily partners · FL + TX"} /><small>Saved in Ellie so you can reopen the same audience later.</small></label>
+          <label>Search name<input value={target.name} onChange={(event) => setTarget({ ...target, name: event.target.value })} placeholder={suggestedSearchName(target, selectedEventCampaign?.name) || "Example: Multifamily partners · FL + TX"} /><small>{targetPreset === "custom" ? "Not saved yet. Save it only if you want to reuse this audience." : "Saved in My saved searches. Changes are not kept until you click Save changes."}</small></label>
           {searchMode === "people" ? <label>Job titles<input value={target.titles} onChange={(event) => setTarget({ ...target, titles: event.target.value })} placeholder="Owner, Founder, Investor" /></label> : null}
           {searchMode === "organizations" ? <label>Company industries<input value={target.industries} onChange={(event) => setTarget({ ...target, industries: event.target.value })} placeholder="Real estate, hospitality" /><small>Sent to Apollo as company keyword tags.</small></label> : null}
           <label>Company keywords<input value={target.keywords} onChange={(event) => setTarget({ ...target, keywords: event.target.value })} placeholder="multifamily, Airbnb, acquisitions" /></label>
@@ -447,7 +439,7 @@ export default function Discovery() {
           </div>
           <div className="apollo-unavailable-filter"><strong>Technology and buyer-intent filters</strong><span>Technology requires Apollo’s technology catalog—not raw IDs—so Ellie hides it until a proper searchable picker is connected. Buyer intent is not available through these public search endpoints.</span></div>
         </details>
-        <div className="apollo-template-actions"><Button variant="outline" loading={savingTemplate} onClick={saveTemplate}>{targetPreset === "custom" ? "Save as template" : "Save template changes"}</Button>{targetPreset !== "custom" ? <Button variant="ghost" disabled={savingTemplate} onClick={deleteTemplate}>Delete template</Button> : null}<span>Templates store filters in Ellie. They do not run until you click Find.</span></div>
+        <div className="apollo-template-actions"><Button variant="outline" loading={savingTemplate} onClick={saveTemplate}>{targetPreset === "custom" ? "Save this search" : "Save changes"}</Button>{targetPreset !== "custom" ? <Button variant="ghost" disabled={savingTemplate} onClick={deleteTemplate}>Delete saved search</Button> : null}<span>{targetPreset === "custom" ? "Unsaved · safe to edit" : "Saved · reusable from My saved searches"}</span></div>
         <div className="apollo-search-actions"><Button loading={searchingApollo} onClick={() => searchMode === "people" && peopleSearchRunsInApollo ? openApolloPeopleSearch() : runApolloSearch(1)}>{searchMode === "people" ? (peopleSearchRunsInApollo ? "Open search in Apollo" : "Find matching people") : "Find matching organizations"}</Button></div>
         {apolloError ? <div className="apollo-error-panel" role="alert"><strong>{apolloError.title}</strong><p>{apolloError.message}</p><span>{apolloError.action}</span>{apolloError.code ? <small>Error code: {apolloError.code}{apolloError.retryAfter ? ` · Retry after ${apolloError.retryAfter}` : ""}</small> : null}</div> : null}
         <div className="apollo-status"><span className="status-dot" />People Search: no search credit · Organization Search: 1 credit per results page · Enrichment may use credits</div>
@@ -520,6 +512,12 @@ export default function Discovery() {
         <DashboardCard title="Apollo account"><strong>{apolloStatus.state === "connected" ? "Ready" : "Check account"}</strong><span>Search access and permissions</span></DashboardCard>
       </section>
 
+      <Modal isOpen={suggestionsOpen} onClose={() => setSuggestionsOpen(false)} title={`Suggested searches${selectedEventCampaign?.name ? ` for ${selectedEventCampaign.name}` : ""}`}>
+        <div className="apollo-suggestion-list">
+          <p>Ellie prepared distinct audience strategies. Nothing is saved or searched until you choose what to do.</p>
+          {eventSuggestions.map((suggestion) => <article key={suggestion.id}><div><span>Suggested by Ellie</span><h4>{suggestion.label}</h4><p>{suggestion.description}</p><small>{splitFilters(suggestion.target.titles).length || 0} titles · {splitLocations(suggestion.target.locations).length || 0} locations · {(suggestion.target.employeeRanges || []).map(employeeRangeLabel).join(", ")} employees</small></div><Button onClick={() => useSuggestedSearch(suggestion)}>Use this search</Button></article>)}
+        </div>
+      </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete prospect" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}>
         <p>Delete this prospect permanently? This action cannot be undone.</p>
       </Modal>
