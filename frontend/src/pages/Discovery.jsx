@@ -55,6 +55,7 @@ export default function Discovery() {
   const [apolloError, setApolloError] = useState(null);
   const [apolloPhase, setApolloPhase] = useState("ready");
   const [apolloLists, setApolloLists] = useState([]);
+  const [apolloListCapability, setApolloListCapability] = useState({ state: "checking", message: "Checking saved-list access…" });
   const [apolloListName, setApolloListName] = useState("");
   const [apolloHistory, setApolloHistory] = useState([]);
   const [enrichmentEstimate, setEnrichmentEstimate] = useState(null);
@@ -86,7 +87,12 @@ export default function Discovery() {
         code: error.response?.data?.code || "unavailable",
         message: error.response?.data?.message || "Ellie could not verify the Apollo connection.",
       }));
-    fetchApolloLists().then((data) => setApolloLists((data.lists || []).filter((item) => item.modality === "contacts"))).catch(() => {});
+    fetchApolloLists()
+      .then((data) => {
+        setApolloLists((data.lists || []).filter((item) => item.modality === "contacts"));
+        setApolloListCapability({ state: data.available === false ? "unavailable" : "available", code: data.code, message: data.message, action: data.action });
+      })
+      .catch((error) => setApolloListCapability({ state: "error", code: error.response?.data?.errorCode || "provider_error", message: error.response?.data?.message || "Ellie could not check Apollo saved-list access.", action: "Recheck the Apollo connection or try again later." }));
     fetchApolloHistory().then((data) => setApolloHistory(data.runs || [])).catch(() => {});
   }, []);
 
@@ -322,7 +328,8 @@ export default function Discovery() {
 
       <div className="apollo-workbench">
       <DashboardCard title="Filters" className="apollo-filter-panel" action={<span className="apollo-filter-count">{searchMode === "people" ? "People" : "Companies"}</span>}>
-        <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? "Apollo account ready" : apolloStatus.state === "checking" ? "Checking Apollo account" : "Apollo account needs attention"}</strong><p>{apolloStatus.state === "connected" ? "Search access verified" : apolloStatus.message}</p></div><Button variant="ghost" size="sm" onClick={() => { setApolloStatus({ state: "checking", message: "Checking Apollo connection…" }); fetchApolloStatus().then((status) => setApolloStatus({ ...status, state: status.connected ? "connected" : "error" })).catch((error) => setApolloStatus({ state: "error", message: error.response?.data?.message || "Unable to verify Apollo." })); }}>Recheck</Button></div>
+        <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? "Apollo search ready" : apolloStatus.state === "checking" ? "Checking Apollo account" : "Apollo account needs attention"}</strong><p>{apolloStatus.state === "connected" ? "People and company search access is connected." : apolloStatus.message}</p></div><Button variant="ghost" size="sm" onClick={() => { setApolloStatus({ state: "checking", message: "Checking Apollo connection…" }); fetchApolloStatus().then((status) => setApolloStatus({ ...status, state: status.connected ? "connected" : "error" })).catch((error) => setApolloStatus({ state: "error", message: error.response?.data?.message || "Unable to verify Apollo." })); }}>Recheck</Button></div>
+        {apolloListCapability.state === "unavailable" ? <div className="apollo-capability-notice" role="status"><div><strong>Saved-list sync unavailable</strong><span>{apolloListCapability.message}</span><small>{apolloListCapability.action}</small></div></div> : null}
         <p className="apollo-note">Choose a saved filter set or build a new one. Saved searches here are reusable Ellie filters for searching Apollo.</p>
         <div className="apollo-target-topline">
           <label>Saved search template<select value={targetPreset} onChange={(event) => selectPreset(event.target.value)}><option value="custom">New custom search</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
@@ -362,7 +369,7 @@ export default function Discovery() {
       {searchMode === "people" && apolloPeople.length ? <DashboardCard title="Apollo people results" action={<span>{apolloPeopleTotal.toLocaleString()} matched</span>}>
         <div className="apollo-people-toolbar">
           <label>Assign to campaign<select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">Choose campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
-          <label>Synchronize to Apollo list<select value={apolloListName} onChange={(event) => setApolloListName(event.target.value)}><option value="">Do not sync to a list</option>{apolloLists.map((list) => <option key={list.id || list._id} value={list.name}>{list.name}</option>)}</select></label>
+          <label>Synchronize to Apollo list<select disabled={apolloListCapability.state !== "available"} value={apolloListName} onChange={(event) => setApolloListName(event.target.value)}><option value="">{apolloListCapability.state === "available" ? "Do not sync to a list" : "Unavailable for this API key"}</option>{apolloLists.map((list) => <option key={list.id || list._id} value={list.name}>{list.name}</option>)}</select></label>
           <Button disabled={!selectedApolloPeople.length || !campaignId} onClick={importSelectedPeople}>{enrichmentEstimate?.count === selectedApolloPeople.length ? "Approve enrichment & import" : `Review cost for ${selectedApolloPeople.length || 0}`}</Button>
         </div>
         {enrichmentEstimate?.count === selectedApolloPeople.length ? <div className="apollo-credit-estimate" role="status"><div><strong>Approval required</strong><span>{enrichmentEstimate.count} selected contacts may use {enrichmentEstimate.minimumCredits}–{enrichmentEstimate.maximumCredits} Apollo credits.</span><small>{enrichmentEstimate.note}</small></div><Button variant="ghost" size="sm" onClick={() => setEnrichmentEstimate(null)}>Cancel</Button></div> : null}

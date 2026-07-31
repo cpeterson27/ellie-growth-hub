@@ -107,9 +107,21 @@ async function listApolloLists() {
   try {
     const response = await apolloClient().get("/labels", { headers: { "x-api-key": getApiKey() } });
     const lists = response.data?.labels || response.data?.lists || [];
-    return { success: true, lists: lists.map((item) => ({ id: item.id, name: item.name, modality: item.modality || item.kind || "contacts" })) };
+    return { success: true, available: true, code: "available", lists: lists.map((item) => ({ id: item.id, name: item.name, modality: item.modality || item.kind || "contacts" })) };
   } catch (error) {
-    return { ...formatError(error), lists: [] };
+    const formatted = formatError(error);
+    if (formatted.errorCode === "forbidden") {
+      return {
+        success: true,
+        available: false,
+        code: "list_scope_unavailable",
+        providerStatus: 403,
+        lists: [],
+        message: "Apollo search is connected, but this API key cannot read saved lists.",
+        action: "Ask your Apollo administrator to issue a key that includes access to the labels/lists endpoint, then replace APOLLO_API_KEY and recheck.",
+      };
+    }
+    return { ...formatted, available: false, lists: [] };
   }
 }
 
