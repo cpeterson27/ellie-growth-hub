@@ -768,6 +768,91 @@ router.post("/send", async(req,res)=>{
 // UPDATE
 // ======================================
 
+router.post("/:id/replace-email", async (req, res) => {
+  try {
+    const newEmail = String(req.body?.email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      return res.status(400).json({ error: "Enter a complete email address." });
+    }
+
+    const original = await Outreach.findById(req.params.id);
+    if (!original) return res.status(404).json({ error: "Outreach record not found." });
+    if (!["bounced", "failed", "suppressed"].includes(original.deliveryStatus)) {
+      return res.status(409).json({ error: "Only an undeliverable address can be replaced from this workflow." });
+    }
+    if (!original.contactId) {
+      return res.status(409).json({ error: "This message is not linked to a contact record." });
+    }
+    if (newEmail === String(original.contactEmail || "").toLowerCase()) {
+      return res.status(400).json({ error: "Enter a different email address." });
+    }
+
+    const duplicate = await Contact.findOne({
+      _id: { $ne: original.contactId },
+      email: newEmail,
+    }).select("name email");
+    if (duplicate) {
+      return res.status(409).json({
+        error: `That address already belongs to ${duplicate.name || duplicate.email}. No duplicate was created.`,
+      });
+    }
+
+    const contact = await Contact.findByIdAndUpdate(
+      original.contactId,
+      {
+        $set: {
+          email: newEmail,
+          status: "active",
+          emailStatus: "unverified",
+          emailBounced: false,
+          primaryEmailSource: "manual_correction",
+        },
+      },
+      { new: true, runValidators: true },
+    );
+
+    let draft = await Outreach.findOne({
+      campaignId: original.campaignId,
+      contactId: original.contactId,
+      contactEmail: newEmail,
+      status: { $in: ["pending", "approved"] },
+    });
+    if (!draft) {
+      draft = await Outreach.create({
+        campaignId: original.campaignId,
+        contactId: original.contactId,
+        retryOf: original._id,
+        organization: original.organization,
+        contactName: original.contactName,
+        contactEmail: newEmail,
+        contactRole: original.contactRole,
+        reason: `Replacement address for bounced message to ${original.contactEmail}.`,
+        subject: original.subject,
+        emailDraft: original.emailDraft,
+        htmlBody: original.htmlBody,
+        eventLink: original.eventLink,
+        flyerUrl: original.flyerUrl,
+        templateVersion: original.templateVersion,
+        templateAudienceKey: original.templateAudienceKey,
+        templateAudienceLabel: original.templateAudienceLabel,
+        emailTopic: original.emailTopic,
+        status: "pending",
+        deliveryStatus: "",
+      });
+    }
+
+    return res.json({
+      contact,
+      draft,
+      original,
+      message: "Email updated and a replacement draft was prepared for review. Nothing was sent.",
+    });
+  } catch (error) {
+    console.error("REPLACE BOUNCED EMAIL ERROR:", error);
+    return res.status(500).json({ error: "Unable to replace the email address." });
+  }
+});
+
 router.patch("/:id", async(req,res)=>{
 
   try {

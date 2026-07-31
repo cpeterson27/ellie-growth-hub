@@ -349,6 +349,9 @@ export const updateOutreach = (id, updateData) =>
     .patch(`/outreach/${id}`, updateData)
     .then((res) => res.data);
 
+export const replaceBouncedOutreachEmail = (id, email) =>
+  api.post(`/outreach/${id}/replace-email`, { email }).then((res) => res.data);
+
 export const approveAllOutreach = (campaignId) =>
   api.patch("/outreach/bulk/approve", { campaignId }).then((res) => res.data);
 

@@ -253,8 +253,8 @@
 }
 .outreach-item__actions .btn { min-width: 0; padding-inline: 0.65rem; }
 .outreach-item__actions .btn:first-child { width: auto; white-space: nowrap; }
-.outreach-item__actions .btn:nth-child(2) { width: 38px; height: 36px; padding: 0; }
-.outreach-item__actions .btn:nth-child(2) span { display: none; }
+.outreach-item__actions .btn:nth-child(2) { width: auto; height: 36px; padding-inline: 0.65rem; }
+.outreach-item__actions .btn:nth-child(2) span { display: inline-flex; }
 .outreach-status {
   display: inline-flex;
   align-items: center;
@@ -318,6 +318,19 @@
   color: var(--text-muted);
   font-size: 0.78rem;
 }
+.outreach-email-correction { display: grid; gap: 1rem; }
+.outreach-email-correction__audit {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  border-left: 3px solid #b94d45;
+  background: #fff7f5;
+}
+.outreach-email-correction__audit span { color: var(--text-muted); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.outreach-email-correction__audit p,
+.outreach-email-correction__note { margin: 0; color: var(--text-muted); line-height: 1.5; }
+.outreach-email-correction label { display: grid; gap: 0.4rem; font-weight: 700; }
+.outreach-email-correction input { width: 100%; padding: 0.75rem 0.85rem; border: 1px solid var(--border); border-radius: 7px; font: inherit; color: var(--text); background: #fff; }
 .outreach-pagination > div {
   display: flex;
   gap: 0.45rem;
@@ -397,7 +410,7 @@
   .outreach-item { grid-template-columns: minmax(0, 1fr) 96px 136px; }
   .outreach-item__actions .btn span { display: inline; }
   .outreach-item__actions .btn { width: auto; height: 36px; padding-inline: 0.55rem; }
-  .outreach-item__actions .btn:nth-child(2) span { display: none; }
+  .outreach-item__actions .btn:nth-child(2) span { display: inline-flex; }
 }
 @container (max-width: 850px) {
   .outreach-mailbox__head { display: none; }

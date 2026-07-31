@@ -27,6 +27,13 @@ const outreachSchema = new mongoose.Schema(
       index: true,
     },
 
+    retryOf: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Outreach",
+      default: null,
+      index: true,
+    },
+
 
     // ======================================
     // CONTACT SNAPSHOT

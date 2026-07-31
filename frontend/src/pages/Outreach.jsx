@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FiChevronLeft, FiChevronRight, FiEye, FiMail, FiRefreshCw, FiSearch } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiEdit2, FiEye, FiMail, FiRefreshCw, FiSearch } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
@@ -10,6 +10,7 @@ import {
   fetchOutreach,
   fetchOutreachPreview,
   generateOutreach,
+  replaceBouncedOutreachEmail,
   sendOutreachTestEmail,
   sendEmails,
   syncGmailOutreachReplies,
@@ -77,6 +78,8 @@ export default function Outreach() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [preview, setPreview] = useState(null);
+  const [emailCorrection, setEmailCorrection] = useState(null);
+  const [emailCorrectionError, setEmailCorrectionError] = useState("");
   const [approveAllOpen, setApproveAllOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -252,6 +255,22 @@ export default function Outreach() {
       setTestSending(false);
     }
   };
+  const saveReplacementEmail = async () => {
+    if (!emailCorrection?._id) return;
+    try {
+      setSaving(true);
+      setEmailCorrectionError("");
+      const result = await replaceBouncedOutreachEmail(emailCorrection._id, emailCorrection.newEmail);
+      setEmailCorrection(null);
+      setNotice(result.message || "Email updated. A replacement draft is ready for review; nothing was sent.");
+      await loadItems(selected);
+      setFilter("pending");
+    } catch (err) {
+      setEmailCorrectionError(err.response?.data?.error || "Unable to replace this email address.");
+    } finally {
+      setSaving(false);
+    }
+  };
   const send = async () => {
     const ids = items.filter((x) => x.status === "approved").map((x) => x._id);
     if (!ids.length)
@@ -385,16 +404,21 @@ export default function Outreach() {
                   <Button
                     variant={item.status === "pending" ? "primary" : "outline"}
                     size="sm"
-                    onClick={() => item.deliveryStatus === "bounced" ? navigate(`/contacts?search=${encodeURIComponent(item.contactEmail || "")}`) : review(item)}
+                    onClick={() => {
+                      if (item.deliveryStatus === "bounced") {
+                        setEmailCorrectionError("");
+                        setEmailCorrection({ ...item, newEmail: "" });
+                      } else review(item);
+                    }}
                   >
-                    {item.deliveryStatus === "bounced" ? <FiSearch /> : <FiEye />}
-                    <span>{item.deliveryStatus === "bounced" ? "Fix email" : item.status === "pending" ? "Review" : item.status === "failed" ? "Review issue" : "View email"}</span>
+                    {item.deliveryStatus === "bounced" ? <FiEdit2 /> : <FiEye />}
+                    <span>{item.deliveryStatus === "bounced" ? "Replace email" : item.status === "pending" ? "Review" : item.status === "failed" ? "Review issue" : "View email"}</span>
                   </Button>
-                  {item.contactEmail && ["sent", "replied"].includes(item.status) ? (
+                  {item.contactEmail && ["sent", "replied"].includes(item.status) && item.deliveryStatus !== "bounced" ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      title="Open conversation"
+                      title="Open this contact’s inbox conversation"
                       aria-label={`Open conversation with ${item.contactName || item.contactEmail}`}
                       onClick={() =>
                         navigate(
@@ -404,7 +428,7 @@ export default function Outreach() {
                       }
                     >
                       <FiMail />
-                      <span>Conversation</span>
+                      <span>Open inbox</span>
                     </Button>
                   ) : null}
                   {item.status === "failed" && item.errorMessage ? (
@@ -431,6 +455,33 @@ export default function Outreach() {
           </div>
         )}
       </DashboardCard>
+      <Modal
+        isOpen={Boolean(emailCorrection)}
+        onClose={() => setEmailCorrection(null)}
+        title="Replace undeliverable email"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEmailCorrection(null)}>Cancel</Button>
+            <Button loading={saving} disabled={!emailCorrection?.newEmail} onClick={saveReplacementEmail}>Save &amp; prepare draft</Button>
+          </>
+        }
+      >
+        {emailCorrection ? (
+          <form className="outreach-email-correction" onSubmit={(event) => { event.preventDefault(); saveReplacementEmail(); }}>
+            <div className="outreach-email-correction__audit">
+              <span>Original bounced address</span>
+              <strong>{emailCorrection.contactEmail}</strong>
+              {emailCorrection.bounceMessage ? <p>{emailCorrection.bounceMessage}</p> : <p>Resend reported that this address could not receive the message.</p>}
+            </div>
+            <label>
+              Replacement email address
+              <input type="email" autoFocus autoComplete="off" placeholder="name@company.com" value={emailCorrection.newEmail} onChange={(event) => setEmailCorrection((current) => ({ ...current, newEmail: event.target.value }))} />
+            </label>
+            {emailCorrectionError ? <p className="form-error">{emailCorrectionError}</p> : null}
+            <p className="outreach-email-correction__note"><strong>What happens next:</strong> Ellie updates the contact and creates a new draft for your review. Confirm this address is correct before approving it. The bounced record stays unchanged for an accurate audit trail, and nothing is sent automatically.</p>
+          </form>
+        ) : null}
+      </Modal>
       <Modal
         isOpen={Boolean(preview)}
         onClose={() => setPreview(null)}
