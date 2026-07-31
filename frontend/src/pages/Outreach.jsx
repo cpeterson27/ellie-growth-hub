@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FiEye, FiMail, FiRefreshCw } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiEye, FiMail, FiRefreshCw, FiSearch } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
@@ -44,6 +44,7 @@ export default function Outreach() {
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("active");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [preview, setPreview] = useState(null);
   const [approveAllOpen, setApproveAllOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -117,6 +118,13 @@ export default function Outreach() {
       ),
     [items, filter, search],
   );
+  const pageSize = 15;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const visibleItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  useEffect(() => setPage(1), [filter, search, selected?._id]);
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
   const review = async (item) => {
     try {
       setSaving(true);
@@ -253,7 +261,7 @@ export default function Outreach() {
       </header>
       {error ? <p className="form-error">{error}</p> : null}
       {notice ? <p className="outreach-notice">{notice}</p> : null}
-      <section className="outreach-controls">
+      <section className="outreach-controls outreach-controls--sticky">
         <label>
           Campaign
           <select
@@ -273,12 +281,18 @@ export default function Outreach() {
             ))}
           </select>
         </label>
-        <input
-          className="select-input"
-          placeholder="Search contacts, companies, or subjects"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <label className="outreach-search">
+          Search {labels[filter] || "outreach"}
+          <span>
+            <FiSearch aria-hidden="true" />
+            <input
+              className="select-input"
+              placeholder={filter === "sent" ? "Search sent recipients, companies, or subjects" : "Search contacts, companies, or subjects"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </span>
+        </label>
       </section>
       <section className="outreach-summary">
         {["active", "pending", "approved", "sent", "replied", "failed"].map(
@@ -300,31 +314,29 @@ export default function Outreach() {
         {loading ? (
           <p>Loading outreach…</p>
         ) : filtered.length ? (
-          <div className="outreach-list">
-            {filtered.map((item) => (
+          <div className="outreach-mailbox">
+            <div className="outreach-mailbox__head" aria-hidden="true">
+              <span>Recipient</span><span>Message</span><span>Status</span><span>Actions</span>
+            </div>
+            <div className="outreach-list">
+            {visibleItems.map((item) => (
               <article key={item._id} className="outreach-item">
-                <div className="outreach-item__top">
-                  <div>
-                    <p className="outreach-item__company">
-                      {item.organization || "Independent contact"}
-                    </p>
-                    <h3>
-                      {item.contactName || item.contactEmail || "Contact"}
-                    </h3>
-                    <p>{item.contactEmail || "No email"}</p>
-                  </div>
-                  <span
-                    className={`outreach-status outreach-status--${item.status}`}
-                  >
+                <div className="outreach-item__recipient">
+                  <strong>{item.contactName || item.contactEmail || "Contact"}</strong>
+                  <span>{item.contactEmail || "No email"}</span>
+                  <small>{item.organization || "Independent contact"}</small>
+                </div>
+                <div className="outreach-item__message">
+                  <strong>{item.subject || "No subject"}</strong>
+                  <span>{item.templateAudienceLabel || "All Deal to Close contacts"}</span>
+                  {item.sentAt ? <small>Sent {new Date(item.sentAt).toLocaleString()}</small> : null}
+                </div>
+                <div className="outreach-item__state">
+                  <span className={`outreach-status outreach-status--${item.status}`}>
                     {labels[item.status] || item.status}
                   </span>
+                  {item.deliveryStatus ? <small>{item.deliveryStatus}</small> : null}
                 </div>
-                <p className="outreach-item__subject">
-                  {item.subject || "No subject"}
-                </p>
-                <p className="outreach-item__template">
-                  Template: {item.templateAudienceLabel || "All Deal to Close contacts"}
-                </p>
                 <div className="outreach-item__actions">
                   <Button
                     variant="outline"
@@ -366,6 +378,14 @@ export default function Outreach() {
                 </div>
               </article>
             ))}
+            </div>
+            <footer className="outreach-pagination">
+              <span>{filtered.length} message{filtered.length === 1 ? "" : "s"} · Page {page} of {pageCount}</span>
+              <div>
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((value) => value - 1)} aria-label="Previous outreach page"><FiChevronLeft /> Previous</Button>
+                <Button variant="outline" size="sm" disabled={page === pageCount} onClick={() => setPage((value) => value + 1)} aria-label="Next outreach page">Next <FiChevronRight /></Button>
+              </div>
+            </footer>
           </div>
         ) : (
           <div className="table-state table-state--empty">
