@@ -40,7 +40,7 @@ router.get("/apollo/history", async (req, res) => {
 router.get("/imports/latest", async (req, res) => {
   const latest = await ContactImportReceipt.findOne({ workspaceId: req.auth.workspaceId }).sort({ createdAt: -1 }).lean();
   if (!latest || Date.now() - new Date(latest.createdAt).getTime() > 86400000) return res.json({ data: null });
-  return res.json({ data: { ...latest.summary, completedAt: latest.createdAt } });
+  return res.json({ data: { ...latest.summary, receiptId: latest._id, completedAt: latest.createdAt } });
 });
 
 router.post("/apollo/enrichment-estimate", (req, res) => {
@@ -283,6 +283,8 @@ router.get("/overview", async (req, res) => {
       campaignAssigned,
       audienceUnknown,
       needsAttention,
+      emailAttention,
+      audienceAttention,
       readyToAssign,
       missingFields,
     ] = await Promise.all([
@@ -305,6 +307,20 @@ router.get("/overview", async (req, res) => {
           { email: "" },
           audienceUnknownCriteria,
         ],
+      }),
+      Contact.countDocuments({
+        ...active,
+        $or: [
+          { emailStatus: { $ne: "verified" } },
+          { email: { $exists: false } },
+          { email: "" },
+        ],
+      }),
+      Contact.countDocuments({
+        ...active,
+        emailStatus: "verified",
+        email: { $type: "string", $ne: "" },
+        ...audienceUnknownCriteria,
       }),
       Contact.countDocuments({
         ...active,
@@ -335,6 +351,8 @@ router.get("/overview", async (req, res) => {
         campaignAssigned,
         audienceUnknown,
         needsAttention,
+        emailAttention,
+        audienceAttention,
         readyToAssign,
         missingFields: Object.fromEntries(missingFields.map((item) => [item._id, item.count])),
       },

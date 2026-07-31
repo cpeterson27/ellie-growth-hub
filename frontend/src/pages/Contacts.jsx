@@ -407,9 +407,15 @@ export default function Contacts() {
 
   useEffect(() => {
     fetchLatestContactImport().then((response) => {
-      if (response.data) setImportSummary(response.data);
+      const receipt = response.data;
+      if (receipt && localStorage.getItem("ellie.dismissedImportReceipt") !== String(receipt.receiptId || receipt.importBatchId || receipt.completedAt)) setImportSummary(receipt);
     }).catch(() => {});
   }, []);
+
+  function dismissImportReceipt() {
+    if (importSummary) localStorage.setItem("ellie.dismissedImportReceipt", String(importSummary.receiptId || importSummary.importBatchId || importSummary.completedAt || "dismissed"));
+    setImportSummary(null);
+  }
 
   useEffect(() => {
     setCurrentPage(1);
@@ -800,19 +806,19 @@ export default function Contacts() {
       <DashboardCard title="Contacts">
         {error ? <p className="form-error">{error}</p> : null}
         {importSummary ? <section className={importSummary.failed ? "import-receipt has-errors" : "import-receipt"}>
-          <header><div><span>Import complete</span><h3>{importSummary.mongoCreated} new contact{importSummary.mongoCreated === 1 ? "" : "s"} added</h3><p>{importSummary.mongoUpdated} existing contact{importSummary.mongoUpdated === 1 ? " was" : "s were"} updated without creating duplicates.</p></div><div className="import-receipt__actions">{importCampaignTargetId ? <Button size="sm" onClick={() => navigate(`/campaigns/${importCampaignTargetId}`)}><b className="import-receipt-button-label">Open campaign</b></Button> : null}{importSummary.createdContacts?.length ? <Button variant={importCampaignTargetId ? "outline" : "primary"} size="sm" onClick={viewNewImportedContacts}><b className={importCampaignTargetId ? "" : "import-receipt-button-label"}>View these {importSummary.mongoCreated} contacts</b></Button> : null}</div></header>
+          <header><div><span>Recent import receipt</span><h3>{importSummary.mongoCreated} new contact{importSummary.mongoCreated === 1 ? "" : "s"} added</h3><p>{importSummary.mongoUpdated} existing contact{importSummary.mongoUpdated === 1 ? " was" : "s were"} updated without creating duplicates. This is an audit receipt, not a pending-work queue.</p></div><div className="import-receipt__actions">{importCampaignTargetId ? <Button size="sm" onClick={() => navigate(`/campaigns/${importCampaignTargetId}`)}><b className="import-receipt-button-label">Open campaign</b></Button> : null}{importSummary.createdContacts?.length ? <Button variant={importCampaignTargetId ? "outline" : "primary"} size="sm" onClick={viewNewImportedContacts}><b className={importCampaignTargetId ? "" : "import-receipt-button-label"}>View these {importSummary.mongoCreated} contacts</b></Button> : null}<Button variant="ghost" size="sm" onClick={dismissImportReceipt}>Dismiss receipt</Button></div></header>
           {importSummary.createdContacts?.length ? <div className="import-receipt__contacts">{importSummary.createdContacts.map((contact) => <article key={String(contact.id)}><span>{String(contact.name || "?").slice(0, 1).toUpperCase()}</span><div><strong>{contact.name}</strong><small>{contact.company || "Company missing"} · {contact.email || "No usable email"}</small></div><em className={`is-${contact.emailStatus}`}>{contact.emailStatus === "verified" ? "Ready to contact" : "Email needs review"}</em></article>)}</div> : null}
-          {importSummary.campaignName ? <div className="import-receipt__next"><strong>Next step</strong><p>These contacts are already assigned to {importSummary.campaignName}. Open the campaign to review its audience and message, then continue to Outreach when you are ready.</p>{importCampaignTargetId ? <Button variant="outline" size="sm" onClick={() => navigate(`/outreach?campaignId=${importCampaignTargetId}`)}>Open outreach</Button> : null}</div> : <p className="import-receipt__assignment">Use “View these contacts,” then choose a campaign from the bulk-action bar.</p>}
+          {importSummary.campaignName ? <div className="import-receipt__next"><strong>Assignment confirmed</strong><p>These contacts are assigned to {importSummary.campaignName}. Sending or completing outreach does not remove this receipt; dismiss it when you no longer need the import record.</p>{importCampaignTargetId ? <Button variant="outline" size="sm" onClick={() => navigate(`/outreach?campaignId=${importCampaignTargetId}`)}>Open outreach</Button> : null}</div> : <p className="import-receipt__assignment">Use “View these contacts,” then choose a campaign from the bulk-action bar.</p>}
           {importSummary.failed && importSummary.errors?.[0]?.message ? <p className="form-error">First failure: {importSummary.errors[0].message}</p> : null}
         </section> : null}
         {contactOverview ? <section className="contact-overview contact-overview--workflow" aria-label="CRM workflow overview">
           <button onClick={() => setContactTab("all")}><span>All relationships</span><strong>{contactOverview.total}</strong><small>Everyone stored in your CRM</small></button>
-          <button className="is-warning" onClick={() => setContactTab("attention")}><span>Needs attention</span><strong>{contactOverview.needsAttention || 0}</strong><small>Email or audience information needs a decision</small></button>
+          <button className="is-warning" onClick={() => setContactTab("attention")}><span>Data quality review</span><strong>{contactOverview.needsAttention || 0}</strong><small>{contactOverview.emailAttention || 0} email safety · {contactOverview.audienceAttention || 0} missing profile</small></button>
           <button className="is-safe" onClick={() => setContactTab("ready")}><span>Ready to assign</span><strong>{contactOverview.readyToAssign || 0}</strong><small>Verified contacts not yet assigned</small></button>
           <button className="is-safe" onClick={() => setContactTab("assigned")}><span>Campaign assigned</span><strong>{contactOverview.campaignAssigned || 0}</strong><small>Contacts already connected to an offer or event</small></button>
         </section> : null}
         {contactOverview ? <p className="contact-guidance">
-          <strong>How this CRM works:</strong> Imported contacts appear here immediately. Open <strong>Needs attention</strong> to correct an email or add an audience profile. When a verified contact is a fit, assign them to a campaign here. Discovery is only for finding new prospects you do not already have.
+          <strong>How this CRM works:</strong> Campaign assignment and data quality are separate. A contact can already be assigned or contacted and still appear in <strong>Data quality review</strong> if an email is unsafe or their profile is incomplete. Discovery is only for finding new prospects you do not already have.
         </p> : null}
         <div className="crm-toolbar">
           <label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
@@ -822,7 +828,7 @@ export default function Contacts() {
         </div>
         <div className="crm-tabs crm-tabs--simple">{[
           ["all", "All contacts"],
-          ["attention", "Needs attention"],
+          ["attention", "Data quality review"],
           ["ready", "Ready to assign"],
           ["assigned", "Campaign assigned"],
           ["archived", "Archived"],
@@ -894,7 +900,7 @@ export default function Contacts() {
           {contactTab === "ready"
             ? "No verified contacts are waiting for a campaign assignment."
             : contactTab === "attention"
-              ? "Nothing needs attention right now."
+              ? "No contacts need a data-quality decision right now."
               : "No contacts match this view."}
         </div>}
       </DashboardCard>
@@ -954,6 +960,12 @@ export default function Contacts() {
       >
         <div className="business-card-capture">
           <section className="business-card-capture__intro"><span>Networking intake</span><h3>Scan once. Review once. Keep the relationship connected.</h3><p>Ellie reads QR-based digital cards and vCards, checks for an existing CRM record, and then creates or updates one contact.</p></section>
+          <ol className="business-card-steps">
+            <li><strong>Stay signed into Ellie</strong><span>Only your team needs an Ellie login. The person sharing the card does not.</span></li>
+            <li><strong>Scan or paste the card</strong><span>Ellie keeps you on this screen instead of silently saving or launching a link.</span></li>
+            <li><strong>Review the match</strong><span>Confirm the details and see whether this updates an existing contact or creates a new one.</span></li>
+            <li><strong>Choose Add to CRM</strong><span>Nothing enters the CRM until you approve it with the final button.</span></li>
+          </ol>
           <div className="business-card-capture__methods">
             <div><strong>Scan live QR</strong><small>Use the phone or computer camera.</small><Button variant="outline" size="sm" onClick={cardScanning ? stopCardScanner : startCardScanner}>{cardScanning ? "Stop camera" : "Start camera"}</Button></div>
             <label><strong>Upload QR image</strong><small>Choose a screenshot of the digital card QR.</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => readCardImage(event.target.files?.[0])} /></label>
