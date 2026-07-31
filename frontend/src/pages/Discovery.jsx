@@ -92,6 +92,15 @@ const buildApolloPeopleUrl = (target) => {
   if (target.revenueMax) params.set("revenueRange[max]", target.revenueMax);
   return `https://app.apollo.io/#/people?${params.toString()}`;
 };
+const buildApolloOrganizationUrl = (target) => {
+  const params = new URLSearchParams({ page: "1" });
+  [...splitFilters(target.industries), ...splitFilters(target.keywords)].forEach((value) => params.append("qOrganizationKeywordTags[]", value));
+  splitLocations(target.locations).forEach((value) => params.append("organizationLocations[]", value));
+  (target.employeeRanges || []).forEach((value) => params.append("organizationNumEmployeesRanges[]", value));
+  if (target.revenueMin) params.set("revenueRange[min]", target.revenueMin);
+  if (target.revenueMax) params.set("revenueRange[max]", target.revenueMax);
+  return `https://app.apollo.io/#/companies?${params.toString()}`;
+};
 const campaignSearchSuggestions = (campaign) => {
   if (!campaign) return [];
   const isMultifamily = /multifamily|deal to close/i.test(`${campaign.name || ""} ${campaign.programName || ""}`);
@@ -202,7 +211,9 @@ export default function Discovery() {
     };
   }, [apolloHistory]);
   const peopleApiAvailable = apolloStatus.capabilities?.peopleSearch?.available !== false;
+  const companyApiAvailable = apolloStatus.capabilities?.companySearch?.available !== false;
   const peopleSearchRunsInApollo = !peopleApiAvailable || splitFilters(target.keywords).length > 0;
+  const organizationSearchRunsInApollo = !companyApiAvailable;
   const currentFilterGroups = searchMode === "people" ? [
     ["Job titles", splitFilters(target.titles)],
     ["Person locations", splitLocations(target.locations)],
@@ -281,9 +292,10 @@ export default function Discovery() {
       setApolloLists((listData.lists || []).filter((item) => item.modality === "contacts"));
       setApolloListCapability({ state: nextListState, code: listData.code, message: listData.message, action: listData.action });
       const peopleReady = status.capabilities?.peopleSearch?.available !== false;
-      setNotice(peopleReady && nextListState === "available"
+      const companiesReady = status.capabilities?.companySearch?.available !== false;
+      setNotice(peopleReady && companiesReady && nextListState === "available"
         ? "Apollo full access confirmed: company search, people search, and saved-list sync are ready."
-        : "Apollo rechecked. Company search is ready; the capability panel shows what is still limited.");
+        : "Apollo rechecked. The capability panel shows which searches open in Apollo and which can return through the API.");
     } catch (error) {
       setApolloStatus({ state: "error", message: error.response?.data?.message || "Unable to verify Apollo." });
       setApolloListCapability({ state: "error", message: "Ellie could not complete every Apollo permission check." });
@@ -295,6 +307,11 @@ export default function Discovery() {
   const openApolloPeopleSearch = () => {
     if (!splitFilters(target.titles).length) return setNotice("Add at least one job title first.");
     window.open(buildApolloPeopleUrl(target), "_blank", "noopener,noreferrer");
+  };
+
+  const openApolloOrganizationSearch = () => {
+    if (!splitFilters(target.keywords).length && !splitFilters(target.industries).length) return setNotice("Add at least one company industry or keyword first.");
+    window.open(buildApolloOrganizationUrl(target), "_blank", "noopener,noreferrer");
   };
 
   const deleteTemplate = async () => {
@@ -394,10 +411,13 @@ export default function Discovery() {
     } catch (error) {
       const data = error.response?.data || {};
       setApolloPhase("error");
+      if (searchMode === "organizations" && data.code === "forbidden") {
+        setApolloStatus((status) => ({ ...status, capabilities: { ...status.capabilities, companySearch: { available: false, code: "plan_unavailable", message: data.error } } }));
+      }
       setApolloError({
-        title: data.message || data.error || "Apollo search could not be completed",
-        message: data.detail || (error.response ? "Apollo rejected or could not complete this search request." : "Ellie could not reach the search service."),
-        action: data.action || "Check the Apollo connection status and retry.",
+        title: data.code === "forbidden" ? "Apollo API search is unavailable on this plan" : (data.message || data.error || "Apollo search could not be completed"),
+        message: data.code === "forbidden" ? "Your filters are safe. Apollo’s Free plan blocks API results from returning to Ellie, but you can run this exact search in Apollo now." : (data.detail || (error.response ? "Apollo rejected or could not complete this search request." : "Ellie could not reach the search service.")),
+        action: data.code === "forbidden" ? "Use Open in Apollo below, or upgrade Apollo to return results inside Ellie." : (data.action || "Check the Apollo connection status and retry."),
         code: data.code,
         retryAfter: data.retryAfter,
       });
@@ -457,10 +477,10 @@ export default function Discovery() {
 
       <div className="apollo-workbench">
       <DashboardCard title="Filters" className="apollo-filter-panel" action={<span className="apollo-filter-count">{searchMode === "people" ? "People" : "Companies"}</span>}>
-        <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? (peopleApiAvailable ? "Apollo search ready" : "Apollo company search ready") : apolloStatus.state === "checking" ? "Checking Apollo account" : "Apollo account needs attention"}</strong><p>{apolloStatus.state === "connected" ? (peopleApiAvailable ? "People and company API access is connected." : "Company API connected · People searches open in Apollo on this plan.") : apolloStatus.message}</p></div><Button variant="ghost" size="sm" loading={recheckingApollo} onClick={recheckApolloAccess}>Recheck all access</Button></div>
+        <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? (peopleApiAvailable && companyApiAvailable ? "Apollo API search ready" : "Apollo web search ready") : apolloStatus.state === "checking" ? "Checking Apollo account" : "Apollo account needs attention"}</strong><p>{apolloStatus.state === "connected" ? (peopleApiAvailable && companyApiAvailable ? "People and organization API access is connected." : "Apollo is connected. Searches blocked by the Free-plan API open directly in Apollo instead.") : apolloStatus.message}</p></div><Button variant="ghost" size="sm" loading={recheckingApollo} onClick={recheckApolloAccess}>Recheck all access</Button></div>
         <details className="apollo-access-summary">
-          <summary><span>Apollo connection capabilities</span><strong>{peopleApiAvailable && apolloListCapability.state === "available" ? "Full access" : "Partial access"}</strong></summary>
-          <div><span className="is-ready">Available now</span><p><strong>Company search:</strong> keywords, headquarters, employee size, revenue, funding, and supported firmographic filters.</p></div>
+          <summary><span>Apollo connection capabilities</span><strong>{peopleApiAvailable && companyApiAvailable && apolloListCapability.state === "available" ? "Full access" : "Partial access"}</strong></summary>
+          <div><span className={companyApiAvailable ? "is-ready" : "is-limited"}>{companyApiAvailable ? "API available" : "Opens in Apollo"}</span><p><strong>Organization search:</strong> keywords, headquarters, employee size, revenue, funding, and supported firmographic filters.</p></div>
           <div><span className={peopleApiAvailable ? "is-ready" : "is-limited"}>{peopleApiAvailable ? "Available now" : "Upgrade Apollo"}</span><p><strong>People results inside Ellie:</strong> requires a paid Apollo plan and a key with <code>mixed_people_api_search</code> access. Until then, Ellie opens the saved search in Apollo.</p></div>
           <div><span className={apolloListCapability.state === "available" ? "is-ready" : "is-limited"}>{apolloListCapability.state === "available" ? "Available now" : "Key permission"}</span><p><strong>Saved-list sync:</strong> requires the key’s labels/lists endpoint permission. It is separate from search access.</p></div>
           <div><span className="is-unavailable">Not in API</span><p><strong>Buyer intent:</strong> available in Apollo’s product experience, but not through the connected public search endpoints.</p></div>
@@ -496,9 +516,9 @@ export default function Discovery() {
           </div>
           <div className="apollo-unavailable-filter"><strong>Technology and buyer-intent filters</strong><span>Technology requires Apollo’s technology catalog—not raw IDs—so Ellie hides it until a proper searchable picker is connected. Buyer intent is not available through these public search endpoints.</span></div>
         </details>
-        <div className="apollo-template-actions"><Button variant="outline" loading={savingTemplate} onClick={saveTemplate}>{targetPreset === "custom" ? "Save to library" : "Save changes"}</Button><Button loading={searchingApollo} onClick={() => searchMode === "people" && peopleSearchRunsInApollo ? openApolloPeopleSearch() : runApolloSearch(1)}>{searchMode === "people" ? (peopleSearchRunsInApollo ? "Open in Apollo" : "Search people") : "Search organizations"}</Button>{targetPreset !== "custom" ? <Button className="apollo-delete-template" variant="ghost" disabled={savingTemplate} onClick={deleteTemplate}>Delete template</Button> : null}<span>{targetPreset === "custom" ? "Save the reusable template, then run the search." : "Template saved · review changes before searching."}</span></div>
+        <div className="apollo-template-actions"><Button variant="outline" loading={savingTemplate} onClick={saveTemplate}>{targetPreset === "custom" ? "Save to library" : "Save changes"}</Button><Button loading={searchingApollo} onClick={() => searchMode === "people" && peopleSearchRunsInApollo ? openApolloPeopleSearch() : searchMode === "organizations" && organizationSearchRunsInApollo ? openApolloOrganizationSearch() : runApolloSearch(1)}>{searchMode === "people" ? (peopleSearchRunsInApollo ? "Open in Apollo" : "Search people") : (organizationSearchRunsInApollo ? "Open in Apollo" : "Search organizations")}</Button>{targetPreset !== "custom" ? <Button className="apollo-delete-template" variant="ghost" disabled={savingTemplate} onClick={deleteTemplate}>Delete template</Button> : null}<span>{targetPreset === "custom" ? "Save the reusable template, then run the search." : "Template saved · review changes before searching."}</span></div>
         {apolloError ? <div className="apollo-error-panel" role="alert"><strong>{apolloError.title}</strong><p>{apolloError.message}</p><span>{apolloError.action}</span>{apolloError.code ? <small>Error code: {apolloError.code}{apolloError.retryAfter ? ` · Retry after ${apolloError.retryAfter}` : ""}</small> : null}</div> : null}
-        <div className="apollo-status"><span className="status-dot" />{peopleApiAvailable ? "People Search API connected" : "People Search: opens in Apollo"} · Company Search: runs inside Ellie · Enrichment may use Apollo credits</div>
+        <div className="apollo-status"><span className="status-dot" />People: {peopleSearchRunsInApollo ? "opens in Apollo" : "API connected"} · Organizations: {organizationSearchRunsInApollo ? "opens in Apollo" : "API connected"} · Enrichment may use Apollo credits</div>
         <p className="apollo-note">Discovery searches Apollo for net-new people or organizations to add to your pipeline. It does not search the contacts already stored in Ellie.</p>
       </DashboardCard>
       <div className="apollo-results-pane">
@@ -513,7 +533,7 @@ export default function Discovery() {
         <div className="apollo-results-pagination"><Button variant="outline" size="sm" disabled={apolloPeoplePage === 1 || searchingApollo} onClick={() => runApolloSearch(apolloPeoplePage - 1)}>Previous</Button><span>Page {apolloPeoplePage} · showing {apolloPeople.length} results</span><Button variant="outline" size="sm" disabled={apolloPeoplePage * 25 >= apolloPeopleTotal || searchingApollo} onClick={() => runApolloSearch(apolloPeoplePage + 1)}>Next</Button></div>
       </DashboardCard> : null}
       {searchMode === "people" && !apolloPeople.length ? <DashboardCard title="People results" className="apollo-results-empty"><div><strong>{searchingApollo ? "Searching Apollo…" : "Ready to search"}</strong><p>Set filters on the left, then find matching people. Results will stay here in a selectable table.</p></div></DashboardCard> : null}
-      {searchMode === "organizations" ? <DashboardCard title="Company results" className="apollo-results-empty" action={apolloResult ? <span>{apolloResult.organizationsFound || 0} matched</span> : null}><div><strong>{searchingApollo ? "Searching Apollo…" : apolloResult ? (apolloResult.organizationsFound ? "Companies saved to Discovery" : "No matching companies") : "Ready to search"}</strong><p>{apolloResult?.organizationsFound ? `${apolloResult.organizationsCreated || 0} new companies were added and ${apolloResult.organizationsUpdated || 0} were updated. Open Prospect review below when you are ready to work with them.` : "Set company filters on the left. Matching organizations will be saved in Ellie for review."}</p></div></DashboardCard> : null}
+      {searchMode === "organizations" ? <DashboardCard title="Organization results" className="apollo-results-empty" action={apolloResult ? <span>{apolloResult.organizationsFound || 0} matched</span> : null}><div><strong>{searchingApollo ? "Searching Apollo…" : apolloError?.code === "forbidden" ? "Search this audience in Apollo" : apolloResult ? (apolloResult.organizationsFound ? "Organizations saved to Discovery" : "No matching organizations") : "Ready to search"}</strong><p>{apolloError?.code === "forbidden" ? "Apollo’s Free plan will not return organization results through the API. Your completed filters can still open directly in Apollo today." : apolloResult?.organizationsFound ? `${apolloResult.organizationsCreated || 0} new organizations were added and ${apolloResult.organizationsUpdated || 0} were updated. Open Prospect review below when you are ready to work with them.` : "Set organization filters on the left. Matching organizations will be ready for review."}</p>{apolloError?.code === "forbidden" ? <Button onClick={openApolloOrganizationSearch}>Open this search in Apollo</Button> : null}</div></DashboardCard> : null}
 
       <DashboardCard title="Search activity" className="apollo-history-panel" action={<span>Last {apolloHistory.length}</span>}>
         <div className="apollo-performance-summary"><div><strong>{apolloPerformance.searches}</strong><span>Searches</span></div><div><strong>{apolloPerformance.successRate}%</strong><span>Completed</span></div><div><strong>{apolloPerformance.matches.toLocaleString()}</strong><span>Total matches</span></div><div><strong>{apolloPerformance.averageSeconds}s</strong><span>Average time</span></div></div>

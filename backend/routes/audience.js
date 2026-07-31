@@ -945,7 +945,9 @@ router.post("/:id/discover", async (req, res) => {
         action: result.errorCode === "unauthorized"
           ? "Replace the Apollo API key in backend settings."
           : result.errorCode === "forbidden"
-            ? "Enable Company Search access for the Apollo API key or use a master key."
+            ? (/free plan|all paid plans/i.test(result.error || "")
+              ? "Upgrade Apollo for API access, or open this saved filter set in Apollo to search there today."
+              : "Enable Company Search access for the Apollo API key or use a master key.")
             : result.errorCode === "rate_limited"
               ? "Wait for Apollo's rate-limit window to reset."
               : "Review the company filters and Apollo permissions, then retry.",

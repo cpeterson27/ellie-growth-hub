@@ -73,6 +73,9 @@ async function getAccountStatus() {
       };
       if (formatted.errorCode === "unauthorized") throw error;
     }
+    const companySearch = !peopleSearch.available && /free plan|all paid plans/i.test(peopleSearch.message || "")
+      ? { available: false, code: "plan_unavailable", message: "Company Search API is not included in the Apollo Free plan." }
+      : { available: true, code: "available", message: "Company Search API is expected to be available for this Apollo plan." };
     let usage = null;
     let usageAvailable = false;
     try {
@@ -89,7 +92,7 @@ async function getAccountStatus() {
       message: "Apollo accepted the configured API key.",
       usageAvailable,
       usage,
-      capabilities: { peopleSearch },
+      capabilities: { peopleSearch, companySearch },
       checkedAt: new Date().toISOString(),
     };
   } catch (error) {
