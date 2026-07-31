@@ -81,7 +81,6 @@ router.post("/resend", async (req, res) => {
     if (lifecycle && messageId) {
       const outreach = await Outreach.findOne({ messageId });
       const recorded = await recordProviderEvent(req, event, outreach);
-      if (recorded.duplicate) return res.json({ received: true, duplicate: true });
       if (!outreach) return res.json({ received: true, matched: false });
 
       const occurredAt = eventTime(event);
@@ -113,7 +112,7 @@ router.post("/resend", async (req, res) => {
           },
         },
       );
-      if (lifecycle.metric && firstOccurrence) {
+      if (lifecycle.metric && firstOccurrence && !recorded.duplicate) {
         await Campaign.updateOne(
           { _id: outreach.campaignId },
           { $inc: { [`metrics.${lifecycle.metric}`]: 1 } },
@@ -142,7 +141,7 @@ router.post("/resend", async (req, res) => {
           },
         );
       }
-      return res.json({ received: true, matched: true });
+      return res.json({ received: true, matched: true, duplicate: recorded.duplicate });
     }
 
     if (event.type !== "email.received") {
