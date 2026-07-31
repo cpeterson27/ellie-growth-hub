@@ -25,6 +25,37 @@ import "./DiscoveryReview.css";
 const EMPTY_TARGET = { name: "", titles: "", industries: "", keywords: "", locations: "", employeeMin: "", employeeMax: "", employeeRanges: [], industryIds: [], emailStatuses: ["verified"], seniorities: [], technologiesAny: "", technologiesAll: "", technologiesExclude: "", revenueMin: "", revenueMax: "", fundingMin: "", fundingMax: "" };
 const SENIORITIES = ["owner","founder","c_suite","partner","vp","head","director","manager","senior","entry","intern"];
 const EMPLOYEE_RANGES = ["1,10", "11,20", "21,50", "51,100", "101,200", "201,500", "501,1000", "1001,2000", "2001,5000", "5001,10000", "10001,1000000"];
+const LOCATION_SUGGESTIONS = ["United States", "Alabama, US", "Alaska, US", "Arizona, US", "Arkansas, US", "California, US", "Colorado, US", "Connecticut, US", "Delaware, US", "Florida, US", "Georgia, US", "Hawaii, US", "Idaho, US", "Illinois, US", "Indiana, US", "Iowa, US", "Kansas, US", "Kentucky, US", "Louisiana, US", "Maine, US", "Maryland, US", "Massachusetts, US", "Michigan, US", "Minnesota, US", "Mississippi, US", "Missouri, US", "Montana, US", "Nebraska, US", "Nevada, US", "New Hampshire, US", "New Jersey, US", "New Mexico, US", "New York, US", "North Carolina, US", "North Dakota, US", "Ohio, US", "Oklahoma, US", "Oregon, US", "Pennsylvania, US", "Rhode Island, US", "South Carolina, US", "South Dakota, US", "Tennessee, US", "Texas, US", "Utah, US", "Vermont, US", "Virginia, US", "Washington, US", "West Virginia, US", "Wisconsin, US", "Wyoming, US"];
+const INDUSTRY_SUGGESTIONS = ["Real Estate", "Commercial Real Estate", "Financial Services", "Investment Management", "Hospitality", "Construction", "Property Management", "Banking", "Venture Capital & Private Equity", "Professional Services", "Marketing & Advertising", "Information Technology & Services"];
+const KEYWORD_SUGGESTIONS = ["Multifamily", "Syndication", "Rent Roll", "Apartment Investing", "Real Estate Investing", "Commercial Real Estate", "Property Investment", "Property Management", "Acquisitions", "Investor Education", "Affordable Housing", "Short-Term Rentals", "Airbnb"];
+
+function TypeaheadInput({ value, onChange, suggestions, separator = ",", placeholder, label }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const segments = String(value || "").split(separator);
+  const query = segments.at(-1)?.trim().toLowerCase() || "";
+  const selected = new Set(segments.slice(0, -1).map((item) => item.trim().toLowerCase()));
+  const matches = query ? suggestions
+    .filter((item) => !selected.has(item.toLowerCase()) && item.toLowerCase().includes(query))
+    .sort((a, b) => Number(!a.toLowerCase().startsWith(query)) - Number(!b.toLowerCase().startsWith(query)))
+    .slice(0, 8) : [];
+  const choose = (item) => {
+    const prior = segments.slice(0, -1).map((part) => part.trim()).filter(Boolean);
+    onChange(`${[...prior, item].join(`${separator} `)}${separator} `);
+    setOpen(false);
+    setActive(0);
+  };
+  return <div className="apollo-typeahead">
+    <input aria-label={label} aria-autocomplete="list" aria-expanded={open && Boolean(matches.length)} role="combobox" value={value} placeholder={placeholder} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onChange={(event) => { onChange(event.target.value); setOpen(true); setActive(0); }} onKeyDown={(event) => {
+      if (!matches.length) return;
+      if (event.key === "ArrowDown") { event.preventDefault(); setActive((index) => Math.min(index + 1, matches.length - 1)); }
+      if (event.key === "ArrowUp") { event.preventDefault(); setActive((index) => Math.max(index - 1, 0)); }
+      if (event.key === "Enter" && open) { event.preventDefault(); choose(matches[active]); }
+      if (event.key === "Escape") setOpen(false);
+    }} />
+    {open && matches.length ? <div className="apollo-typeahead__menu" role="listbox">{matches.map((item, index) => <button className={index === active ? "is-active" : ""} key={item} type="button" role="option" aria-selected={index === active} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(item)}>{item}</button>)}</div> : null}
+  </div>;
+}
 
 const splitFilters = (value) => String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
 const splitLocations = (value) => {
@@ -231,7 +262,7 @@ export default function Discovery() {
     await persistTemplates([...templates, { ...namedTarget, id }], id);
   };
 
-  const useSuggestedSearch = (suggestion) => {
+  const applySuggestedSearch = (suggestion) => {
     setSearchMode(suggestion.target.mode || "people");
     setTargetPreset("custom");
     setTarget({ ...suggestion.target });
@@ -447,9 +478,9 @@ export default function Discovery() {
         <div className="apollo-target-grid">
           <label>Search template name<input value={target.name} onChange={(event) => setTarget({ ...target, name: event.target.value })} placeholder={suggestedSearchName(target, selectedEventCampaign?.name) || "Example: Multifamily deal team · FL + TX"} /><small>{targetPreset === "custom" ? "Use a name you will recognize next time. Nothing is saved until you choose Save." : "This template is in your Search library. Choose Save changes after editing it."}</small></label>
           {searchMode === "people" ? <label>Job titles<input value={target.titles} onChange={(event) => setTarget({ ...target, titles: event.target.value })} placeholder="Owner, Founder, Investor" /></label> : null}
-          {searchMode === "organizations" ? <label>Company industries<input value={target.industries} onChange={(event) => setTarget({ ...target, industries: event.target.value })} placeholder="Real estate, hospitality" /><small>Sent to Apollo as company keyword tags.</small></label> : null}
-          <label>Company keywords<input value={target.keywords} onChange={(event) => setTarget({ ...target, keywords: event.target.value })} placeholder="multifamily, Airbnb, acquisitions" /></label>
-          <label>{searchMode === "people" ? "Person locations" : "Headquarters locations"}<input value={target.locations} onChange={(event) => setTarget({ ...target, locations: event.target.value })} placeholder="Florida, US; Texas, US" /><small>{searchMode === "people" ? "Matches where the person lives. Separate locations with a semicolon." : "Matches company headquarters. Separate locations with a semicolon."}</small></label>
+          {searchMode === "organizations" ? <label>Company industries<TypeaheadInput label="Company industries" value={target.industries} onChange={(industries) => setTarget({ ...target, industries })} suggestions={INDUSTRY_SUGGESTIONS} placeholder="Start typing: Real Estate" /><small>Choose a suggestion or keep your own industry term.</small></label> : null}
+          <label>Company keywords<TypeaheadInput label="Company keywords" value={target.keywords} onChange={(keywords) => setTarget({ ...target, keywords })} suggestions={KEYWORD_SUGGESTIONS} placeholder="Start typing: Multifamily" /></label>
+          <label>{searchMode === "people" ? "Person locations" : "Headquarters locations"}<TypeaheadInput label={searchMode === "people" ? "Person locations" : "Headquarters locations"} value={target.locations} onChange={(locations) => setTarget({ ...target, locations })} suggestions={LOCATION_SUGGESTIONS} separator=";" placeholder="Start typing a state" /><small>{searchMode === "people" ? "Matches where the person lives. Pick multiple states one at a time." : "Matches company headquarters. Pick multiple states one at a time."}</small></label>
           <fieldset className="apollo-employee-ranges"><legend>Company size · employees</legend>{EMPLOYEE_RANGES.map((range) => <label key={range}><input type="checkbox" checked={(target.employeeRanges || []).includes(range)} onChange={() => setTarget({ ...target, employeeRanges: (target.employeeRanges || []).includes(range) ? target.employeeRanges.filter((item) => item !== range) : [...(target.employeeRanges || []), range], employeeMin: "", employeeMax: "" })} />{employeeRangeLabel(range)}</label>)}<small>Select one or more Apollo ranges.</small></fieldset>
           {searchMode === "people" ? <fieldset className="apollo-verified-filter"><legend>Email status</legend><label><input type="checkbox" checked={(target.emailStatuses || []).includes("verified")} onChange={(event) => setTarget({ ...target, emailStatuses: event.target.checked ? ["verified"] : [] })} />Verified emails only</label></fieldset> : null}
         </div>
@@ -542,7 +573,7 @@ export default function Discovery() {
         <div className="apollo-suggestion-list">
           <div className="apollo-suggestion-source"><strong>How Ellie built these</strong><p>These are transparent, curated audience playbooks chosen from the event name and program type—not results pulled from Apollo and not an AI guess hidden from you. Choosing one only loads editable filters.</p></div>
           <p>Nothing is saved and no Apollo search runs until you review the filters and choose the next action.</p>
-          {eventSuggestions.map((suggestion) => <article key={suggestion.id}><div><span>Suggested by Ellie</span><h4>{suggestion.label}</h4><p>{suggestion.description}</p><small><strong>Why:</strong> {suggestion.why}</small><small>{splitFilters(suggestion.target.titles).length || 0} titles · {splitLocations(suggestion.target.locations).length || 0} locations · {(suggestion.target.employeeRanges || []).map(employeeRangeLabel).join(", ")} employees</small></div><Button onClick={() => useSuggestedSearch(suggestion)}>Use &amp; review</Button></article>)}
+          {eventSuggestions.map((suggestion) => <article key={suggestion.id}><div><span>Suggested by Ellie</span><h4>{suggestion.label}</h4><p>{suggestion.description}</p><small><strong>Why:</strong> {suggestion.why}</small><small>{splitFilters(suggestion.target.titles).length || 0} titles · {splitLocations(suggestion.target.locations).length || 0} locations · {(suggestion.target.employeeRanges || []).map(employeeRangeLabel).join(", ")} employees</small></div><Button onClick={() => applySuggestedSearch(suggestion)}>Use &amp; review</Button></article>)}
         </div>
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete prospect" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}>
