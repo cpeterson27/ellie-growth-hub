@@ -59,6 +59,8 @@
   gap: 0.5rem;
 }
 .outreach-header__actions .btn {
+  display: inline-flex;
+  column-gap: 0.58rem;
   min-height: 38px;
   padding: 0.52rem 0.72rem;
   font-size: 0.78rem;
@@ -66,7 +68,7 @@
   white-space: nowrap;
   box-shadow: none;
 }
-.outreach-header__actions .btn svg { flex: 0 0 auto; font-size: 0.95rem; }
+.outreach-header__actions .btn svg { flex: 0 0 auto; width: 1rem; height: 1rem; font-size: 1rem; }
 .outreach-header .btn--outline {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.35);
