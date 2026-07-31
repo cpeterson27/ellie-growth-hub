@@ -117,7 +117,7 @@
 }
 .outreach-summary {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -263,6 +263,21 @@
 .outreach-status--sent {
   background: #dff3e5;
   color: #166534;
+}
+.outreach-status--accepted,
+.outreach-status--delayed {
+  background: #e8eef5;
+  color: #38536e;
+}
+.outreach-status--delivered {
+  background: #dff3e5;
+  color: #166534;
+}
+.outreach-status--bounced,
+.outreach-status--suppressed,
+.outreach-status--complained {
+  background: #fde4e4;
+  color: #a32929;
 }
 .outreach-status--failed {
   background: #fde4e4;

@@ -22,9 +22,28 @@ const labels = {
   active: "Needs attention",
   pending: "Pending review",
   approved: "Approved",
-  sent: "Sent",
+  processing: "In delivery",
+  delivered: "Delivered",
+  bounced: "Bounced",
   replied: "Replied",
   failed: "Failed",
+};
+const viewStatuses = ["active", "pending", "approved", "processing", "delivered", "bounced", "replied"];
+const matchesView = (item, view) => {
+  if (view === "active") return ["pending", "approved", "failed"].includes(item.status);
+  if (view === "processing") return item.status === "sent" && !["delivered", "bounced", "failed", "suppressed", "complained"].includes(item.deliveryStatus);
+  if (view === "delivered") return item.deliveryStatus === "delivered" && item.status !== "replied";
+  if (view === "bounced") return ["bounced", "failed", "suppressed", "complained"].includes(item.deliveryStatus);
+  return item.status === view;
+};
+const deliveryLabel = (item) => {
+  if (item.status === "replied") return "Replied";
+  if (item.deliveryStatus === "delivered") return "Delivered";
+  if (item.deliveryStatus === "bounced") return "Bounced";
+  if (item.deliveryStatus === "delayed") return "Delayed";
+  if (["failed", "suppressed", "complained"].includes(item.deliveryStatus)) return labels[item.deliveryStatus] || item.deliveryStatus;
+  if (item.status === "sent") return "In delivery";
+  return labels[item.status] || item.status;
 };
 const htmlToText = (html = "") =>
   String(html)
@@ -101,9 +120,7 @@ export default function Outreach() {
     () =>
       items.filter(
         (item) =>
-          (filter === "active"
-            ? ["pending", "approved", "failed"].includes(item.status)
-            : item.status === filter) &&
+          matchesView(item, filter) &&
           (!search ||
             [
               item.organization,
@@ -138,15 +155,7 @@ export default function Outreach() {
     }
   };
   const counts = {
-    active: items.filter((x) =>
-      ["pending", "approved", "failed"].includes(x.status),
-    ).length,
-    ...Object.fromEntries(
-      ["pending", "approved", "sent", "replied", "failed"].map((s) => [
-        s,
-        items.filter((x) => x.status === s).length,
-      ]),
-    ),
+    ...Object.fromEntries(viewStatuses.map((status) => [status, items.filter((item) => matchesView(item, status)).length])),
   };
   const generate = async () => {
     if (!selected) return setError("Select a campaign first.");
@@ -284,7 +293,7 @@ export default function Outreach() {
         <p><strong>{selected?.name || "Choose a campaign"}</strong><span>{counts.active || 0} messages need attention</span></p>
       </section>
       <section className="outreach-summary">
-        {["active", "pending", "approved", "sent", "replied", "failed"].map(
+        {viewStatuses.map(
           (status) => (
             <button
               key={status}
@@ -327,10 +336,10 @@ export default function Outreach() {
                   </div>
                 </div>
                 <div className="outreach-item__state">
-                  <span className={`outreach-status outreach-status--${item.status}`}>
-                    {labels[item.status] || item.status}
+                  <span className={`outreach-status outreach-status--${item.deliveryStatus || item.status}`}>
+                    {deliveryLabel(item)}
                   </span>
-                  {item.deliveryStatus ? <small>{item.deliveryStatus}</small> : null}
+                  {item.deliveryStatus === "bounced" ? <small>Do not resend</small> : null}
                 </div>
                 <div className="outreach-item__actions">
                   <Button

@@ -663,6 +663,25 @@ router.post("/send", async(req,res)=>{
 
     for(const item of items){
 
+      const contact = item.contactId
+        ? await Contact.findById(item.contactId).select("status emailStatus emailBounced")
+        : await Contact.findOne({ email: String(item.contactEmail || "").toLowerCase() }).select("status emailStatus emailBounced");
+      if (
+        contact &&
+        (["invalid", "unsubscribed", "archived"].includes(contact.status) ||
+          contact.emailBounced === true ||
+          contact.emailStatus === "undeliverable")
+      ) {
+        item.status = "failed";
+        item.deliveryStatus = "suppressed";
+        item.failedAt = new Date();
+        item.errorMessage = "Suppressed because this address previously bounced or cannot receive marketing email.";
+        failedCount++;
+        failures.push({ outreachId: item._id, email: item.contactEmail, message: item.errorMessage });
+        await item.save();
+        continue;
+      }
+
 
       const result =
         await sendEmail(item);

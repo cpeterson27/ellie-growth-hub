@@ -129,7 +129,11 @@ router.post("/resend", async (req, res) => {
                 "emailPreferences.topics.programOffers": false,
                 "emailPreferences.topics.educationalNewsletter": false,
               }
-              : { status: "invalid" },
+              : {
+                status: "invalid",
+                emailStatus: "undeliverable",
+                emailBounced: true,
+              },
           },
         );
       }
