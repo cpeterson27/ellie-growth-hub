@@ -339,7 +339,7 @@ export default function Outreach() {
                     onClick={() => review(item)}
                   >
                     <FiEye />
-                    <span>{item.status === "pending" ? "Review draft" : item.status === "failed" ? "Review issue" : "View email"}</span>
+                    <span>{item.status === "pending" ? "Review" : item.status === "failed" ? "Review issue" : "View email"}</span>
                   </Button>
                   {item.contactEmail && ["sent", "replied"].includes(item.status) ? (
                     <Button
