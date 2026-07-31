@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Papa from "papaparse";
 import { FiMoreHorizontal } from "react-icons/fi";
@@ -92,6 +92,59 @@ const manualContactDefaults = {
   city: "", state: "", country: "", tags: "", lists: "", departments: "", keywords: "",
   notes: "", audienceProfiles: "", confirmEmailManually: false, canReceiveCampaignEmail: false,
 };
+
+const CRM_PIPELINE_STAGES = ["New lead", "Qualified", "Contacted", "Engaged", "Opportunity", "Customer", "Partner", "Nurture"];
+
+function crmStage(contact = {}) {
+  const current = String(contact.stage || "").trim();
+  const match = CRM_PIPELINE_STAGES.find((stage) => stage.toLowerCase() === current.toLowerCase());
+  if (match) return match;
+  if (contact.type === "customer") return "Customer";
+  if (contact.type === "partner") return "Partner";
+  if (contact.replied) return "Engaged";
+  if (contact.emailSent || contact.lastContacted) return "Contacted";
+  if (contact.qualifyContact || contact.researchStatus === "qualified") return "Qualified";
+  return "New lead";
+}
+
+function cleanCardValue(value = "") {
+  return String(value).replace(/\\n/gi, " ").replace(/\\,/g, ",").replace(/\\;/g, ";").trim();
+}
+
+function parseBusinessCardPayload(payload = "") {
+  const raw = String(payload || "").replace(/\r\n[ \t]/g, "").trim();
+  const card = {};
+  if (/^MECARD:/i.test(raw)) {
+    const entries = Object.fromEntries(raw.replace(/^MECARD:/i, "").split(";").map((part) => { const splitAt = part.indexOf(":"); return splitAt > 0 ? [part.slice(0, splitAt).toUpperCase(), cleanCardValue(part.slice(splitAt + 1))] : ["", ""]; }));
+    const [lastName = "", firstName = ""] = String(entries.N || "").split(",").map(cleanCardValue);
+    return { firstName, lastName, email: entries.EMAIL || "", phone: entries.TEL || "", company: entries.ORG || "", title: entries.TITLE || "", website: entries.URL || "", notes: entries.NOTE || "" };
+  }
+  const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const values = (key) => lines.filter((line) => new RegExp(`^${key}(?:;[^:]*)?:`, "i").test(line)).map((line) => cleanCardValue(line.slice(line.indexOf(":") + 1)));
+  if (/BEGIN:VCARD/i.test(raw)) {
+    const fullName = values("FN")[0] || "";
+    const structuredName = (values("N")[0] || "").split(";");
+    card.firstName = cleanCardValue(structuredName[1] || fullName.split(/\s+/)[0] || "");
+    card.lastName = cleanCardValue(structuredName[0] || fullName.split(/\s+/).slice(1).join(" "));
+    card.company = values("ORG")[0] || "";
+    card.title = values("TITLE")[0] || "";
+    card.email = values("EMAIL")[0] || "";
+    card.phone = values("TEL")[0] || "";
+    const urls = values("URL");
+    card.linkedin = urls.find((url) => /linkedin\.com/i.test(url)) || "";
+    card.website = urls.find((url) => !/linkedin\.com/i.test(url)) || "";
+    card.notes = values("NOTE")[0] || "";
+    const address = (values("ADR")[0] || "").split(";");
+    card.city = cleanCardValue(address[3] || ""); card.state = cleanCardValue(address[4] || ""); card.country = cleanCardValue(address[6] || "");
+    return card;
+  }
+  const email = raw.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || "";
+  const phone = raw.match(/(?:\+?\d[\d ().-]{7,}\d)/)?.[0] || "";
+  const url = raw.match(/https?:\/\/[^\s]+/i)?.[0] || "";
+  const possibleName = lines.find((line) => !line.includes("@") && !/^https?:/i.test(line) && !/^[+()\d .-]+$/.test(line)) || "";
+  const nameParts = possibleName.split(/\s+/);
+  return { firstName: nameParts.shift() || "", lastName: nameParts.join(" "), email, phone, ...(url && /linkedin\.com/i.test(url) ? { linkedin: url } : { website: url }), notes: raw && !email && !phone && url ? `Digital business card: ${url}` : "" };
+}
 
 function detailValue(value) {
   if (Array.isArray(value)) return value.filter(Boolean).join(", ");
@@ -199,11 +252,120 @@ export default function Contacts() {
   const [bulkCampaignId, setBulkCampaignId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkNotice, setBulkNotice] = useState("");
+  const [crmView, setCrmView] = useState("list");
+  const [isCardCaptureOpen, setCardCaptureOpen] = useState(false);
+  const [cardDraft, setCardDraft] = useState(manualContactDefaults);
+  const [cardRaw, setCardRaw] = useState("");
+  const [cardStatus, setCardStatus] = useState("");
+  const [cardDuplicate, setCardDuplicate] = useState(null);
+  const [cardCampaignId, setCardCampaignId] = useState("");
+  const [cardScanning, setCardScanning] = useState(false);
+  const cardVideoRef = useRef(null);
+  const cardStreamRef = useRef(null);
+  const cardFrameRef = useRef(null);
   const pageSize = 15;
   const importCampaignTargetId = String(importSummary?.campaignId || campaigns.find((campaign) => campaign.name === importSummary?.campaignName)?._id || "");
   const selectedContacts = contacts.filter((contact) => selectedContactIds.includes(String(contact._id)));
   const selectedCampaignIds = [...new Set(selectedContacts.flatMap((contact) => (contact.campaignIds || []).map(String)))];
   const commonSelectedCampaignId = selectedCampaignIds.length === 1 && selectedContacts.every((contact) => contact.campaignIds?.some((id) => String(id) === selectedCampaignIds[0])) ? selectedCampaignIds[0] : "";
+
+  function stopCardScanner() {
+    if (cardFrameRef.current) cancelAnimationFrame(cardFrameRef.current);
+    cardFrameRef.current = null;
+    cardStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+    cardStreamRef.current = null;
+    setCardScanning(false);
+  }
+
+  function closeCardCapture() {
+    stopCardScanner();
+    setCardCaptureOpen(false);
+  }
+
+  async function reviewCardDraft(nextDraft) {
+    const name = fullContactName(nextDraft);
+    if (!name) { setCardDuplicate(null); return; }
+    try {
+      const preview = await previewContactIngestion({ contacts: [{ ...nextDraft, name }], source: "business_card" });
+      setCardDuplicate(preview.data?.rows?.[0] || null);
+    } catch {
+      setCardDuplicate(null);
+    }
+  }
+
+  async function acceptCardPayload(payload) {
+    const parsed = parseBusinessCardPayload(payload);
+    const nextDraft = { ...manualContactDefaults, ...parsed };
+    setCardRaw(payload);
+    setCardDraft(nextDraft);
+    setCardStatus(fullContactName(nextDraft) ? "Card read successfully. Review the information before saving." : "The QR code was read, but the card did not include a name. Complete the missing fields below.");
+    await reviewCardDraft(nextDraft);
+  }
+
+  async function startCardScanner() {
+    if (!("BarcodeDetector" in window)) {
+      setCardStatus("Live QR scanning is not supported by this browser. Upload a QR screenshot or paste the vCard instead.");
+      return;
+    }
+    try {
+      setCardStatus("Point the camera at the contact’s digital business-card QR code.");
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      cardStreamRef.current = stream;
+      setCardScanning(true);
+      const video = cardVideoRef.current;
+      video.srcObject = stream;
+      await video.play();
+      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+      const detect = async () => {
+        if (!cardStreamRef.current) return;
+        try {
+          const codes = await detector.detect(video);
+          if (codes[0]?.rawValue) { await acceptCardPayload(codes[0].rawValue); stopCardScanner(); return; }
+        } catch { /* Continue scanning the next frame. */ }
+        cardFrameRef.current = requestAnimationFrame(detect);
+      };
+      detect();
+    } catch (err) {
+      stopCardScanner();
+      setCardStatus(err.name === "NotAllowedError" ? "Camera access was blocked. Allow camera access, or upload a QR screenshot instead." : "Ellie could not start the camera. Upload a QR screenshot or paste the vCard instead.");
+    }
+  }
+
+  async function readCardImage(file) {
+    if (!file) return;
+    if (!("BarcodeDetector" in window)) return setCardStatus("QR image reading is not supported by this browser. Paste the vCard or card link instead.");
+    try {
+      const bitmap = await createImageBitmap(file);
+      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+      const codes = await detector.detect(bitmap);
+      bitmap.close?.();
+      if (!codes[0]?.rawValue) return setCardStatus("No QR code was found in that image. Try a clearer screenshot or paste the vCard.");
+      await acceptCardPayload(codes[0].rawValue);
+    } catch { setCardStatus("Ellie could not read that image. Try a PNG or JPG screenshot of the QR code."); }
+  }
+
+  async function saveBusinessCard() {
+    const name = fullContactName(cardDraft);
+    if (!name) return setCardStatus("Add the contact’s first or last name before saving.");
+    const saved = await saveIngestion([{ ...cardDraft, name, notes: [cardDraft.notes, "Captured from a digital business card."].filter(Boolean).join("\n") }], "business_card", cardCampaignId, false);
+    if (saved) {
+      closeCardCapture();
+      setCardDraft(manualContactDefaults); setCardRaw(""); setCardStatus(""); setCardDuplicate(null); setCardCampaignId("");
+    }
+  }
+
+  async function moveContactStage(contactId, stage) {
+    try {
+      await updateContact(contactId, { stage });
+      setBulkNotice(`Contact moved to ${stage}.`);
+      await loadContacts();
+    } catch (err) { setError(err.response?.data?.message || "Unable to update the lifecycle stage."); }
+  }
+
+  useEffect(() => () => {
+    if (cardFrameRef.current) cancelAnimationFrame(cardFrameRef.current);
+    cardStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+  }, []);
 
   async function loadContacts() {
     try {
@@ -610,6 +772,7 @@ export default function Contacts() {
           <p className="page-subtitle">Keep every relationship organized, understand the next action, and move the right people into campaigns.</p>
         </div>
         <div className="crm-header-actions">
+          <Button onClick={() => { setCardDraft(manualContactDefaults); setCardRaw(""); setCardStatus(""); setCardDuplicate(null); setCardCampaignId(campaignId || ""); setCardCaptureOpen(true); }}>Scan business card</Button>
           <Button onClick={() => { setError(""); setContactFormOpen(true); }}>+ New Contact</Button>
           <Button variant="outline" onClick={() => navigate("/contacts/fields")}>Customize fields</Button>
           <div className="crm-menu-wrap">
@@ -655,6 +818,7 @@ export default function Contacts() {
           <label>Campaign <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label>
           <input className="select-input" placeholder="Search contacts" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
           {(campaignId || searchTerm) ? <Button variant="outline" onClick={() => { setCampaignId(""); setSearchTerm(""); }}>Clear filters</Button> : null}
+          <div className="crm-view-switch" aria-label="CRM view"><button className={crmView === "list" ? "active" : ""} onClick={() => setCrmView("list")}>Relationship list</button><button className={crmView === "pipeline" ? "active" : ""} onClick={() => setCrmView("pipeline")}>Lifecycle pipeline</button></div>
         </div>
         <div className="crm-tabs crm-tabs--simple">{[
           ["all", "All contacts"],
@@ -677,7 +841,8 @@ export default function Contacts() {
           <span>Page {currentPage} of {Math.ceil(contacts.length / pageSize)}</span>
           <Button variant="outline" disabled={currentPage >= Math.ceil(contacts.length / pageSize)} onClick={() => setCurrentPage((page) => page + 1)}>Next</Button>
         </nav> : null}
-        {loading ? <div className="table-state">Loading contacts…</div> : contacts.length ? <div className="contact-record-list contact-record-list--compact">
+        {!loading && contacts.length && crmView === "pipeline" ? <section className="crm-pipeline" aria-label="Contact lifecycle pipeline">{CRM_PIPELINE_STAGES.map((stage) => { const stageContacts = contacts.filter((contact) => crmStage(contact) === stage); return <div className="crm-pipeline__column" key={stage} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const contactId = event.dataTransfer.getData("text/contact-id"); if (contactId) moveContactStage(contactId, stage); }}><header><strong>{stage}</strong><span>{stageContacts.length}</span></header><div>{stageContacts.length ? stageContacts.map((contact) => <article draggable key={contact._id} onDragStart={(event) => event.dataTransfer.setData("text/contact-id", String(contact._id))} onClick={() => setDetailContact(contact)}><strong>{contact.name}</strong><span>{contact.title || "Role missing"}</span><small>{contact.company || "Company missing"}</small><footer><em className={`is-${contact.emailStatus || "missing"}`}>{contact.emailStatus === "verified" ? "Verified" : "Email review"}</em><span>{contact.campaignIds?.length ? "Campaign assigned" : "Unassigned"}</span></footer></article>) : <p>Drop a contact here</p>}</div></div>; })}</section> : null}
+        {loading ? <div className="table-state">Loading contacts…</div> : contacts.length && crmView === "list" ? <div className="contact-record-list contact-record-list--compact">
           {contacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
             const workflow = contactWorkflowState(contact);
             return <article className="contact-record" key={contact._id} onClick={() => setDetailContact(contact)}>
@@ -779,6 +944,28 @@ export default function Contacts() {
         )}
       >
         <p>{selectedCopy?.body}</p>
+      </Modal>
+
+      <Modal
+        isOpen={isCardCaptureOpen}
+        onClose={closeCardCapture}
+        title="Capture a digital business card"
+        footer={<><Button variant="outline" disabled={savingContact} onClick={closeCardCapture}>Cancel</Button><Button loading={savingContact} disabled={!fullContactName(cardDraft)} onClick={saveBusinessCard}>{cardDuplicate?.status === "existing" ? "Update existing contact" : "Add to CRM"}</Button></>}
+      >
+        <div className="business-card-capture">
+          <section className="business-card-capture__intro"><span>Networking intake</span><h3>Scan once. Review once. Keep the relationship connected.</h3><p>Ellie reads QR-based digital cards and vCards, checks for an existing CRM record, and then creates or updates one contact.</p></section>
+          <div className="business-card-capture__methods">
+            <div><strong>Scan live QR</strong><small>Use the phone or computer camera.</small><Button variant="outline" size="sm" onClick={cardScanning ? stopCardScanner : startCardScanner}>{cardScanning ? "Stop camera" : "Start camera"}</Button></div>
+            <label><strong>Upload QR image</strong><small>Choose a screenshot of the digital card QR.</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => readCardImage(event.target.files?.[0])} /></label>
+            <div><strong>Paste vCard or card data</strong><small>Use this when the card offers Copy contact.</small><Button variant="outline" size="sm" disabled={!cardRaw.trim()} onClick={() => acceptCardPayload(cardRaw)}>Read pasted card</Button></div>
+          </div>
+          <video className={cardScanning ? "business-card-camera is-active" : "business-card-camera"} ref={cardVideoRef} muted playsInline />
+          <label className="business-card-raw"><span>vCard, QR content, or digital-card link</span><textarea value={cardRaw} onChange={(event) => setCardRaw(event.target.value)} placeholder="Paste BEGIN:VCARD… or the copied card information" /></label>
+          {cardStatus ? <p className="business-card-status" role="status">{cardStatus}</p> : null}
+          {cardDuplicate ? <section className={`business-card-match is-${cardDuplicate.status}`}><strong>{cardDuplicate.status === "existing" ? "Existing CRM contact found" : "New CRM contact"}</strong><span>{cardDuplicate.status === "existing" ? `${cardDuplicate.existingContact?.name || "This person"} matches by ${cardDuplicate.matchReason}. Saving updates the existing record instead of creating a duplicate.` : "No matching email, LinkedIn URL, phone number, or name/company record was found."}</span></section> : null}
+          <fieldset className="business-card-review"><legend>Review captured information</legend><div className="contact-form-grid">{[["firstName", "First name"], ["lastName", "Last name"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Job title"], ["linkedin", "LinkedIn"], ["website", "Website"], ["city", "City"], ["state", "State"], ["country", "Country"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={cardDraft[key] || ""} onChange={(event) => { setCardDraft({ ...cardDraft, [key]: event.target.value }); setCardDuplicate(null); }} onBlur={() => reviewCardDraft(cardDraft)} /></label>)}<label className="form-field span-2"><span>Networking notes</span><textarea className="select-input" value={cardDraft.notes || ""} onChange={(event) => setCardDraft({ ...cardDraft, notes: event.target.value })} placeholder="Where you met, what you discussed, and the next step" /></label><label className="form-field span-2"><span>Campaign or event</span><select className="select-input" value={cardCampaignId} onChange={(event) => setCardCampaignId(event.target.value)}><option value="">Keep unassigned</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label></div></fieldset>
+          <p className="business-card-consent"><strong>Email safety:</strong> Receiving a business card does not automatically grant bulk-marketing consent. Ellie stores the contact for relationship follow-up; campaign permission remains off until it is recorded separately.</p>
+        </div>
       </Modal>
 
       <Modal

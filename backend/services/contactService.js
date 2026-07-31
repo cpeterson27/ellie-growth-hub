@@ -564,12 +564,19 @@ class ContactService {
 
 
 
+    const requestedLifecycleStage = updates.stage !== undefined
+      ? String(updates.stage || "").trim()
+      : null;
+
     Object.assign(
       contact,
       updates
     );
 
     applyResearchClassification(contact);
+    // Research readiness and CRM lifecycle are related but not identical.
+    // A deliberate user move in the pipeline must remain authoritative.
+    if (requestedLifecycleStage !== null) contact.stage = requestedLifecycleStage;
     await contact.save();
 
 
