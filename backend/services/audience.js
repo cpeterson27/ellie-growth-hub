@@ -315,6 +315,9 @@ async function discoverOrganizationsForAudience(audienceId) {
     const industries = criteria.industries || [];
     const locations = criteria.locations || [];
     const employeeRange = criteria.employeeRange || { min: null, max: null };
+    const revenueRange = criteria.revenueRange || { min: null, max: null };
+    const fundingRange = criteria.fundingRange || { min: null, max: null };
+    const technologiesAny = criteria.technologiesAny || [];
     const minimumScore = criteria.minimumScore ?? 0;
     const targetTier = criteria.targetTier ?? null;
 
@@ -343,6 +346,9 @@ async function discoverOrganizationsForAudience(audienceId) {
         keywords: searchKeywords,
         locations,
         employeeRange,
+        revenueRange,
+        fundingRange,
+        technologiesAny,
         page,
         perPage,
       });
@@ -361,6 +367,9 @@ async function discoverOrganizationsForAudience(audienceId) {
           keywords: [searchKeywords[0]],
           locations,
           employeeRange,
+          revenueRange,
+          fundingRange,
+          technologiesAny,
           page,
           perPage,
         });
@@ -370,8 +379,13 @@ async function discoverOrganizationsForAudience(audienceId) {
       }
 
       if (!searchResult.success || !searchResult.organizations) {
-        pagination.stoppedReason = "error";
-        break;
+        return {
+          success: false,
+          error: searchResult.message || "Apollo organization search failed",
+          errorCode: searchResult.errorCode || searchResult.error || "provider_error",
+          status: searchResult.status || null,
+          retryAfter: searchResult.retryAfter || null,
+        };
       }
 
       if (page === 1) {

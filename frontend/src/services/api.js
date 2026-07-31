@@ -30,6 +30,12 @@ export const fetchWorkspaceMembers = () =>
 export const createWorkspaceMember = (values) =>
   api.post("/workspace/members", values).then((res) => res.data);
 
+export const fetchDiscoveryTemplates = () =>
+  api.get("/workspace/discovery-templates").then((res) => res.data);
+
+export const saveDiscoveryTemplates = (templates) =>
+  api.put("/workspace/discovery-templates", { templates }).then((res) => res.data);
+
 
 // ======================================
 // CAMPAIGNS
@@ -270,6 +276,18 @@ export const fetchIntegrationHub = () =>
 
 export const searchApolloLeads = (payload) =>
   api.post("/contacts/apollo/search", payload).then((res) => res.data);
+
+export const fetchApolloStatus = () =>
+  api.get("/contacts/apollo/status").then((res) => res.data);
+
+export const fetchApolloLists = () =>
+  api.get("/contacts/apollo/lists").then((res) => res.data);
+
+export const fetchApolloHistory = () =>
+  api.get("/contacts/apollo/history").then((res) => res.data);
+
+export const estimateApolloEnrichment = (count) =>
+  api.post("/contacts/apollo/enrichment-estimate", { count }).then((res) => res.data);
 
 export const createAudienceDefinition = (payload) =>
   api.post("/audience", payload).then((res) => res.data);

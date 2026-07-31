@@ -66,6 +66,21 @@ const audienceSchema = new mongoose.Schema(
         max: { type: Number, default: null },
       },
 
+      revenueRange: {
+        min: { type: Number, default: null },
+        max: { type: Number, default: null },
+      },
+
+      fundingRange: {
+        min: { type: Number, default: null },
+        max: { type: Number, default: null },
+      },
+
+      technologiesAny: {
+        type: [String],
+        default: [],
+      },
+
       // Only organizations scoring at or above this threshold are linked to this audience
       minimumScore: {
         type: Number,

@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
 const User = require("../models/User");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
@@ -97,6 +98,47 @@ router.post("/members", async (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.code === 11000 ? "That email already belongs to an account" : error.message });
   }
+});
+
+router.get("/discovery-templates", async (_req, res) => {
+  const config = await WorkspaceConfig.findOneAndUpdate(
+    { key: "primary" },
+    { $setOnInsert: { workspaceName: "Ellie AI Growth Operator" } },
+    { upsert: true, new: true },
+  );
+  res.json({ templates: config.discoveryTemplates || [] });
+});
+
+router.put("/discovery-templates", async (req, res) => {
+  const templates = (Array.isArray(req.body?.templates) ? req.body.templates : [])
+    .slice(0, 30)
+    .map((template) => ({
+      id: String(template.id || crypto.randomUUID()),
+      name: String(template.name || "").trim().slice(0, 120),
+      titles: String(template.titles || "").slice(0, 500),
+      industries: String(template.industries || "").slice(0, 500),
+      keywords: String(template.keywords || "").slice(0, 1000),
+      locations: String(template.locations || "").slice(0, 500),
+      employeeMin: String(template.employeeMin ?? "").slice(0, 12),
+      employeeMax: String(template.employeeMax ?? "").slice(0, 12),
+      industryIds: (Array.isArray(template.industryIds) ? template.industryIds : []).map(String).slice(0, 20),
+      emailStatuses: (Array.isArray(template.emailStatuses) ? template.emailStatuses : []).map(String).slice(0, 5),
+      seniorities: (Array.isArray(template.seniorities) ? template.seniorities : []).map(String).slice(0, 12),
+      technologiesAny: String(template.technologiesAny || "").slice(0, 1000),
+      technologiesAll: String(template.technologiesAll || "").slice(0, 1000),
+      technologiesExclude: String(template.technologiesExclude || "").slice(0, 1000),
+      revenueMin: String(template.revenueMin ?? "").slice(0, 20),
+      revenueMax: String(template.revenueMax ?? "").slice(0, 20),
+      fundingMin: String(template.fundingMin ?? "").slice(0, 20),
+      fundingMax: String(template.fundingMax ?? "").slice(0, 20),
+    }))
+    .filter((template) => template.name);
+  const config = await WorkspaceConfig.findOneAndUpdate(
+    { key: "primary" },
+    { $set: { discoveryTemplates: templates } },
+    { upsert: true, new: true },
+  );
+  res.json({ templates: config.discoveryTemplates });
 });
 
 module.exports = router;

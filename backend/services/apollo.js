@@ -36,6 +36,8 @@ function formatError(error) {
     ? "timeout"
     : status === 401 ? "unauthorized"
       : status === 403 ? "forbidden"
+        : status === 422 ? "invalid_request"
+          : status === 429 ? "rate_limited"
         : status === 404 || status === 405 ? "unsupported_endpoint"
           : "provider_error";
 
@@ -44,9 +46,89 @@ function formatError(error) {
     error: code,
     errorCode: code,
     status: status ?? null,
+    retryAfter: error.response?.headers?.["retry-after"] || null,
     results: [],
     message: error.response?.data?.message || error.response?.data?.error || null,
   };
+}
+
+async function getAccountStatus() {
+  if (!process.env.APOLLO_API_KEY) {
+    return { connected: false, configured: false, code: "not_configured", message: "Apollo API key is not configured." };
+  }
+  try {
+    const key = getApiKey();
+    const response = await apolloClient().post("/usage_stats/api_usage_stats", {}, {
+      headers: { "x-api-key": key },
+    });
+    return {
+      connected: true,
+      configured: true,
+      code: "connected",
+      message: "Apollo accepted the configured API key.",
+      usageAvailable: true,
+      usage: response.data || {},
+      checkedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    const formatted = formatError(error);
+    if (formatted.errorCode === "forbidden") {
+      return {
+        connected: true,
+        configured: true,
+        code: "usage_scope_unavailable",
+        message: "Apollo key is configured, but it cannot read API usage stats. Search permissions are checked when a search runs.",
+        usageAvailable: false,
+        checkedAt: new Date().toISOString(),
+      };
+    }
+    if (formatted.errorCode === "rate_limited") {
+      return {
+        connected: true,
+        configured: true,
+        code: "rate_limited",
+        message: "Apollo accepted the key but the API is currently rate limited.",
+        retryAfter: formatted.retryAfter,
+        checkedAt: new Date().toISOString(),
+      };
+    }
+    return {
+      connected: false,
+      configured: true,
+      code: formatted.errorCode,
+      status: formatted.status,
+      message: formatted.message,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+}
+
+async function listApolloLists() {
+  try {
+    const response = await apolloClient().get("/labels", { headers: { "x-api-key": getApiKey() } });
+    const lists = response.data?.labels || response.data?.lists || [];
+    return { success: true, lists: lists.map((item) => ({ id: item.id, name: item.name, modality: item.modality || item.kind || "contacts" })) };
+  } catch (error) {
+    return { ...formatError(error), lists: [] };
+  }
+}
+
+async function savePeopleToApolloList(people = [], listName = "") {
+  const saved = [];
+  for (const person of people.slice(0, 25)) {
+    const response = await apolloClient().post("/contacts", {
+      first_name: person.firstName || "",
+      last_name: person.lastName || "",
+      organization_name: person.company || "",
+      title: person.title || "",
+      email: person.email || undefined,
+      present_raw_address: person.location || "",
+      label_names: [listName],
+      run_dedupe: true,
+    }, { headers: { "x-api-key": getApiKey() } });
+    saved.push(response.data?.contact || response.data);
+  }
+  return { success: true, saved: saved.length };
 }
 
 function nonBlankStrings(values) {
@@ -55,16 +137,29 @@ function nonBlankStrings(values) {
     : [];
 }
 
-function buildContactSearchBody({ titles = [], keywords = [], domains = [], locations = [], page = 1, perPage = 25 } = {}) {
+function buildContactSearchBody({ titles = [], keywords = [], domains = [], locations = [], industryIds = [], emailStatuses = [], seniorities = [], technologiesAny = [], technologiesAll = [], technologiesExclude = [], employeeRange = {}, revenueRange = {}, page = 1, perPage = 25 } = {}) {
   const body = { page: Math.max(1, Number(page) || 1), per_page: Math.min(100, Math.max(1, Number(perPage) || 25)) };
   const cleanedTitles = nonBlankStrings(titles);
   const cleanedKeywords = nonBlankStrings(keywords);
   const cleanedDomains = nonBlankStrings(domains);
   const cleanedLocations = nonBlankStrings(locations);
+  const cleanedIndustryIds = nonBlankStrings(industryIds);
+  const cleanedEmailStatuses = nonBlankStrings(emailStatuses);
   if (cleanedTitles.length) body.person_titles = cleanedTitles;
   if (cleanedKeywords.length) body.q_keywords = cleanedKeywords.join(" ");
   if (cleanedDomains.length) body.q_organization_domains_list = cleanedDomains;
   if (cleanedLocations.length) body.person_locations = cleanedLocations;
+  if (cleanedIndustryIds.length) body.organization_industry_tag_ids = cleanedIndustryIds;
+  if (cleanedEmailStatuses.length) body.contact_email_status = cleanedEmailStatuses;
+  if (nonBlankStrings(seniorities).length) body.person_seniorities = nonBlankStrings(seniorities);
+  if (nonBlankStrings(technologiesAny).length) body.currently_using_any_of_technology_uids = nonBlankStrings(technologiesAny);
+  if (nonBlankStrings(technologiesAll).length) body.currently_using_all_of_technology_uids = nonBlankStrings(technologiesAll);
+  if (nonBlankStrings(technologiesExclude).length) body.currently_not_using_any_of_technology_uids = nonBlankStrings(technologiesExclude);
+  const hasEmployeeMin = employeeRange?.min !== null && employeeRange?.min !== undefined && employeeRange?.min !== "";
+  const hasEmployeeMax = employeeRange?.max !== null && employeeRange?.max !== undefined && employeeRange?.max !== "";
+  if (hasEmployeeMin || hasEmployeeMax) body.organization_num_employees_ranges = [`${hasEmployeeMin ? Number(employeeRange.min) : 1},${hasEmployeeMax ? Number(employeeRange.max) : 1000000}`];
+  if (revenueRange?.min !== "" && revenueRange?.min != null) body["revenue_range[min]"] = Number(revenueRange.min);
+  if (revenueRange?.max !== "" && revenueRange?.max != null) body["revenue_range[max]"] = Number(revenueRange.max);
   return body;
 }
 
@@ -141,6 +236,9 @@ async function searchOrganizations({
   keywords = [],
   locations = [],
   employeeRange = {},
+  revenueRange = {},
+  fundingRange = {},
+  technologiesAny = [],
   page = 1,
   perPage = 25,
 } = {}) {
@@ -169,6 +267,11 @@ async function searchOrganizations({
         `${Number.isFinite(minEmployees) ? minEmployees : 1},${Number.isFinite(maxEmployees) ? maxEmployees : 1000000}`,
       ];
     }
+    if (revenueRange?.min !== "" && revenueRange?.min != null) body["revenue_range[min]"] = Number(revenueRange.min);
+    if (revenueRange?.max !== "" && revenueRange?.max != null) body["revenue_range[max]"] = Number(revenueRange.max);
+    if (fundingRange?.min !== "" && fundingRange?.min != null) body["latest_funding_amount_range[min]"] = Number(fundingRange.min);
+    if (fundingRange?.max !== "" && fundingRange?.max != null) body["latest_funding_amount_range[max]"] = Number(fundingRange.max);
+    if (nonBlankStrings(technologiesAny).length) body.currently_using_any_of_technology_uids = nonBlankStrings(technologiesAny);
 
     const response = await apolloClient().post("/mixed_companies/search", body, {
       headers: { "x-api-key": key },
@@ -367,6 +470,9 @@ module.exports = {
   searchContacts,
   buildContactSearchBody,
   contactSearchDiagnostic,
+  getAccountStatus,
+  listApolloLists,
+  savePeopleToApolloList,
   enrichContacts,
 };
 
@@ -412,13 +518,21 @@ async function searchContacts({
   keywords = [],
   domains = [],
   locations = [],
+  industryIds = [],
+  emailStatuses = [],
+  seniorities = [],
+  technologiesAny = [],
+  technologiesAll = [],
+  technologiesExclude = [],
+  employeeRange = {},
+  revenueRange = {},
   page = 1,
   perPage = 25,
 } = {}) {
   try {
     const key = getApiKey();
 
-    const body = buildContactSearchBody({ titles, keywords, domains, locations, page, perPage });
+    const body = buildContactSearchBody({ titles, keywords, domains, locations, industryIds, emailStatuses, seniorities, technologiesAny, technologiesAll, technologiesExclude, employeeRange, revenueRange, page, perPage });
 
     const { page: searchPage, per_page: perPageValue, ...filters } = body;
     const response = await apolloClient().post("/mixed_people/api_search", null, {

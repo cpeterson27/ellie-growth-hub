@@ -4,6 +4,7 @@ const Contact = require("../models/Contact");
 const Organization = require("../models/Organization");
 const Audience = require("../models/Audience");
 const DiscoveryRun = require("../models/DiscoveryRun");
+const ApolloSearchRun = require("../models/ApolloSearchRun");
 
 const {
   discoverAudienceSources,
@@ -909,6 +910,7 @@ router.get("/organizations", async (req, res) => {
 // ======================================
 
 router.post("/:id/discover", async (req, res) => {
+  const startedAt = Date.now();
   try {
     const { id } = req.params;
 
@@ -922,12 +924,45 @@ router.post("/:id/discover", async (req, res) => {
     const result = await discoverOrganizationsForAudience(id);
 
     if (!result.success) {
-      return res.status(400).json({
+      await ApolloSearchRun.create({
+        workspaceId: req.auth.workspaceId,
+        userId: req.auth.user._id,
+        mode: "organizations",
+        templateName: result.audience?.name || "",
+        status: "error",
+        durationMs: Date.now() - startedAt,
+        errorCode: result.errorCode || "organization_search_failed",
+        errorMessage: result.error || "",
+      });
+      const status = result.status === 401 || result.status === 403 || result.status === 429
+        ? result.status
+        : 400;
+      return res.status(status).json({
         success: false,
         error: result.error,
+        code: result.errorCode || "organization_search_failed",
+        retryAfter: result.retryAfter || null,
+        action: result.errorCode === "unauthorized"
+          ? "Replace the Apollo API key in backend settings."
+          : result.errorCode === "forbidden"
+            ? "Enable Company Search access for the Apollo API key or use a master key."
+            : result.errorCode === "rate_limited"
+              ? "Wait for Apollo's rate-limit window to reset."
+              : "Review the company filters and Apollo permissions, then retry.",
       });
     }
 
+    await ApolloSearchRun.create({
+      workspaceId: req.auth.workspaceId,
+      userId: req.auth.user._id,
+      mode: "organizations",
+      templateName: result.audience?.name || "",
+      filters: result.audience?.criteria || {},
+      status: result.organizationsFound ? "success" : "empty",
+      totalMatches: result.organizationsFound || 0,
+      resultsReturned: result.organizationsFound || 0,
+      durationMs: Date.now() - startedAt,
+    });
     return res.json({
       success: result.success,
       audienceId: result.audienceId,
