@@ -208,6 +208,9 @@ const outreachSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    bounceType: { type: String, default: "" },
+    bounceSubType: { type: String, default: "" },
+    bounceMessage: { type: String, default: "" },
 
 
   },

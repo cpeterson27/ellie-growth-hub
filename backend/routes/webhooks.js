@@ -105,6 +105,11 @@ router.post("/resend", async (req, res) => {
           $set: {
             lastEmailEventAt: occurredAt,
             ...(lifecycle.status ? { deliveryStatus: lifecycle.status } : {}),
+            ...(event.type === "email.bounced" ? {
+              bounceType: String(data.bounce?.type || ""),
+              bounceSubType: String(data.bounce?.subType || ""),
+              bounceMessage: String(data.bounce?.message || ""),
+            } : {}),
           },
         },
       );

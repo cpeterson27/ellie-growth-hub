@@ -161,6 +161,22 @@
 .outreach-list-tools .outreach-search { display: block; }
 .outreach-list-tools .outreach-search > span { width: 100%; }
 .outreach-list-tools .outreach-search input { min-width: 0; }
+.outreach-guidance {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem 0.8rem;
+  align-items: center;
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #cbd9d5;
+  border-left: 3px solid #547a70;
+  border-radius: 5px;
+  background: #f3f7f5;
+}
+.outreach-guidance span { color: var(--text-muted); font-size: 0.8rem; line-height: 1.45; }
+.outreach-guidance--bounced { border-color: #e7c9c5; border-left-color: #a84b41; background: #fff5f3; }
+.outreach-guidance--delivered { border-color: #c5dfd3; border-left-color: #2e705c; background: #f1f8f4; }
+@media (max-width: 680px) { .outreach-guidance { grid-template-columns: 1fr; } }
 .outreach-mailbox {
   width: 100%;
   min-width: 0;

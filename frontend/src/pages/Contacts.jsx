@@ -187,7 +187,7 @@ export default function Contacts() {
   const [detailContact, setDetailContact] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
   const [contactEditMode, setContactEditMode] = useState("full");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get("search") || "");
   const [currentPage, setCurrentPage] = useState(1);
   const [verifyingEmails, setVerifyingEmails] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(null);
@@ -262,6 +262,7 @@ export default function Contacts() {
   useEffect(() => {
     setCampaignId(searchParams.get("allCampaigns") === "true" ? "" : searchParams.get("campaignId") || (initiativeId === "all" ? "" : initiativeId));
     if (searchParams.get("tab")) setContactTab(searchParams.get("tab"));
+    if (searchParams.get("search") !== null) setSearchTerm(searchParams.get("search") || "");
   }, [initiativeId, searchParams]);
 
   function openImportConfirmation(source) {

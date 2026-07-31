@@ -45,6 +45,11 @@ const deliveryLabel = (item) => {
   if (item.status === "sent") return "In delivery";
   return labels[item.status] || item.status;
 };
+const viewGuidance = {
+  processing: { title: "No action needed", body: "Resend is attempting delivery. Ellie will update this automatically. Do not send the message again." },
+  delivered: { title: "Delivered successfully", body: "The recipient’s mail server accepted the email. Wait for a reply; delivery does not guarantee the person opened it." },
+  bounced: { title: "Replace the email address", body: "Keep the contact, but do not reuse this address. Open the contact, research a different verified email, and update the record before future outreach." },
+};
 const htmlToText = (html = "") =>
   String(html)
     .replace(/<br\s*\/?>/gi, "\n")
@@ -315,6 +320,7 @@ export default function Outreach() {
             <span><FiSearch aria-hidden="true" /><input className="select-input" aria-label={`Search ${labels[filter] || "outreach"}`} placeholder={filter === "sent" ? "Search sent mail" : `Search ${String(labels[filter] || "outreach").toLowerCase()}`} value={search} onChange={(e) => setSearch(e.target.value)} /></span>
           </label>
         </div>
+        {viewGuidance[filter] ? <aside className={`outreach-guidance outreach-guidance--${filter}`}><strong>{viewGuidance[filter].title}</strong><span>{viewGuidance[filter].body}</span></aside> : null}
         {loading ? (
           <p>Loading outreach…</p>
         ) : filtered.length ? (
@@ -345,10 +351,10 @@ export default function Outreach() {
                   <Button
                     variant={item.status === "pending" ? "primary" : "outline"}
                     size="sm"
-                    onClick={() => review(item)}
+                    onClick={() => item.deliveryStatus === "bounced" ? navigate(`/contacts?search=${encodeURIComponent(item.contactEmail || "")}`) : review(item)}
                   >
-                    <FiEye />
-                    <span>{item.status === "pending" ? "Review" : item.status === "failed" ? "Review issue" : "View email"}</span>
+                    {item.deliveryStatus === "bounced" ? <FiSearch /> : <FiEye />}
+                    <span>{item.deliveryStatus === "bounced" ? "Fix email" : item.status === "pending" ? "Review" : item.status === "failed" ? "Review issue" : "View email"}</span>
                   </Button>
                   {item.contactEmail && ["sent", "replied"].includes(item.status) ? (
                     <Button
