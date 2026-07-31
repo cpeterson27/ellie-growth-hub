@@ -65,13 +65,13 @@ const campaignSearchSuggestions = (campaign) => {
   if (!campaign) return [];
   const isMultifamily = /multifamily|deal to close/i.test(`${campaign.name || ""} ${campaign.programName || ""}`);
   if (isMultifamily) return [
-    { id: "deal-team", label: "Deal team professionals", description: "People actively evaluating and structuring multifamily acquisitions.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · deal team · FL + TX`, titles: "Acquisitions Manager, Underwriter, Managing Partner", keywords: "Multifamily, Syndication, Rent Roll", locations: "Florida, US; Texas, US", employeeRanges: ["1,10"], emailStatuses: ["verified"] } },
-    { id: "operators", label: "Multifamily operators", description: "Owners and operators who may attend, sponsor, or share the event.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · operators · FL + TX`, titles: "Owner, Founder, Principal, Managing Partner", keywords: "Multifamily, Apartment Investing, Syndication", locations: "Florida, US; Texas, US", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"], seniorities: ["owner", "founder", "partner"] } },
-    { id: "referral-partners", label: "Referral partners", description: "Professionals with audiences or client relationships relevant to the bootcamp.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · referral partners · US`, titles: "Real Estate Broker, Mortgage Broker, Property Manager", keywords: "Multifamily, Real Estate Investing, Investor Education", locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"] } },
+    { id: "deal-team", label: "Deal team professionals", description: "People actively evaluating and structuring multifamily acquisitions.", why: "The event topic points to acquisition work, so this strategy combines deal roles with multifamily keywords and the event’s target markets.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · deal team · FL + TX`, titles: "Acquisitions Manager, Underwriter, Managing Partner", keywords: "Multifamily, Syndication, Rent Roll", locations: "Florida, US; Texas, US", employeeRanges: ["1,10"], emailStatuses: ["verified"] } },
+    { id: "operators", label: "Multifamily operators", description: "Owners and operators who may attend, sponsor, or share the event.", why: "This broadens beyond employees to owner-level operators while retaining multifamily relevance and verified email status.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · operators · FL + TX`, titles: "Owner, Founder, Principal, Managing Partner", keywords: "Multifamily, Apartment Investing, Syndication", locations: "Florida, US; Texas, US", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"], seniorities: ["owner", "founder", "partner"] } },
+    { id: "referral-partners", label: "Referral partners", description: "Professionals with audiences or client relationships relevant to the bootcamp.", why: "This is a separate partner strategy for professionals who can refer qualified attendees rather than attend as operators themselves.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · referral partners · US`, titles: "Real Estate Broker, Mortgage Broker, Property Manager", keywords: "Multifamily, Real Estate Investing, Investor Education", locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"] } },
   ];
   return [
-    { id: "decision-makers", label: "Event decision-makers", description: "Owners and leaders likely to evaluate or share this offer.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · decision-makers`, titles: "Owner, Founder, Managing Partner", keywords: campaign.programName || campaign.name, locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"] } },
-    { id: "companies", label: "Matching companies", description: "Companies aligned with the event topic for later contact discovery.", target: { ...EMPTY_TARGET, mode: "organizations", name: `${campaign.name} · matching companies`, industries: campaign.programName || campaign.name, keywords: campaign.programName || campaign.name, locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"] } },
+    { id: "decision-makers", label: "Event decision-makers", description: "Owners and leaders likely to evaluate or share this offer.", why: "This strategy pairs the event topic with senior decision-making roles and verified email status.", target: { ...EMPTY_TARGET, mode: "people", name: `${campaign.name} · decision-makers`, titles: "Owner, Founder, Managing Partner", keywords: campaign.programName || campaign.name, locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"], emailStatuses: ["verified"] } },
+    { id: "companies", label: "Matching companies", description: "Companies aligned with the event topic for later contact discovery.", why: "This company-first strategy finds relevant organizations before choosing individual contacts.", target: { ...EMPTY_TARGET, mode: "organizations", name: `${campaign.name} · matching companies`, industries: campaign.programName || campaign.name, keywords: campaign.programName || campaign.name, locations: "United States", employeeRanges: ["1,10", "11,20", "21,50"] } },
   ];
 };
 
@@ -104,6 +104,7 @@ export default function Discovery() {
   const [apolloHistory, setApolloHistory] = useState([]);
   const [enrichmentEstimate, setEnrichmentEstimate] = useState(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [recheckingApollo, setRecheckingApollo] = useState(false);
 
   const loadProspects = async () => {
     const response = await fetchContacts({ status: "prospect", limit: 500 });
@@ -236,6 +237,28 @@ export default function Discovery() {
     setTarget({ ...suggestion.target });
     setSuggestionsOpen(false);
     setNotice(`“${suggestion.label}” loaded as an unsaved search. Review it, then save only if you want to keep it.`);
+  };
+
+  const recheckApolloAccess = async () => {
+    setRecheckingApollo(true);
+    setApolloStatus({ state: "checking", message: "Checking Apollo search and saved-list access…" });
+    setApolloListCapability({ state: "checking", message: "Checking saved-list access…" });
+    try {
+      const [status, listData] = await Promise.all([fetchApolloStatus(), fetchApolloLists()]);
+      const nextListState = listData.available === false ? "unavailable" : "available";
+      setApolloStatus({ ...status, state: status.connected ? "connected" : "error" });
+      setApolloLists((listData.lists || []).filter((item) => item.modality === "contacts"));
+      setApolloListCapability({ state: nextListState, code: listData.code, message: listData.message, action: listData.action });
+      const peopleReady = status.capabilities?.peopleSearch?.available !== false;
+      setNotice(peopleReady && nextListState === "available"
+        ? "Apollo full access confirmed: company search, people search, and saved-list sync are ready."
+        : "Apollo rechecked. Company search is ready; the capability panel shows what is still limited.");
+    } catch (error) {
+      setApolloStatus({ state: "error", message: error.response?.data?.message || "Unable to verify Apollo." });
+      setApolloListCapability({ state: "error", message: "Ellie could not complete every Apollo permission check." });
+    } finally {
+      setRecheckingApollo(false);
+    }
   };
 
   const openApolloPeopleSearch = () => {
@@ -403,7 +426,7 @@ export default function Discovery() {
 
       <div className="apollo-workbench">
       <DashboardCard title="Filters" className="apollo-filter-panel" action={<span className="apollo-filter-count">{searchMode === "people" ? "People" : "Companies"}</span>}>
-        <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? (peopleApiAvailable ? "Apollo search ready" : "Apollo company search ready") : apolloStatus.state === "checking" ? "Checking Apollo account" : "Apollo account needs attention"}</strong><p>{apolloStatus.state === "connected" ? (peopleApiAvailable ? "People and company API access is connected." : "Company API connected · People searches open in Apollo on this plan.") : apolloStatus.message}</p></div><Button variant="ghost" size="sm" onClick={() => { setApolloStatus({ state: "checking", message: "Checking Apollo connection…" }); fetchApolloStatus().then((status) => setApolloStatus({ ...status, state: status.connected ? "connected" : "error" })).catch((error) => setApolloStatus({ state: "error", message: error.response?.data?.message || "Unable to verify Apollo." })); }}>Recheck</Button></div>
+        <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? (peopleApiAvailable ? "Apollo search ready" : "Apollo company search ready") : apolloStatus.state === "checking" ? "Checking Apollo account" : "Apollo account needs attention"}</strong><p>{apolloStatus.state === "connected" ? (peopleApiAvailable ? "People and company API access is connected." : "Company API connected · People searches open in Apollo on this plan.") : apolloStatus.message}</p></div><Button variant="ghost" size="sm" loading={recheckingApollo} onClick={recheckApolloAccess}>Recheck all access</Button></div>
         <details className="apollo-access-summary">
           <summary><span>Apollo connection capabilities</span><strong>{peopleApiAvailable && apolloListCapability.state === "available" ? "Full access" : "Partial access"}</strong></summary>
           <div><span className="is-ready">Available now</span><p><strong>Company search:</strong> keywords, headquarters, employee size, revenue, funding, and supported firmographic filters.</p></div>
@@ -411,6 +434,7 @@ export default function Discovery() {
           <div><span className={apolloListCapability.state === "available" ? "is-ready" : "is-limited"}>{apolloListCapability.state === "available" ? "Available now" : "Key permission"}</span><p><strong>Saved-list sync:</strong> requires the key’s labels/lists endpoint permission. It is separate from search access.</p></div>
           <div><span className="is-unavailable">Not in API</span><p><strong>Buyer intent:</strong> available in Apollo’s product experience, but not through the connected public search endpoints.</p></div>
           <footer><strong>Recommended server key:</strong> paid-plan scoped key with People Search, Company Search, labels/lists, contact creation, and bulk people enrichment—or a master API key. Store it only as <code>APOLLO_API_KEY</code> on Render; never in frontend code.</footer>
+          <section className="apollo-key-setup"><strong>To unlock full access</strong><ol><li>Upgrade the Apollo account to a plan that includes API access.</li><li>In Apollo—not Resend—create a master key or a scoped key with People Search (<code>mixed_people_api_search</code>) and Lists/Labels (<code>api/v1/labels/index</code>).</li><li>Replace <code>APOLLO_API_KEY</code> in the Render backend environment and redeploy the backend.</li><li>Return here and click <strong>Recheck all access</strong>. Ellie will retest both capabilities.</li></ol></section>
         </details>
         <div className="apollo-event-builder"><label>Build an audience for<select value={eventCampaignId} onChange={(event) => setEventCampaignId(event.target.value)}><option value="">Choose event or campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><Button variant="outline" size="sm" disabled={!eventCampaignId} onClick={() => setSuggestionsOpen(true)}>View suggested searches</Button></div>
         <p className="apollo-note">Choose a saved filter set or build a new one. Saved searches here are reusable Ellie filters for searching Apollo.</p>
@@ -427,6 +451,7 @@ export default function Discovery() {
           <fieldset className="apollo-employee-ranges"><legend>Company size · employees</legend>{EMPLOYEE_RANGES.map((range) => <label key={range}><input type="checkbox" checked={(target.employeeRanges || []).includes(range)} onChange={() => setTarget({ ...target, employeeRanges: (target.employeeRanges || []).includes(range) ? target.employeeRanges.filter((item) => item !== range) : [...(target.employeeRanges || []), range], employeeMin: "", employeeMax: "" })} />{employeeRangeLabel(range)}</label>)}<small>Select one or more Apollo ranges.</small></fieldset>
           {searchMode === "people" ? <fieldset className="apollo-verified-filter"><legend>Email status</legend><label><input type="checkbox" checked={(target.emailStatuses || []).includes("verified")} onChange={(event) => setTarget({ ...target, emailStatuses: event.target.checked ? ["verified"] : [] })} />Verified emails only</label></fieldset> : null}
         </div>
+        {targetPreset === "custom" && target.name ? <div className="apollo-unsaved-search"><div><strong>Unsaved search</strong><span>Review the filters below, then save it to make it available in My saved searches next time.</span></div><Button size="sm" loading={savingTemplate} onClick={saveTemplate}>Save for next time</Button></div> : null}
         {searchMode === "people" && currentFilterGroups.length ? <div className="apollo-search-blueprint"><header><div><strong>Search blueprint</strong><span>{currentFilterCount} active filters</span></div><small>{peopleSearchRunsInApollo ? "Opens as a filtered search in Apollo" : "Runs through Apollo People Search API"}</small></header>{currentFilterGroups.map(([label, values]) => <div key={label}><strong>{label}</strong><span>{values.join(" · ")}</span></div>)}</div> : null}
         <details className="apollo-advanced-filters">
           <summary>Advanced Apollo filters <span>{searchMode === "people" ? "Seniority and company revenue" : "Revenue and latest funding"}</span></summary>
@@ -514,8 +539,9 @@ export default function Discovery() {
 
       <Modal isOpen={suggestionsOpen} onClose={() => setSuggestionsOpen(false)} title={`Suggested searches${selectedEventCampaign?.name ? ` for ${selectedEventCampaign.name}` : ""}`}>
         <div className="apollo-suggestion-list">
-          <p>Ellie prepared distinct audience strategies. Nothing is saved or searched until you choose what to do.</p>
-          {eventSuggestions.map((suggestion) => <article key={suggestion.id}><div><span>Suggested by Ellie</span><h4>{suggestion.label}</h4><p>{suggestion.description}</p><small>{splitFilters(suggestion.target.titles).length || 0} titles · {splitLocations(suggestion.target.locations).length || 0} locations · {(suggestion.target.employeeRanges || []).map(employeeRangeLabel).join(", ")} employees</small></div><Button onClick={() => useSuggestedSearch(suggestion)}>Use this search</Button></article>)}
+          <div className="apollo-suggestion-source"><strong>How Ellie built these</strong><p>These are transparent, curated audience playbooks chosen from the event name and program type—not results pulled from Apollo and not an AI guess hidden from you. Choosing one only loads editable filters.</p></div>
+          <p>Nothing is saved and no Apollo search runs until you review the filters and choose the next action.</p>
+          {eventSuggestions.map((suggestion) => <article key={suggestion.id}><div><span>Suggested by Ellie</span><h4>{suggestion.label}</h4><p>{suggestion.description}</p><small><strong>Why:</strong> {suggestion.why}</small><small>{splitFilters(suggestion.target.titles).length || 0} titles · {splitLocations(suggestion.target.locations).length || 0} locations · {(suggestion.target.employeeRanges || []).map(employeeRangeLabel).join(", ")} employees</small></div><Button onClick={() => useSuggestedSearch(suggestion)}>Use &amp; review</Button></article>)}
         </div>
       </Modal>
       <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete prospect" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}>
