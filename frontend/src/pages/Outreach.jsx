@@ -244,18 +244,18 @@ export default function Outreach() {
         <div className="outreach-header__actions">
           <Button variant="outline" loading={saving} onClick={generate}>
             <FiRefreshCw />
-            Refresh all drafts
+            Refresh drafts
           </Button>
           <Button
             variant="outline"
             disabled={!counts.pending || saving}
             onClick={() => setApproveAllOpen(true)}
           >
-            Approve all pending ({counts.pending || 0})
+            Approve pending · {counts.pending || 0}
           </Button>
           <Button loading={saving} onClick={send}>
             <FiMail />
-            Send approved ({counts.approved || 0})
+            Send approved · {counts.approved || 0}
           </Button>
         </div>
       </header>

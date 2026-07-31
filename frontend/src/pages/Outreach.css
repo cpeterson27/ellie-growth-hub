@@ -52,6 +52,21 @@
   align-items: end;
   flex-wrap: wrap;
 }
+.outreach-header__actions {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  align-items: center;
+  gap: 0.5rem;
+}
+.outreach-header__actions .btn {
+  min-height: 38px;
+  padding: 0.52rem 0.72rem;
+  font-size: 0.78rem;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.outreach-header__actions .btn svg { flex: 0 0 auto; font-size: 0.95rem; }
 .outreach-header .btn--outline {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.35);
@@ -334,10 +349,15 @@
   }
   .outreach-header__actions {
     width: 100%;
+    grid-template-columns: 1fr;
   }
   .outreach-header__actions .btn {
-    flex: 1;
+    width: 100%;
   }
+}
+@media (min-width: 761px) and (max-width: 1080px) {
+  .outreach-header { align-items: flex-start; flex-direction: column; }
+  .outreach-header__actions { grid-template-columns: repeat(3, 1fr); width: 100%; }
 }
 @media (min-width: 761px) and (max-width: 1180px) {
   .outreach-mailbox__head,
