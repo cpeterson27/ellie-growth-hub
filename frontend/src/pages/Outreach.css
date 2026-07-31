@@ -331,6 +331,15 @@
 .outreach-email-correction__note { margin: 0; color: var(--text-muted); line-height: 1.5; }
 .outreach-email-correction label { display: grid; gap: 0.4rem; font-weight: 700; }
 .outreach-email-correction input { width: 100%; padding: 0.75rem 0.85rem; border: 1px solid var(--border); border-radius: 7px; font: inherit; color: var(--text); background: #fff; }
+.outreach-preview__replacement {
+  display: grid;
+  gap: 0.2rem;
+  margin-bottom: 0.9rem;
+  padding: 0.8rem 0.9rem;
+  border-left: 3px solid var(--primary);
+  background: #f1f7f5;
+}
+.outreach-preview__replacement span { color: var(--text-muted); line-height: 1.45; }
 .outreach-pagination > div {
   display: flex;
   gap: 0.45rem;

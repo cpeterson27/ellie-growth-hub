@@ -80,6 +80,7 @@ export default function Outreach() {
   const [preview, setPreview] = useState(null);
   const [emailCorrection, setEmailCorrection] = useState(null);
   const [emailCorrectionError, setEmailCorrectionError] = useState("");
+  const [replacementSendError, setReplacementSendError] = useState("");
   const [approveAllOpen, setApproveAllOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -262,11 +263,36 @@ export default function Outreach() {
       setEmailCorrectionError("");
       const result = await replaceBouncedOutreachEmail(emailCorrection._id, emailCorrection.newEmail);
       setEmailCorrection(null);
-      setNotice(result.message || "Email updated. A replacement draft is ready for review; nothing was sent.");
       await loadItems(selected);
-      setFilter("pending");
+      setPreview({
+        ...result.draft,
+        replacementDraft: true,
+        htmlBody: result.draft?.htmlBody || "",
+      });
+      setReplacementSendError("");
+      setNotice("Address updated. Review the replacement below; nothing has been sent yet.");
     } catch (err) {
       setEmailCorrectionError(err.response?.data?.error || "Unable to replace this email address.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const sendReplacement = async () => {
+    if (!preview?._id || !preview?.replacementDraft) return;
+    try {
+      setSaving(true);
+      setReplacementSendError("");
+      const approved = await updateOutreach(preview._id, { status: "approved" });
+      const result = await sendEmails([approved._id]);
+      if (result.failedCount) {
+        throw new Error(result.failures?.[0]?.message || "The replacement email could not be sent.");
+      }
+      setPreview(null);
+      setNotice(`Replacement sent to ${approved.contactEmail}. Ellie will update its delivery status automatically.`);
+      await loadItems(selected);
+      setFilter("processing");
+    } catch (err) {
+      setReplacementSendError(err.response?.data?.error || err.message || "Unable to send the replacement email.");
     } finally {
       setSaving(false);
     }
@@ -495,7 +521,12 @@ export default function Outreach() {
             >
               Send test to team@elliescoaching.com
             </Button>
-            {preview?.status === "pending" ? (
+            {preview?.replacementDraft ? (
+              <Button loading={saving} onClick={sendReplacement}>
+                <FiMail />
+                Send replacement now
+              </Button>
+            ) : preview?.status === "pending" ? (
               <Button
                 onClick={() => {
                   approve(preview);
@@ -514,6 +545,13 @@ export default function Outreach() {
       >
         {preview ? (
           <div className="outreach-preview">
+            {preview.replacementDraft ? (
+              <div className="outreach-preview__replacement">
+                <strong>Replacement ready</strong>
+                <span>This sends only this corrected message. The original bounce remains in delivery history.</span>
+              </div>
+            ) : null}
+            {replacementSendError ? <p className="form-error">{replacementSendError}</p> : null}
             <p>
               <strong>To</strong> {preview.contactName || "Contact"}{" "}
               {preview.contactEmail ? `<${preview.contactEmail}>` : ""}
