@@ -304,7 +304,7 @@ export default function Contacts() {
 
   async function startCardScanner() {
     if (!("BarcodeDetector" in window)) {
-      setCardStatus("Live QR scanning is not supported by this browser. Upload a QR screenshot or paste the vCard instead.");
+      setCardStatus("Live QR scanning is not supported by this browser. Upload a QR screenshot or paste the contact details copied from the digital card.");
       return;
     }
     try {
@@ -327,19 +327,19 @@ export default function Contacts() {
       detect();
     } catch (err) {
       stopCardScanner();
-      setCardStatus(err.name === "NotAllowedError" ? "Camera access was blocked. Allow camera access, or upload a QR screenshot instead." : "Ellie could not start the camera. Upload a QR screenshot or paste the vCard instead.");
+      setCardStatus(err.name === "NotAllowedError" ? "Camera access was blocked. Allow camera access, or upload a QR screenshot instead." : "Ellie could not start the camera. Upload a QR screenshot or paste the copied contact details instead.");
     }
   }
 
   async function readCardImage(file) {
     if (!file) return;
-    if (!("BarcodeDetector" in window)) return setCardStatus("QR image reading is not supported by this browser. Paste the vCard or card link instead.");
+    if (!("BarcodeDetector" in window)) return setCardStatus("QR image reading is not supported by this browser. Paste the contact details or digital-card link instead.");
     try {
       const bitmap = await createImageBitmap(file);
       const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
       const codes = await detector.detect(bitmap);
       bitmap.close?.();
-      if (!codes[0]?.rawValue) return setCardStatus("No QR code was found in that image. Try a clearer screenshot or paste the vCard.");
+      if (!codes[0]?.rawValue) return setCardStatus("No QR code was found in that image. Try a clearer screenshot or paste the copied contact details.");
       await acceptCardPayload(codes[0].rawValue);
     } catch { setCardStatus("Ellie could not read that image. Try a PNG or JPG screenshot of the QR code."); }
   }
@@ -959,7 +959,7 @@ export default function Contacts() {
         footer={<><Button variant="outline" disabled={savingContact} onClick={closeCardCapture}>Cancel</Button><Button loading={savingContact} disabled={!fullContactName(cardDraft)} onClick={saveBusinessCard}>{cardDuplicate?.status === "existing" ? "Update existing contact" : "Add to CRM"}</Button></>}
       >
         <div className="business-card-capture">
-          <section className="business-card-capture__intro"><span>Networking intake</span><h3>Scan once. Review once. Keep the relationship connected.</h3><p>Ellie reads QR-based digital cards and vCards, checks for an existing CRM record, and then creates or updates one contact.</p></section>
+          <section className="business-card-capture__intro"><span>Networking intake</span><h3>Scan once. Review once. Keep the relationship connected.</h3><p>Ellie reads a digital-card QR code or copied contact details, checks for an existing CRM record, and then creates or updates one contact.</p></section>
           <ol className="business-card-steps">
             <li><strong>Stay signed into Ellie</strong><span>Only your team needs an Ellie login. The person sharing the card does not.</span></li>
             <li><strong>Scan or paste the card</strong><span>Ellie keeps you on this screen instead of silently saving or launching a link.</span></li>
@@ -968,11 +968,11 @@ export default function Contacts() {
           </ol>
           <div className="business-card-capture__methods">
             <div><strong>Scan live QR</strong><small>Use the phone or computer camera.</small><Button variant="outline" size="sm" onClick={cardScanning ? stopCardScanner : startCardScanner}>{cardScanning ? "Stop camera" : "Start camera"}</Button></div>
-            <label><strong>Upload QR image</strong><small>Choose a screenshot of the digital card QR.</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => readCardImage(event.target.files?.[0])} /></label>
-            <div><strong>Paste vCard or card data</strong><small>Use this when the card offers Copy contact.</small><Button variant="outline" size="sm" disabled={!cardRaw.trim()} onClick={() => acceptCardPayload(cardRaw)}>Read pasted card</Button></div>
+            <label><strong>Use a QR screenshot</strong><small>Choose a saved screenshot containing the card’s QR code.</small><span className="business-card-upload-button">Choose screenshot</span><input className="business-card-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => readCardImage(event.target.files?.[0])} /></label>
+            <div className="business-card-capture__paste"><strong>Paste copied contact details</strong><small>Use this if the digital card offers “Copy contact,” “Share contact,” or a card link.</small><Button variant="outline" size="sm" disabled={!cardRaw.trim()} onClick={() => acceptCardPayload(cardRaw)}>Read contact details</Button></div>
           </div>
           <video className={cardScanning ? "business-card-camera is-active" : "business-card-camera"} ref={cardVideoRef} muted playsInline />
-          <label className="business-card-raw"><span>vCard, QR content, or digital-card link</span><textarea value={cardRaw} onChange={(event) => setCardRaw(event.target.value)} placeholder="Paste BEGIN:VCARD… or the copied card information" /></label>
+          <label className="business-card-raw"><span>Copied contact details or digital-card link</span><textarea value={cardRaw} onChange={(event) => setCardRaw(event.target.value)} placeholder="Paste what you copied from the digital business card" /></label>
           {cardStatus ? <p className="business-card-status" role="status">{cardStatus}</p> : null}
           {cardDuplicate ? <section className={`business-card-match is-${cardDuplicate.status}`}><strong>{cardDuplicate.status === "existing" ? "Existing CRM contact found" : "New CRM contact"}</strong><span>{cardDuplicate.status === "existing" ? `${cardDuplicate.existingContact?.name || "This person"} matches by ${cardDuplicate.matchReason}. Saving updates the existing record instead of creating a duplicate.` : "No matching email, LinkedIn URL, phone number, or name/company record was found."}</span></section> : null}
           <fieldset className="business-card-review"><legend>Review captured information</legend><div className="contact-form-grid">{[["firstName", "First name"], ["lastName", "Last name"], ["email", "Email"], ["phone", "Phone"], ["company", "Company"], ["title", "Job title"], ["linkedin", "LinkedIn"], ["website", "Website"], ["city", "City"], ["state", "State"], ["country", "Country"]].map(([key, label]) => <label className="form-field" key={key}><span>{label}</span><input className="select-input" value={cardDraft[key] || ""} onChange={(event) => { setCardDraft({ ...cardDraft, [key]: event.target.value }); setCardDuplicate(null); }} onBlur={() => reviewCardDraft(cardDraft)} /></label>)}<label className="form-field span-2"><span>Networking notes</span><textarea className="select-input" value={cardDraft.notes || ""} onChange={(event) => setCardDraft({ ...cardDraft, notes: event.target.value })} placeholder="Where you met, what you discussed, and the next step" /></label><label className="form-field span-2"><span>Campaign or event</span><select className="select-input" value={cardCampaignId} onChange={(event) => setCardCampaignId(event.target.value)}><option value="">Keep unassigned</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label></div></fieldset>
