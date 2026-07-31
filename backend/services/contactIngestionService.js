@@ -95,6 +95,54 @@ function normalizeIncoming(row, source = "manual") {
   return mapped;
 }
 
+function contactMatchKeys(data) {
+  const keys = [];
+  if (data.providerContactId) keys.push({ field: "providerContactId", label: "Apollo contact ID", query: { sourceProvider: data.sourceProvider, providerContactId: data.providerContactId } });
+  if (data.email) keys.push({ field: "email", label: "email address", query: { email: data.email } });
+  if (data.linkedin) keys.push({ field: "linkedin", label: "LinkedIn URL", query: { linkedin: data.linkedin } });
+  if (data.mondayItemId) keys.push({ field: "mondayItemId", label: "Monday item ID", query: { mondayItemId: data.mondayItemId } });
+  if (data.phone) keys.push({ field: "phone", label: "phone number", query: { phone: data.phone } });
+  if (!keys.length && data.company) keys.push({ field: "nameCompany", label: "name and company", query: { name: data.name, company: data.company } });
+  return keys;
+}
+
+async function previewContactIngestion({ contacts, source = "csv" }) {
+  if (!Array.isArray(contacts) || !contacts.length || contacts.length > 500) throw new Error("Provide between 1 and 500 contacts");
+  const rows = [];
+  const seen = new Map();
+  for (let index = 0; index < contacts.length; index += 1) {
+    const data = normalizeIncoming(contacts[index], source);
+    const keys = contactMatchKeys(data);
+    const signatures = keys.length ? keys.map((key) => JSON.stringify(key.query)) : [`row:${index}`];
+    const duplicateSignature = signatures.find((signature) => seen.has(signature));
+    const earlierRow = duplicateSignature === undefined ? undefined : seen.get(duplicateSignature);
+    if (earlierRow !== undefined) {
+      rows.push({ index, rowNumber: index + 2, status: "file_duplicate", name: data.name, email: data.email || "", company: data.company || "", matchReason: keys[0]?.label || "matching row", duplicateOfRow: earlierRow + 2 });
+      continue;
+    }
+    signatures.forEach((signature) => seen.set(signature, index));
+    const existing = keys.length ? await Contact.findOne({ $or: keys.map((key) => key.query) }).select("_id name email company linkedin phone providerContactId sourceProvider mondayItemId").lean() : null;
+    const matchedKey = existing ? keys.find((key) => Object.entries(key.query).every(([field, value]) => String(existing[field] || data[field] || "") === String(value))) : null;
+    rows.push({
+      index,
+      rowNumber: index + 2,
+      status: existing ? "existing" : "new",
+      name: data.name,
+      email: data.email || "",
+      company: data.company || "",
+      matchReason: matchedKey?.label || (existing ? "existing contact information" : ""),
+      existingContact: existing ? { id: existing._id, name: existing.name, email: existing.email || "", company: existing.company || "" } : null,
+    });
+  }
+  return {
+    total: rows.length,
+    newContacts: rows.filter((row) => row.status === "new").length,
+    existingContacts: rows.filter((row) => row.status === "existing").length,
+    duplicatesInFile: rows.filter((row) => row.status === "file_duplicate").length,
+    rows,
+  };
+}
+
 async function ingestContacts({
   contacts,
   source = "manual",
@@ -124,11 +172,7 @@ async function ingestContacts({
   for (let index = 0; index < contacts.length; index += 1) {
     const data = normalizeIncoming(contacts[index], source);
     if (!data.name) { summary.failed += 1; summary.errors.push({ index, message: "Name is required" }); continue; }
-    const keys = [];
-    if (data.providerContactId) keys.push({ sourceProvider: data.sourceProvider, providerContactId: data.providerContactId });
-    if (data.email) keys.push({ email: data.email }); if (data.linkedin) keys.push({ linkedin: data.linkedin });
-    if (data.mondayItemId) keys.push({ mondayItemId: data.mondayItemId }); if (data.phone) keys.push({ phone: data.phone });
-    if (!keys.length && data.company) keys.push({ name: data.name, company: data.company });
+    const keys = contactMatchKeys(data).map((key) => key.query);
     let contact = keys.length ? await Contact.findOne({ $or: keys }) : null;
     const contactExisted = Boolean(contact);
     if (contact) {
@@ -183,4 +227,4 @@ async function ingestContacts({
   return summary;
 }
 
-module.exports = { canonicalFieldMap, normalizeIncoming, ingestContacts };
+module.exports = { canonicalFieldMap, normalizeIncoming, previewContactIngestion, ingestContacts };

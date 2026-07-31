@@ -10,7 +10,7 @@ const integrationHub = require("../services/integrationHub");
 const { importApolloLeads } = require("../services/apolloLeadService");
 const { getAccountStatus, listApolloLists, savePeopleToApolloList } = require("../services/apollo");
 const ApolloSearchRun = require("../models/ApolloSearchRun");
-const { ingestContacts, canonicalFieldMap } = require("../services/contactIngestionService");
+const { ingestContacts, previewContactIngestion, canonicalFieldMap } = require("../services/contactIngestionService");
 const emailVerificationService = require("../services/emailVerificationService");
 const EmailVerificationBatch = require("../models/EmailVerificationBatch");
 const Contact = require("../models/Contact");
@@ -668,6 +668,11 @@ router.post("/import/apollo", async (req, res) => {
 router.post("/ingest", async (req, res) => {
   try { return res.json({ success: true, data: await ingestContacts(req.body) }); }
   catch (err) { return res.status(400).json({ success: false, message: err.message || "Unable to import contacts" }); }
+});
+
+router.post("/ingest/preview", async (req, res) => {
+  try { return res.json({ success: true, data: await previewContactIngestion(req.body) }); }
+  catch (err) { return res.status(400).json({ success: false, message: err.message || "Unable to preview contact import" }); }
 });
 
 router.get("/import/field-map", (req, res) => res.json({ success: true, data: canonicalFieldMap }));

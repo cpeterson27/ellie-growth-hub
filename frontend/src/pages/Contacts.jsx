@@ -16,6 +16,7 @@ import {
   fetchCampaigns,
   importContactsFromApollo,
   ingestContacts,
+  previewContactIngestion,
   archiveContact,
   deleteContact,
   updateContact,
@@ -181,6 +182,7 @@ export default function Contacts() {
   const [actionMenu, setActionMenu] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [previewStats, setPreviewStats] = useState(null);
+  const [duplicatePreview, setDuplicatePreview] = useState(null);
   const [detailContact, setDetailContact] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
   const [contactEditMode, setContactEditMode] = useState("full");
@@ -346,7 +348,7 @@ export default function Contacts() {
   }
 
   function prepareImport(text) {
-    Papa.parse(String(text || ""), { header: true, skipEmptyLines: "greedy", delimiter: String(text || "").includes("\t") ? "\t" : "", transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(), complete: ({ data, meta, errors }) => {
+    Papa.parse(String(text || ""), { header: true, skipEmptyLines: "greedy", delimiter: String(text || "").includes("\t") ? "\t" : "", transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(), complete: async ({ data, meta, errors }) => {
       const rows = data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => {
         const cleaned = String(value ?? "").trim();
         if (key === "Title" && /^[+()\d\s.-]{7,}$/.test(cleaned) && cleaned.replace(/\D/g, "").length >= 7) return [key, ""];
@@ -359,7 +361,13 @@ export default function Contacts() {
       const valid = rows.filter((row) => row.Name || row["First Name"] || row["Last Name"]).length;
       const emails = rows.filter((row) => !row.Email).length;
       const hasImportedEmailStatus = (meta.fields || []).includes("Email Status") && rows.some((row) => importedEmailState(row["Email Status"]));
-      setEmailVerificationMode(hasImportedEmailStatus ? "source" : "emailable"); setShowAllImportRows(false); setImportHeaders(meta.fields || []); setImportRows(rows); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setImportError(errors.length ? "Some rows have malformed column counts." : ""); setError(""); setUploadOpen(true);
+      setEmailVerificationMode(hasImportedEmailStatus ? "source" : "emailable"); setShowAllImportRows(false); setImportHeaders(meta.fields || []); setImportRows(rows); setDuplicatePreview(null); setVerificationResults({}); setVerificationProgress(null); setPreviewStats({ parsed: rows.length, valid, missingName: rows.length - valid, missingEmail: emails, malformed: errors.length }); setImportError(errors.length ? "Some rows have malformed column counts." : ""); setError(""); setUploadOpen(true);
+      try {
+        const preview = await previewContactIngestion({ contacts: rows, source: "csv" });
+        setDuplicatePreview(preview.data);
+      } catch (previewError) {
+        setImportError(previewError.response?.data?.message || "Ellie could not check this CSV for duplicates. Import is paused.");
+      }
     }, error: () => setImportError("Unable to parse contact file.") });
   }
 
@@ -431,7 +439,7 @@ export default function Contacts() {
     if (saved) {
       setContactTab("all");
       setCampaignId("");
-      setUploadOpen(false); setImportRows([]); setImportHeaders([]); setImportFileName(""); setVerificationResults({}); setVerificationProgress(null); setEmailVerificationMode("emailable"); setImportMarketingPermission(false);
+      setUploadOpen(false); setImportRows([]); setImportHeaders([]); setImportFileName(""); setDuplicatePreview(null); setVerificationResults({}); setVerificationProgress(null); setEmailVerificationMode("emailable"); setImportMarketingPermission(false);
     }
   }
 
@@ -746,7 +754,7 @@ export default function Contacts() {
         isOpen={isUploadOpen}
         onClose={() => !savingContact && !verifyingEmails && setUploadOpen(false)}
         title="Import Contacts"
-        footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>Import contacts</Button></>}
+        footer={<><Button variant="outline" disabled={savingContact || verifyingEmails} onClick={() => setUploadOpen(false)}>Cancel</Button><Button loading={savingContact} disabled={!importRows.length || !duplicatePreview || verifyingEmails || pendingEmailCount > 0} onClick={saveUploadedContacts}>{duplicatePreview?.existingContacts ? `Add ${duplicatePreview.newContacts} new & update ${duplicatePreview.existingContacts}` : "Import new contacts"}</Button></>}
       >
         {importError ? <p className="form-error" role="alert">{importError}</p> : null}
         <section className="csv-campaign-first">
@@ -775,7 +783,12 @@ export default function Contacts() {
             <div className="active"><span>3</span><strong>Verify emails</strong><small>Use Emailable only when needed</small></div>
             <div><span>4</span><strong>Save to CRM</strong><small>No Discovery approval required</small></div>
           </div>
-          <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p><p>Duplicate candidates are checked by the shared ingestion service during import.</p>
+          <p>Rows parsed: {previewStats?.parsed || 0}; valid: {previewStats?.valid || 0}; missing usable name: {previewStats?.missingName || 0}; missing email: {previewStats?.missingEmail || 0}; malformed: {previewStats?.malformed || 0}.</p>
+          {duplicatePreview ? <section className="duplicate-preflight">
+            <header><div><span>Duplicate protection complete</span><h3>{duplicatePreview.newContacts} new · {duplicatePreview.existingContacts} already in Ellie · {duplicatePreview.duplicatesInFile} repeated in this CSV</h3></div><strong>{duplicatePreview.existingContacts || duplicatePreview.duplicatesInFile ? "Review matches" : "No duplicates found"}</strong></header>
+            <p>Ellie will never create another contact for a matched row. Existing contacts are updated with useful new information. Repeated rows in this file resolve to the same contact.</p>
+            {duplicatePreview.rows.some((row) => row.status !== "new") ? <div className="duplicate-preflight__list">{duplicatePreview.rows.filter((row) => row.status !== "new").map((row) => <article key={`${row.status}-${row.index}`}><span className={`duplicate-preflight__status is-${row.status}`}>{row.status === "existing" ? "Already in Ellie" : "Repeated in CSV"}</span><div><strong>{row.name || row.email || `CSV row ${row.rowNumber}`}</strong><small>{row.email || row.company || "No email or company"}</small></div><p>{row.status === "existing" ? `Matches ${row.existingContact?.name || "an existing contact"} by ${row.matchReason}. This record will be updated, not copied.` : `Matches CSV row ${row.duplicateOfRow} by ${row.matchReason}.`}</p></article>)}</div> : null}
+          </section> : <section className="duplicate-preflight is-checking"><strong>Checking every row against Ellie…</strong><span>Import stays disabled until duplicate protection finishes.</span></section>}
           <p>Detected headers: {importHeaders.join(", ")}</p>
           <p>Recognized: {importHeaders.filter((header) => recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
           <p>Unrecognized columns: {importHeaders.filter((header) => !recognizedImportHeaders.includes(header)).join(", ") || "none"}</p>
