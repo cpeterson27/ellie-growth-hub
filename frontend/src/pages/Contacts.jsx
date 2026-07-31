@@ -450,6 +450,19 @@ export default function Contacts() {
     }
   }
 
+  function viewNewImportedContacts() {
+    const verifiedIds = (importSummary?.createdContacts || [])
+      .filter((contact) => contact.emailStatus === "verified")
+      .map((contact) => String(contact.id));
+    setContactTab("all");
+    setCampaignId("");
+    setSearchTerm("");
+    setCurrentPage(1);
+    setSelectedContactIds(verifiedIds);
+    setBulkNotice(`${importSummary?.mongoCreated || 0} new contacts are shown at the top. ${verifiedIds.length} with verified emails are selected.`);
+    window.setTimeout(() => document.getElementById("contact-results")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
   const emailsToVerify = [...new Set(importRows.map((row) => String(row.Email || "").trim().toLowerCase()).filter(Boolean))];
   const importedVerificationResults = Object.fromEntries(importRows
     .map((row) => {
@@ -595,9 +608,9 @@ export default function Contacts() {
       <DashboardCard title="Contacts">
         {error ? <p className="form-error">{error}</p> : null}
         {importSummary ? <section className={importSummary.failed ? "import-receipt has-errors" : "import-receipt"}>
-          <header><div><span>Import complete</span><h3>{importSummary.mongoCreated} new contact{importSummary.mongoCreated === 1 ? "" : "s"} added</h3><p>{importSummary.mongoUpdated} existing contact{importSummary.mongoUpdated === 1 ? " was" : "s were"} updated without creating duplicates.</p></div>{importSummary.createdContacts?.some((contact) => contact.emailStatus === "verified") ? <Button size="sm" onClick={() => { setContactTab("all"); setCampaignId(""); setSelectedContactIds(importSummary.createdContacts.filter((contact) => contact.emailStatus === "verified").map((contact) => String(contact.id))); }}>Select verified new contacts</Button> : null}</header>
+          <header><div><span>Import complete</span><h3>{importSummary.mongoCreated} new contact{importSummary.mongoCreated === 1 ? "" : "s"} added</h3><p>{importSummary.mongoUpdated} existing contact{importSummary.mongoUpdated === 1 ? " was" : "s were"} updated without creating duplicates.</p></div>{importSummary.createdContacts?.length ? <Button size="sm" onClick={viewNewImportedContacts}>View these {importSummary.mongoCreated} contacts</Button> : null}</header>
           {importSummary.createdContacts?.length ? <div className="import-receipt__contacts">{importSummary.createdContacts.map((contact) => <article key={String(contact.id)}><span>{String(contact.name || "?").slice(0, 1).toUpperCase()}</span><div><strong>{contact.name}</strong><small>{contact.company || "Company missing"} · {contact.email || "No usable email"}</small></div><em className={`is-${contact.emailStatus}`}>{contact.emailStatus === "verified" ? "Ready to contact" : "Email needs review"}</em></article>)}</div> : null}
-          {importSummary.campaignName ? <p className="import-receipt__assignment">Assigned to {importSummary.campaignName}</p> : <p className="import-receipt__assignment">Choose “Select verified new contacts,” then assign them with the campaign control below.</p>}
+          {importSummary.campaignName ? <p className="import-receipt__assignment">Already assigned to {importSummary.campaignName}. Use the button above to open them in Contacts.</p> : <p className="import-receipt__assignment">Use “View these contacts,” then choose a campaign from the bulk-action bar.</p>}
           {importSummary.failed && importSummary.errors?.[0]?.message ? <p className="form-error">First failure: {importSummary.errors[0].message}</p> : null}
         </section> : null}
         {contactOverview ? <section className="contact-overview contact-overview--workflow" aria-label="CRM workflow overview">
@@ -635,7 +648,7 @@ export default function Contacts() {
           <small>This assigns the audience only. It does not generate or send emails.</small>
         </section> : null}
         {bulkNotice ? <p className="contact-bulk-notice">{bulkNotice}</p> : null}
-        {!loading && contacts.length ? <div className="crm-results-summary">
+        {!loading && contacts.length ? <div className="crm-results-summary" id="contact-results">
           <span>Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, contacts.length)} of {contacts.length} contacts</span>
           <span>Page {currentPage} of {Math.max(1, Math.ceil(contacts.length / pageSize))}</span>
         </div> : null}
