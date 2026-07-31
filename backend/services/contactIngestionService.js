@@ -168,6 +168,8 @@ async function ingestContacts({
     importBatchId: cleanBatchId || null,
     importFileName: cleanFileName || null,
     campaignName: campaign?.name || null,
+    createdContacts: [],
+    updatedContacts: [],
   };
   for (let index = 0; index < contacts.length; index += 1) {
     const data = normalizeIncoming(contacts[index], source);
@@ -217,8 +219,9 @@ async function ingestContacts({
     if (campaign && !contact.campaignIds.some((id) => String(id) === String(campaign._id))) { contact.campaignIds.push(campaign._id); summary.campaignAssociated += 1; }
     try {
       await contact.save();
-      if (contactExisted) summary.mongoUpdated += 1;
-      else summary.mongoCreated += 1;
+      const receiptContact = { id: contact._id, name: contact.name, email: contact.email || "", emailStatus: contact.emailStatus || "missing", company: contact.company || "", campaignAssigned: Boolean(campaign) };
+      if (contactExisted) { summary.mongoUpdated += 1; summary.updatedContacts.push(receiptContact); }
+      else { summary.mongoCreated += 1; summary.createdContacts.push(receiptContact); }
     } catch (error) {
       summary.failed += 1;
       summary.errors.push({ index, message: error.message || "Unable to save contact" });

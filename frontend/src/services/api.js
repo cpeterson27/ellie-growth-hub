@@ -306,6 +306,9 @@ export const ingestContacts = (payload) =>
 export const previewContactIngestion = (payload) =>
   api.post("/contacts/ingest/preview", payload).then((res) => res.data);
 
+export const fetchLatestContactImport = () =>
+  api.get("/contacts/imports/latest").then((res) => res.data);
+
 export const createEmailVerificationBatch = (emails) =>
   api.post("/contacts/email-verification/batches", { emails }).then((res) => res.data);
 

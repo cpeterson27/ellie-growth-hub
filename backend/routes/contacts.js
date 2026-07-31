@@ -10,6 +10,7 @@ const integrationHub = require("../services/integrationHub");
 const { importApolloLeads } = require("../services/apolloLeadService");
 const { getAccountStatus, listApolloLists, savePeopleToApolloList } = require("../services/apollo");
 const ApolloSearchRun = require("../models/ApolloSearchRun");
+const ContactImportReceipt = require("../models/ContactImportReceipt");
 const { ingestContacts, previewContactIngestion, canonicalFieldMap } = require("../services/contactIngestionService");
 const emailVerificationService = require("../services/emailVerificationService");
 const EmailVerificationBatch = require("../models/EmailVerificationBatch");
@@ -34,6 +35,12 @@ router.get("/apollo/lists", async (_req, res) => {
 router.get("/apollo/history", async (req, res) => {
   const runs = await ApolloSearchRun.find({ workspaceId: req.auth.workspaceId }).sort({ createdAt: -1 }).limit(50).lean();
   res.json({ runs });
+});
+
+router.get("/imports/latest", async (req, res) => {
+  const latest = await ContactImportReceipt.findOne({ workspaceId: req.auth.workspaceId }).sort({ createdAt: -1 }).lean();
+  if (!latest || Date.now() - new Date(latest.createdAt).getTime() > 86400000) return res.json({ data: null });
+  return res.json({ data: { ...latest.summary, completedAt: latest.createdAt } });
 });
 
 router.post("/apollo/enrichment-estimate", (req, res) => {
@@ -666,7 +673,17 @@ router.post("/import/apollo", async (req, res) => {
 });
 
 router.post("/ingest", async (req, res) => {
-  try { return res.json({ success: true, data: await ingestContacts(req.body) }); }
+  try {
+    const result = await ingestContacts(req.body);
+    if (result.importBatchId) {
+      await ContactImportReceipt.findOneAndUpdate(
+        { workspaceId: req.auth.workspaceId, importBatchId: result.importBatchId },
+        { $set: { userId: req.auth.user._id, importFileName: result.importFileName || "", summary: result } },
+        { upsert: true, new: true },
+      );
+    }
+    return res.json({ success: true, data: result });
+  }
   catch (err) { return res.status(400).json({ success: false, message: err.message || "Unable to import contacts" }); }
 });
 

@@ -17,6 +17,7 @@ import {
   importContactsFromApollo,
   ingestContacts,
   previewContactIngestion,
+  fetchLatestContactImport,
   archiveContact,
   deleteContact,
   updateContact,
@@ -237,6 +238,12 @@ export default function Contacts() {
   useEffect(() => {
     loadContacts();
   }, [contactTab, campaignId, searchTerm, searchParams]);
+
+  useEffect(() => {
+    fetchLatestContactImport().then((response) => {
+      if (response.data) setImportSummary(response.data);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -571,10 +578,12 @@ export default function Contacts() {
 
       <DashboardCard title="Contacts">
         {error ? <p className="form-error">{error}</p> : null}
-        {importSummary ? <div className={importSummary.failed ? "form-error" : "contact-modal-intro"}>
-          <p>MongoDB: {importSummary.mongoCreated} created, {importSummary.mongoUpdated} updated, {importSummary.failed || 0} failed.</p>
-          {importSummary.failed && importSummary.errors?.[0]?.message ? <p>First failure: {importSummary.errors[0].message}</p> : null}
-        </div> : null}
+        {importSummary ? <section className={importSummary.failed ? "import-receipt has-errors" : "import-receipt"}>
+          <header><div><span>Import complete</span><h3>{importSummary.mongoCreated} new contact{importSummary.mongoCreated === 1 ? "" : "s"} added</h3><p>{importSummary.mongoUpdated} existing contact{importSummary.mongoUpdated === 1 ? " was" : "s were"} updated without creating duplicates.</p></div>{importSummary.createdContacts?.some((contact) => contact.emailStatus === "verified") ? <Button size="sm" onClick={() => { setContactTab("all"); setCampaignId(""); setSelectedContactIds(importSummary.createdContacts.filter((contact) => contact.emailStatus === "verified").map((contact) => String(contact.id))); }}>Select verified new contacts</Button> : null}</header>
+          {importSummary.createdContacts?.length ? <div className="import-receipt__contacts">{importSummary.createdContacts.map((contact) => <article key={String(contact.id)}><span>{String(contact.name || "?").slice(0, 1).toUpperCase()}</span><div><strong>{contact.name}</strong><small>{contact.company || "Company missing"} · {contact.email || "No usable email"}</small></div><em className={`is-${contact.emailStatus}`}>{contact.emailStatus === "verified" ? "Ready to contact" : "Email needs review"}</em></article>)}</div> : null}
+          {importSummary.campaignName ? <p className="import-receipt__assignment">Assigned to {importSummary.campaignName}</p> : <p className="import-receipt__assignment">Choose “Select verified new contacts,” then assign them with the campaign control below.</p>}
+          {importSummary.failed && importSummary.errors?.[0]?.message ? <p className="form-error">First failure: {importSummary.errors[0].message}</p> : null}
+        </section> : null}
         {contactOverview ? <section className="contact-overview contact-overview--workflow" aria-label="CRM workflow overview">
           <button onClick={() => setContactTab("all")}><span>All relationships</span><strong>{contactOverview.total}</strong><small>Everyone stored in your CRM</small></button>
           <button className="is-warning" onClick={() => setContactTab("attention")}><span>Needs attention</span><strong>{contactOverview.needsAttention || 0}</strong><small>Email or audience information needs a decision</small></button>
