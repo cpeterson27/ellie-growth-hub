@@ -333,6 +333,21 @@ function parseBusinessCardPayload(payload = "") {
     card.country = cleanCardValue(address[6] || "");
     return card;
   }
+    if (/^https?:\/\/blinq\.me/i.test(raw)) {
+    const blinqUrl = new URL(raw);
+
+    const name = blinqUrl.searchParams.get("n") || "";
+    const nameParts = name.trim().split(/\s+/);
+
+    return {
+      firstName: nameParts.shift() || "",
+      lastName: nameParts.join(" "),
+      email: "",
+      phone: "",
+      website: raw,
+      notes: `Digital business card: ${raw}`,
+    };
+  }
   const email = raw.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || "";
   const phone = raw.match(/(?:\+?\d[\d ().-]{7,}\d)/)?.[0] || "";
   const url = raw.match(/https?:\/\/[^\s]+/i)?.[0] || "";
@@ -561,27 +576,19 @@ export default function Contacts() {
   }
 
   async function acceptCardPayload(payload) {
-  console.log("QR RAW PAYLOAD:", payload);
 
-  setCardStatus(`QR DATA: ${payload}`);
+    const parsed = parseBusinessCardPayload(payload);
 
-  const parsed = parseBusinessCardPayload(payload);
-
-  console.log("PARSED CARD:", parsed);
-
-  const nextDraft = { ...manualContactDefaults, ...parsed };
-
-  setCardRaw(payload);
-  setCardDraft(nextDraft);
-
-  setCardStatus(
-    fullContactName(nextDraft)
-      ? "Card read successfully. Review the information before saving."
-      : `QR read. No name found. Data: ${payload}`,
-  );
-
-  await reviewCardDraft(nextDraft);
-}
+    const nextDraft = { ...manualContactDefaults, ...parsed };
+    setCardRaw(payload);
+    setCardDraft(nextDraft);
+    setCardStatus(
+      fullContactName(nextDraft)
+        ? "Card read successfully. Review the information before saving."
+        : "The QR code was read, but the card did not include a name. Complete the missing fields below.",
+    );
+    await reviewCardDraft(nextDraft);
+  }
 
   async function startCardScanner() {
     try {
