@@ -15,6 +15,7 @@ export function AuthProvider({ children }) {
       })
       .catch(() => {
         sessionStorage.removeItem("ellie-csrf-token");
+        sessionStorage.removeItem("ellie-session-token");
         setSession(null);
       })
       .finally(() => setLoading(false));
@@ -25,15 +26,18 @@ export function AuthProvider({ children }) {
     loading,
     async login(email, password) {
       const { data } = await api.post("/auth/login", { email, password });
-      sessionStorage.setItem("ellie-csrf-token", data.csrfToken);
-      setSession(data);
-      return data;
+      const { sessionToken, ...sessionData } = data;
+      sessionStorage.setItem("ellie-csrf-token", sessionData.csrfToken);
+      sessionStorage.setItem("ellie-session-token", sessionToken);
+      setSession(sessionData);
+      return sessionData;
     },
     async logout() {
       try {
         await api.post("/auth/logout");
       } finally {
         sessionStorage.removeItem("ellie-csrf-token");
+        sessionStorage.removeItem("ellie-session-token");
         setSession(null);
       }
     },

@@ -9,7 +9,9 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const csrfToken = sessionStorage.getItem("ellie-csrf-token");
+  const sessionToken = sessionStorage.getItem("ellie-session-token");
   if (csrfToken) config.headers["X-CSRF-Token"] = csrfToken;
+  if (sessionToken) config.headers.Authorization = `Bearer ${sessionToken}`;
   return config;
 });
 
@@ -18,6 +20,15 @@ export const fetchWorkspaceConfig = () =>
 
 export const updateWorkspaceConfig = (values) =>
   api.patch("/workspace", values).then((res) => res.data);
+
+export const changePassword = (values) =>
+  api.patch("/auth/password", values).then((res) => res.data);
+
+export const fetchWorkspaceMembers = () =>
+  api.get("/workspace/members").then((res) => res.data);
+
+export const createWorkspaceMember = (values) =>
+  api.post("/workspace/members", values).then((res) => res.data);
 
 
 // ======================================
@@ -162,6 +173,9 @@ export const fetchGmailThread = (threadId) =>
 
 export const updateGmailThread = (threadId, action) =>
   api.post(`/gmail/threads/${threadId}/action`, { action }).then((res) => res.data);
+
+export const emptyGmailTrash = () =>
+  api.delete("/gmail/trash", { data: { confirmation: "DELETE ALL TRASH" } }).then((res) => res.data);
 
 export const sendGmailMessage = (message) =>
   api.post("/gmail/send", message).then((res) => res.data);

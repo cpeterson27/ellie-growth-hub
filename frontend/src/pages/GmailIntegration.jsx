@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FiArchive, FiArrowLeft, FiMail, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
 import Button from "../components/Button.jsx";
+import Modal from "../components/Modal.jsx";
 import {
   beginGmailConnection,
   disconnectGmail,
+  emptyGmailTrash,
   fetchContactEmailHistory,
   fetchGmailConnection,
   fetchGmailThread,
@@ -37,12 +39,16 @@ export default function GmailIntegration() {
   const [search, setSearch] = useState(params.get("contact") || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [reply, setReply] = useState("");
   const [followUp, setFollowUp] = useState("");
   const [sending, setSending] = useState(false);
+  const [emptyingTrash, setEmptyingTrash] = useState(false);
+  const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
 
   const query = search.trim() ? search.trim() : mailboxQueries[mailbox] || mailboxQueries.inbox;
   const needsModifyPermission = status?.connected && !status.scopes?.includes("https://www.googleapis.com/auth/gmail.modify");
+  const needsDeletePermission = status?.connected && !status.scopes?.includes("https://mail.google.com/");
   const reconnect = async () => window.location.assign((await beginGmailConnection()).authorizationUrl);
   const load = async () => {
     try {
@@ -85,6 +91,21 @@ export default function GmailIntegration() {
     await load();
   };
 
+  const emptyTrash = async () => {
+    try {
+      setEmptyingTrash(true);
+      const result = await emptyGmailTrash();
+      setThreads([]);
+      setError("");
+      setNotice(`${result.deleted || 0} trash thread${result.deleted === 1 ? "" : "s"} permanently deleted.`);
+      setTrashConfirmOpen(false);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to empty Gmail Trash.");
+    } finally {
+      setEmptyingTrash(false);
+    }
+  };
+
   const sendReply = async () => {
     const messages = selectedThread?.messages || [];
     const latest = messages[messages.length - 1];
@@ -125,12 +146,13 @@ export default function GmailIntegration() {
     <section className="gmail-status-card"><div><h2>Connect a Google account</h2><p>The client signs into Google and grants access themselves. Passwords are never shared with Ellie.</p></div><Button disabled={!status?.configured} onClick={async () => window.location.assign((await beginGmailConnection()).authorizationUrl)}>Connect Gmail</Button></section>
   </div>;
 
-  return <div className="page-dashboard inbox-page">
+  return <div className="page-dashboard inbox-page inbox-page--compact">
     <div className="page-header">
       <div><p className="page-eyebrow">Client correspondence</p><h1 className="page-title">Conversations</h1><p className="page-subtitle">A complete record of campaign delivery, incoming replies, and personal follow-up.</p></div>
       <div className="crm-header-actions"><Button variant="outline" onClick={load}><FiRefreshCw /> Refresh</Button><Button variant="outline" onClick={() => navigate("/integrations")}>Connection settings</Button></div>
     </div>
     {error ? <p className="form-error">{error}</p> : null}
+    {notice ? <p className="inbox-success-notice">{notice}</p> : null}
     <section className="delivery-legend">
       <p><span>Campaign delivery</span><strong>Resend</strong></p>
       <i />
@@ -163,12 +185,20 @@ export default function GmailIntegration() {
           <div className="conversation-messages">{selectedThread.messages?.map((message) => <article key={message.id} className={message.labels?.includes("SENT") ? "is-sent" : ""}><div><strong>{message.labels?.includes("SENT") ? "You" : message.from}</strong><time>{message.date ? new Date(message.date).toLocaleString() : ""}</time></div><small>To: {message.to}</small><pre>{message.body || message.snippet}</pre></article>)}</div>
           <section className="conversation-reply"><h3>Reply</h3><textarea rows="7" value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Write a reply…" /><Button loading={sending} disabled={!reply.trim()} onClick={sendReply}><FiSend /> Approve and send reply</Button></section>
         </div> : <>
-          <div className="inbox-list-heading"><div><h2>{search ? `Correspondence with ${search}` : mailbox === "campaign" ? "Campaign sends" : mailbox[0].toUpperCase() + mailbox.slice(1)}</h2><p>{mailbox === "campaign" ? `${campaignSends.length} campaign message${campaignSends.length === 1 ? "" : "s"}` : search ? `${outreachHistory.length} campaign message${outreachHistory.length === 1 ? "" : "s"} · ${threads.length} Gmail repl${threads.length === 1 ? "y" : "ies"}` : `${threads.length} email thread${threads.length === 1 ? "" : "s"}`}</p></div></div>
+          <div className="inbox-list-heading"><div><h2>{search ? `Correspondence with ${search}` : mailbox === "campaign" ? "Campaign sends" : mailbox[0].toUpperCase() + mailbox.slice(1)}</h2><p>{mailbox === "campaign" ? `${campaignSends.length} campaign message${campaignSends.length === 1 ? "" : "s"}` : search ? `${outreachHistory.length} campaign message${outreachHistory.length === 1 ? "" : "s"} · ${threads.length} Gmail repl${threads.length === 1 ? "y" : "ies"}` : `${threads.length} email thread${threads.length === 1 ? "" : "s"}`}</p></div>{mailbox === "trash" && !search && threads.length ? <Button className="empty-trash-button" variant="outline" size="sm" onClick={needsDeletePermission ? reconnect : () => setTrashConfirmOpen(true)}><FiTrash2 /> {needsDeletePermission ? "Approve empty trash" : "Empty trash"}</Button> : null}</div>
           {mailbox === "campaign" ? <div className="campaign-send-list">{campaignSends.map((item) => <button key={item.id} onClick={() => { setSearch(item.contactEmail); setMailbox("inbox"); }}><div><strong>{item.contactName || item.contactEmail}</strong><span className={`outreach-status outreach-status--${item.status}`}>{item.replyCategory ? item.replyCategory.replaceAll("_", " ") : item.deliveryStatus || item.status}</span></div><h3>{item.subject}</h3><p>{item.campaignName}</p><small>{item.sentAt ? new Date(item.sentAt).toLocaleString() : ""}</small></button>)}</div> : null}
           {outreachHistory.length ? <section className="outreach-conversation-history"><header><h3>Campaign correspondence</h3><span>Sent through Resend</span></header>{outreachHistory.map((item) => <button type="button" key={item.id} onClick={() => { setSelectedOutreach({ ...item, contactEmail: emailAddress(search) }); setFollowUp(item.aiReplyDraft || ""); }}><div><strong>{item.campaignName}</strong><span className={`outreach-status outreach-status--${item.status}`}>{item.replyCategory ? item.replyCategory.replaceAll("_", " ") : item.deliveryStatus || item.status}</span></div><h4>{item.subject}</h4><p>{item.body}</p><footer><small>{item.sentAt ? new Date(item.sentAt).toLocaleString() : "Not sent yet"}</small><span>Read full message →</span></footer>{item.replyText ? <blockquote><strong>Latest response</strong>{item.replyText}</blockquote> : null}</button>)}</section> : null}
           {mailbox !== "campaign" ? loading ? <p className="table-state">Loading correspondence…</p> : threads.length ? <div className="gmail-thread-list">{threads.map((thread) => <button type="button" key={thread.id} className={thread.labels?.includes("UNREAD") ? "gmail-thread is-unread" : "gmail-thread"} onClick={() => openThread(thread)}><div className="gmail-thread__meta"><strong>{mailbox === "sent" ? thread.to : thread.from || "Unknown sender"}</strong><time>{thread.date ? new Date(thread.date).toLocaleDateString() : ""}</time></div><h3>{thread.subject}</h3><p>{thread.snippet}</p><small>{thread.messageCount} message{thread.messageCount === 1 ? "" : "s"}</small></button>)}</div> : search && outreachHistory.length ? <section className="correspondence-empty"><span>Awaiting reply</span><h3>No Gmail response yet</h3><p>The campaign message above was delivered successfully. When this contact replies, their response will appear here and Outreach will change to Replied.</p></section> : <section className="correspondence-empty"><span>{mailbox === "sent" ? "No personal follow-up" : "Inbox clear"}</span><h3>{mailbox === "sent" ? "No Gmail messages have been sent from this view" : "There is nothing requiring attention here"}</h3><p>{mailbox === "sent" ? "Campaign delivery lives under Campaign sends. Personal replies sent from Ellie appear here." : "New client replies will appear here automatically when you refresh Conversations."}</p></section> : null}
         </>}
       </div>
     </section>
+    <Modal
+      isOpen={trashConfirmOpen}
+      onClose={() => !emptyingTrash && setTrashConfirmOpen(false)}
+      title="Permanently empty trash?"
+      footer={<><Button variant="outline" disabled={emptyingTrash} onClick={() => setTrashConfirmOpen(false)}>Cancel</Button><Button className="empty-trash-confirm" loading={emptyingTrash} onClick={emptyTrash}><FiTrash2 /> Delete everything</Button></>}
+    >
+      <div className="empty-trash-confirmation"><span><FiTrash2 /></span><div><strong>This cannot be undone</strong><p>Every conversation currently in the connected Gmail account’s Trash will be permanently deleted, including items beyond the {threads.length} shown here.</p></div></div>
+    </Modal>
   </div>;
 }

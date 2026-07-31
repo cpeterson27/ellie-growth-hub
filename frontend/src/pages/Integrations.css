@@ -17,11 +17,9 @@
 }
 
 .crm-connection-card--active {
-  background:
-    linear-gradient(90deg, rgba(60, 200, 156, .14), transparent 40%),
-    var(--surface);
+  background: var(--surface);
   border-color: rgba(31, 92, 80, .28);
-  box-shadow: 0 16px 38px rgba(31, 92, 80, .08);
+  box-shadow: none;
   color: var(--text);
 }
 
@@ -36,6 +34,33 @@
 .correspondence-empty{border:1px solid #d9d4c8;border-radius:4px;margin-top:16px;padding:42px;text-align:center}.correspondence-empty>span{color:#8c7543;font-size:.72rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.correspondence-empty h3{font-family:Georgia,"Times New Roman",serif;font-size:1.45rem;font-weight:500;margin:10px 0}.correspondence-empty p{color:#777972;line-height:1.6;margin:0 auto;max-width:560px}
 .correspondence-detail>header{align-items:center;border-bottom:1px solid #d9d4c8;display:flex;justify-content:space-between;padding-bottom:15px}.correspondence-detail__eyebrow{color:#8c7543;font-size:.72rem;font-weight:900;letter-spacing:.12em;margin:28px 0 9px;text-transform:uppercase}.correspondence-detail>h2{font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.7rem,3vw,2.45rem);font-weight:500;letter-spacing:-.02em;margin:0 0 24px}.correspondence-detail dl{border-bottom:1px solid #d9d4c8;border-top:1px solid #d9d4c8;display:grid;grid-template-columns:repeat(3,1fr);margin:0 0 28px;padding:15px 0}.correspondence-detail dl>div{display:grid;gap:4px;padding:0 16px}.correspondence-detail dl>div+div{border-left:1px solid #d9d4c8}.correspondence-detail dt{color:#85867f;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase}.correspondence-detail dd{font-weight:700;margin:0}.correspondence-letter{background:#fff;border:1px solid #d9d4c8;box-shadow:0 18px 50px rgba(44,39,28,.07);display:grid;grid-template-columns:48px 1fr;gap:22px;margin:0 auto;padding:34px;max-width:800px}.correspondence-letter__mark{align-items:center;background:#173f37;border-radius:50%;color:#fff;display:flex;font-family:Georgia,serif;font-size:1.2rem;height:44px;justify-content:center;width:44px}.correspondence-letter pre{font:inherit;line-height:1.75;margin:0;white-space:pre-wrap}.awaiting-reply,.correspondence-received{border-left:2px solid #a88d52;margin:28px auto;max-width:800px;padding:4px 0 4px 18px}.awaiting-reply p{color:#777972;line-height:1.6;margin:5px 0}.correspondence-received>p{color:#8c7543;font-size:.72rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.correspondence-received blockquote{font-family:Georgia,serif;font-size:1.15rem;line-height:1.6;margin:0}
 .campaign-send-list{display:grid}.campaign-send-list>button{background:#fff;border:0;border-top:1px solid var(--border);cursor:pointer;padding:18px 5px;text-align:left}.campaign-send-list>button:hover{background:#fafbf9}.campaign-send-list>button>div{align-items:center;display:flex;justify-content:space-between}.campaign-send-list h3{margin:8px 0 4px}.campaign-send-list p,.campaign-send-list small{color:var(--text-muted);margin:0}
+.inbox-page--compact .page-header{align-items:center;margin-bottom:14px}
+.inbox-page--compact .page-title{font-size:clamp(1.8rem,3vw,2.45rem)}
+.inbox-page--compact .page-subtitle{font-size:.94rem;margin-top:4px}
+.inbox-page--compact .delivery-legend{font-size:.8rem;margin-bottom:14px;padding:9px 2px}
+.inbox-page--compact .inbox-shell{border-radius:14px;grid-template-columns:168px minmax(0,1fr);min-height:570px}
+.inbox-page--compact .inbox-folders{gap:2px;padding:14px 10px}
+.inbox-page--compact .inbox-folders button{border-radius:7px;font-size:.86rem;font-weight:700;gap:8px;padding:9px 10px}
+.inbox-page--compact .inbox-folders hr{margin:8px 0}
+.inbox-page--compact .inbox-main{padding:14px 18px}
+.inbox-page--compact .inbox-search{border-radius:9px;padding:4px 5px 4px 11px}
+.inbox-page--compact .inbox-search input{font-size:.9rem;height:34px}
+.inbox-page--compact .inbox-search .btn{min-height:34px;padding:6px 13px}
+.inbox-page--compact .inbox-list-heading{align-items:center;padding:16px 2px 9px}
+.inbox-page--compact .inbox-list-heading h2{font-size:1.16rem}
+.inbox-page--compact .inbox-list-heading p{font-size:.78rem;margin-top:2px}
+.inbox-page--compact .gmail-thread{display:grid;gap:2px;padding:11px 8px}
+.inbox-page--compact .gmail-thread__meta strong{font-size:.86rem}
+.inbox-page--compact .gmail-thread__meta time,.inbox-page--compact .gmail-thread small{font-size:.72rem}
+.inbox-page--compact .gmail-thread h3{font-size:.9rem;margin:2px 0}
+.inbox-page--compact .gmail-thread p{font-size:.8rem;line-height:1.35;margin:1px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inbox-page--compact .empty-trash-button{border-color:#d9aaa4;color:#9b3025}
+.inbox-page--compact .empty-trash-button:hover{background:#fff2f0;border-color:#c77e74}
+.inbox-success-notice{background:#e8f5ef;border:1px solid #b9dccc;border-radius:9px;color:#175c49;font-size:.84rem;margin:0 0 12px;padding:10px 12px}
+.empty-trash-confirmation{align-items:flex-start;background:#fff8f7;border:1px solid #efd2ce;border-radius:12px;display:flex;gap:14px;padding:16px}
+.empty-trash-confirmation>span{align-items:center;background:#f8dfdc;border-radius:50%;color:#9b3025;display:flex;flex:0 0 38px;height:38px;justify-content:center}
+.empty-trash-confirmation strong{color:#70251e}.empty-trash-confirmation p{color:#746b69;line-height:1.5;margin:5px 0 0}
+.empty-trash-confirm{background:#a43a30!important;border-color:#a43a30!important}
 @media(max-width:800px){.delivery-legend{align-items:flex-start;flex-direction:column;gap:5px}.delivery-legend i{display:none}.inbox-shell{grid-template-columns:1fr}.inbox-folders{border-bottom:1px solid var(--border);border-right:0;flex-direction:row;overflow-x:auto}.inbox-folders hr,.inbox-folders button:last-child{display:none}.conversation-view>header{align-items:flex-start;gap:10px}.conversation-view>header>div{flex-wrap:wrap;justify-content:flex-end}.correspondence-detail dl{grid-template-columns:1fr}.correspondence-detail dl>div{padding:9px 0}.correspondence-detail dl>div+div{border-left:0}.correspondence-letter{grid-template-columns:1fr;padding:22px}}
 
 .integration-status {

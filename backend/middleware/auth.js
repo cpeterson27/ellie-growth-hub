@@ -22,6 +22,12 @@ function tokenHash(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function sessionToken(req) {
+  const authorization = String(req.headers.authorization || "");
+  const bearerMatch = authorization.match(/^Bearer\s+(.+)$/i);
+  return bearerMatch?.[1]?.trim() || parseCookies(req.headers.cookie)[COOKIE_NAME];
+}
+
 function sessionCookie(token, expiresAt) {
   const secure = process.env.NODE_ENV === "production";
   return [
@@ -48,7 +54,7 @@ function clearSessionCookie() {
 
 async function requireAuth(req, res, next) {
   try {
-    const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
+    const token = sessionToken(req);
     if (!token) return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
 
     const session = await AuthSession.findOne({
@@ -107,5 +113,6 @@ module.exports = {
   requireAuth,
   requireRole,
   sessionCookie,
+  sessionToken,
   tokenHash,
 };

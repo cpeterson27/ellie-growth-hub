@@ -74,6 +74,7 @@
 .account-profile-form--compact .form-field{gap:7px}
 .account-profile-form--compact .form-field>span{font-size:.76rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
 .account-profile-form--compact input,.account-profile-form--compact textarea{box-sizing:border-box;font-size:.95rem!important;height:44px!important;min-height:44px!important;padding:10px 12px!important;width:100%}
+.account-profile-form--compact select{box-sizing:border-box;font-size:.95rem;height:44px;padding:0 12px;width:100%}
 .account-profile-form--compact textarea{height:68px!important;resize:vertical}
 .settings-address-fields{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;margin:0;padding:18px;border:1px solid #d8d2c5;background:#faf9f6}.settings-address-fields legend{padding:0 8px;color:#1b2724;font-size:.78rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.settings-address-fields>p{grid-column:1/-1;margin:0;color:#85867f;font-size:.82rem}.settings-address-fields__wide{grid-column:1/-1}
 .settings-email-row{align-items:center;background:#f6f3ed;border:1px solid #ded8cc;display:flex;justify-content:space-between;padding:13px 15px}
@@ -86,6 +87,9 @@
 .program-brand-links em{align-items:center;color:#77643d;display:flex;font-size:.78rem;font-style:normal;gap:5px}
 .campaign-brand-name{align-items:flex-start!important;display:grid!important;gap:2px!important}.campaign-brand-name small{color:#9a8048;font-size:.62rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase}
 .account-settings-panel--refined>footer{background:#fff;padding:24px 38px}
+.security-check-list,.team-member-list{display:grid;gap:10px}
+.security-check-list>p,.team-member-list>div{align-items:center;background:#faf9f6;border:1px solid #ded8cc;display:grid;gap:12px;grid-template-columns:24px 1fr auto;margin:0;padding:14px}
+.security-check-list>p>svg{color:#2f6b5d}.security-check-list span,.team-member-list span{display:grid;gap:3px}.security-check-list small,.team-member-list small{color:#7b807a}.security-check-list em,.team-member-list em{background:#e0f2ea;color:#17604d;font-size:.7rem;font-style:normal;font-weight:800;padding:5px 8px;text-transform:capitalize}.team-member-list>div{grid-template-columns:1fr auto}
 
 .settings-card-note {
   color: var(--text-muted);

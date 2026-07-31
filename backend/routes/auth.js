@@ -4,14 +4,13 @@ const AuthSession = require("../models/AuthSession");
 const User = require("../models/User");
 require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
-const { verifyPassword } = require("../utils/passwords");
+const { hashPassword, verifyPassword } = require("../utils/passwords");
 const {
   clearSessionCookie,
-  parseCookies,
   requireAuth,
   sessionCookie,
+  sessionToken,
   tokenHash,
-  COOKIE_NAME,
 } = require("../middleware/auth");
 
 const router = express.Router();
@@ -62,7 +61,7 @@ router.post("/login", async (req, res) => {
     await user.save();
     res.setHeader("Set-Cookie", sessionCookie(token, expiresAt));
     req.auth = { user, workspace: membership.workspaceId, role: membership.role, session };
-    res.json(publicSession(req));
+    res.json({ ...publicSession(req), sessionToken: token });
   } catch (error) {
     console.error("LOGIN ERROR:", error);
     res.status(500).json({ error: "Unable to sign in" });
@@ -71,8 +70,26 @@ router.post("/login", async (req, res) => {
 
 router.get("/session", requireAuth, (req, res) => res.json(publicSession(req)));
 
+router.patch("/password", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.user._id).select("+passwordHash");
+    if (!user || !await verifyPassword(req.body?.currentPassword, user.passwordHash)) {
+      return res.status(400).json({ error: "Current password is incorrect" });
+    }
+    if (req.body?.newPassword !== req.body?.confirmPassword) {
+      return res.status(400).json({ error: "New passwords do not match" });
+    }
+    user.passwordHash = await hashPassword(req.body?.newPassword);
+    await user.save();
+    await AuthSession.deleteMany({ userId: user._id, _id: { $ne: req.auth.session._id } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Unable to change password" });
+  }
+});
+
 router.post("/logout", async (req, res) => {
-  const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
+  const token = sessionToken(req);
   if (token) await AuthSession.deleteOne({ tokenHash: tokenHash(token) });
   res.setHeader("Set-Cookie", clearSessionCookie());
   res.status(204).end();

@@ -56,6 +56,16 @@ router.post("/threads/:threadId/action", async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
+router.delete("/trash", async (req, res) => {
+  if (req.body?.confirmation !== "DELETE ALL TRASH") {
+    return res.status(400).json({ error: "Trash deletion must be explicitly confirmed" });
+  }
+  try {
+    const result = await gmail.emptyTrash();
+    res.json({ success: true, ...result });
+  } catch (error) { res.status(400).json({ error: error.message }); }
+});
+
 router.post("/send", async (req, res) => {
   try {
     const result = await gmail.sendMessage(req.body || {});

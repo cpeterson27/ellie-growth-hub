@@ -9,6 +9,7 @@ const scopes = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.modify",
+  "https://mail.google.com/",
 ];
 
 function required(name) {
@@ -216,6 +217,20 @@ async function modifyThread(threadId, action) {
   return gmailRequest(`/threads/${encodeURIComponent(threadId)}/modify`, { method: "POST", body: JSON.stringify(operations[action]) });
 }
 
+async function emptyTrash() {
+  let deleted = 0;
+  while (true) {
+    const result = await gmailRequest(`/threads?${new URLSearchParams({ q: "in:trash", maxResults: "100" })}`);
+    const threadIds = (result.threads || []).map((thread) => thread.id).filter(Boolean);
+    if (!threadIds.length) break;
+    await Promise.all(threadIds.map((threadId) =>
+      gmailRequest(`/threads/${encodeURIComponent(threadId)}`, { method: "DELETE" })
+    ));
+    deleted += threadIds.length;
+  }
+  return { deleted };
+}
+
 async function sendMessage({ to, subject, body, threadId = null, inReplyTo = "" }) {
   if (!String(to || "").includes("@")) throw new Error("A valid recipient email is required");
   if (!String(subject || "").trim() || !String(body || "").trim()) throw new Error("Subject and message are required");
@@ -232,4 +247,4 @@ async function sendMessage({ to, subject, body, threadId = null, inReplyTo = "" 
   return gmailRequest("/messages/send", { method: "POST", body: JSON.stringify({ raw, ...(threadId ? { threadId } : {}) }) });
 }
 
-module.exports = { authorizationUrl, exchangeCode, getThread, googleProfile, listThreads, modifyThread, saveConnection, sendMessage, status, verifyState };
+module.exports = { authorizationUrl, emptyTrash, exchangeCode, getThread, googleProfile, listThreads, modifyThread, saveConnection, sendMessage, status, verifyState };

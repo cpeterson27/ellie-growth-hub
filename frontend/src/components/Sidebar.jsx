@@ -11,7 +11,6 @@ import {
   FiSettings,
   FiLink,
   FiCpu,
-  FiCode,
   FiCheckCircle,
 } from "react-icons/fi";
 import "./Sidebar.css";
@@ -29,7 +28,6 @@ const navItems = [
   { label: "Partners", path: "/partners", icon: <FiUsers /> },
   { label: "AI Content", path: "/content", icon: <FiZap /> },
   { label: "Jarvis", path: "/jarvis", icon: <FiCpu /> },
-  { label: "Dev Requests", path: "/development-requests", icon: <FiCode /> },
   { label: "Analytics", path: "/analytics", icon: <FiBarChart2 /> },
   { label: "Integrations", path: "/integrations", icon: <FiLink /> },
   { label: "Settings", path: "/settings", icon: <FiSettings /> },

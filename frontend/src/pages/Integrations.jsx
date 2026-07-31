@@ -115,7 +115,7 @@ export default function Integrations() {
 
       <h2 className="integration-section-title">CRM and contact sources</h2>
       <section className="crm-connection-grid">
-        <article className="crm-connection-card crm-connection-card--active">
+        <article className="crm-connection-card">
           <div><span className="integration-status integration-status--connected">Active</span><h2>Ellie CRM</h2></div>
           <p>Your built-in CRM for contacts, audience profiles, campaign assignments, outreach history, and CSV imports. No external CRM account is required.</p>
           <div className="crm-connection-actions">
@@ -133,7 +133,7 @@ export default function Integrations() {
 
       <h2 className="integration-section-title">Email and inbox</h2>
       <section className="crm-connection-grid">
-        <article className={gmail?.connected ? "crm-connection-card crm-connection-card--active" : "crm-connection-card"}>
+        <article className="crm-connection-card">
           <div><span className={`integration-status integration-status--${gmail?.connected ? "connected" : "configuration_required"}`}>{gmail?.connected ? "Connected" : gmail?.configured ? "Ready to connect" : "App setup required"}</span><h2>Gmail</h2></div>
           <p>{gmail?.connected ? `${gmail.email} is authorized for inbox visibility and approved sending.` : "Connect a client’s Google account so Ellie can read relevant threads, prepare replies, and send only after user approval."}</p>
           <div className="crm-connection-actions">
@@ -142,7 +142,7 @@ export default function Integrations() {
           {!gmail?.configured ? <small>Add the Google OAuth client ID, secret, redirect URI, and credential encryption key to the backend environment first.</small> : null}
         </article>
         <article className="crm-connection-card">
-          <div><span className="integration-status">Delivery</span><h2>Resend</h2></div>
+          <div><span className="integration-status integration-status--connected">Connected</span><h2>Resend</h2></div>
           <p>Resend remains the campaign delivery provider. Gmail is for the connected inbox and personal replies; the two integrations have separate jobs.</p>
         </article>
       </section>
@@ -151,7 +151,7 @@ export default function Integrations() {
       {error ? <p className="form-error">{error}</p> : null}
       {loading ? <p>Loading integrations…</p> : (
         <section className="integration-provider-grid">
-          {providers.map((provider) => {
+          {providers.filter((provider) => provider.id !== "resend").map((provider) => {
             const isEventbrite = provider.id === "eventbrite";
             const status = isEventbrite && eventbriteReady ? "connected" : provider.status;
             return (
@@ -164,6 +164,8 @@ export default function Integrations() {
                     <Button onClick={() => navigate("/integrations/eventbrite")}>{eventbriteReady ? "Manage setup" : "Set up Eventbrite"}</Button>
                   ) : provider.id === "csv" ? (
                     <Button variant="outline" onClick={() => navigate("/contacts")}>Import contacts</Button>
+                  ) : provider.id === "apollo" ? (
+                    <Button variant="outline" onClick={() => navigate("/discovery")}>{["connected", "ready"].includes(status) ? "Open discovery" : "Set up Apollo"}</Button>
                   ) : (
                     <Button variant="outline" disabled>Details coming soon</Button>
                   )}
