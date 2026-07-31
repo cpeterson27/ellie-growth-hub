@@ -76,6 +76,7 @@ export default function Outreach() {
   const [testSending, setTestSending] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [deliverySyncedAt, setDeliverySyncedAt] = useState(null);
   const loadItems = useCallback(async (campaign) => {
     if (!campaign?._id) {
       setItems([]);
@@ -121,6 +122,28 @@ export default function Outreach() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    if (!selected?._id) return undefined;
+    let active = true;
+    const refreshDelivery = async () => {
+      try {
+        const result = await fetchOutreach(selected._id);
+        if (!active) return;
+        setItems(Array.isArray(result) ? result : result.outreach || []);
+        setDeliverySyncedAt(new Date());
+      } catch {
+        // Keep the last known delivery state; the next poll will retry.
+      }
+    };
+    const interval = window.setInterval(refreshDelivery, 20000);
+    const onVisible = () => { if (document.visibilityState === "visible") refreshDelivery(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [selected?._id]);
   const filtered = useMemo(
     () =>
       items.filter(
@@ -315,7 +338,7 @@ export default function Outreach() {
         title={selected ? `Messages for ${selected.name}` : "Outreach messages"}
       >
         <div className="outreach-list-tools">
-          <div><strong>{labels[filter] || "Outreach"}</strong><span>{filtered.length} message{filtered.length === 1 ? "" : "s"} in this view</span></div>
+          <div><strong>{labels[filter] || "Outreach"}</strong><span>{filtered.length} message{filtered.length === 1 ? "" : "s"} in this view · Delivery updates automatically{deliverySyncedAt ? ` · Checked ${deliverySyncedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</span></div>
           <label className="outreach-search">
             <span><FiSearch aria-hidden="true" /><input className="select-input" aria-label={`Search ${labels[filter] || "outreach"}`} placeholder={filter === "sent" ? "Search sent mail" : `Search ${String(labels[filter] || "outreach").toLowerCase()}`} value={search} onChange={(e) => setSearch(e.target.value)} /></span>
           </label>
