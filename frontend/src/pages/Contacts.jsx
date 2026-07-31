@@ -561,7 +561,9 @@ export default function Contacts() {
   }
 
   async function acceptCardPayload(payload) {
+
     const parsed = parseBusinessCardPayload(payload);
+
     const nextDraft = { ...manualContactDefaults, ...parsed };
     setCardRaw(payload);
     setCardDraft(nextDraft);
