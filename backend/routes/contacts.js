@@ -561,8 +561,8 @@ router.post("/sync", async (req, res) => {
 router.post("/apollo/search", async (req, res) => {
   const startedAt = Date.now();
   try {
-    const { titles = [], locations = [], keywords = [], domains = [], industryIds = [], emailStatuses = [], seniorities = [], technologiesAny = [], technologiesAll = [], technologiesExclude = [], employeeRange = {}, revenueRange = {}, page = 1, perPage = 25 } = req.body;
-    if (![titles, locations, keywords, domains, industryIds, emailStatuses, seniorities, technologiesAny, technologiesAll, technologiesExclude].every(Array.isArray)) {
+    const { titles = [], locations = [], keywords = [], domains = [], industryIds = [], emailStatuses = [], seniorities = [], technologiesAny = [], technologiesAll = [], technologiesExclude = [], employeeRanges = [], employeeRange = {}, revenueRange = {}, page = 1, perPage = 25 } = req.body;
+    if (![titles, locations, keywords, domains, industryIds, emailStatuses, seniorities, technologiesAny, technologiesAll, technologiesExclude, employeeRanges].every(Array.isArray)) {
       return res.status(400).json({ success: false, code: "invalid_request", message: "Apollo search filters must be arrays" });
     }
     const result = await integrationHub.execute("apollo", "searchLeads", {
@@ -572,6 +572,7 @@ router.post("/apollo/search", async (req, res) => {
       domains: Array.isArray(domains) ? domains.slice(0, 10) : [],
       industryIds: industryIds.slice(0, 20),
       emailStatuses: emailStatuses.slice(0, 5),
+      employeeRanges: employeeRanges.slice(0, 12),
       employeeRange: { min: employeeRange?.min ?? null, max: employeeRange?.max ?? null },
       seniorities: seniorities.slice(0, 12),
       technologiesAny: technologiesAny.slice(0, 50),

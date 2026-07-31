@@ -58,16 +58,38 @@ async function getAccountStatus() {
   }
   try {
     const key = getApiKey();
-    const response = await apolloClient().post("/usage_stats/api_usage_stats", {}, {
-      headers: { "x-api-key": key },
-    });
+    let peopleSearch = { available: true, code: "available", message: "People Search API access verified." };
+    try {
+      await apolloClient().post("/mixed_people/api_search", null, {
+        params: { q_keywords: `ellie_access_check_${Date.now()}`, page: 1, per_page: 1 },
+        headers: { "x-api-key": key },
+      });
+    } catch (error) {
+      const formatted = formatError(error);
+      peopleSearch = {
+        available: formatted.errorCode !== "forbidden",
+        code: formatted.errorCode,
+        message: formatted.message || "Apollo People Search access could not be verified.",
+      };
+      if (formatted.errorCode === "unauthorized") throw error;
+    }
+    let usage = null;
+    let usageAvailable = false;
+    try {
+      const response = await apolloClient().post("/usage_stats/api_usage_stats", {}, { headers: { "x-api-key": key } });
+      usage = response.data || {};
+      usageAvailable = true;
+    } catch (error) {
+      if (formatError(error).errorCode === "unauthorized") throw error;
+    }
     return {
       connected: true,
       configured: true,
-      code: "connected",
+      code: peopleSearch.available ? "connected" : "people_search_plan_unavailable",
       message: "Apollo accepted the configured API key.",
-      usageAvailable: true,
-      usage: response.data || {},
+      usageAvailable,
+      usage,
+      capabilities: { peopleSearch },
       checkedAt: new Date().toISOString(),
     };
   } catch (error) {
@@ -149,7 +171,7 @@ function nonBlankStrings(values) {
     : [];
 }
 
-function buildContactSearchBody({ titles = [], keywords = [], domains = [], locations = [], industryIds = [], emailStatuses = [], seniorities = [], technologiesAny = [], technologiesAll = [], technologiesExclude = [], employeeRange = {}, revenueRange = {}, page = 1, perPage = 25 } = {}) {
+function buildContactSearchBody({ titles = [], keywords = [], domains = [], locations = [], industryIds = [], emailStatuses = [], seniorities = [], technologiesAny = [], technologiesAll = [], technologiesExclude = [], employeeRanges = [], employeeRange = {}, revenueRange = {}, page = 1, perPage = 25 } = {}) {
   const body = { page: Math.max(1, Number(page) || 1), per_page: Math.min(100, Math.max(1, Number(perPage) || 25)) };
   const cleanedTitles = nonBlankStrings(titles);
   const cleanedKeywords = nonBlankStrings(keywords);
@@ -167,9 +189,11 @@ function buildContactSearchBody({ titles = [], keywords = [], domains = [], loca
   if (nonBlankStrings(technologiesAny).length) body.currently_using_any_of_technology_uids = nonBlankStrings(technologiesAny);
   if (nonBlankStrings(technologiesAll).length) body.currently_using_all_of_technology_uids = nonBlankStrings(technologiesAll);
   if (nonBlankStrings(technologiesExclude).length) body.currently_not_using_any_of_technology_uids = nonBlankStrings(technologiesExclude);
+  const cleanedEmployeeRanges = nonBlankStrings(employeeRanges);
   const hasEmployeeMin = employeeRange?.min !== null && employeeRange?.min !== undefined && employeeRange?.min !== "";
   const hasEmployeeMax = employeeRange?.max !== null && employeeRange?.max !== undefined && employeeRange?.max !== "";
-  if (hasEmployeeMin || hasEmployeeMax) body.organization_num_employees_ranges = [`${hasEmployeeMin ? Number(employeeRange.min) : 1},${hasEmployeeMax ? Number(employeeRange.max) : 1000000}`];
+  if (cleanedEmployeeRanges.length) body.organization_num_employees_ranges = cleanedEmployeeRanges;
+  else if (hasEmployeeMin || hasEmployeeMax) body.organization_num_employees_ranges = [`${hasEmployeeMin ? Number(employeeRange.min) : 1},${hasEmployeeMax ? Number(employeeRange.max) : 1000000}`];
   if (revenueRange?.min !== "" && revenueRange?.min != null) body["revenue_range[min]"] = Number(revenueRange.min);
   if (revenueRange?.max !== "" && revenueRange?.max != null) body["revenue_range[max]"] = Number(revenueRange.max);
   return body;
@@ -536,6 +560,7 @@ async function searchContacts({
   technologiesAny = [],
   technologiesAll = [],
   technologiesExclude = [],
+  employeeRanges = [],
   employeeRange = {},
   revenueRange = {},
   page = 1,
@@ -544,7 +569,7 @@ async function searchContacts({
   try {
     const key = getApiKey();
 
-    const body = buildContactSearchBody({ titles, keywords, domains, locations, industryIds, emailStatuses, seniorities, technologiesAny, technologiesAll, technologiesExclude, employeeRange, revenueRange, page, perPage });
+    const body = buildContactSearchBody({ titles, keywords, domains, locations, industryIds, emailStatuses, seniorities, technologiesAny, technologiesAll, technologiesExclude, employeeRanges, employeeRange, revenueRange, page, perPage });
 
     const { page: searchPage, per_page: perPageValue, ...filters } = body;
     const response = await apolloClient().post("/mixed_people/api_search", null, {

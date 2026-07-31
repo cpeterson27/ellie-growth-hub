@@ -22,21 +22,50 @@ import "./Discovery.css";
 import "./DiscoveryTargeting.css";
 import "./DiscoveryReview.css";
 
-const EMPTY_TARGET = { name: "Untitled search", titles: "", industries: "", keywords: "", locations: "", employeeMin: "", employeeMax: "", industryIds: [], emailStatuses: ["verified"], seniorities: [], technologiesAny: "", technologiesAll: "", technologiesExclude: "", revenueMin: "", revenueMax: "", fundingMin: "", fundingMax: "" };
-const APOLLO_INDUSTRIES = [
-  { id: "5567cd477369645401010000", label: "Real estate" },
-  { id: "5567e1887369641d68d40100", label: "Commercial real estate" },
-  { id: "5567cdd67369643e64020000", label: "Financial services" },
-];
+const EMPTY_TARGET = { name: "", titles: "", industries: "", keywords: "", locations: "", employeeMin: "", employeeMax: "", employeeRanges: [], industryIds: [], emailStatuses: ["verified"], seniorities: [], technologiesAny: "", technologiesAll: "", technologiesExclude: "", revenueMin: "", revenueMax: "", fundingMin: "", fundingMax: "" };
 const SENIORITIES = ["owner","founder","c_suite","partner","vp","head","director","manager","senior","entry","intern"];
+const EMPLOYEE_RANGES = ["1,10", "11,20", "21,50", "51,100", "101,200", "201,500", "501,1000", "1001,2000", "2001,5000", "5001,10000", "10001,1000000"];
 
 const splitFilters = (value) => String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
+const splitLocations = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+  if (/[;\n]/.test(raw)) return raw.split(/[;\n]+/).map((item) => item.trim()).filter(Boolean);
+  const pieces = raw.split(",").map((item) => item.trim()).filter(Boolean);
+  const locations = [];
+  for (const piece of pieces) {
+    if (/^(US|USA|United States)$/i.test(piece) && locations.length) locations[locations.length - 1] += `, ${piece}`;
+    else locations.push(piece);
+  }
+  return locations;
+};
+const employeeRangeLabel = (range) => range === "10001,1000000" ? "10,001+" : range.replace(",", "–");
+const employeeRangeBounds = (ranges = []) => {
+  const parsed = ranges.map((range) => range.split(",").map(Number)).filter(([min, max]) => Number.isFinite(min) && Number.isFinite(max));
+  return parsed.length ? { min: Math.min(...parsed.map(([min]) => min)), max: Math.max(...parsed.map(([, max]) => max)) } : { min: null, max: null };
+};
+const suggestedSearchName = (target, campaignName = "") => {
+  const focus = splitFilters(target.keywords)[0] || splitFilters(target.titles)[0] || "Event prospects";
+  const locations = splitLocations(target.locations).map((item) => item.replace(/,?\s*US$/i, "")).slice(0, 2).join(" + ");
+  return [campaignName, focus, locations].filter(Boolean).join(" · ");
+};
+const buildApolloPeopleUrl = (target) => {
+  const params = new URLSearchParams({ page: "1" });
+  splitFilters(target.titles).forEach((value) => params.append("personTitles[]", value));
+  splitLocations(target.locations).forEach((value) => params.append("personLocations[]", value));
+  splitFilters(target.keywords).forEach((value) => params.append("qOrganizationKeywordTags[]", value));
+  (target.emailStatuses || []).forEach((value) => params.append("contactEmailStatusV2[]", value));
+  (target.employeeRanges || []).forEach((value) => params.append("organizationNumEmployeesRanges[]", value));
+  (target.seniorities || []).forEach((value) => params.append("personSeniorities[]", value));
+  return `https://app.apollo.io/#/people?${params.toString()}`;
+};
 
 export default function Discovery() {
   const [prospects, setProspects] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [query, setQuery] = useState("");
   const [campaignId, setCampaignId] = useState("");
+  const [eventCampaignId, setEventCampaignId] = useState("");
   const [emailFilter, setEmailFilter] = useState("verified");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [notice, setNotice] = useState("");
@@ -68,7 +97,11 @@ export default function Discovery() {
   useEffect(() => {
     loadProspects().catch(() => setNotice("Unable to load prospects."));
     fetchCampaigns()
-      .then((items) => setCampaigns(Array.isArray(items) ? items.filter((item) => item?._id) : []))
+      .then((items) => {
+        const available = Array.isArray(items) ? items.filter((item) => item?._id) : [];
+        setCampaigns(available);
+        if (available[0]) setEventCampaignId(available[0]._id);
+      })
       .catch(() => setNotice("Unable to load campaigns for filtering."));
     fetchDiscoveryTemplates()
       .then((data) => {
@@ -125,6 +158,16 @@ export default function Discovery() {
         : "0.0",
     };
   }, [apolloHistory]);
+  const peopleApiAvailable = apolloStatus.capabilities?.peopleSearch?.available !== false;
+  const peopleSearchRunsInApollo = !peopleApiAvailable || splitFilters(target.keywords).length > 0;
+  const currentFilterGroups = searchMode === "people" ? [
+    ["Job titles", splitFilters(target.titles)],
+    ["Person locations", splitLocations(target.locations)],
+    ["Company keywords", splitFilters(target.keywords)],
+    ["Email status", target.emailStatuses || []],
+    ["Employees", (target.employeeRanges || []).map(employeeRangeLabel)],
+  ].filter(([, values]) => values.length) : [];
+  const currentFilterCount = currentFilterGroups.reduce((total, [, values]) => total + values.length, 0);
 
   const approve = async (row) => {
     await updateContact(row._id, { status: "active" });
@@ -142,7 +185,9 @@ export default function Discovery() {
 
   const selectPreset = (value) => {
     setTargetPreset(value);
-    setTarget(value === "custom" ? { ...EMPTY_TARGET } : { ...templates.find((template) => template.id === value) });
+    const template = templates.find((item) => item.id === value);
+    setTarget(value === "custom" ? { ...EMPTY_TARGET } : { ...template });
+    if (template?.mode) setSearchMode(template.mode);
   };
 
   const persistTemplates = async (nextTemplates, selectedId) => {
@@ -160,13 +205,48 @@ export default function Discovery() {
   };
 
   const saveTemplate = async () => {
-    const name = target.name.trim();
+    const campaign = campaigns.find((item) => item._id === eventCampaignId);
+    const name = target.name.trim() || suggestedSearchName(target, campaign?.name);
     if (!name) return setNotice("Give this search template a name first.");
+    const namedTarget = { ...target, name, mode: searchMode };
     if (targetPreset !== "custom") {
-      return persistTemplates(templates.map((template) => template.id === targetPreset ? { ...target, id: targetPreset } : template), targetPreset);
+      return persistTemplates(templates.map((template) => template.id === targetPreset ? { ...namedTarget, id: targetPreset } : template), targetPreset);
     }
     const id = globalThis.crypto?.randomUUID?.() || `template-${Date.now()}`;
-    await persistTemplates([...templates, { ...target, id }], id);
+    setTarget(namedTarget);
+    await persistTemplates([...templates, { ...namedTarget, id }], id);
+  };
+
+  const buildEventAudience = () => {
+    const campaign = campaigns.find((item) => item._id === eventCampaignId);
+    if (!campaign) return setNotice("Choose an event or campaign first.");
+    const isMultifamily = /multifamily|deal to close/i.test(`${campaign.name || ""} ${campaign.programName || ""}`);
+    const next = isMultifamily ? {
+      ...EMPTY_TARGET,
+      name: `${campaign.name} · acquisitions & underwriting · FL + TX`,
+      titles: "Acquisitions Manager, Underwriter, Managing Partner",
+      keywords: "Multifamily, Syndication, Rent Roll",
+      locations: "Florida, US; Texas, US",
+      employeeRanges: ["1,10"],
+      emailStatuses: ["verified"],
+    } : {
+      ...EMPTY_TARGET,
+      name: `${campaign.name} · event prospects`,
+      titles: "Owner, Founder, Managing Partner",
+      keywords: campaign.programName || campaign.name,
+      locations: "United States",
+      employeeRanges: ["1,10", "11,20", "21,50"],
+      emailStatuses: ["verified"],
+    };
+    setSearchMode("people");
+    setTargetPreset("custom");
+    setTarget(next);
+    setNotice("Event audience prepared. Review the filters, save the search, then open it in Apollo.");
+  };
+
+  const openApolloPeopleSearch = () => {
+    if (!splitFilters(target.titles).length) return setNotice("Add at least one job title first.");
+    window.open(buildApolloPeopleUrl(target), "_blank", "noopener,noreferrer");
   };
 
   const deleteTemplate = async () => {
@@ -213,9 +293,10 @@ export default function Discovery() {
         const response = await searchApolloLeads({
           titles: splitFilters(target.titles),
           keywords: splitFilters(target.keywords),
-          locations: splitFilters(target.locations),
+          locations: splitLocations(target.locations),
           industryIds: target.industryIds || [],
           emailStatuses: target.emailStatuses || [],
+          employeeRanges: target.employeeRanges || [],
           employeeRange: {
             min: target.employeeMin === "" ? null : Number(target.employeeMin),
             max: target.employeeMax === "" ? null : Number(target.employeeMax),
@@ -245,8 +326,8 @@ export default function Discovery() {
         criteria: {
           keywords: splitFilters(target.keywords),
           industries: splitFilters(target.industries),
-          locations: splitFilters(target.locations),
-          employeeRange: {
+          locations: splitLocations(target.locations),
+          employeeRange: (target.employeeRanges || []).length ? employeeRangeBounds(target.employeeRanges) : {
             min: target.employeeMin === "" ? null : Number(target.employeeMin),
             max: target.employeeMax === "" ? null : Number(target.employeeMax),
           },
@@ -330,21 +411,23 @@ export default function Discovery() {
       <DashboardCard title="Filters" className="apollo-filter-panel" action={<span className="apollo-filter-count">{searchMode === "people" ? "People" : "Companies"}</span>}>
         <div className={`apollo-connection-panel is-${apolloStatus.state}`}><span className="status-dot" /><div><strong>{apolloStatus.state === "connected" ? "Apollo search ready" : apolloStatus.state === "checking" ? "Checking Apollo account" : "Apollo account needs attention"}</strong><p>{apolloStatus.state === "connected" ? "People and company search access is connected." : apolloStatus.message}</p></div><Button variant="ghost" size="sm" onClick={() => { setApolloStatus({ state: "checking", message: "Checking Apollo connection…" }); fetchApolloStatus().then((status) => setApolloStatus({ ...status, state: status.connected ? "connected" : "error" })).catch((error) => setApolloStatus({ state: "error", message: error.response?.data?.message || "Unable to verify Apollo." })); }}>Recheck</Button></div>
         {apolloListCapability.state === "unavailable" ? <div className="apollo-capability-notice" role="status"><div><strong>Saved-list sync unavailable</strong><span>{apolloListCapability.message}</span><small>{apolloListCapability.action}</small></div></div> : null}
+        {!peopleApiAvailable ? <div className="apollo-capability-notice" role="status"><div><strong>People Search runs in Apollo on the Free plan</strong><span>Ellie can build, name, save, and reopen the exact web search. Apollo does not allow this account to return People results through its API.</span><small>Upgrade Apollo when you want the same People results returned inside Ellie.</small></div></div> : null}
+        <div className="apollo-event-builder"><label>Build an audience for<select value={eventCampaignId} onChange={(event) => setEventCampaignId(event.target.value)}><option value="">Choose event or campaign</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select></label><Button variant="outline" size="sm" onClick={buildEventAudience}>Generate event search</Button></div>
         <p className="apollo-note">Choose a saved filter set or build a new one. Saved searches here are reusable Ellie filters for searching Apollo.</p>
         <div className="apollo-target-topline">
           <label>Saved search template<select value={targetPreset} onChange={(event) => selectPreset(event.target.value)}><option value="custom">New custom search</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
           <label>Search mode<select value={searchMode} onChange={(event) => setSearchMode(event.target.value)}><option value="organizations">Organizations</option><option value="people">People</option></select></label>
         </div>
         <div className="apollo-target-grid">
-          <label>Search name<input value={target.name} onChange={(event) => setTarget({ ...target, name: event.target.value })} placeholder="Example: Texas property managers" /><small>This is the name Ellie saves—not an Apollo list.</small></label>
+          <label>Search name<input value={target.name} onChange={(event) => setTarget({ ...target, name: event.target.value })} placeholder={suggestedSearchName(target, campaigns.find((item) => item._id === eventCampaignId)?.name) || "Example: Multifamily partners · FL + TX"} /><small>Saved in Ellie so you can reopen the same audience later.</small></label>
           {searchMode === "people" ? <label>Job titles<input value={target.titles} onChange={(event) => setTarget({ ...target, titles: event.target.value })} placeholder="Owner, Founder, Investor" /></label> : null}
-          {searchMode === "people" ? <fieldset className="apollo-industry-options"><legend>Company industries</legend>{APOLLO_INDUSTRIES.map((industry) => <label key={industry.id}><input type="checkbox" checked={(target.industryIds || []).includes(industry.id)} onChange={() => setTarget({ ...target, industryIds: (target.industryIds || []).includes(industry.id) ? target.industryIds.filter((id) => id !== industry.id) : [...(target.industryIds || []), industry.id] })} />{industry.label}</label>)}<small>These use Apollo’s industry IDs from your search.</small></fieldset> : <label>Company industries<input value={target.industries} onChange={(event) => setTarget({ ...target, industries: event.target.value })} placeholder="Real estate, hospitality" /><small>Sent to Apollo as company keyword tags.</small></label>}
+          {searchMode === "organizations" ? <label>Company industries<input value={target.industries} onChange={(event) => setTarget({ ...target, industries: event.target.value })} placeholder="Real estate, hospitality" /><small>Sent to Apollo as company keyword tags.</small></label> : null}
           <label>Company keywords<input value={target.keywords} onChange={(event) => setTarget({ ...target, keywords: event.target.value })} placeholder="multifamily, Airbnb, acquisitions" /></label>
-          <label>Headquarters locations<input value={target.locations} onChange={(event) => setTarget({ ...target, locations: event.target.value })} placeholder="United States, Texas" /><small>Apollo matches the company headquarters.</small></label>
-          <label>Minimum employees<input type="number" min="0" value={target.employeeMin} onChange={(event) => setTarget({ ...target, employeeMin: event.target.value })} /></label>
-          <label>Maximum employees<input type="number" min="0" value={target.employeeMax} onChange={(event) => setTarget({ ...target, employeeMax: event.target.value })} /></label>
+          <label>{searchMode === "people" ? "Person locations" : "Headquarters locations"}<input value={target.locations} onChange={(event) => setTarget({ ...target, locations: event.target.value })} placeholder="Florida, US; Texas, US" /><small>{searchMode === "people" ? "Matches where the person lives. Separate locations with a semicolon." : "Matches company headquarters. Separate locations with a semicolon."}</small></label>
+          <fieldset className="apollo-employee-ranges"><legend>Company size · employees</legend>{EMPLOYEE_RANGES.map((range) => <label key={range}><input type="checkbox" checked={(target.employeeRanges || []).includes(range)} onChange={() => setTarget({ ...target, employeeRanges: (target.employeeRanges || []).includes(range) ? target.employeeRanges.filter((item) => item !== range) : [...(target.employeeRanges || []), range], employeeMin: "", employeeMax: "" })} />{employeeRangeLabel(range)}</label>)}<small>Select one or more Apollo ranges.</small></fieldset>
           {searchMode === "people" ? <fieldset className="apollo-verified-filter"><legend>Email status</legend><label><input type="checkbox" checked={(target.emailStatuses || []).includes("verified")} onChange={(event) => setTarget({ ...target, emailStatuses: event.target.checked ? ["verified"] : [] })} />Verified emails only</label></fieldset> : null}
         </div>
+        {searchMode === "people" && currentFilterGroups.length ? <div className="apollo-search-blueprint"><header><div><strong>Search blueprint</strong><span>{currentFilterCount} active filters</span></div><small>{peopleSearchRunsInApollo ? "Opens as a filtered search in Apollo" : "Runs through Apollo People Search API"}</small></header>{currentFilterGroups.map(([label, values]) => <div key={label}><strong>{label}</strong><span>{values.join(" · ")}</span></div>)}</div> : null}
         <details className="apollo-advanced-filters">
           <summary>Advanced Apollo filters <span>Technology, revenue, funding, and seniority</span></summary>
           <div className="apollo-target-grid">
@@ -360,7 +443,7 @@ export default function Discovery() {
           <div className="apollo-unavailable-filter"><strong>Buyer intent</strong><span>Not available through Apollo’s public People or Organization Search API for this connection. Ellie will not pretend to apply a filter Apollo ignores.</span></div>
         </details>
         <div className="apollo-template-actions"><Button variant="outline" loading={savingTemplate} onClick={saveTemplate}>{targetPreset === "custom" ? "Save as template" : "Save template changes"}</Button>{targetPreset !== "custom" ? <Button variant="ghost" disabled={savingTemplate} onClick={deleteTemplate}>Delete template</Button> : null}<span>Templates store filters in Ellie. They do not run until you click Find.</span></div>
-        <div className="apollo-search-actions"><Button loading={searchingApollo} onClick={() => runApolloSearch(1)}>{searchMode === "people" ? "Find matching people" : "Find matching organizations"}</Button></div>
+        <div className="apollo-search-actions"><Button loading={searchingApollo} onClick={() => searchMode === "people" && peopleSearchRunsInApollo ? openApolloPeopleSearch() : runApolloSearch(1)}>{searchMode === "people" ? (peopleSearchRunsInApollo ? "Open search in Apollo" : "Find matching people") : "Find matching organizations"}</Button></div>
         {apolloError ? <div className="apollo-error-panel" role="alert"><strong>{apolloError.title}</strong><p>{apolloError.message}</p><span>{apolloError.action}</span>{apolloError.code ? <small>Error code: {apolloError.code}{apolloError.retryAfter ? ` · Retry after ${apolloError.retryAfter}` : ""}</small> : null}</div> : null}
         <div className="apollo-status"><span className="status-dot" />People Search: no search credit · Organization Search: 1 credit per results page · Enrichment may use credits</div>
         <p className="apollo-note">Company results are saved in Ellie’s Discovery workspace so you can review and use them later. Your Apollo account stays unchanged unless you explicitly synchronize selected people to an Apollo list.</p>
