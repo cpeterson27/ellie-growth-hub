@@ -200,6 +200,7 @@ export default function Contacts() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkNotice, setBulkNotice] = useState("");
   const pageSize = 15;
+  const importCampaignTargetId = String(importSummary?.campaignId || campaigns.find((campaign) => campaign.name === importSummary?.campaignName)?._id || "");
 
   async function loadContacts() {
     try {
@@ -608,9 +609,9 @@ export default function Contacts() {
       <DashboardCard title="Contacts">
         {error ? <p className="form-error">{error}</p> : null}
         {importSummary ? <section className={importSummary.failed ? "import-receipt has-errors" : "import-receipt"}>
-          <header><div><span>Import complete</span><h3>{importSummary.mongoCreated} new contact{importSummary.mongoCreated === 1 ? "" : "s"} added</h3><p>{importSummary.mongoUpdated} existing contact{importSummary.mongoUpdated === 1 ? " was" : "s were"} updated without creating duplicates.</p></div>{importSummary.createdContacts?.length ? <Button size="sm" onClick={viewNewImportedContacts}><b className="import-receipt-button-label">View these {importSummary.mongoCreated} contacts</b></Button> : null}</header>
+          <header><div><span>Import complete</span><h3>{importSummary.mongoCreated} new contact{importSummary.mongoCreated === 1 ? "" : "s"} added</h3><p>{importSummary.mongoUpdated} existing contact{importSummary.mongoUpdated === 1 ? " was" : "s were"} updated without creating duplicates.</p></div><div className="import-receipt__actions">{importCampaignTargetId ? <Button size="sm" onClick={() => navigate(`/campaigns/${importCampaignTargetId}`)}><b className="import-receipt-button-label">Open campaign</b></Button> : null}{importSummary.createdContacts?.length ? <Button variant={importCampaignTargetId ? "outline" : "primary"} size="sm" onClick={viewNewImportedContacts}><b className={importCampaignTargetId ? "" : "import-receipt-button-label"}>View these {importSummary.mongoCreated} contacts</b></Button> : null}</div></header>
           {importSummary.createdContacts?.length ? <div className="import-receipt__contacts">{importSummary.createdContacts.map((contact) => <article key={String(contact.id)}><span>{String(contact.name || "?").slice(0, 1).toUpperCase()}</span><div><strong>{contact.name}</strong><small>{contact.company || "Company missing"} · {contact.email || "No usable email"}</small></div><em className={`is-${contact.emailStatus}`}>{contact.emailStatus === "verified" ? "Ready to contact" : "Email needs review"}</em></article>)}</div> : null}
-          {importSummary.campaignName ? <p className="import-receipt__assignment">Already assigned to {importSummary.campaignName}. Use the button above to open them in Contacts.</p> : <p className="import-receipt__assignment">Use “View these contacts,” then choose a campaign from the bulk-action bar.</p>}
+          {importSummary.campaignName ? <div className="import-receipt__next"><strong>Next step</strong><p>These contacts are already assigned to {importSummary.campaignName}. Open the campaign to review its audience and message, then continue to Outreach when you are ready.</p>{importCampaignTargetId ? <Button variant="outline" size="sm" onClick={() => navigate(`/outreach?campaignId=${importCampaignTargetId}`)}>Open outreach</Button> : null}</div> : <p className="import-receipt__assignment">Use “View these contacts,” then choose a campaign from the bulk-action bar.</p>}
           {importSummary.failed && importSummary.errors?.[0]?.message ? <p className="form-error">First failure: {importSummary.errors[0].message}</p> : null}
         </section> : null}
         {contactOverview ? <section className="contact-overview contact-overview--workflow" aria-label="CRM workflow overview">
@@ -634,7 +635,7 @@ export default function Contacts() {
           ["assigned", "Campaign assigned"],
           ["archived", "Archived"],
         ].map(([value, label]) => <button key={value} className={contactTab === value ? "active" : ""} onClick={() => setContactTab(value)}>{label}</button>)}</div>
-        {contacts.length && contactTab !== "archived" ? <section className="contact-bulk-actions" aria-label="Bulk contact actions">
+        {contacts.length && contactTab !== "archived" && !importSummary?.campaignName ? <section className="contact-bulk-actions" aria-label="Bulk contact actions">
           <label className="contact-select-all">
             <input type="checkbox" checked={contacts.some((contact) => contact.emailStatus === "verified") && contacts.filter((contact) => contact.emailStatus === "verified").every((contact) => selectedContactIds.includes(contact._id))} onChange={(event) => setSelectedContactIds(event.target.checked ? contacts.filter((contact) => contact.emailStatus === "verified").map((contact) => contact._id) : [])} />
             <span>Select all verified contacts in this view</span>

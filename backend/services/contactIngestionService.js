@@ -168,6 +168,7 @@ async function ingestContacts({
     importBatchId: cleanBatchId || null,
     importFileName: cleanFileName || null,
     campaignName: campaign?.name || null,
+    campaignId: campaign?._id || null,
     createdContacts: [],
     updatedContacts: [],
   };
