@@ -326,29 +326,48 @@ async function discoverOrganizationsForAudience(audienceId) {
     }
 
     // Step 4: Search Apollo (paginate, max 500 organizations)
-    // Note: Apollo API only supports either keywords OR industries, not both.
-    // Strategy: Combine industries into keywords if both are provided.
+    // Apollo's company search accepts human-readable company keyword tags.
+    // Treat the UI's industries as additional keyword tags rather than sending
+    // names into the industry-ID field.
     const maxOrgs = 500;
     const perPage = 25;
     const maxPages = Math.ceil(maxOrgs / perPage);
 
-    const searchKeywords = [
-      ...keywords,
-      ...(industries.length > 0 && keywords.length > 0 ? industries : []),
-    ];
-    const searchIndustries =
-      keywords.length === 0 && industries.length > 0 ? industries : [];
+    const searchKeywords = [...new Set([...industries, ...keywords])];
 
     let allSearchResults = [];
     let totalAvailableFromApollo = 0;
 
     for (let page = 1; page <= maxPages; page++) {
-      const searchResult = await searchOrganizations({
+      let searchResult = await searchOrganizations({
         keywords: searchKeywords,
-        industries: searchIndustries,
+        locations,
+        employeeRange,
         page,
         perPage,
       });
+
+      // Apollo can interpret multiple keyword tags too narrowly and return
+      // zero organizations even when the broad market is available. Retry the
+      // first page with the primary keyword so users receive a useful result
+      // set, then apply location, employee, score, and tier filters below.
+      if (
+        page === 1 &&
+        searchResult.success &&
+        searchResult.organizations?.length === 0 &&
+        searchKeywords.length > 1
+      ) {
+        searchResult = await searchOrganizations({
+          keywords: [searchKeywords[0]],
+          locations,
+          employeeRange,
+          page,
+          perPage,
+        });
+        if (searchResult.organizations?.length) {
+          discoveryErrors.message = `Apollo broadened the search to the primary keyword “${searchKeywords[0]}” because the full keyword combination returned no matches.`;
+        }
+      }
 
       if (!searchResult.success || !searchResult.organizations) {
         pagination.stoppedReason = "error";

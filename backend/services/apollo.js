@@ -97,7 +97,7 @@ async function verifyAuth() {
   try {
     const key = getApiKey();
     const response = await apolloClient().post(
-      "/organizations/search",
+      "/mixed_companies/search",
       { q_organization_keyword_tags: ["real estate"], page: 1, per_page: 1 },
       { headers: { "x-api-key": key } },
     );
@@ -139,7 +139,8 @@ async function verifyAuth() {
  */
 async function searchOrganizations({
   keywords = [],
-  industries = [],
+  locations = [],
+  employeeRange = {},
   page = 1,
   perPage = 25,
 } = {}) {
@@ -155,11 +156,21 @@ async function searchOrganizations({
       body.q_organization_keyword_tags = keywords;
     }
 
-    if (industries.length > 0) {
-      body.organization_industry_tag_ids = industries;
+    if (locations.length > 0) {
+      body.organization_locations = locations;
     }
 
-    const response = await apolloClient().post("/organizations/search", body, {
+    const hasMinEmployees = employeeRange?.min !== null && employeeRange?.min !== undefined && employeeRange?.min !== "";
+    const hasMaxEmployees = employeeRange?.max !== null && employeeRange?.max !== undefined && employeeRange?.max !== "";
+    const minEmployees = hasMinEmployees ? Number(employeeRange.min) : null;
+    const maxEmployees = hasMaxEmployees ? Number(employeeRange.max) : null;
+    if (Number.isFinite(minEmployees) || Number.isFinite(maxEmployees)) {
+      body.organization_num_employees_ranges = [
+        `${Number.isFinite(minEmployees) ? minEmployees : 1},${Number.isFinite(maxEmployees) ? maxEmployees : 1000000}`,
+      ];
+    }
+
+    const response = await apolloClient().post("/mixed_companies/search", body, {
       headers: { "x-api-key": key },
     });
 

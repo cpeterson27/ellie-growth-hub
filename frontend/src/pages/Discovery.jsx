@@ -38,6 +38,7 @@ export default function Discovery() {
   const [targetPreset, setTargetPreset] = useState("real_estate");
   const [target, setTarget] = useState(TARGET_PRESETS.real_estate);
   const [searchingApollo, setSearchingApollo] = useState(false);
+  const [apolloResult, setApolloResult] = useState(null);
 
   const loadProspects = async () => {
     const response = await fetchContacts({ status: "prospect", limit: 500 });
@@ -92,6 +93,7 @@ export default function Discovery() {
   const runApolloSearch = async () => {
     setSearchingApollo(true);
     setNotice("");
+    setApolloResult(null);
     try {
       if (searchMode === "people") {
         const response = await searchApolloLeads({
@@ -120,6 +122,7 @@ export default function Discovery() {
         },
       });
       const result = await discoverAudienceOrganizations(created.audience._id);
+      setApolloResult(result);
       setNotice(`${result.organizationsFound || 0} organizations found for “${target.name}”; ${result.organizationsCreated || 0} added and ${result.organizationsUpdated || 0} updated.`);
     } catch (error) {
       setNotice(error.response?.data?.message || error.response?.data?.error || "Apollo search could not be completed.");
@@ -145,22 +148,23 @@ export default function Discovery() {
       </p>
 
       <DashboardCard title="Apollo targeting">
-        <p className="apollo-note">Choose who this search is for, then adjust the filters. Organization discovery works on the connected plan; People Search requires Apollo API access.</p>
+        <p className="apollo-note">Start with an Ellie search template, then adjust the Apollo-compatible company filters. Templates are saved in Ellie; they are not imported from your Apollo account.</p>
         <div className="apollo-target-topline">
-          <label>Target profile<select value={targetPreset} onChange={(event) => selectPreset(event.target.value)}><option value="real_estate">Real estate decision-makers</option><option value="short_term_rental">Airbnb / short-term rental investors</option><option value="program_15k">$15K program prospects</option><option value="custom">Custom search</option></select></label>
+          <label>Ellie search template<select value={targetPreset} onChange={(event) => selectPreset(event.target.value)}><option value="real_estate">Real estate decision-makers</option><option value="short_term_rental">Airbnb / short-term rental investors</option><option value="program_15k">$15K program prospects</option><option value="custom">Custom search</option></select></label>
           <label>Search mode<select value={searchMode} onChange={(event) => setSearchMode(event.target.value)}><option value="organizations">Organizations</option><option value="people">People</option></select></label>
         </div>
         <div className="apollo-target-grid">
-          <label>Titles<input value={target.titles} onChange={(event) => setTarget({ ...target, titles: event.target.value })} placeholder="Owner, Founder, Investor" /></label>
-          <label>Industries<input value={target.industries} onChange={(event) => setTarget({ ...target, industries: event.target.value })} placeholder="Real Estate, Hospitality" /></label>
-          <label>Keywords<input value={target.keywords} onChange={(event) => setTarget({ ...target, keywords: event.target.value })} placeholder="multifamily, Airbnb, acquisitions" /></label>
-          <label>Locations<input value={target.locations} onChange={(event) => setTarget({ ...target, locations: event.target.value })} placeholder="United States, Texas" /></label>
+          {searchMode === "people" ? <label>Job titles<input value={target.titles} onChange={(event) => setTarget({ ...target, titles: event.target.value })} placeholder="Owner, Founder, Investor" /></label> : null}
+          <label>Company industries<input value={target.industries} onChange={(event) => setTarget({ ...target, industries: event.target.value })} placeholder="Real estate, hospitality" /><small>Sent to Apollo as company keyword tags.</small></label>
+          <label>Company keywords<input value={target.keywords} onChange={(event) => setTarget({ ...target, keywords: event.target.value })} placeholder="multifamily, Airbnb, acquisitions" /></label>
+          <label>Headquarters locations<input value={target.locations} onChange={(event) => setTarget({ ...target, locations: event.target.value })} placeholder="United States, Texas" /><small>Apollo matches the company headquarters.</small></label>
           <label>Minimum employees<input type="number" min="0" value={target.employeeMin} onChange={(event) => setTarget({ ...target, employeeMin: event.target.value })} /></label>
           <label>Maximum employees<input type="number" min="0" value={target.employeeMax} onChange={(event) => setTarget({ ...target, employeeMax: event.target.value })} /></label>
         </div>
         <div className="apollo-search-actions"><Button loading={searchingApollo} disabled={searchMode === "people"} onClick={runApolloSearch}>{searchMode === "people" ? "People Search requires paid Apollo" : "Find matching organizations"}</Button></div>
-        <div className="apollo-status"><span className="status-dot" />Connected · Free plan · People Search unavailable · Organization Search available</div>
-        <p className="apollo-note">Profiles are starting points, not permanent rules. Ellie can switch profiles for each offer or campaign.</p>
+        {apolloResult ? <div className={`apollo-search-result ${apolloResult.organizationsFound ? "is-success" : "is-empty"}`} role="status"><strong>{apolloResult.organizationsFound ? `${apolloResult.organizationsFound} organizations found` : "Search completed — no matches found"}</strong><p>{apolloResult.organizationsFound ? `${apolloResult.organizationsCreated || 0} new organizations were added and ${apolloResult.organizationsUpdated || 0} existing records were updated.` : "Apollo is connected and responded successfully. Try fewer keywords, a broader location, or a larger employee range."}</p></div> : null}
+        <div className="apollo-status"><span className="status-dot" />API key configured · Organization Search uses 1 Apollo credit per results page · People Search access depends on your Apollo key</div>
+        <p className="apollo-note">Each search creates an Ellie audience record and saves matched companies to Discovery. It does not create or modify an Apollo saved search.</p>
       </DashboardCard>
 
       <section className="discovery-stats">

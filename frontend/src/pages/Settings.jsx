@@ -177,7 +177,7 @@ export default function Settings() {
         </section>
 
         <footer><Button loading={saving} disabled={workspaceName.trim().length < 2} onClick={save}>Save organization profile</Button></footer>
-      </div> : activeSection === "login" ? <div className="account-settings-panel account-settings-panel--refined">
+      </div> : activeSection === "login" ? <form className="account-settings-panel account-settings-panel--refined" onSubmit={(event) => { event.preventDefault(); savePassword(); }}>
         <header><p className="page-eyebrow">Login & password</p><h2>Sign-in details</h2><p>Change the password for {session?.user?.email}. Your other signed-in devices will be logged out.</p></header>
         <section className="settings-section"><div className="settings-section__heading"><FiLock /><div><h3>Change password</h3><p>Use at least 12 characters and a password unique to Ellie.</p></div></div><div className="account-profile-form account-profile-form--compact">
           <label className="form-field"><span>Current password</span><input type="password" autoComplete="current-password" value={passwords.currentPassword} onChange={(event) => setPasswords({ ...passwords, currentPassword: event.target.value })} /></label>
@@ -185,11 +185,11 @@ export default function Settings() {
           <label className="form-field"><span>New password</span><input type="password" autoComplete="new-password" value={passwords.newPassword} onChange={(event) => setPasswords({ ...passwords, newPassword: event.target.value })} /></label>
           <label className="form-field"><span>Confirm new password</span><input type="password" autoComplete="new-password" value={passwords.confirmPassword} onChange={(event) => setPasswords({ ...passwords, confirmPassword: event.target.value })} /></label>
         </div></section>
-        <footer><Button loading={saving} disabled={!passwords.currentPassword || passwords.newPassword.length < 12 || passwords.newPassword !== passwords.confirmPassword} onClick={savePassword}>Update password</Button></footer>
-      </div> : activeSection === "security" ? <div className="account-settings-panel account-settings-panel--refined">
+        <footer><Button type="submit" loading={saving} disabled={!passwords.currentPassword || passwords.newPassword.length < 12 || passwords.newPassword !== passwords.confirmPassword}>Update password</Button></footer>
+      </form> : activeSection === "security" ? <div className="account-settings-panel account-settings-panel--refined">
         <header><p className="page-eyebrow">Security</p><h2>Account protection</h2><p>Review the security controls currently protecting this workspace.</p></header>
         <section className="settings-section security-check-list"><p><FiShield /><span><strong>Secure server-side sessions</strong><small>Sessions expire automatically after 14 days.</small></span><em>Active</em></p><p><FiLock /><span><strong>Protected account changes</strong><small>Passwords are hashed and current-password verification is required.</small></span><em>Active</em></p><p><FiUsers /><span><strong>Role-based workspace access</strong><small>Your current role is {session?.role || "member"}.</small></span><em>Active</em></p></section>
-      </div> : <div className="account-settings-panel account-settings-panel--refined">
+      </div> : <form className="account-settings-panel account-settings-panel--refined" onSubmit={(event) => { event.preventDefault(); addMember(); }}>
         <header><p className="page-eyebrow">Team access</p><h2>Workspace members</h2><p>Add a teammate with a temporary password, then send their login details securely.</p></header>
         <section className="settings-section"><div className="team-member-list">{members.map((member) => <div key={member.id}><span><strong>{member.name}</strong><small>{member.email}</small></span><em>{member.role}</em></div>)}</div></section>
         {["owner", "admin"].includes(session?.role) ? <section className="settings-section"><div className="settings-section__heading"><FiUsers /><div><h3>Add team member</h3><p>They can sign in immediately using the temporary password.</p></div></div><div className="account-profile-form account-profile-form--compact">
@@ -198,8 +198,8 @@ export default function Settings() {
           <label className="form-field"><span>Role</span><select value={newMember.role} onChange={(event) => setNewMember({ ...newMember, role: event.target.value })}><option value="admin">Admin</option><option value="member">Member</option><option value="viewer">Viewer</option></select></label>
           <label className="form-field"><span>Temporary password</span><input type="password" value={newMember.temporaryPassword} onChange={(event) => setNewMember({ ...newMember, temporaryPassword: event.target.value })} /></label>
         </div></section> : null}
-        {["owner", "admin"].includes(session?.role) ? <footer><Button loading={saving} disabled={newMember.name.length < 2 || !newMember.email.includes("@") || newMember.temporaryPassword.length < 12} onClick={addMember}>Add team member</Button></footer> : null}
-      </div>}
+        {["owner", "admin"].includes(session?.role) ? <footer><Button type="submit" loading={saving} disabled={newMember.name.length < 2 || !newMember.email.includes("@") || newMember.temporaryPassword.length < 12}>Add team member</Button></footer> : null}
+      </form>}
     </section>
   </div>;
 }

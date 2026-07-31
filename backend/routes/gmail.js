@@ -66,6 +66,17 @@ router.delete("/trash", async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
+router.post("/trash/delete-selected", async (req, res) => {
+  const threadIds = Array.isArray(req.body?.threadIds) ? req.body.threadIds : [];
+  if (req.body?.confirmation !== "DELETE SELECTED" || !threadIds.length) {
+    return res.status(400).json({ error: "Select at least one trash conversation and confirm deletion" });
+  }
+  try {
+    const result = await gmail.deleteThreads(threadIds);
+    res.json({ success: true, ...result });
+  } catch (error) { res.status(400).json({ error: error.message }); }
+});
+
 router.post("/send", async (req, res) => {
   try {
     const result = await gmail.sendMessage(req.body || {});

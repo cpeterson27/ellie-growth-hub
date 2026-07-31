@@ -209,12 +209,22 @@ async function modifyThread(threadId, action) {
   const operations = {
     archive: { removeLabelIds: ["INBOX"] },
     trash: null,
+    untrash: null,
     read: { removeLabelIds: ["UNREAD"] },
     unread: { addLabelIds: ["UNREAD"] },
   };
   if (!(action in operations)) throw new Error("Unsupported Gmail action");
   if (action === "trash") return gmailRequest(`/threads/${encodeURIComponent(threadId)}/trash`, { method: "POST", body: "{}" });
+  if (action === "untrash") return gmailRequest(`/threads/${encodeURIComponent(threadId)}/untrash`, { method: "POST", body: "{}" });
   return gmailRequest(`/threads/${encodeURIComponent(threadId)}/modify`, { method: "POST", body: JSON.stringify(operations[action]) });
+}
+
+async function deleteThreads(threadIds = []) {
+  const uniqueIds = [...new Set(threadIds.map(String).filter(Boolean))].slice(0, 100);
+  await Promise.all(uniqueIds.map((threadId) =>
+    gmailRequest(`/threads/${encodeURIComponent(threadId)}`, { method: "DELETE" })
+  ));
+  return { deleted: uniqueIds.length };
 }
 
 async function emptyTrash() {
@@ -247,4 +257,4 @@ async function sendMessage({ to, subject, body, threadId = null, inReplyTo = "" 
   return gmailRequest("/messages/send", { method: "POST", body: JSON.stringify({ raw, ...(threadId ? { threadId } : {}) }) });
 }
 
-module.exports = { authorizationUrl, emptyTrash, exchangeCode, getThread, googleProfile, listThreads, modifyThread, saveConnection, sendMessage, status, verifyState };
+module.exports = { authorizationUrl, deleteThreads, emptyTrash, exchangeCode, getThread, googleProfile, listThreads, modifyThread, saveConnection, sendMessage, status, verifyState };

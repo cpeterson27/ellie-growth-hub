@@ -48,3 +48,4 @@
     grid-template-columns: 1fr;
   }
 }
+.apollo-search-result{border-left:3px solid #3a6f62;margin-top:12px;padding:10px 13px}.apollo-search-result strong{font-size:.88rem}.apollo-search-result p{color:var(--text-muted);font-size:.82rem;margin:4px 0 0}.apollo-search-result.is-success{background:#edf7f3}.apollo-search-result.is-empty{background:#fff7e6;border-left-color:#b1873d}

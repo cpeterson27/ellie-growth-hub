@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FiArchive, FiArrowLeft, FiMail, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
+import { FiArchive, FiArrowLeft, FiEye, FiEyeOff, FiInbox, FiMail, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import Modal from "../components/Modal.jsx";
 import {
   beginGmailConnection,
   disconnectGmail,
+  deleteSelectedGmailTrash,
   emptyGmailTrash,
   fetchContactEmailHistory,
   fetchGmailConnection,
@@ -45,6 +46,8 @@ export default function GmailIntegration() {
   const [sending, setSending] = useState(false);
   const [emptyingTrash, setEmptyingTrash] = useState(false);
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
+  const [selectedThreadIds, setSelectedThreadIds] = useState([]);
+  const [bulkActionRunning, setBulkActionRunning] = useState(false);
 
   const query = search.trim() ? search.trim() : mailboxQueries[mailbox] || mailboxQueries.inbox;
   const needsModifyPermission = status?.connected && !status.scopes?.includes("https://www.googleapis.com/auth/gmail.modify");
@@ -65,6 +68,7 @@ export default function GmailIntegration() {
       const searchedEmail = emailAddress(search);
       setOutreachHistory(searchedEmail ? (await fetchContactEmailHistory(searchedEmail)).outreach || [] : []);
       setError("");
+      setSelectedThreadIds([]);
     } catch (err) {
       const message = err.response?.data?.error || "Unable to load Gmail.";
       setError(message.toLowerCase().includes("insufficient authentication scopes") ? "" : message);
@@ -103,6 +107,29 @@ export default function GmailIntegration() {
       setError(err.response?.data?.error || "Unable to empty Gmail Trash.");
     } finally {
       setEmptyingTrash(false);
+    }
+  };
+
+  const toggleThread = (threadId) => setSelectedThreadIds((items) =>
+    items.includes(threadId) ? items.filter((id) => id !== threadId) : [...items, threadId]
+  );
+
+  const runBulkAction = async (action) => {
+    if (!selectedThreadIds.length) return;
+    try {
+      setBulkActionRunning(true);
+      if (action === "delete") {
+        if (!window.confirm(`Permanently delete ${selectedThreadIds.length} selected conversation${selectedThreadIds.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
+        await deleteSelectedGmailTrash(selectedThreadIds);
+      } else {
+        await Promise.all(selectedThreadIds.map((threadId) => updateGmailThread(threadId, action)));
+      }
+      setNotice(`${selectedThreadIds.length} conversation${selectedThreadIds.length === 1 ? "" : "s"} updated.`);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to update the selected conversations.");
+    } finally {
+      setBulkActionRunning(false);
     }
   };
 
@@ -186,9 +213,15 @@ export default function GmailIntegration() {
           <section className="conversation-reply"><h3>Reply</h3><textarea rows="7" value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Write a reply…" /><Button loading={sending} disabled={!reply.trim()} onClick={sendReply}><FiSend /> Approve and send reply</Button></section>
         </div> : <>
           <div className="inbox-list-heading"><div><h2>{search ? `Correspondence with ${search}` : mailbox === "campaign" ? "Campaign sends" : mailbox[0].toUpperCase() + mailbox.slice(1)}</h2><p>{mailbox === "campaign" ? `${campaignSends.length} campaign message${campaignSends.length === 1 ? "" : "s"}` : search ? `${outreachHistory.length} campaign message${outreachHistory.length === 1 ? "" : "s"} · ${threads.length} Gmail repl${threads.length === 1 ? "y" : "ies"}` : `${threads.length} email thread${threads.length === 1 ? "" : "s"}`}</p></div>{mailbox === "trash" && !search && threads.length ? <Button className="empty-trash-button" variant="outline" size="sm" onClick={needsDeletePermission ? reconnect : () => setTrashConfirmOpen(true)}><FiTrash2 /> {needsDeletePermission ? "Approve empty trash" : "Empty trash"}</Button> : null}</div>
+          {mailbox !== "campaign" && threads.length ? <div className="mailbox-toolbar">
+            <label><input type="checkbox" checked={selectedThreadIds.length === threads.length} onChange={() => setSelectedThreadIds(selectedThreadIds.length === threads.length ? [] : threads.map((thread) => thread.id))} /><span>{selectedThreadIds.length ? `${selectedThreadIds.length} selected` : "Select all"}</span></label>
+            <div>
+              {mailbox === "trash" ? <><Button variant="ghost" size="sm" disabled={!selectedThreadIds.length || bulkActionRunning} onClick={() => runBulkAction("untrash")}><FiInbox /> Move to inbox</Button><Button variant="ghost" size="sm" disabled={!selectedThreadIds.length || bulkActionRunning || needsDeletePermission} onClick={() => runBulkAction("delete")}><FiTrash2 /> Delete permanently</Button></> : <><Button variant="ghost" size="sm" disabled={!selectedThreadIds.length || bulkActionRunning} onClick={() => runBulkAction("archive")}><FiArchive /> Archive</Button><Button variant="ghost" size="sm" disabled={!selectedThreadIds.length || bulkActionRunning} onClick={() => runBulkAction("read")}><FiEye /> Mark read</Button><Button variant="ghost" size="sm" disabled={!selectedThreadIds.length || bulkActionRunning} onClick={() => runBulkAction("unread")}><FiEyeOff /> Mark unread</Button><Button variant="ghost" size="sm" disabled={!selectedThreadIds.length || bulkActionRunning} onClick={() => runBulkAction("trash")}><FiTrash2 /> Trash</Button></>}
+            </div>
+          </div> : null}
           {mailbox === "campaign" ? <div className="campaign-send-list">{campaignSends.map((item) => <button key={item.id} onClick={() => { setSearch(item.contactEmail); setMailbox("inbox"); }}><div><strong>{item.contactName || item.contactEmail}</strong><span className={`outreach-status outreach-status--${item.status}`}>{item.replyCategory ? item.replyCategory.replaceAll("_", " ") : item.deliveryStatus || item.status}</span></div><h3>{item.subject}</h3><p>{item.campaignName}</p><small>{item.sentAt ? new Date(item.sentAt).toLocaleString() : ""}</small></button>)}</div> : null}
           {outreachHistory.length ? <section className="outreach-conversation-history"><header><h3>Campaign correspondence</h3><span>Sent through Resend</span></header>{outreachHistory.map((item) => <button type="button" key={item.id} onClick={() => { setSelectedOutreach({ ...item, contactEmail: emailAddress(search) }); setFollowUp(item.aiReplyDraft || ""); }}><div><strong>{item.campaignName}</strong><span className={`outreach-status outreach-status--${item.status}`}>{item.replyCategory ? item.replyCategory.replaceAll("_", " ") : item.deliveryStatus || item.status}</span></div><h4>{item.subject}</h4><p>{item.body}</p><footer><small>{item.sentAt ? new Date(item.sentAt).toLocaleString() : "Not sent yet"}</small><span>Read full message →</span></footer>{item.replyText ? <blockquote><strong>Latest response</strong>{item.replyText}</blockquote> : null}</button>)}</section> : null}
-          {mailbox !== "campaign" ? loading ? <p className="table-state">Loading correspondence…</p> : threads.length ? <div className="gmail-thread-list">{threads.map((thread) => <button type="button" key={thread.id} className={thread.labels?.includes("UNREAD") ? "gmail-thread is-unread" : "gmail-thread"} onClick={() => openThread(thread)}><div className="gmail-thread__meta"><strong>{mailbox === "sent" ? thread.to : thread.from || "Unknown sender"}</strong><time>{thread.date ? new Date(thread.date).toLocaleDateString() : ""}</time></div><h3>{thread.subject}</h3><p>{thread.snippet}</p><small>{thread.messageCount} message{thread.messageCount === 1 ? "" : "s"}</small></button>)}</div> : search && outreachHistory.length ? <section className="correspondence-empty"><span>Awaiting reply</span><h3>No Gmail response yet</h3><p>The campaign message above was delivered successfully. When this contact replies, their response will appear here and Outreach will change to Replied.</p></section> : <section className="correspondence-empty"><span>{mailbox === "sent" ? "No personal follow-up" : "Inbox clear"}</span><h3>{mailbox === "sent" ? "No Gmail messages have been sent from this view" : "There is nothing requiring attention here"}</h3><p>{mailbox === "sent" ? "Campaign delivery lives under Campaign sends. Personal replies sent from Ellie appear here." : "New client replies will appear here automatically when you refresh Conversations."}</p></section> : null}
+          {mailbox !== "campaign" ? loading ? <p className="table-state">Loading correspondence…</p> : threads.length ? <div className="gmail-thread-list">{threads.map((thread) => <div key={thread.id} className={`${thread.labels?.includes("UNREAD") ? "gmail-thread is-unread" : "gmail-thread"} ${selectedThreadIds.includes(thread.id) ? "is-selected" : ""}`}><label className="gmail-thread__select"><input type="checkbox" checked={selectedThreadIds.includes(thread.id)} onChange={() => toggleThread(thread.id)} aria-label={`Select ${thread.subject}`} /></label><button type="button" onClick={() => openThread(thread)}><strong>{mailbox === "sent" ? thread.to : thread.from || "Unknown sender"}</strong><span><b>{thread.subject}</b><small>{thread.snippet}</small></span><em>{thread.messageCount}</em><time>{thread.date ? new Date(thread.date).toLocaleDateString() : ""}</time></button></div>)}</div> : search && outreachHistory.length ? <section className="correspondence-empty"><span>Awaiting reply</span><h3>No Gmail response yet</h3><p>The campaign message above was delivered successfully. When this contact replies, their response will appear here and Outreach will change to Replied.</p></section> : <section className="correspondence-empty"><span>{mailbox === "sent" ? "No personal follow-up" : "Inbox clear"}</span><h3>{mailbox === "sent" ? "No Gmail messages have been sent from this view" : "There is nothing requiring attention here"}</h3><p>{mailbox === "sent" ? "Campaign delivery lives under Campaign sends. Personal replies sent from Ellie appear here." : "New client replies will appear here automatically when you refresh Conversations."}</p></section> : null}
         </>}
       </div>
     </section>

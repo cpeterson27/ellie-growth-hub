@@ -1,19 +1,19 @@
 .crm-connection-grid,
 .integration-provider-grid {
   display: grid;
-  gap: 18px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .crm-connection-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-height: 260px;
-  padding: 24px;
+  min-height: 220px;
+  padding: 20px;
 }
 
 .crm-connection-card--active {
@@ -23,7 +23,7 @@
   color: var(--text);
 }
 
-.crm-connection-card h2 { margin: 10px 0 0; }
+.crm-connection-card h2 { font-family:inherit;font-size:1.25rem;margin:9px 0 0; }
 .crm-connection-card p { color: inherit; line-height: 1.55; margin: 0; opacity: .82; }
 .crm-connection-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; }
 .gmail-status-card{align-items:center;background:linear-gradient(145deg,#fff,#f7faf9);border:1px solid var(--border);border-radius:22px;display:flex;justify-content:space-between;margin-bottom:22px;padding:24px}.gmail-status-card h2{margin:10px 0 5px}.gmail-status-card p{color:var(--text-muted);margin:0}
@@ -54,6 +54,16 @@
 .inbox-page--compact .gmail-thread__meta time,.inbox-page--compact .gmail-thread small{font-size:.72rem}
 .inbox-page--compact .gmail-thread h3{font-size:.9rem;margin:2px 0}
 .inbox-page--compact .gmail-thread p{font-size:.8rem;line-height:1.35;margin:1px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mailbox-toolbar{align-items:center;background:#f5f6f4;border:1px solid #d9ddd9;display:flex;justify-content:space-between;min-height:44px;padding:0 10px}
+.mailbox-toolbar>label{align-items:center;display:flex;font-size:.78rem;font-weight:700;gap:8px}.mailbox-toolbar input,.gmail-thread__select input{accent-color:#1f5c50;height:15px!important;min-height:0!important;width:15px}
+.mailbox-toolbar>div{display:flex;gap:2px}.mailbox-toolbar .btn{font-size:.75rem;min-height:32px;padding:5px 8px}
+.inbox-page--compact .gmail-thread{align-items:center;border-bottom:1px solid #e3e5e2;border-top:0;display:grid;gap:0;grid-template-columns:38px 1fr;padding:0}
+.inbox-page--compact .gmail-thread:hover,.inbox-page--compact .gmail-thread.is-selected{background:#f1f6f4}.inbox-page--compact .gmail-thread.is-unread{background:#f7faf9}
+.gmail-thread__select{align-items:center;display:flex;height:100%;justify-content:center}
+.inbox-page--compact .gmail-thread>button{align-items:center;background:transparent;border:0;cursor:pointer;display:grid;font:inherit;gap:14px;grid-template-columns:minmax(150px,.65fr) minmax(280px,2fr) 34px 88px;min-width:0;padding:11px 8px 11px 0;text-align:left}
+.inbox-page--compact .gmail-thread>button>strong{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inbox-page--compact .gmail-thread>button>span{align-items:center;display:flex;gap:8px;min-width:0}.inbox-page--compact .gmail-thread>button b{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.inbox-page--compact .gmail-thread>button small{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inbox-page--compact .gmail-thread>button em{background:#edf0ed;border-radius:999px;color:#59615c;font-size:.68rem;font-style:normal;padding:3px 6px;text-align:center}.inbox-page--compact .gmail-thread>button time{color:#747b76;font-size:.72rem;text-align:right}
 .inbox-page--compact .empty-trash-button{border-color:#d9aaa4;color:#9b3025}
 .inbox-page--compact .empty-trash-button:hover{background:#fff2f0;border-color:#c77e74}
 .inbox-success-notice{background:#e8f5ef;border:1px solid #b9dccc;border-radius:9px;color:#175c49;font-size:.84rem;margin:0 0 12px;padding:10px 12px}
@@ -61,7 +71,7 @@
 .empty-trash-confirmation>span{align-items:center;background:#f8dfdc;border-radius:50%;color:#9b3025;display:flex;flex:0 0 38px;height:38px;justify-content:center}
 .empty-trash-confirmation strong{color:#70251e}.empty-trash-confirmation p{color:#746b69;line-height:1.5;margin:5px 0 0}
 .empty-trash-confirm{background:#a43a30!important;border-color:#a43a30!important}
-@media(max-width:800px){.delivery-legend{align-items:flex-start;flex-direction:column;gap:5px}.delivery-legend i{display:none}.inbox-shell{grid-template-columns:1fr}.inbox-folders{border-bottom:1px solid var(--border);border-right:0;flex-direction:row;overflow-x:auto}.inbox-folders hr,.inbox-folders button:last-child{display:none}.conversation-view>header{align-items:flex-start;gap:10px}.conversation-view>header>div{flex-wrap:wrap;justify-content:flex-end}.correspondence-detail dl{grid-template-columns:1fr}.correspondence-detail dl>div{padding:9px 0}.correspondence-detail dl>div+div{border-left:0}.correspondence-letter{grid-template-columns:1fr;padding:22px}}
+@media(max-width:800px){.delivery-legend{align-items:flex-start;flex-direction:column;gap:5px}.delivery-legend i{display:none}.inbox-shell{grid-template-columns:1fr}.inbox-folders{border-bottom:1px solid var(--border);border-right:0;flex-direction:row;overflow-x:auto}.inbox-folders hr,.inbox-folders button:last-child{display:none}.conversation-view>header{align-items:flex-start;gap:10px}.conversation-view>header>div{flex-wrap:wrap;justify-content:flex-end}.correspondence-detail dl{grid-template-columns:1fr}.correspondence-detail dl>div{padding:9px 0}.correspondence-detail dl>div+div{border-left:0}.correspondence-letter{grid-template-columns:1fr;padding:22px}.mailbox-toolbar{align-items:flex-start;gap:8px;flex-direction:column;padding:8px}.mailbox-toolbar>div{flex-wrap:wrap}.inbox-page--compact .gmail-thread>button{gap:5px;grid-template-columns:1fr 74px}.inbox-page--compact .gmail-thread>button>span{grid-column:1/-1;grid-row:2}.inbox-page--compact .gmail-thread>button em{display:none}}
 
 .integration-status {
   background: #eeeae1;
@@ -88,8 +98,9 @@
 }
 
 .integration-capabilities { color: var(--text-muted); }
-.integration-section-title { margin: 26px 0 16px; }
+.integration-section-title { font-size:1.25rem;margin:26px 0 12px; }
 .integration-provider-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.integration-provider-card .integration-capabilities{border-top:1px solid #e3e0d9;font-size:.75rem;margin-top:auto;padding-top:12px}
 
 .eventbrite-setup-grid {
   display: grid;

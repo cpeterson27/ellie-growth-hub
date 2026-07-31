@@ -177,6 +177,9 @@ export const updateGmailThread = (threadId, action) =>
 export const emptyGmailTrash = () =>
   api.delete("/gmail/trash", { data: { confirmation: "DELETE ALL TRASH" } }).then((res) => res.data);
 
+export const deleteSelectedGmailTrash = (threadIds) =>
+  api.post("/gmail/trash/delete-selected", { threadIds, confirmation: "DELETE SELECTED" }).then((res) => res.data);
+
 export const sendGmailMessage = (message) =>
   api.post("/gmail/send", message).then((res) => res.data);
 

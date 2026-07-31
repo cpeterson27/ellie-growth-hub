@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Button from "../components/Button.jsx";
-import DashboardCard from "../components/DashboardCard.jsx";
 import {
   fetchEventbriteConnection,
   fetchEventbriteWebhookStatus,
@@ -155,11 +154,11 @@ export default function Integrations() {
             const isEventbrite = provider.id === "eventbrite";
             const status = isEventbrite && eventbriteReady ? "connected" : provider.status;
             return (
-              <DashboardCard key={provider.id} title={provider.name}>
-                <span className={`integration-status integration-status--${status}`}>{statusLabels[status] || status}</span>
+              <article className="crm-connection-card integration-provider-card" key={provider.id}>
+                <div><span className={`integration-status integration-status--${status}`}>{statusLabels[status] || status}</span><h2>{provider.name}</h2></div>
                 <p>{providerSummary(provider, eventbriteReady)}</p>
                 <p className="integration-capabilities">{provider.capabilities?.join(" · ") || "No capabilities reported"}</p>
-                <div className="integration-card-actions">
+                <div className="crm-connection-actions">
                   {isEventbrite ? (
                     <Button onClick={() => navigate("/integrations/eventbrite")}>{eventbriteReady ? "Manage setup" : "Set up Eventbrite"}</Button>
                   ) : provider.id === "csv" ? (
@@ -170,7 +169,7 @@ export default function Integrations() {
                     <Button variant="outline" disabled>Details coming soon</Button>
                   )}
                 </div>
-              </DashboardCard>
+              </article>
             );
           })}
         </section>
