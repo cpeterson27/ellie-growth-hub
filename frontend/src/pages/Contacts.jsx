@@ -561,19 +561,27 @@ export default function Contacts() {
   }
 
   async function acceptCardPayload(payload) {
+  console.log("QR RAW PAYLOAD:", payload);
 
-    const parsed = parseBusinessCardPayload(payload);
+  setCardStatus(`QR DATA: ${payload}`);
 
-    const nextDraft = { ...manualContactDefaults, ...parsed };
-    setCardRaw(payload);
-    setCardDraft(nextDraft);
-    setCardStatus(
-      fullContactName(nextDraft)
-        ? "Card read successfully. Review the information before saving."
-        : "The QR code was read, but the card did not include a name. Complete the missing fields below.",
-    );
-    await reviewCardDraft(nextDraft);
-  }
+  const parsed = parseBusinessCardPayload(payload);
+
+  console.log("PARSED CARD:", parsed);
+
+  const nextDraft = { ...manualContactDefaults, ...parsed };
+
+  setCardRaw(payload);
+  setCardDraft(nextDraft);
+
+  setCardStatus(
+    fullContactName(nextDraft)
+      ? "Card read successfully. Review the information before saving."
+      : `QR read. No name found. Data: ${payload}`,
+  );
+
+  await reviewCardDraft(nextDraft);
+}
 
   async function startCardScanner() {
     try {
