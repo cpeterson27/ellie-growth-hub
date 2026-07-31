@@ -261,7 +261,7 @@ export default function Outreach() {
       </header>
       {error ? <p className="form-error">{error}</p> : null}
       {notice ? <p className="outreach-notice">{notice}</p> : null}
-      <section className="outreach-controls outreach-controls--sticky">
+      <section className="outreach-controls">
         <label>
           Campaign
           <select
@@ -281,18 +281,7 @@ export default function Outreach() {
             ))}
           </select>
         </label>
-        <label className="outreach-search">
-          Search {labels[filter] || "outreach"}
-          <span>
-            <FiSearch aria-hidden="true" />
-            <input
-              className="select-input"
-              placeholder={filter === "sent" ? "Search sent recipients, companies, or subjects" : "Search contacts, companies, or subjects"}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </span>
-        </label>
+        <p><strong>{selected?.name || "Choose a campaign"}</strong><span>{counts.active || 0} messages need attention</span></p>
       </section>
       <section className="outreach-summary">
         {["active", "pending", "approved", "sent", "replied", "failed"].map(
@@ -311,6 +300,12 @@ export default function Outreach() {
       <DashboardCard
         title={selected ? `Messages for ${selected.name}` : "Outreach messages"}
       >
+        <div className="outreach-list-tools">
+          <div><strong>{labels[filter] || "Outreach"}</strong><span>{filtered.length} message{filtered.length === 1 ? "" : "s"} in this view</span></div>
+          <label className="outreach-search">
+            <span><FiSearch aria-hidden="true" /><input className="select-input" aria-label={`Search ${labels[filter] || "outreach"}`} placeholder={filter === "sent" ? "Search sent mail" : `Search ${String(labels[filter] || "outreach").toLowerCase()}`} value={search} onChange={(e) => setSearch(e.target.value)} /></span>
+          </label>
+        </div>
         {loading ? (
           <p>Loading outreach…</p>
         ) : filtered.length ? (
@@ -344,12 +339,14 @@ export default function Outreach() {
                     onClick={() => review(item)}
                   >
                     <FiEye />
-                    Review
+                    <span>Review</span>
                   </Button>
                   {item.contactEmail ? (
                     <Button
                       variant="outline"
                       size="sm"
+                      title="Open conversation"
+                      aria-label={`Open conversation with ${item.contactName || item.contactEmail}`}
                       onClick={() =>
                         navigate(
                           "/inbox?contact=" +
@@ -358,7 +355,7 @@ export default function Outreach() {
                       }
                     >
                       <FiMail />
-                      Conversation
+                      <span>Conversation</span>
                     </Button>
                   ) : null}
                   {item.status === "pending" ? (

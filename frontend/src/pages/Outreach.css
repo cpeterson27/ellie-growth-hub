@@ -1,7 +1,12 @@
 .outreach-page {
   display: grid;
   gap: 1.35rem;
+  min-width: 0;
+  overflow-x: clip;
 }
+.outreach-page > *,
+.outreach-page .dashboard-card,
+.outreach-page .dashboard-card__content { min-width: 0; max-width: 100%; }
 .outreach-header {
   display: flex;
   justify-content: space-between;
@@ -44,12 +49,6 @@
   align-items: end;
   flex-wrap: wrap;
 }
-.outreach-controls--sticky {
-  position: sticky;
-  top: 0.75rem;
-  z-index: 8;
-  box-shadow: 0 8px 24px rgba(18, 42, 36, 0.08);
-}
 .outreach-header .btn--outline {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.35);
@@ -67,13 +66,20 @@
   font-size: 0.8rem;
   font-weight: 700;
 }
+.outreach-controls > label { width: min(420px, 100%); }
+.outreach-controls > p {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0 0 0 auto;
+  text-align: right;
+}
+.outreach-controls > p span { color: var(--text-muted); font-size: 0.78rem; }
 .outreach-controls input {
   min-width: 280px;
   flex: 1;
 }
 .outreach-search {
-  flex: 1;
-  min-width: 300px;
+  width: min(440px, 100%);
 }
 .outreach-search > span {
   position: relative;
@@ -91,31 +97,53 @@
 }
 .outreach-summary {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0.65rem;
-}
-.outreach-summary button {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.85rem;
-  text-align: left;
-  background: var(--surface);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
+  background: var(--surface);
+}
+.outreach-summary button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.72rem 0.8rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
   cursor: pointer;
 }
+.outreach-summary button:last-child { border-right: 0; }
 .outreach-summary button.is-active {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  background: #e8f1ee;
+  box-shadow: inset 0 -3px 0 var(--accent);
 }
 .outreach-summary span {
   color: var(--text-muted);
   font-size: 0.78rem;
 }
 .outreach-summary strong {
-  font-size: 1.45rem;
+  font-size: 1rem;
 }
+.outreach-list-tools {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+.outreach-list-tools > div { display: grid; gap: 0.15rem; }
+.outreach-list-tools > div span { color: var(--text-muted); font-size: 0.78rem; }
+.outreach-list-tools .outreach-search { display: block; }
+.outreach-list-tools .outreach-search > span { width: 100%; }
+.outreach-list-tools .outreach-search input { min-width: 0; }
 .outreach-mailbox {
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -124,8 +152,8 @@
 .outreach-mailbox__head,
 .outreach-item {
   display: grid;
-  grid-template-columns: minmax(210px, 1.05fr) minmax(280px, 1.65fr) 130px minmax(260px, auto);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) 96px 190px;
+  gap: 0.75rem;
   align-items: center;
 }
 .outreach-mailbox__head {
@@ -180,6 +208,9 @@
   margin: 0;
   white-space: nowrap;
 }
+.outreach-item__actions .btn { min-width: 0; padding-inline: 0.65rem; }
+.outreach-item__actions .btn:nth-child(2) { width: 38px; height: 36px; padding: 0; }
+.outreach-item__actions .btn:nth-child(2) span { display: none; }
 .outreach-status {
   height: max-content;
   padding: 0.3rem 0.55rem;
@@ -255,6 +286,9 @@
   .outreach-summary {
     grid-template-columns: repeat(2, 1fr);
   }
+  .outreach-summary button:nth-child(2n) { border-right: 0; }
+  .outreach-summary button { border-bottom: 1px solid var(--border); }
+  .outreach-summary button:nth-last-child(-n + 2) { border-bottom: 0; }
   .outreach-controls input {
     min-width: 0;
     width: 100%;
@@ -262,6 +296,7 @@
   .outreach-search {
     min-width: 100%;
   }
+  .outreach-list-tools { align-items: stretch; flex-direction: column; }
   .outreach-mailbox__head {
     display: none;
   }
@@ -286,4 +321,10 @@
   .outreach-header__actions .btn {
     flex: 1;
   }
+}
+@media (min-width: 761px) and (max-width: 1180px) {
+  .outreach-mailbox__head,
+  .outreach-item { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 88px 84px; }
+  .outreach-item__actions .btn span { display: none; }
+  .outreach-item__actions .btn { width: 38px; height: 36px; padding: 0; }
 }
