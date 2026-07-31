@@ -311,20 +311,20 @@ export default function Outreach() {
         ) : filtered.length ? (
           <div className="outreach-mailbox">
             <div className="outreach-mailbox__head" aria-hidden="true">
-              <span>Recipient</span><span>Message</span><span>Status</span><span>Actions</span>
+              <span>Recipient and message</span><span>Status</span><span>Action</span>
             </div>
             <div className="outreach-list">
             {visibleItems.map((item) => (
               <article key={item._id} className="outreach-item">
-                <div className="outreach-item__recipient">
-                  <strong>{item.contactName || item.contactEmail || "Contact"}</strong>
-                  <span>{item.contactEmail || "No email"}</span>
-                  <small>{item.organization || "Independent contact"}</small>
-                </div>
-                <div className="outreach-item__message">
-                  <strong>{item.subject || "No subject"}</strong>
-                  <span>{item.templateAudienceLabel || "All Deal to Close contacts"}</span>
-                  {item.sentAt ? <small>Sent {new Date(item.sentAt).toLocaleString()}</small> : null}
+                <div className="outreach-item__main">
+                  <div className="outreach-item__recipient">
+                    <strong>{item.contactName || item.contactEmail || "Contact"}</strong>
+                    <span>{item.contactEmail || "No email"}{item.organization ? ` · ${item.organization}` : ""}</span>
+                  </div>
+                  <div className="outreach-item__message">
+                    <strong>{item.subject || "No subject"}</strong>
+                    <span>{item.templateAudienceLabel || "All Deal to Close contacts"}{item.sentAt ? ` · Sent ${new Date(item.sentAt).toLocaleString()}` : ""}</span>
+                  </div>
                 </div>
                 <div className="outreach-item__state">
                   <span className={`outreach-status outreach-status--${item.status}`}>
@@ -339,7 +339,7 @@ export default function Outreach() {
                     onClick={() => review(item)}
                   >
                     <FiEye />
-                    <span>{item.status === "pending" ? "Review & approve" : item.status === "failed" ? "Review issue" : "View email"}</span>
+                    <span>{item.status === "pending" ? "Review draft" : item.status === "failed" ? "Review issue" : "View email"}</span>
                   </Button>
                   {item.contactEmail && ["sent", "replied"].includes(item.status) ? (
                     <Button
