@@ -478,6 +478,22 @@ export default function Contacts() {
     counts[state] = (counts[state] || 0) + 1;
     return counts;
   }, {});
+  const verificationIssues = emailsToVerify
+    .map((email) => {
+      const result = effectiveVerificationResults[email];
+      if (!result || result.state === "deliverable") return null;
+      const rowIndex = importRows.findIndex((row) => String(row.Email || "").trim().toLowerCase() === email);
+      const row = importRows[rowIndex] || {};
+      return {
+        email,
+        state: result.state || "unknown",
+        reason: result.reason || "verification_failed",
+        rowNumber: rowIndex + 2,
+        name: String(row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`).trim() || "Unnamed contact",
+        company: row["Company Name"] || row.Company || "",
+      };
+    })
+    .filter(Boolean);
 
   function getLocalInvalidResults() {
     return Object.fromEntries(
@@ -835,6 +851,7 @@ export default function Contacts() {
             {Object.keys(effectiveVerificationResults).length ? <p className="verification-summary">
               Deliverable: {verificationCounts.deliverable || 0} · Risky: {verificationCounts.risky || 0} · Undeliverable: {verificationCounts.undeliverable || 0} · Unknown: {verificationCounts.unknown || 0} · Pending: {pendingEmailCount}
             </p> : null}
+            {verificationIssues.length ? <section className="verification-issues"><h4>Email issues to review</h4>{verificationIssues.map((issue) => <article key={issue.email}><span className={`verification-badge ${issue.state}`}>{issue.state}</span><div><strong>{issue.name}</strong><small>{issue.email}{issue.company ? ` · ${issue.company}` : ""} · CSV row {issue.rowNumber}</small></div><p>{issue.reason === "invalid_format" || issue.reason === "owner_skipped_verification" ? "This address is not formatted like a valid email and will be removed before import." : issue.state === "risky" ? "This address may bounce. It will be withheld until reviewed." : issue.state === "unknown" ? "Verification could not confirm this address. It will be withheld until reviewed." : "This address was reported as undeliverable and will be removed before import."}</p></article>)}</section> : null}
           </div> : null}
           <div className="import-preview-heading"><p><strong>Previewing {showAllImportRows ? importRows.length : Math.min(5, importRows.length)} of {importRows.length} contacts.</strong> All {importRows.length} will be imported.</p>{importRows.length > 5 ? <Button size="sm" variant="outline" onClick={() => setShowAllImportRows((current) => !current)}>{showAllImportRows ? "Show first 5" : `Show all ${importRows.length}`}</Button> : null}</div>
           <div className="email-import-preview"><table><thead><tr>{importHeaders.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{importRows.slice(0, showAllImportRows ? importRows.length : 5).map((row, index) => <tr key={`${row.Email || row.Name || "contact"}-${index}`}>{importHeaders.map((header) => {
