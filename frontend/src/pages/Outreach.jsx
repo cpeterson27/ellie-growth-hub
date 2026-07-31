@@ -22,16 +22,20 @@ const labels = {
   active: "Needs attention",
   pending: "Pending review",
   approved: "Approved",
-  processing: "In delivery",
+  processing: "Accepted",
+  delayed: "Delayed",
+  unconfirmed: "Status unavailable",
   delivered: "Delivered",
   bounced: "Bounced",
   replied: "Replied",
   failed: "Failed",
 };
-const viewStatuses = ["active", "pending", "approved", "processing", "delivered", "bounced", "replied"];
+const baseViewStatuses = ["active", "pending", "approved", "processing", "delayed", "delivered", "bounced", "replied"];
 const matchesView = (item, view) => {
   if (view === "active") return ["pending", "approved", "failed"].includes(item.status);
-  if (view === "processing") return item.status === "sent" && !["delivered", "bounced", "failed", "suppressed", "complained"].includes(item.deliveryStatus);
+  if (view === "processing") return item.status === "sent" && item.deliveryStatus === "accepted";
+  if (view === "delayed") return item.status === "sent" && item.deliveryStatus === "delayed";
+  if (view === "unconfirmed") return item.status === "sent" && !item.deliveryStatus;
   if (view === "delivered") return item.deliveryStatus === "delivered" && item.status !== "replied";
   if (view === "bounced") return ["bounced", "failed", "suppressed", "complained"].includes(item.deliveryStatus);
   return item.status === view;
@@ -42,11 +46,14 @@ const deliveryLabel = (item) => {
   if (item.deliveryStatus === "bounced") return "Bounced";
   if (item.deliveryStatus === "delayed") return "Delayed";
   if (["failed", "suppressed", "complained"].includes(item.deliveryStatus)) return labels[item.deliveryStatus] || item.deliveryStatus;
-  if (item.status === "sent") return "In delivery";
+  if (item.deliveryStatus === "accepted") return "Accepted by Resend";
+  if (item.status === "sent") return "Status unavailable";
   return labels[item.status] || item.status;
 };
 const viewGuidance = {
-  processing: { title: "No action needed", body: "Resend is attempting delivery. Ellie will update this automatically. Do not send the message again." },
+  processing: { title: "Accepted by Resend", body: "Resend accepted these messages and is waiting for the recipient’s mail server to confirm delivery. Do not send them again." },
+  delayed: { title: "Delivery is taking longer", body: "Resend is still retrying these messages. Ellie will move each one to Delivered or Bounced when the recipient’s server responds." },
+  unconfirmed: { title: "Provider status unavailable", body: "Ellie has a sent record but no matching provider result. These are shown separately so they are never mistaken for active delivery." },
   delivered: { title: "Delivered successfully", body: "The recipient’s mail server accepted the email. Wait for a reply; delivery does not guarantee the person opened it." },
   bounced: { title: "Replace the email address", body: "Keep the contact, but do not reuse this address. Open the contact, research a different verified email, and update the record before future outreach." },
 };
@@ -182,6 +189,10 @@ export default function Outreach() {
       setSaving(false);
     }
   };
+  const hasUnconfirmed = items.some((item) => matchesView(item, "unconfirmed"));
+  const viewStatuses = hasUnconfirmed
+    ? [...baseViewStatuses.slice(0, 5), "unconfirmed", ...baseViewStatuses.slice(5)]
+    : baseViewStatuses;
   const counts = {
     ...Object.fromEntries(viewStatuses.map((status) => [status, items.filter((item) => matchesView(item, status)).length])),
   };
