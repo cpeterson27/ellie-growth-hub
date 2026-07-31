@@ -10,6 +10,7 @@ const {
   discoverAudienceSources,
   discoverOrganizationsForAudience,
 } = require("../services/audience");
+const { previewOrganizationImport, importOrganizations } = require("../services/organizationImportService");
 
 const router = express.Router();
 
@@ -95,6 +96,24 @@ router.get("/", async (req, res) => {
       success: false,
       error: "Failed to retrieve audiences",
     });
+  }
+});
+
+router.post("/imports/organizations/preview", async (req, res) => {
+  try {
+    const data = await previewOrganizationImport(req.body?.rows);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to preview organizations" });
+  }
+});
+
+router.post("/imports/organizations", async (req, res) => {
+  try {
+    const data = await importOrganizations({ rows: req.body?.rows, name: req.body?.name });
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to import organizations" });
   }
 });
 
