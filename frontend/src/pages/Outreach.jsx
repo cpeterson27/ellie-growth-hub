@@ -19,7 +19,7 @@ import "./Outreach.css";
 import { useInitiative } from "../context/InitiativeContext.jsx";
 
 const labels = {
-  active: "To do",
+  active: "Needs attention",
   pending: "Pending review",
   approved: "Approved",
   sent: "Sent",
@@ -334,14 +334,14 @@ export default function Outreach() {
                 </div>
                 <div className="outreach-item__actions">
                   <Button
-                    variant="outline"
+                    variant={item.status === "pending" ? "primary" : "outline"}
                     size="sm"
                     onClick={() => review(item)}
                   >
                     <FiEye />
-                    <span>Review</span>
+                    <span>{item.status === "pending" ? "Review & approve" : item.status === "failed" ? "Review issue" : "View email"}</span>
                   </Button>
-                  {item.contactEmail ? (
+                  {item.contactEmail && ["sent", "replied"].includes(item.status) ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -356,15 +356,6 @@ export default function Outreach() {
                     >
                       <FiMail />
                       <span>Conversation</span>
-                    </Button>
-                  ) : null}
-                  {item.status === "pending" ? (
-                    <Button
-                      size="sm"
-                      loading={saving}
-                      onClick={() => approve(item)}
-                    >
-                      Approve
                     </Button>
                   ) : null}
                   {item.status === "failed" && item.errorMessage ? (
