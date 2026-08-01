@@ -506,6 +506,7 @@ export default function Contacts() {
   const [importFileName, setImportFileName] = useState("");
   const [importPasteText, setImportPasteText] = useState("");
   const [importSource, setImportSource] = useState("csv");
+  const [importWorkspaceMode, setImportWorkspaceMode] = useState("import");
   const [importCampaignId, setImportCampaignId] = useState("");
   const [importMarketingPermission, setImportMarketingPermission] =
     useState(false);
@@ -872,6 +873,7 @@ export default function Contacts() {
   }
 
   function openCsvImport() {
+    setImportWorkspaceMode("import");
     setImportCampaignId(
       campaignId || (initiativeId === "all" ? "" : initiativeId),
     );
@@ -889,6 +891,12 @@ export default function Contacts() {
     setImportError("");
     setUploadOpen(true);
     setImportMenuOpen(false);
+  }
+
+  function openApolloPreparationWorkspace() {
+    openCsvImport();
+    setImportWorkspaceMode("prepare");
+    setImportSource("apollo");
   }
 
   async function assignSelectedContacts() {
@@ -1562,7 +1570,10 @@ export default function Contacts() {
             </Button>
             {importMenuOpen ? (
               <div className="crm-menu crm-import-menu">
-                <button onClick={openCsvImport}>Import people</button>
+                <button onClick={openApolloPreparationWorkspace}>
+                  Prepare Apollo list / CSV
+                </button>
+                <button onClick={openCsvImport}>Import completed CSV</button>
                 <button
                   onClick={() => {
                     navigate("/discovery");
@@ -2805,7 +2816,11 @@ export default function Contacts() {
         onClose={() =>
           !savingContact && !verifyingEmails && setUploadOpen(false)
         }
-        title="Import people"
+        title={
+          importWorkspaceMode === "prepare"
+            ? "Prepare Apollo list / CSV"
+            : "Import people"
+        }
         size="workspace"
         footer={
           <>
@@ -2816,20 +2831,29 @@ export default function Contacts() {
             >
               Cancel
             </Button>
-            <Button
-              loading={savingContact}
-              disabled={
-                !importRows.length ||
-                !duplicatePreview ||
-                verifyingEmails ||
-                pendingEmailCount > 0
-              }
-              onClick={saveUploadedContacts}
-            >
-              {duplicatePreview?.existingContacts
-                ? `Add ${duplicatePreview.newContacts} new & update ${duplicatePreview.existingContacts}`
-                : "Import new contacts"}
-            </Button>
+            {importWorkspaceMode === "prepare" ? (
+              <Button
+                disabled={!importRows.length}
+                onClick={downloadPreparedContactCsv}
+              >
+                Download CSV for email finder
+              </Button>
+            ) : (
+              <Button
+                loading={savingContact}
+                disabled={
+                  !importRows.length ||
+                  !duplicatePreview ||
+                  verifyingEmails ||
+                  pendingEmailCount > 0
+                }
+                onClick={saveUploadedContacts}
+              >
+                {duplicatePreview?.existingContacts
+                  ? `Add ${duplicatePreview.newContacts} new & update ${duplicatePreview.existingContacts}`
+                  : "Import new contacts"}
+              </Button>
+            )}
           </>
         }
       >
@@ -2838,7 +2862,8 @@ export default function Contacts() {
             {importError}
           </p>
         ) : null}
-        <section className="csv-campaign-first">
+        {importWorkspaceMode === "import" ? (
+          <section className="csv-campaign-first">
           <span className="csv-campaign-first__step">Step 1</span>
           <div>
             <strong>Choose where these people belong</strong>
@@ -2859,7 +2884,18 @@ export default function Contacts() {
               </option>
             ))}
           </select>
-        </section>
+          </section>
+        ) : (
+          <section className="apollo-workspace-intro">
+            <span>Preparation only</span>
+            <strong>No contacts will be added to your CRM here.</strong>
+            <p>
+              Paste Apollo, edit the structured list, and download the clean
+              CSV. After your email-finder fills it in, return through Import →
+              Import completed CSV.
+            </p>
+          </section>
+        )}
         {!importRows.length ? (
           <div className="crm-import-start">
             <div className="crm-import-steps">
