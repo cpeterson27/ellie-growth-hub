@@ -1417,11 +1417,15 @@ export default function Contacts() {
       },
     ]),
   );
+  const sourceVerificationResults = {
+    ...skippedVerificationResults,
+    ...importedVerificationResults,
+  };
   const hasImportedVerification =
     Object.keys(importedVerificationResults).length > 0;
   const effectiveVerificationResults =
     emailVerificationMode === "source"
-      ? importedVerificationResults
+      ? sourceVerificationResults
       : emailVerificationMode === "skip"
         ? skippedVerificationResults
         : verificationResults;
