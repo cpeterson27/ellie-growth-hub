@@ -1169,6 +1169,28 @@ export default function Contacts() {
     setVerificationResults({});
   }
 
+  function remapImportHeader(currentHeader, nextHeader) {
+    if (!nextHeader || nextHeader === currentHeader) return;
+    if (importHeaders.includes(nextHeader)) {
+      setImportError(`“${nextHeader}” is already assigned to another column.`);
+      return;
+    }
+    const nextRows = importRows.map((row) => {
+      const updated = { ...row, [nextHeader]: row[currentHeader] || "" };
+      delete updated[currentHeader];
+      return updated;
+    });
+    setImportHeaders((current) =>
+      current.map((header) =>
+        header === currentHeader ? nextHeader : header,
+      ),
+    );
+    setImportRows(nextRows);
+    setImportError("");
+    setVerificationResults({});
+    refreshImportPreview(nextRows);
+  }
+
   function removeImportRow(rowIndex) {
     const nextRows = importRows.filter((_, index) => index !== rowIndex);
     setImportRows(nextRows);
@@ -2935,22 +2957,28 @@ export default function Contacts() {
                   Download people template
                 </Button>
               </header>
-              <textarea
-                value={importPasteText}
-                onChange={(event) => setImportPasteText(event.target.value)}
-                placeholder={
-                  "Paste Apollo people here, including the header row\nExample: First Name    Last Name    Title    Company    Email"
-                }
-              />
-              <Button
-                disabled={!importPasteText.trim()}
-                onClick={() => {
+              <div
+                className="apollo-clipboard-target"
+                tabIndex={0}
+                role="button"
+                aria-label="Paste copied Apollo contacts"
+                onPaste={(event) => {
+                  const pasted = event.clipboardData.getData("text/plain");
+                  if (!pasted.trim()) return;
+                  event.preventDefault();
+                  setImportPasteText(pasted);
                   setImportFileName("Apollo people pasted into Ellie");
-                  prepareImport(importPasteText, "apollo");
+                  prepareImport(pasted, "apollo");
                 }}
               >
-                Build editable working list
-              </Button>
+                <span className="apollo-clipboard-target__icon">⌘V</span>
+                <strong>Click here, then paste from Apollo</strong>
+                <p>
+                  Ellie immediately converts the clipboard into spreadsheet
+                  columns. The unstructured source text is not kept on screen.
+                </p>
+                <small>Mac: Command + V · Windows: Ctrl + V</small>
+              </div>
             </section>
             <div className="apollo-import-divider">
               <span>or upload a file</span>
@@ -3351,7 +3379,24 @@ export default function Contacts() {
                 <thead>
                   <tr>
                     {importHeaders.map((header) => (
-                      <th key={header}>{header}</th>
+                      <th key={header}>
+                        <span>Map to Ellie field</span>
+                        <select
+                          aria-label={`Map ${header} column to Ellie field`}
+                          value={header}
+                          onChange={(event) =>
+                            remapImportHeader(header, event.target.value)
+                          }
+                        >
+                          {[...new Set([header, ...recognizedImportHeaders])].map(
+                            (field) => (
+                              <option key={field} value={field}>
+                                {field}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </th>
                     ))}
                     <th>Remove</th>
                   </tr>
