@@ -306,24 +306,27 @@ function parseBusinessCardPayload(payload = "") {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-    const lines = raw
-  .split(/\r?\n/)
-  .map((line) => line.trim())
-  .filter(Boolean);
-
-if (raw.includes("blinq.me")) {
-  const blinqUrl = new URL(raw);
-
-  const name = blinqUrl.searchParams.get("n") || "";
-  const nameParts = name.trim().split(/\s+/);
-
-  return {
-    firstName: nameParts[0] || "",
-    lastName: nameParts.slice(1).join(" "),
-    website: raw,
-    notes: `Imported from Blinq: ${raw}`,
-  };
-}
+  const url = raw.match(/https?:\/\/[^\s]+/i)?.[0] || "";
+  if (url) {
+    try {
+      const cardUrl = new URL(url);
+      if (/(^|\.)blinq\.me$/i.test(cardUrl.hostname)) {
+        const sharedName = cleanCardValue(cardUrl.searchParams.get("n") || "");
+        const nameParts = sharedName.split(/\s+/).filter(Boolean);
+        const location = cleanCardValue(cardUrl.searchParams.get("l") || "");
+        return {
+          firstName: nameParts.shift() || "",
+          lastName: nameParts.join(" "),
+          website: url,
+          notes: [location && `Location: ${location}`, `Digital business card: ${url}`]
+            .filter(Boolean)
+            .join("\n"),
+        };
+      }
+    } catch {
+      // Continue with the generic text/card parser for malformed URLs.
+    }
+  }
   const values = (key) =>
     lines
       .filter((line) => new RegExp(`^${key}(?:;[^:]*)?:`, "i").test(line))
@@ -354,7 +357,6 @@ if (raw.includes("blinq.me")) {
   
   const email = raw.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] || "";
   const phone = raw.match(/(?:\+?\d[\d ().-]{7,}\d)/)?.[0] || "";
-  const url = raw.match(/https?:\/\/[^\s]+/i)?.[0] || "";
   const possibleName =
     lines.find(
       (line) =>
@@ -602,8 +604,11 @@ export default function Contacts() {
 
       const codeReader = new BrowserQRCodeReader();
 
-      const controls = await codeReader.decodeFromVideoDevice(
-        undefined,
+      const controls = await codeReader.decodeFromConstraints(
+        {
+          audio: false,
+          video: { facingMode: { ideal: "environment" } },
+        },
         cardVideoRef.current,
         async (result) => {
           if (result) {
@@ -630,24 +635,18 @@ export default function Contacts() {
 
   async function readCardImage(file) {
     if (!file) return;
-    if (!("BarcodeDetector" in window))
-      return setCardStatus(
-        "QR image reading is not supported by this browser. Paste the contact details or digital-card link instead.",
-      );
+    const imageUrl = URL.createObjectURL(file);
     try {
-      const bitmap = await createImageBitmap(file);
-      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-      const codes = await detector.detect(bitmap);
-      bitmap.close?.();
-      if (!codes[0]?.rawValue)
-        return setCardStatus(
-          "No QR code was found in that image. Try a clearer screenshot or paste the copied contact details.",
-        );
-      await acceptCardPayload(codes[0].rawValue);
+      setCardStatus("Reading QR code from the image…");
+      const codeReader = new BrowserQRCodeReader();
+      const result = await codeReader.decodeFromImageUrl(imageUrl);
+      await acceptCardPayload(result.getText());
     } catch {
       setCardStatus(
-        "Ellie could not read that image. Try a PNG or JPG screenshot of the QR code.",
+        "No QR code was found in that image. Try a clearer screenshot or paste the digital-card link.",
       );
+    } finally {
+      URL.revokeObjectURL(imageUrl);
     }
   }
 
@@ -1174,9 +1173,7 @@ export default function Contacts() {
           Email: email,
           "Email Status": "verified",
           "Primary Email Verification Source":
-            result.reason === "owner_skipped_verification"
-              ? "owner_accepted_without_verification"
-              : result.reason === "imported_email_status"
+            result.reason === "imported_email_status"
                 ? "csv_import_status"
                 : "emailable",
         };
@@ -1191,8 +1188,11 @@ export default function Contacts() {
       ].join(",");
       return {
         ...row,
-        Email: "",
-        "Email Status": result?.state || "unverified",
+        Email: email,
+        "Email Status":
+          result?.state === "undeliverable" ? "undeliverable" : "unverified",
+        "Primary Email Verification Source":
+          result?.reason === "verification_skipped" ? "not_verified" : "emailable",
         Tags: tags,
       };
     });
@@ -1277,9 +1277,11 @@ export default function Contacts() {
       {
         email,
         state: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-          ? "deliverable"
+          ? "unknown"
           : "undeliverable",
-        reason: "owner_skipped_verification",
+        reason: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+          ? "verification_skipped"
+          : "invalid_format",
       },
     ]),
   );
@@ -2370,9 +2372,11 @@ export default function Contacts() {
             </li>
           </ol>
           <div className="business-card-capture__methods">
-            <div>
+            <div
+              className={cardScanning ? "business-card-live is-active" : "business-card-live"}
+            >
               <strong>Scan live QR</strong>
-              <small>Use the phone or computer camera.</small>
+              <small>Use the rear camera on a phone when available.</small>
               <Button
                 variant="outline"
                 size="sm"
@@ -2380,6 +2384,17 @@ export default function Contacts() {
               >
                 {cardScanning ? "Stop camera" : "Start camera"}
               </Button>
+              <video
+                className={
+                  cardScanning
+                    ? "business-card-camera is-active"
+                    : "business-card-camera"
+                }
+                ref={cardVideoRef}
+                autoPlay
+                muted
+                playsInline
+              />
             </div>
             <label>
               <strong>Use a QR screenshot</strong>
@@ -2412,17 +2427,6 @@ export default function Contacts() {
               </Button>
             </div>
           </div>
-          <video
-            className={
-              cardScanning
-                ? "business-card-camera is-active"
-                : "business-card-camera"
-            }
-            ref={cardVideoRef}
-            autoPlay
-            muted
-            playsInline
-          />
           <label className="business-card-raw">
             <span>Copied contact details or digital-card link</span>
             <textarea
@@ -3015,8 +3019,8 @@ export default function Contacts() {
                     <span>
                       <strong>Skip email verification</strong>
                       <small>
-                        No credits. Accept syntactically valid addresses as
-                        provided; this can increase bounce risk.
+                        Save addresses as unverified without using credits.
+                        Unverified addresses stay blocked from outreach.
                       </small>
                     </span>
                   </label>
@@ -3057,7 +3061,7 @@ export default function Contacts() {
                   <p className="source-verification-note">
                     {emailVerificationMode === "source"
                       ? "Using the verification statuses already included in this CSV."
-                      : "No external email verification will run."}
+                      : "No external verification will run. These addresses will be saved as unverified and cannot be emailed."}
                   </p>
                 )}
                 {verificationProgress ? (
@@ -3095,14 +3099,15 @@ export default function Contacts() {
                           </small>
                         </div>
                         <p>
-                          {issue.reason === "invalid_format" ||
-                          issue.reason === "owner_skipped_verification"
-                            ? "This address is not formatted like a valid email and will be removed before import."
+                          {issue.reason === "invalid_format"
+                            ? "This address is not formatted like a valid email. It will be saved for reference but blocked from outreach."
+                            : issue.reason === "verification_skipped"
+                              ? "Saved for reference; blocked from outreach until verified."
                             : issue.state === "risky"
                               ? "This address may bounce. It will be withheld until reviewed."
                               : issue.state === "unknown"
                                 ? "Verification could not confirm this address. It will be withheld until reviewed."
-                                : "This address was reported as undeliverable and will be removed before import."}
+                                : "This address was reported as undeliverable. It will be saved for reference but blocked from outreach."}
                         </p>
                       </article>
                     ))}

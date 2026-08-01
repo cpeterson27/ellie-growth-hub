@@ -182,6 +182,7 @@ async function ingestContacts({
       Object.entries(data).forEach(([key, value]) => {
         if (key === "apolloFields") contact.apolloFields = { ...(contact.apolloFields || {}), ...(value || {}) };
         else if (arrayFields.has(key) && Array.isArray(value)) contact[key] = [...new Set([...(contact[key] || []), ...value])];
+        else if (key === "emailStatus" && contact.emailStatus === "verified" && value !== "verified") return;
         else if (value !== undefined && value !== "" && value !== null) contact[key] = value;
       });
       if (!contact.sources.includes(source)) contact.sources.push(source);
