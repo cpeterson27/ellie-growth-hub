@@ -818,17 +818,32 @@ router.post("/:id/replace-email", async (req, res) => {
     const existingContact = await Contact.findById(original.contactId);
     if (!existingContact) return res.status(404).json({ error: "Contact record not found." });
     const alreadyVerified = existingContact.email === newEmail && existingContact.emailStatus === "verified";
+    const directlyConfirmed = req.body?.confirmDirectSource === true;
+    if (!alreadyVerified && !directlyConfirmed) {
+      return res.status(400).json({
+        error: "Confirm that this exact address came from an official company source or directly from the person. Guessed address patterns cannot be sent.",
+      });
+    }
     const contact = await Contact.findByIdAndUpdate(
       existingContact._id,
       {
         $set: {
           email: newEmail,
           status: "active",
-          emailStatus: alreadyVerified ? "verified" : "unverified",
+          emailStatus: "verified",
           emailBounced: false,
           primaryEmailSource: alreadyVerified
             ? existingContact.primaryEmailSource
             : "manual_correction",
+          primaryEmailVerificationSource: alreadyVerified
+            ? existingContact.primaryEmailVerificationSource
+            : "owner_confirmation",
+          emailConfidence: alreadyVerified
+            ? existingContact.emailConfidence
+            : "directly_confirmed",
+          primaryEmailLastVerifiedAt: alreadyVerified
+            ? existingContact.primaryEmailLastVerifiedAt
+            : new Date(),
         },
       },
       { new: true, runValidators: true },

@@ -261,7 +261,11 @@ export default function Outreach() {
     try {
       setSaving(true);
       setEmailCorrectionError("");
-      const result = await replaceBouncedOutreachEmail(emailCorrection._id, emailCorrection.newEmail);
+      const result = await replaceBouncedOutreachEmail(
+        emailCorrection._id,
+        emailCorrection.newEmail,
+        emailCorrection.confirmDirectSource,
+      );
       setEmailCorrection(null);
       await loadItems(selected);
       setPreview({
@@ -448,7 +452,7 @@ export default function Outreach() {
                           item.contactId.email !== item.contactEmail
                             ? item.contactId.email
                             : "";
-                        setEmailCorrection({ ...item, newEmail: correctedEmail });
+                        setEmailCorrection({ ...item, newEmail: correctedEmail, confirmDirectSource: false });
                       } else review(item);
                     }}
                   >
@@ -503,7 +507,14 @@ export default function Outreach() {
         footer={
           <>
             <Button variant="outline" onClick={() => setEmailCorrection(null)}>Cancel</Button>
-            <Button loading={saving} disabled={!emailCorrection?.newEmail} onClick={saveReplacementEmail}>Save &amp; prepare draft</Button>
+            <Button
+              loading={saving}
+              disabled={
+                !emailCorrection?.newEmail ||
+                (!(emailCorrection.contactId?.emailStatus === "verified" && emailCorrection.newEmail === emailCorrection.contactId?.email) && !emailCorrection?.confirmDirectSource)
+              }
+              onClick={saveReplacementEmail}
+            >Save &amp; prepare draft</Button>
           </>
         }
       >
@@ -520,7 +531,16 @@ export default function Outreach() {
             </label>
             {emailCorrection.contactId?.emailStatus === "verified" && emailCorrection.newEmail === emailCorrection.contactId?.email ? (
               <p className="outreach-email-correction__note"><strong>Verified correction found:</strong> This contact already has a different verified address in the CRM. Saving will prepare the replacement draft.</p>
-            ) : null}
+            ) : (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={Boolean(emailCorrection.confirmDirectSource)}
+                  onChange={(event) => setEmailCorrection((current) => ({ ...current, confirmDirectSource: event.target.checked }))}
+                />
+                I found this exact address on an official company source or received it directly from this person. I did not guess the address pattern.
+              </label>
+            )}
             {emailCorrectionError ? <p className="form-error">{emailCorrectionError}</p> : null}
             <p className="outreach-email-correction__note"><strong>What happens next:</strong> Ellie updates the contact and creates a new draft for your review. Confirm this address is correct before approving it. The bounced record stays unchanged for an accurate audit trail, and nothing is sent automatically.</p>
           </form>
