@@ -12,6 +12,7 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import {
+  APOLLO_PEOPLE_TEMPLATE_HEADERS,
   downloadApolloTemplate,
   normalizeApolloRows,
   parseApolloPeoplePaste,
@@ -1132,6 +1133,56 @@ export default function Contacts() {
       },
       error: () => setImportError("Unable to parse contact file."),
     });
+  }
+
+  async function refreshImportPreview(rows) {
+    setDuplicatePreview(null);
+    try {
+      const preview = await previewContactIngestion({
+        contacts: rows,
+        source: importSource,
+      });
+      setDuplicatePreview(preview.data);
+    } catch (previewError) {
+      setImportError(
+        previewError.response?.data?.message ||
+          "Ellie could not recheck this working list for duplicates.",
+      );
+    }
+  }
+
+  function updateImportCell(rowIndex, header, value) {
+    setImportRows((current) =>
+      current.map((row, index) =>
+        index === rowIndex ? { ...row, [header]: value } : row,
+      ),
+    );
+    setDuplicatePreview(null);
+    setVerificationResults({});
+  }
+
+  function removeImportRow(rowIndex) {
+    const nextRows = importRows.filter((_, index) => index !== rowIndex);
+    setImportRows(nextRows);
+    setVerificationResults({});
+    refreshImportPreview(nextRows);
+  }
+
+  function downloadPreparedContactCsv() {
+    const fields = [
+      ...APOLLO_PEOPLE_TEMPLATE_HEADERS,
+      ...importHeaders.filter(
+        (header) => !APOLLO_PEOPLE_TEMPLATE_HEADERS.includes(header),
+      ),
+    ];
+    const csv = Papa.unparse({ fields, data: importRows });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "ellie-email-finder-working-list.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function saveIngestion(
@@ -2755,6 +2806,7 @@ export default function Contacts() {
           !savingContact && !verifyingEmails && setUploadOpen(false)
         }
         title="Import people"
+        size="workspace"
         footer={
           <>
             <Button
@@ -2830,12 +2882,13 @@ export default function Contacts() {
             <section className="apollo-paste-intake">
               <header>
                 <div>
-                  <span>Fastest on Apollo Free</span>
-                  <strong>Paste Apollo people directly</strong>
+                  <span>List preparation workspace</span>
+                  <strong>Turn a copied Apollo page into a clean CSV</strong>
                   <small>
-                    Copy the column headings and people rows from Apollo or a
-                    spreadsheet. Ellie maps Apollo’s names to the CRM fields
-                    automatically.
+                    Paste the whole Apollo results page. Ellie separates the
+                    people into editable fields, removes masked last names, and
+                    prepares a CSV for your email-finder website. Nothing is
+                    added to the CRM until you choose to import it.
                   </small>
                 </div>
                 <Button
@@ -2860,7 +2913,7 @@ export default function Contacts() {
                   prepareImport(importPasteText, "apollo");
                 }}
               >
-                Review pasted people
+                Build editable working list
               </Button>
             </section>
             <div className="apollo-import-divider">
@@ -2934,6 +2987,20 @@ export default function Contacts() {
                 </p>
               </section>
             ) : null}
+            <section className="contact-list-workbench">
+              <div>
+                <span>Working CSV</span>
+                <strong>Edit, remove, and download before importing</strong>
+                <p>
+                  Download this clean file for your email-finder website. When
+                  it returns the emails, upload that completed CSV back here so
+                  Ellie keeps every field in the correct column.
+                </p>
+              </div>
+              <Button variant="outline" onClick={downloadPreparedContactCsv}>
+                Download CSV for email finder
+              </Button>
+            </section>
             {duplicatePreview ? (
               <section className="duplicate-preflight">
                 <header>
@@ -3229,7 +3296,7 @@ export default function Contacts() {
                     : Math.min(5, importRows.length)}{" "}
                   of {importRows.length} contacts.
                 </strong>{" "}
-                All {importRows.length} will be imported.
+                You can edit every cell before download or import.
               </p>
               {importRows.length > 5 ? (
                 <Button
@@ -3250,31 +3317,43 @@ export default function Contacts() {
                     {importHeaders.map((header) => (
                       <th key={header}>{header}</th>
                     ))}
+                    <th>Remove</th>
                   </tr>
                 </thead>
                 <tbody>
                   {importRows
                     .slice(0, showAllImportRows ? importRows.length : 5)
-                    .map((row, index) => (
-                      <tr
-                        key={`${row.Email || row.Name || "contact"}-${index}`}
-                      >
-                        {importHeaders.map((header) => {
-                          const rawValue = String(row[header] || "").trim();
-                          const value =
-                            header.toLowerCase().includes("phone") &&
-                            /request phone number/i.test(rawValue)
-                              ? ""
-                              : rawValue;
-                          const result =
-                            header === "Email"
-                              ? effectiveVerificationResults[
-                                  value.toLowerCase()
-                                ]
-                              : null;
-                          return (
-                            <td key={header}>
-                              <span>{value || "—"}</span>
+                    .map((row, rowIndex) => {
+                      return (
+                        <tr key={`working-contact-${rowIndex}`}>
+                          {importHeaders.map((header) => {
+                            const rawValue = String(row[header] || "").trim();
+                            const value =
+                              header.toLowerCase().includes("phone") &&
+                              /request phone number/i.test(rawValue)
+                                ? ""
+                                : rawValue;
+                            const result =
+                              header === "Email"
+                                ? effectiveVerificationResults[
+                                    value.toLowerCase()
+                                  ]
+                                : null;
+                            return (
+                              <td key={header}>
+                              <input
+                                aria-label={`${header} for row ${rowIndex + 1}`}
+                                value={value}
+                                placeholder={header}
+                                onChange={(event) =>
+                                  updateImportCell(
+                                    rowIndex,
+                                    header,
+                                    event.target.value,
+                                  )
+                                }
+                                onBlur={() => refreshImportPreview(importRows)}
+                              />
                               {header === "Email" && value ? (
                                 <i
                                   className={`verification-badge ${result?.state || "pending"}`}
@@ -3284,11 +3363,21 @@ export default function Contacts() {
                                     : result?.state || "not verified"}
                                 </i>
                               ) : null}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                              </td>
+                            );
+                          })}
+                          <td>
+                            <button
+                              className="contact-workbench-remove"
+                              type="button"
+                              onClick={() => removeImportRow(rowIndex)}
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

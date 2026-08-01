@@ -31,6 +31,11 @@
   z-index: 1;
 }
 
+.modal-panel--workspace {
+  width: min(96vw, 1180px);
+  max-height: 94vh;
+}
+
 .modal-header {
   flex: 0 0 auto;
   display: flex;

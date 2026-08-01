@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import './Modal.css'
 
-export default function Modal({ isOpen, onClose, title, children, footer }) {
+export default function Modal({ isOpen, onClose, title, children, footer, size = "default" }) {
   useEffect(() => {
     if (!isOpen) {
       return undefined
@@ -29,7 +29,10 @@ export default function Modal({ isOpen, onClose, title, children, footer }) {
   return (
     <div className="modal-root" aria-modal="true" role="dialog">
       <button className="modal-backdrop" onClick={onClose} aria-label="Close modal" />
-      <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+      <div
+        className={`modal-panel ${size === "workspace" ? "modal-panel--workspace" : ""}`}
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="modal-header">
           <div>
             <h3>{title}</h3>
