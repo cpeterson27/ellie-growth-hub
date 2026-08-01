@@ -158,6 +158,7 @@
 }
 .outreach-list-tools > div { display: grid; gap: 0.15rem; }
 .outreach-list-tools > div span { color: var(--text-muted); font-size: 0.78rem; }
+.outreach-list-tools .outreach-bulk-corrections { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 .outreach-list-tools .outreach-search { display: block; }
 .outreach-list-tools .outreach-search > span { width: 100%; }
 .outreach-list-tools .outreach-search input { min-width: 0; }

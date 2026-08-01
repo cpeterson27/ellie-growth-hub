@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import Papa from "papaparse";
 import { FiChevronLeft, FiChevronRight, FiEdit2, FiEye, FiMail, FiRefreshCw, FiSearch } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
@@ -82,6 +83,8 @@ export default function Outreach() {
   const [emailCorrectionError, setEmailCorrectionError] = useState("");
   const [replacementSendError, setReplacementSendError] = useState("");
   const [approveAllOpen, setApproveAllOpen] = useState(false);
+  const [bulkCorrecting, setBulkCorrecting] = useState(false);
+  const correctionFileRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testSending, setTestSending] = useState(false);
@@ -327,6 +330,75 @@ export default function Outreach() {
       setSaving(false);
     }
   };
+
+  const downloadBounceCorrectionCsv = () => {
+    const rows = items
+      .filter((item) => item.deliveryStatus === "bounced" && !item.replacement)
+      .map((item) => ({
+        "Outreach ID": item._id,
+        Name: item.contactName || "",
+        Company: item.organization || "",
+        "Bounced Email": item.contactEmail || "",
+        "Bounce Type": item.bounceType || "",
+        "Bounce Reason": item.bounceMessage || "",
+        "Replacement Email": "",
+        "Official Source Confirmed": "NO",
+        "Research Notes": "",
+      }));
+    const csv = Papa.unparse(rows);
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ellie-bounce-corrections-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importBounceCorrections = (file) => {
+    if (!file) return;
+    setBulkCorrecting(true);
+    setError("");
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: "greedy",
+      complete: async ({ data, errors }) => {
+        if (errors.length) {
+          setError("The correction CSV contains malformed rows. Download a fresh template and try again.");
+          setBulkCorrecting(false);
+          return;
+        }
+        const ready = data.filter((row) => String(row["Replacement Email"] || "").trim());
+        let prepared = 0;
+        const failures = [];
+        for (const row of ready) {
+          const outreachId = String(row["Outreach ID"] || "").trim();
+          const email = String(row["Replacement Email"] || "").trim();
+          const confirmed = /^(yes|true|confirmed|1)$/i.test(
+            String(row["Official Source Confirmed"] || "").trim(),
+          );
+          if (!outreachId || !confirmed) {
+            failures.push(`${row.Name || email}: mark Official Source Confirmed as YES`);
+            continue;
+          }
+          try {
+            await replaceBouncedOutreachEmail(outreachId, email, true);
+            prepared += 1;
+          } catch (err) {
+            failures.push(`${row.Name || email}: ${err.response?.data?.error || "could not be updated"}`);
+          }
+        }
+        await loadItems(selected);
+        setBulkCorrecting(false);
+        if (correctionFileRef.current) correctionFileRef.current.value = "";
+        setNotice(`${prepared} replacement draft${prepared === 1 ? "" : "s"} prepared. ${failures.length} row${failures.length === 1 ? "" : "s"} still need attention.`);
+        if (failures.length) setError(failures.slice(0, 8).join(" · "));
+      },
+      error: () => {
+        setError("Ellie could not read that correction CSV.");
+        setBulkCorrecting(false);
+      },
+    });
+  };
   return (
     <div className="page-dashboard outreach-page">
       <header className="outreach-header">
@@ -399,6 +471,23 @@ export default function Outreach() {
       >
         <div className="outreach-list-tools">
           <div><strong>{labels[filter] || "Outreach"}</strong><span>{filtered.length} message{filtered.length === 1 ? "" : "s"} in this view · Delivery updates automatically{deliverySyncedAt ? ` · Checked ${deliverySyncedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</span></div>
+          {filter === "bounced" ? (
+            <div className="outreach-bulk-corrections">
+              <Button variant="outline" size="sm" onClick={downloadBounceCorrectionCsv}>
+                Download correction CSV
+              </Button>
+              <Button variant="outline" size="sm" loading={bulkCorrecting} onClick={() => correctionFileRef.current?.click()}>
+                Import corrected CSV
+              </Button>
+              <input
+                ref={correctionFileRef}
+                type="file"
+                hidden
+                accept=".csv,text/csv"
+                onChange={(event) => importBounceCorrections(event.target.files?.[0])}
+              />
+            </div>
+          ) : null}
           <label className="outreach-search">
             <span><FiSearch aria-hidden="true" /><input className="select-input" aria-label={`Search ${labels[filter] || "outreach"}`} placeholder={filter === "sent" ? "Search sent mail" : `Search ${String(labels[filter] || "outreach").toLowerCase()}`} value={search} onChange={(e) => setSearch(e.target.value)} /></span>
           </label>
