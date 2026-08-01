@@ -4,6 +4,7 @@ const Outreach = require("../models/Outreach");
 const Campaign = require("../models/Campaign");
 const Contact = require("../models/Contact");
 const EmailEvent = require("../models/EmailEvent");
+const EmailSuppression = require("../models/EmailSuppression");
 
 const { renderEmailContent, sendEmail, sendTestEmail } = require("../services/email");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
@@ -54,9 +55,20 @@ router.get("/", async (req, res) => {
 
     const outreach =
       await Outreach.find(filter)
+        .populate("contactId", "email emailStatus primaryEmailVerificationSource")
         .sort({
           createdAt: -1
-        });
+        })
+        .lean();
+
+    const replacements = await Outreach.find({
+      retryOf: { $in: outreach.map((item) => item._id) },
+    }).sort({ createdAt: -1 }).lean();
+    const replacementByOriginal = new Map();
+    replacements.forEach((replacement) => {
+      const key = String(replacement.retryOf || "");
+      if (key && !replacementByOriginal.has(key)) replacementByOriginal.set(key, replacement);
+    });
 
 
     console.log(
@@ -65,7 +77,10 @@ router.get("/", async (req, res) => {
     );
 
 
-    res.json(outreach);
+    res.json(outreach.map((item) => ({
+      ...item,
+      replacement: replacementByOriginal.get(String(item._id)) || null,
+    })));
 
 
   } catch(error) {
@@ -786,6 +801,9 @@ router.post("/:id/replace-email", async (req, res) => {
     if (newEmail === String(original.contactEmail || "").toLowerCase()) {
       return res.status(400).json({ error: "Enter a different email address." });
     }
+    if (await EmailSuppression.exists({ email: newEmail })) {
+      return res.status(409).json({ error: "That replacement address is suppressed because it previously bounced or generated a complaint." });
+    }
 
     const duplicate = await Contact.findOne({
       _id: { $ne: original.contactId },
@@ -797,15 +815,20 @@ router.post("/:id/replace-email", async (req, res) => {
       });
     }
 
+    const existingContact = await Contact.findById(original.contactId);
+    if (!existingContact) return res.status(404).json({ error: "Contact record not found." });
+    const alreadyVerified = existingContact.email === newEmail && existingContact.emailStatus === "verified";
     const contact = await Contact.findByIdAndUpdate(
-      original.contactId,
+      existingContact._id,
       {
         $set: {
           email: newEmail,
           status: "active",
-          emailStatus: "unverified",
+          emailStatus: alreadyVerified ? "verified" : "unverified",
           emailBounced: false,
-          primaryEmailSource: "manual_correction",
+          primaryEmailSource: alreadyVerified
+            ? existingContact.primaryEmailSource
+            : "manual_correction",
         },
       },
       { new: true, runValidators: true },

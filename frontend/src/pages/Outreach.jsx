@@ -424,7 +424,13 @@ export default function Outreach() {
                   <span className={`outreach-status outreach-status--${item.deliveryStatus || item.status}`}>
                     {deliveryLabel(item)}
                   </span>
-                  {item.deliveryStatus === "bounced" ? <small>Do not resend</small> : null}
+                  {item.deliveryStatus === "bounced" ? (
+                    <small>
+                      {item.replacement
+                        ? `Replacement ${deliveryLabel(item.replacement).toLowerCase()}`
+                        : "Needs a verified replacement"}
+                    </small>
+                  ) : null}
                 </div>
                 <div className="outreach-item__actions">
                   <Button
@@ -432,13 +438,22 @@ export default function Outreach() {
                     size="sm"
                     onClick={() => {
                       if (item.deliveryStatus === "bounced") {
+                        if (item.replacement) {
+                          review(item.replacement);
+                          return;
+                        }
                         setEmailCorrectionError("");
-                        setEmailCorrection({ ...item, newEmail: "" });
+                        const correctedEmail =
+                          item.contactId?.email &&
+                          item.contactId.email !== item.contactEmail
+                            ? item.contactId.email
+                            : "";
+                        setEmailCorrection({ ...item, newEmail: correctedEmail });
                       } else review(item);
                     }}
                   >
                     {item.deliveryStatus === "bounced" ? <FiEdit2 /> : <FiEye />}
-                    <span>{item.deliveryStatus === "bounced" ? "Replace email" : item.status === "pending" ? "Review" : item.status === "failed" ? "Review issue" : "View email"}</span>
+                    <span>{item.deliveryStatus === "bounced" ? (item.replacement ? "View replacement" : "Replace email") : item.status === "pending" ? "Review" : item.status === "failed" ? "Review issue" : "View email"}</span>
                   </Button>
                   {item.contactEmail && ["sent", "replied"].includes(item.status) && item.deliveryStatus !== "bounced" ? (
                     <Button
@@ -503,6 +518,9 @@ export default function Outreach() {
               Replacement email address
               <input type="email" autoFocus autoComplete="off" placeholder="name@company.com" value={emailCorrection.newEmail} onChange={(event) => setEmailCorrection((current) => ({ ...current, newEmail: event.target.value }))} />
             </label>
+            {emailCorrection.contactId?.emailStatus === "verified" && emailCorrection.newEmail === emailCorrection.contactId?.email ? (
+              <p className="outreach-email-correction__note"><strong>Verified correction found:</strong> This contact already has a different verified address in the CRM. Saving will prepare the replacement draft.</p>
+            ) : null}
             {emailCorrectionError ? <p className="form-error">{emailCorrectionError}</p> : null}
             <p className="outreach-email-correction__note"><strong>What happens next:</strong> Ellie updates the contact and creates a new draft for your review. Confirm this address is correct before approving it. The bounced record stays unchanged for an accurate audit trail, and nothing is sent automatically.</p>
           </form>

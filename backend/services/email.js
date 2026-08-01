@@ -89,6 +89,9 @@ async function sendEmail(outreachItem) {
   if (!contact) {
     return { success: false, message: "A CRM contact is required before campaign email can be sent." };
   }
+  if (contact.emailStatus !== "verified") {
+    return { success: false, message: "This email address is not verified. Verify or directly confirm the corrected address before sending." };
+  }
   if (contact.emailPreferences?.marketingStatus !== "subscribed" || !contact.emailPreferences?.consentAt) {
     return { success: false, message: "This contact has no recorded marketing opt-in. Verified email is not the same as permission to send." };
   }

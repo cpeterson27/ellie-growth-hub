@@ -103,7 +103,7 @@ function contactMatchKeys(data) {
   if (data.linkedin) keys.push({ field: "linkedin", label: "LinkedIn URL", query: { linkedin: data.linkedin } });
   if (data.mondayItemId) keys.push({ field: "mondayItemId", label: "Monday item ID", query: { mondayItemId: data.mondayItemId } });
   if (data.phone) keys.push({ field: "phone", label: "phone number", query: { phone: data.phone } });
-  if (!keys.length && data.company) keys.push({ field: "nameCompany", label: "name and company", query: { name: data.name, company: data.company } });
+  if (data.name && data.company) keys.push({ field: "nameCompany", label: "name and company", query: { name: data.name, company: data.company } });
   return keys;
 }
 
