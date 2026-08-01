@@ -97,6 +97,33 @@ function fullContactName(contact = {}) {
     .join(" ");
 }
 
+function isUnsubscribed(contact = {}) {
+  return (
+    contact.status === "unsubscribed" ||
+    contact.emailPreferences?.marketingStatus === "unsubscribed"
+  );
+}
+
+function unsubscribeSourceLabel(source) {
+  const labels = {
+    email_one_click: "Clicked the unsubscribe link in an email",
+    preference_center: "Unsubscribed in the email preference center",
+    reply_request: "Asked to be unsubscribed by reply",
+    spam_complaint: "Reported an email as spam",
+    admin: "Marked unsubscribed by an administrator",
+  };
+  return labels[source] || "Unsubscribed from marketing email";
+}
+
+function unsubscribeDate(contact = {}) {
+  const value = contact.emailPreferences?.unsubscribedAt;
+  if (!value) return "Date not recorded";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "Date not recorded"
+    : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+}
+
 const contactDetailGroups = [
   [
     "Contact",
@@ -507,6 +534,7 @@ export default function Contacts() {
   const [bulkCampaignId, setBulkCampaignId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkNotice, setBulkNotice] = useState("");
+  const [unsubscribedContacts, setUnsubscribedContacts] = useState([]);
   const [crmView, setCrmView] = useState("list");
   const [isCardCaptureOpen, setCardCaptureOpen] = useState(false);
   const [cardDraft, setCardDraft] = useState(manualContactDefaults);
@@ -705,10 +733,24 @@ export default function Contacts() {
       setLoading(true);
       const query = {
         limit: 500,
-        ...(contactTab === "archived" ? { status: "archived" } : {}),
+        ...(contactTab === "archived"
+          ? { status: "archived" }
+          : contactTab === "unsubscribed"
+            ? { status: "unsubscribed" }
+            : {}),
       };
-      const response = await fetchContacts(query);
+      const [response, unsubscribeResponse] = await Promise.all([
+        fetchContacts(query),
+        fetchContacts({ limit: 100, status: "unsubscribed" }),
+      ]);
       const allContacts = response.data || [];
+      setUnsubscribedContacts(
+        [...(unsubscribeResponse.data || [])].sort(
+          (a, b) =>
+            new Date(b.emailPreferences?.unsubscribedAt || 0) -
+            new Date(a.emailPreferences?.unsubscribedAt || 0),
+        ),
+      );
       const items = allContacts.filter((contact) => {
         const workflow = contactWorkflowState(contact);
         const requestedResearchStatus = searchParams.get("researchStatus");
@@ -1656,6 +1698,36 @@ export default function Contacts() {
             finding new prospects you do not already have.
           </p>
         ) : null}
+        {unsubscribedContacts.length ? (
+          <section className="crm-unsubscribe-notice" role="status">
+            <div className="crm-unsubscribe-notice__icon" aria-hidden="true">
+              !
+            </div>
+            <div>
+              <span>Email preference notification</span>
+              <strong>
+                {unsubscribedContacts.length} contact
+                {unsubscribedContacts.length === 1 ? " has" : "s have"}{" "}
+                unsubscribed
+              </strong>
+              <p>
+                Latest: {unsubscribedContacts[0]?.name || "Contact"} ·{" "}
+                {unsubscribeDate(unsubscribedContacts[0])}. Ellie blocks campaign
+                email to every unsubscribed contact.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setContactTab("unsubscribed");
+                setCurrentPage(1);
+              }}
+            >
+              Review unsubscribes
+            </Button>
+          </section>
+        ) : null}
         <div className="crm-toolbar">
           <label>
             Campaign{" "}
@@ -1709,6 +1781,7 @@ export default function Contacts() {
             ["attention", "Data quality review"],
             ["ready", "Ready to assign"],
             ["assigned", "Campaign assigned"],
+            ["unsubscribed", `Unsubscribed (${unsubscribedContacts.length})`],
             ["archived", "Archived"],
           ].map(([value, label]) => (
             <button
@@ -1720,7 +1793,8 @@ export default function Contacts() {
             </button>
           ))}
         </div>
-        {contacts.length && contactTab !== "archived" ? (
+        {contacts.length &&
+        !["archived", "unsubscribed"].includes(contactTab) ? (
           <section
             className={`contact-bulk-actions ${selectedContactIds.length ? "has-selection" : ""}`}
             aria-label="Selected contact actions"
@@ -1983,17 +2057,23 @@ export default function Contacts() {
                         </div>
                       </div>
                       <div className="contact-record__top-actions">
-                        <span
-                          className={`contact-status-badge contact-status-badge--${contact.emailStatus || "missing"}`}
-                        >
-                          {contact.emailStatus === "verified"
-                            ? "Verified email"
-                            : contact.emailStatus === "risky"
-                              ? "Risky — withheld"
-                              : contact.emailStatus === "undeliverable"
-                                ? "Undeliverable — withheld"
-                                : "No verified email"}
-                        </span>
+                        {isUnsubscribed(contact) ? (
+                          <span className="contact-status-badge contact-status-badge--unsubscribed">
+                            Unsubscribed
+                          </span>
+                        ) : (
+                          <span
+                            className={`contact-status-badge contact-status-badge--${contact.emailStatus || "missing"}`}
+                          >
+                            {contact.emailStatus === "verified"
+                              ? "Verified email"
+                              : contact.emailStatus === "risky"
+                                ? "Risky — withheld"
+                                : contact.emailStatus === "undeliverable"
+                                  ? "Undeliverable — withheld"
+                                  : "No verified email"}
+                          </span>
+                        )}
                         {!hasAudienceSignals(contact) ? (
                           <span
                             className="contact-status-badge contact-status-badge--unknown"
@@ -3277,6 +3357,19 @@ export default function Contacts() {
                 Edit contact
               </Button>
             </div>
+            {isUnsubscribed(detailContact) ? (
+              <section className="contact-unsubscribe-alert" role="alert">
+                <span>Do not email</span>
+                <strong>This contact unsubscribed from campaign email.</strong>
+                <p>
+                  {unsubscribeSourceLabel(
+                    detailContact.emailPreferences?.unsubscribeSource,
+                  )}{" "}
+                  on {unsubscribeDate(detailContact)}. Ellie will keep campaign
+                  sending blocked unless the contact explicitly opts in again.
+                </p>
+              </section>
+            ) : null}
             {contactDetailGroups.map(([group, fields]) => {
               const rows = fields.map(([field, label]) => [
                 field,
