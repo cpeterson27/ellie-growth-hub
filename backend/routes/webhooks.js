@@ -4,6 +4,7 @@ const Outreach = require("../models/Outreach");
 const Campaign = require("../models/Campaign");
 const Contact = require("../models/Contact");
 const EmailEvent = require("../models/EmailEvent");
+const EmailSuppression = require("../models/EmailSuppression");
 const { classifyReply, draftReply } = require("../services/replyIntelligence");
 
 const router = express.Router();
@@ -118,6 +119,23 @@ router.post("/resend", async (req, res) => {
           { $inc: { [`metrics.${lifecycle.metric}`]: 1 } },
         );
       }
+      if (outreach.contactId && event.type === "email.delivered") {
+        const globallySuppressed = await EmailSuppression.exists({
+          email: String(outreach.contactEmail || "").toLowerCase().trim(),
+        });
+        if (!globallySuppressed) {
+          await Contact.updateOne(
+            { _id: outreach.contactId, emailBounced: { $ne: true } },
+            {
+              $set: {
+                emailStatus: "verified",
+                primaryEmailVerificationSource: "resend_delivery_confirmation",
+                primaryEmailLastVerifiedAt: occurredAt,
+              },
+            },
+          );
+        }
+      }
       if (outreach.contactId && ["email.bounced", "email.complained", "email.suppressed"].includes(event.type)) {
         const optedOut = event.type === "email.complained";
         await Contact.updateOne(
@@ -140,6 +158,30 @@ router.post("/resend", async (req, res) => {
               },
           },
         );
+      }
+      if (["email.bounced", "email.complained", "email.suppressed"].includes(event.type)) {
+        const suppressedEmail = recipientFrom(data) || String(outreach.contactEmail || "").toLowerCase().trim();
+        if (suppressedEmail) {
+          await EmailSuppression.findOneAndUpdate(
+            { email: suppressedEmail },
+            {
+              $set: {
+                reason: event.type === "email.complained"
+                  ? "complaint"
+                  : event.type === "email.suppressed"
+                    ? "provider_suppressed"
+                    : "bounce",
+                provider: "resend",
+                bounceType: String(data.bounce?.type || ""),
+                bounceSubType: String(data.bounce?.subType || ""),
+                message: String(data.bounce?.message || ""),
+                sourceOutreachId: outreach._id,
+                suppressedAt: occurredAt,
+              },
+            },
+            { upsert: true, new: true },
+          );
+        }
       }
       return res.json({ received: true, matched: true, duplicate: recorded.duplicate });
     }

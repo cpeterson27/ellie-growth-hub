@@ -2,6 +2,7 @@ const integrationHub = require("./integrationHub");
 const IntegrationConnection = require("../models/IntegrationConnection");
 const Contact = require("../models/Contact");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
+const EmailSuppression = require("../models/EmailSuppression");
 const { createUnsubscribeToken, publicBackendUrl } = require("../utils/unsubscribe");
 
 async function renderEmailContent(outreachItem, { contact = null, preview = false } = {}) {
@@ -67,6 +68,13 @@ async function sendEmail(outreachItem) {
       message:"No recipient email found.",
     };
 
+  }
+
+  const suppression = await EmailSuppression.findOne({
+    email: String(recipient).toLowerCase().trim(),
+  }).lean();
+  if (suppression) {
+    return { success: false, message: `This address is suppressed because of a previous ${suppression.reason.replaceAll("_", " ")}.` };
   }
 
 

@@ -1,5 +1,6 @@
 const Contact = require("../models/Contact");
 const Campaign = require("../models/Campaign");
+const EmailSuppression = require("../models/EmailSuppression");
 const { applyResearchClassification } = require("./contactResearchService");
 
 const canonicalFieldMap = Object.fromEntries([
@@ -112,6 +113,12 @@ async function previewContactIngestion({ contacts, source = "csv" }) {
   const seen = new Map();
   for (let index = 0; index < contacts.length; index += 1) {
     const data = normalizeIncoming(contacts[index], source);
+    if (data.email && await EmailSuppression.exists({ email: data.email })) {
+      data.emailStatus = "undeliverable";
+      data.emailBounced = true;
+      data.status = "invalid";
+      data.tags = [...new Set([...(data.tags || []), "suppressed-email"])];
+    }
     const keys = contactMatchKeys(data);
     const signatures = keys.length ? keys.map((key) => JSON.stringify(key.query)) : [`row:${index}`];
     const duplicateSignature = signatures.find((signature) => seen.has(signature));
@@ -174,6 +181,13 @@ async function ingestContacts({
   };
   for (let index = 0; index < contacts.length; index += 1) {
     const data = normalizeIncoming(contacts[index], source);
+    const isSuppressed = Boolean(data.email && await EmailSuppression.exists({ email: data.email }));
+    if (isSuppressed) {
+      data.emailStatus = "undeliverable";
+      data.emailBounced = true;
+      data.status = "invalid";
+      data.tags = [...new Set([...(data.tags || []), "suppressed-email"])];
+    }
     if (!data.name) { summary.failed += 1; summary.errors.push({ index, message: "Name is required" }); continue; }
     const keys = contactMatchKeys(data).map((key) => key.query);
     let contact = keys.length ? await Contact.findOne({ $or: keys }) : null;
@@ -185,6 +199,11 @@ async function ingestContacts({
         else if (key === "emailStatus" && contact.emailStatus === "verified" && value !== "verified") return;
         else if (value !== undefined && value !== "" && value !== null) contact[key] = value;
       });
+      if (isSuppressed) {
+        contact.emailStatus = "undeliverable";
+        contact.emailBounced = true;
+        contact.status = "invalid";
+      }
       if (!contact.sources.includes(source)) contact.sources.push(source);
     }
     else {
