@@ -33,6 +33,59 @@ function cleanHeader(value = "") {
   return String(value).replace(/^\uFEFF/, "").trim().replace(/\s+/g, " ");
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function hasCompletePersonName(name = "") {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return false;
+  const lastName = parts.slice(1).join(" ");
+  return /[A-Za-z]{2}/.test(lastName) && !/[-–—_*•]{2,}/.test(lastName);
+}
+
+export function parseApolloPeoplePaste(text = "") {
+  const lines = String(text)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const candidates = [];
+
+  lines.forEach((line, index) => {
+    if (line.toLowerCase() !== "access mobile" || index < 4) return;
+    const emailValue = lines[index - 1];
+    const name = lines[index - 4];
+    const title = lines[index - 3];
+    const company = lines[index - 2];
+    if (!name || !title || !company) return;
+    const nameParts = name.split(/\s+/).filter(Boolean);
+    const location = lines[index + 3] || "";
+    const locationParts = location.split(",").map((part) => part.trim());
+    candidates.push({
+      "First Name": nameParts.shift() || "",
+      "Last Name": nameParts.join(" "),
+      Title: title,
+      "Company Name": company,
+      Email: EMAIL_PATTERN.test(emailValue) ? emailValue : "",
+      "Email Status": "",
+      City: locationParts.length > 1 ? locationParts[0] : "",
+      State:
+        locationParts.length > 1 && !/^US(?:A)?$/i.test(locationParts[1])
+          ? locationParts[1]
+          : "",
+      Country: /\bUS(?:A)?\b/i.test(location) ? "US" : "",
+    });
+  });
+
+  const rows = candidates.filter((row) =>
+    hasCompletePersonName(`${row["First Name"]} ${row["Last Name"]}`),
+  );
+  return {
+    detected: candidates.length > 0,
+    rows,
+    total: candidates.length,
+    excludedIncompleteName: candidates.length - rows.length,
+  };
+}
+
 export function normalizeApolloRows(rows = [], mode = "people") {
   const aliases = mode === "organizations" ? ORGANIZATION_ALIASES : PEOPLE_ALIASES;
   return rows.map((row) => Object.fromEntries(Object.entries(row || {}).map(([header, value]) => {

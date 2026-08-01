@@ -14,6 +14,7 @@ import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import {
   downloadApolloTemplate,
   normalizeApolloRows,
+  parseApolloPeoplePaste,
 } from "../utils/apolloImport.js";
 import {
   fetchContacts,
@@ -1051,7 +1052,12 @@ export default function Contacts() {
 
   function prepareImport(text, source = "csv") {
     setImportSource(source);
-    Papa.parse(String(text || ""), {
+    const apolloPaste =
+      source === "apollo" ? parseApolloPeoplePaste(text) : { detected: false };
+    const importText = apolloPaste.detected
+      ? Papa.unparse(apolloPaste.rows)
+      : String(text || "");
+    Papa.parse(importText, {
       header: true,
       skipEmptyLines: "greedy",
       delimiter: String(text || "").includes("\t") ? "\t" : "",
@@ -1102,6 +1108,9 @@ export default function Contacts() {
           missingName: rows.length - valid,
           missingEmail: emails,
           malformed: errors.length,
+          apolloPasteDetected: apolloPaste.detected,
+          apolloCandidates: apolloPaste.total || 0,
+          excludedIncompleteName: apolloPaste.excludedIncompleteName || 0,
         });
         setImportError(
           errors.length ? "Some rows have malformed column counts." : "",
@@ -2909,6 +2918,22 @@ export default function Contacts() {
               {previewStats?.missingEmail || 0}; malformed:{" "}
               {previewStats?.malformed || 0}.
             </p>
+            {previewStats?.apolloPasteDetected ? (
+              <section className="apollo-paste-result" role="status">
+                <strong>
+                  {previewStats.parsed} complete Apollo name
+                  {previewStats.parsed === 1 ? "" : "s"} kept
+                </strong>
+                <p>
+                  {previewStats.excludedIncompleteName} record
+                  {previewStats.excludedIncompleteName === 1 ? " was" : "s were"}{" "}
+                  removed because the last name was missing or masked. Apollo’s
+                  “Access email” label is not an address; reveal the email in
+                  Apollo and copy again, or upload an Apollo CSV containing Email
+                  and Email Status, before verification.
+                </p>
+              </section>
+            ) : null}
             {duplicatePreview ? (
               <section className="duplicate-preflight">
                 <header>
