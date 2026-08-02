@@ -15,6 +15,7 @@ assert.equal(normalized.domain, "salonluxe.example");
 assert.equal(normalized.locationCount, 3);
 assert.equal(normalized.evidence.length, 1);
 assert.equal(normalized.decisionMakers[0].emailStatus, "published_unverified");
-assert.equal(sourceStatus().configured, Boolean(process.env.ELLIE_BUSINESS_DATA_API_URL));
+assert.equal(sourceStatus().configured, true);
+assert.match(sourceStatus().mode, /owned_index/);
 
 console.log("Business data source normalization tests passed");

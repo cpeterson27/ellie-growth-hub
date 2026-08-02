@@ -1,0 +1,27 @@
+# Ellie-owned data and AI connections
+
+## What the business index means
+
+The index is Ellie's own searchable MongoDB collection of business facts imported from sources Ellie is legally allowed to use. Each record keeps its dataset name, source URL, license, and observation date. The first target is California, with Sacramento-area searches used as the quality test before national expansion.
+
+The owner does **not** need to create `ELLIE_BUSINESS_DATA_API_URL` or `ELLIE_BUSINESS_DATA_API_KEY`. Ellie searches the owned index by default. Those variables remain optional for a future licensed feed.
+
+An owner or admin can load normalized records through `POST /api/business-index/imports`. Required fields per row are `name` and `sourceUrl`; the request also requires `sourceDataset`. Upserts use `sourceDataset + sourceRecordId`, so refreshes do not create duplicates.
+
+## Ellie MCP
+
+Ellie exposes a stateless Streamable HTTP MCP endpoint at `/mcp`. Development access uses revocable, expiring personal access tokens created through `/api/mcp-access-tokens`. The plaintext token is displayed once; MongoDB stores only its SHA-256 hash.
+
+Available tools:
+
+- `ellie_status`
+- `list_prospect_lists`
+- `search_ranked_leads`
+- `plan_market_research`
+- `start_market_research`
+
+The first release intentionally does not expose email sending. All calls are workspace-scoped and written to an MCP audit log. Public self-service connections should add OAuth 2.1 authorization-code flow with PKCE, consent, narrow scopes, HTTPS, and rate limits before launch.
+
+## Email risk policy
+
+Ellie's no-credit checker validates syntax, MX availability, known disposable domains, role addresses, and the Resend-backed suppression list. It does not use SMTP recipient probing, rotate IP addresses, enumerate mailboxes, or label a mailbox verified merely because its domain accepts email.

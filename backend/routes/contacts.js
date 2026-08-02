@@ -14,8 +14,21 @@ const Contact = require("../models/Contact");
 const Campaign = require("../models/Campaign");
 const Outreach = require("../models/Outreach");
 const { applyResearchClassification } = require("../services/contactResearchService");
+const { assessEmail } = require("../services/emailRiskService");
 
 const router = express.Router();
+
+router.post("/email-risk/check", async (req, res) => {
+  try {
+    const emails = [...new Set((Array.isArray(req.body?.emails) ? req.body.emails : [req.body?.email]).map((value) => String(value || "").trim()).filter(Boolean))].slice(0, 500);
+    if (!emails.length) return res.status(400).json({ success: false, message: "Provide at least one email address." });
+    const results = [];
+    for (const email of emails) results.push(await assessEmail(email));
+    return res.json({ success: true, data: { results, policy: "Ellie does not probe mailboxes or claim an address is verified from DNS alone." } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Unable to assess email risk." });
+  }
+});
 
 router.get("/imports/latest", async (req, res) => {
   const latest = await ContactImportReceipt.findOne({ workspaceId: req.auth.workspaceId }).sort({ createdAt: -1 }).lean();

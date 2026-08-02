@@ -1,6 +1,7 @@
 const axios = require("axios");
 const dns = require("node:dns").promises;
 const net = require("node:net");
+const BusinessIndexRecord = require("../models/BusinessIndexRecord");
 
 const PRIVATE_IPV4 = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
 
@@ -8,13 +9,48 @@ function sourceStatus() {
   const endpoint = String(process.env.ELLIE_BUSINESS_DATA_API_URL || "").trim();
   return {
     id: "ellie_business_data",
-    name: "Ellie Business Data Feed",
-    configured: Boolean(endpoint),
-    mode: endpoint ? "external_feed" : "not_configured",
+    name: "Ellie-owned Business Index",
+    configured: true,
+    mode: endpoint ? "owned_index_plus_feed" : "owned_index",
     supports: ["organization_search", "evidence", "pagination"],
     message: endpoint
-      ? "A provider-neutral business-data feed is configured."
-      : "Connect a licensed feed or Ellie-hosted open-data index to discover net-new organizations.",
+      ? "Ellie will search its owned index and the configured licensed feed."
+      : "Ellie will search its owned index. No external API URL or key is required.",
+  };
+}
+
+function safeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function searchOwnedIndex({ plan, cursor = null, limit = 100 }) {
+  const criteria = plan?.criteria || {};
+  const locations = (criteria.locations || []).filter(Boolean);
+  const industries = (criteria.industries || []).filter(Boolean);
+  const keywords = (criteria.keywords || []).filter(Boolean);
+  const clauses = [];
+  if (locations.length) clauses.push({ $or: locations.flatMap((value) => {
+    const pattern = new RegExp(safeRegex(value), "i");
+    return [{ location: pattern }, { city: pattern }, { state: pattern }];
+  }) });
+  if (industries.length) clauses.push({ industry: { $in: industries.map((value) => new RegExp(safeRegex(value), "i")) } });
+  if (keywords.length) clauses.push({ $or: [
+    { name: { $in: keywords.map((value) => new RegExp(safeRegex(value), "i")) } },
+    { description: { $in: keywords.map((value) => new RegExp(safeRegex(value), "i")) } },
+    { keywords: { $in: keywords.map((value) => new RegExp(safeRegex(value), "i")) } },
+  ] });
+  const query = clauses.length ? { $and: clauses } : {};
+  if (cursor) query._id = { $gt: cursor };
+  const rows = await BusinessIndexRecord.find(query).sort({ _id: 1 }).limit(Math.min(500, Math.max(1, limit))).lean();
+  return {
+    success: true,
+    results: rows.map((row) => normalizeResult({
+      ...row,
+      id: row.sourceRecordId,
+      evidence: [{ sourceType: row.sourceDataset, sourceUrl: row.sourceUrl, field: "organization", observedValue: row.name, observedAt: row.observedAt }],
+    }, "ellie_owned_index")),
+    cursor: rows.length === Math.min(500, Math.max(1, limit)) ? String(rows.at(-1)._id) : null,
+    total: rows.length,
   };
 }
 
@@ -70,7 +106,8 @@ function normalizeResult(item = {}, sourceId) {
 
 async function searchBusinessFeed({ plan, cursor = null, limit = 100 }) {
   const status = sourceStatus();
-  if (!status.configured) return { success: false, code: "source_required", message: status.message };
+  const owned = await searchOwnedIndex({ plan, cursor, limit });
+  if (owned.results.length || !process.env.ELLIE_BUSINESS_DATA_API_URL?.trim()) return owned;
   const endpoint = await validateEndpoint(process.env.ELLIE_BUSINESS_DATA_API_URL.trim());
   const response = await axios.post(endpoint, { plan, cursor, limit: Math.min(500, Math.max(1, limit)) }, {
     timeout: 30000,
@@ -90,4 +127,4 @@ async function searchBusinessFeed({ plan, cursor = null, limit = 100 }) {
   };
 }
 
-module.exports = { normalizeResult, searchBusinessFeed, sourceStatus, validateEndpoint };
+module.exports = { normalizeResult, searchBusinessFeed, searchOwnedIndex, sourceStatus, validateEndpoint };

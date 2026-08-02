@@ -14,12 +14,14 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "axios": "^1.18.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mongoose": "^9.7.4",
     "openai": "^6.48.0",
-    "resend": "^6.17.2"
+    "resend": "^6.17.2",
+    "zod": "^4.4.3"
   }
 }

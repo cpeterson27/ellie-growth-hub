@@ -26,6 +26,9 @@ const gmailRouter = require("./routes/gmail");
 const workspaceRouter = require("./routes/workspace");
 const unsubscribeRouter = require("./routes/unsubscribe");
 const authRouter = require("./routes/auth");
+const businessIndexRouter = require("./routes/businessIndex");
+const mcpAccessRouter = require("./routes/mcpAccess");
+const mcpRouter = require("./routes/mcp");
 const { requireAuth } = require("./middleware/auth");
 
 const app = express();
@@ -86,6 +89,7 @@ connectDatabase(mongoUri)
     }
 
     app.use("/api/auth", authRouter);
+    app.use("/mcp", mcpRouter);
     app.use("/api", (req, res, next) => {
       const publicRequest =
         req.path === "/health" ||
@@ -119,6 +123,8 @@ connectDatabase(mongoUri)
     app.use("/api/gmail", gmailRouter);
     app.use("/api/workspace", workspaceRouter);
     app.use("/api/unsubscribe", unsubscribeRouter);
+    app.use("/api/business-index", businessIndexRouter);
+    app.use("/api/mcp-access-tokens", mcpAccessRouter);
 
     app.get("/api/health", (req, res) => {
       res.json({

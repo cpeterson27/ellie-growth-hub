@@ -122,6 +122,7 @@
 .settings-explainer-list strong {
   color: var(--text);
 }
+.settings-ai-create{display:flex;gap:10px}.settings-ai-create input{border:1px solid #d8d2c5;flex:1;font:inherit;padding:10px 12px}.settings-token-reveal{background:#f1f7f4;border:1px solid #a8c9bd;display:grid;gap:8px;margin-top:18px;padding:16px}.settings-token-reveal code{background:#173f36;color:#fff;overflow-wrap:anywhere;padding:12px}.settings-token-reveal small{color:#5f6f69}.settings-revoke{background:transparent;border:0;color:#92554e;cursor:pointer;font-size:1rem;padding:8px}
 
 @media (max-width: 900px) {
   .settings-hero-card,

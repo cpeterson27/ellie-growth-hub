@@ -7,6 +7,8 @@ const api = axios.create({
   withCredentials: true,
 });
 
+export const getMcpEndpoint = () => String(api.defaults.baseURL || "").replace(/\/api\/?$/, "/mcp");
+
 api.interceptors.request.use((config) => {
   const csrfToken = sessionStorage.getItem("ellie-csrf-token");
   const sessionToken = sessionStorage.getItem("ellie-session-token");
@@ -318,6 +320,18 @@ export const fetchEmailVerificationBatch = (batchId) =>
 
 export const recoverEmailVerificationBatch = (emails) =>
   api.post("/contacts/email-verification/batches/recover", { emails }).then((res) => res.data);
+
+export const assessEmailRisk = (emails) =>
+  api.post("/contacts/email-risk/check", { emails }).then((res) => res.data);
+
+export const fetchMcpAccessTokens = () =>
+  api.get("/mcp-access-tokens").then((res) => res.data);
+
+export const createMcpAccessToken = (name, expiresInDays = 90) =>
+  api.post("/mcp-access-tokens", { name, expiresInDays }).then((res) => res.data);
+
+export const revokeMcpAccessToken = (id) =>
+  api.delete(`/mcp-access-tokens/${id}`).then((res) => res.data);
 
 export const archiveContact = (contactId) => api.post(`/contacts/${contactId}/archive`).then((res) => res.data);
 export const deleteContact = (contactId, confirmCascade = false) => api.delete(`/contacts/${contactId}`, { data: { confirmCascade } }).then((res) => res.data);
