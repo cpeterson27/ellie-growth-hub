@@ -331,7 +331,7 @@ Example discovery response:
 - CRM pipeline or sales automation
 - Relationship history/audit trail
 - Timeline events or activity feeds
-- Integration with Apollo/Eventbrite/Meetup
+- Integration with Ellie research/Eventbrite/Meetup
 
 ## Test Files
 

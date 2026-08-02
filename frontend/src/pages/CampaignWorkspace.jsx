@@ -269,7 +269,7 @@ export default function CampaignWorkspace() {
             {campaign.eventId?.audienceSuggestions?.length ? <details className="campaign-audience-suggestions"><summary>Suggestions found in the Eventbrite listing</summary><p>These are suggestions only. They do not become active unless you select and save them in Event strategy.</p><div>{campaign.eventId.audienceSuggestions.map((audience) => <span key={audience}>{audience}</span>)}</div></details> : null}
             <div className="audience-flow">
               <div><span>1</span><p><strong>Confirm the targeting brief</strong>Ellie can suggest segments from the event, but you decide the official audience for this campaign.</p></div>
-              <div><span>2</span><p><strong>Use real contact sources</strong>Contacts come from Ellie CRM, CSV uploads, Apollo imports/searches, manual entry, and future CRM/Gmail integrations.</p></div>
+              <div><span>2</span><p><strong>Use real contact sources</strong>Contacts come from Ellie research, CRM records, CSV uploads, manual entry, and future approved integrations.</p></div>
               <div><span>3</span><p><strong>Match safely</strong>Ellie compares the brief with titles, industries, tags, keywords, companies, lists, and notes. Nothing is emailed automatically.</p></div>
             </div>
             {eventId ? <div className="audience-strategy-action"><p><strong>Targeting brief</strong><span>{campaign.audience?.join(", ") || "Not approved yet"}</span></p><Button variant="outline" size="sm" onClick={() => navigate(`/events?eventId=${eventId}&tab=strategy`)}>Review targeting brief</Button></div> : null}

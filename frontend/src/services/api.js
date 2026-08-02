@@ -223,7 +223,7 @@ export const publishManagedEventbriteEvent = (eventId) =>
 
 
 // ======================================
-// LEADS / APOLLO
+// LEAD GENERATION
 // ======================================
 
 export const generateLeads = (campaignId) =>
@@ -274,37 +274,17 @@ export const fetchIntegrationHub = () =>
     .then((res) => res.data);
 
 
-export const searchApolloLeads = (payload) =>
-  api.post("/contacts/apollo/search", payload).then((res) => res.data);
-
-export const fetchApolloStatus = () =>
-  api.get("/contacts/apollo/status").then((res) => res.data);
-
-export const fetchApolloLists = () =>
-  api.get("/contacts/apollo/lists").then((res) => res.data);
-
-export const fetchApolloHistory = () =>
-  api.get("/contacts/apollo/history").then((res) => res.data);
-
-export const estimateApolloEnrichment = (count) =>
-  api.post("/contacts/apollo/enrichment-estimate", { count }).then((res) => res.data);
-
 export const createAudienceDefinition = (payload) =>
   api.post("/audience", payload).then((res) => res.data);
 
 export const discoverAudienceOrganizations = (audienceId) =>
   api.post(`/audience/${audienceId}/discover`).then((res) => res.data);
 
-export const previewApolloOrganizationImport = (rows) =>
+export const previewOrganizationImport = (rows) =>
   api.post("/audience/imports/organizations/preview", { rows }).then((res) => res.data);
 
-export const importApolloOrganizations = (rows, name) =>
+export const importOrganizations = (rows, name) =>
   api.post("/audience/imports/organizations", { rows, name }).then((res) => res.data);
-
-export const importContactsFromApollo = (payload) =>
-  api
-    .post("/contacts/import/apollo", payload)
-    .then((res) => res.data);
 
 export const ingestContacts = (payload) =>
   api.post("/contacts/ingest", payload).then((res) => res.data);

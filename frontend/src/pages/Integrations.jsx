@@ -35,9 +35,6 @@ function providerSummary(provider, eventbriteReady) {
   if (provider.id === "csv") {
     return "Import contact spreadsheets from Contacts → Import.";
   }
-  if (provider.id === "apollo") {
-    return "Organization discovery is available; People Search depends on the connected Apollo plan.";
-  }
   return provider.description;
 }
 
@@ -163,8 +160,6 @@ export default function Integrations() {
                     <Button onClick={() => navigate("/integrations/eventbrite")}>{eventbriteReady ? "Manage setup" : "Set up Eventbrite"}</Button>
                   ) : provider.id === "csv" ? (
                     <Button variant="outline" onClick={() => navigate("/contacts")}>Import contacts</Button>
-                  ) : provider.id === "apollo" ? (
-                    <Button variant="outline" onClick={() => navigate("/discovery")}>{["connected", "ready"].includes(status) ? "Open discovery" : "Set up Apollo"}</Button>
                   ) : (
                     <Button variant="outline" disabled>Details coming soon</Button>
                   )}

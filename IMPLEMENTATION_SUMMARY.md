@@ -143,7 +143,7 @@ curl http://localhost:5001/api/audience/6a5f41da75c8a81fefb1535c/organizations/p
     "scoreReasons": [...],
     "discoveredAt": "2026-07-21T10:00:00Z",
     "enrichedAt": "2026-07-21T10:15:00Z",
-    "source": "apollo",
+    "source": "ellie_research",
     "keywords": ["multifamily", "real estate", "investment"]
   },
   "priority": {

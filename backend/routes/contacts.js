@@ -6,10 +6,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const contactService = require("../services/contactService");
-const integrationHub = require("../services/integrationHub");
-const { importApolloLeads } = require("../services/apolloLeadService");
-const { getAccountStatus, listApolloLists, savePeopleToApolloList } = require("../services/apollo");
-const ApolloSearchRun = require("../models/ApolloSearchRun");
 const ContactImportReceipt = require("../models/ContactImportReceipt");
 const { ingestContacts, previewContactIngestion, canonicalFieldMap } = require("../services/contactIngestionService");
 const emailVerificationService = require("../services/emailVerificationService");
@@ -21,31 +17,10 @@ const { applyResearchClassification } = require("../services/contactResearchServ
 
 const router = express.Router();
 
-router.get("/apollo/status", async (_req, res) => {
-  const status = await getAccountStatus();
-  res.status(status.connected ? 200 : status.code === "not_configured" ? 200 : 502).json(status);
-});
-
-router.get("/apollo/lists", async (_req, res) => {
-  const result = await listApolloLists();
-  if (!result.success) return res.status(result.status || 400).json(result);
-  res.json(result);
-});
-
-router.get("/apollo/history", async (req, res) => {
-  const runs = await ApolloSearchRun.find({ workspaceId: req.auth.workspaceId }).sort({ createdAt: -1 }).limit(50).lean();
-  res.json({ runs });
-});
-
 router.get("/imports/latest", async (req, res) => {
   const latest = await ContactImportReceipt.findOne({ workspaceId: req.auth.workspaceId }).sort({ createdAt: -1 }).lean();
   if (!latest || Date.now() - new Date(latest.createdAt).getTime() > 86400000) return res.json({ data: null });
   return res.json({ data: { ...latest.summary, receiptId: latest._id, completedAt: latest.createdAt } });
-});
-
-router.post("/apollo/enrichment-estimate", (req, res) => {
-  const count = Math.min(100, Math.max(0, Number(req.body?.count) || 0));
-  res.json({ count, minimumCredits: count, maximumCredits: count * 9, note: "Actual credits depend on matched data. Phone enrichment can add up to 8 credits per person." });
 });
 
 /**
@@ -569,125 +544,6 @@ router.post("/sync", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-/**
- * POST /api/contacts/import/apollo
- * Import the first page of Apollo contact-search results.
- */
-router.post("/apollo/search", async (req, res) => {
-  const startedAt = Date.now();
-  try {
-    const { titles = [], locations = [], keywords = [], domains = [], industryIds = [], emailStatuses = [], seniorities = [], technologiesAny = [], technologiesAll = [], technologiesExclude = [], employeeRanges = [], employeeRange = {}, revenueRange = {}, page = 1, perPage = 25 } = req.body;
-    if (![titles, locations, keywords, domains, industryIds, emailStatuses, seniorities, technologiesAny, technologiesAll, technologiesExclude, employeeRanges].every(Array.isArray)) {
-      return res.status(400).json({ success: false, code: "invalid_request", message: "Apollo search filters must be arrays" });
-    }
-    const result = await integrationHub.execute("apollo", "searchLeads", {
-      titles: Array.isArray(titles) ? titles.slice(0, 10) : [],
-      locations: Array.isArray(locations) ? locations.slice(0, 10) : [],
-      keywords: Array.isArray(keywords) ? keywords.slice(0, 10) : [],
-      domains: Array.isArray(domains) ? domains.slice(0, 10) : [],
-      industryIds: industryIds.slice(0, 20),
-      emailStatuses: emailStatuses.slice(0, 5),
-      employeeRanges: employeeRanges.slice(0, 12),
-      employeeRange: { min: employeeRange?.min ?? null, max: employeeRange?.max ?? null },
-      seniorities: seniorities.slice(0, 12),
-      technologiesAny: technologiesAny.slice(0, 50),
-      technologiesAll: technologiesAll.slice(0, 50),
-      technologiesExclude: technologiesExclude.slice(0, 50),
-      revenueRange: { min: revenueRange?.min ?? null, max: revenueRange?.max ?? null },
-      page: Math.max(1, Number(page) || 1),
-      perPage: Math.min(100, Math.max(1, Number(perPage) || 25)),
-    });
-
-    if (!result.success) {
-      await ApolloSearchRun.create({ workspaceId: req.auth.workspaceId, userId: req.auth.user._id, mode: "people", templateName: req.body?.templateName || "", filters: req.body, status: "error", durationMs: Date.now() - startedAt, errorCode: result.errorCode || "provider_error", errorMessage: result.message || "" });
-      const status = result.status === 401 || result.status === 403
-        ? result.status
-        : result.errorCode === "timeout" ? 504
-          : result.errorCode === "unsupported_endpoint" ? 501
-            : result.errorCode === "people_search_unavailable" ? 422
-            : 502;
-      const messages = {
-        unauthorized: "Apollo rejected the configured API key.",
-        forbidden: "The configured Apollo account is not permitted to use this search endpoint.",
-        unsupported_endpoint: "The configured Apollo account does not support this search endpoint.",
-        people_search_unavailable: "Apollo people search is unavailable on the connected plan or is not configured. Use organization discovery or CSV import.",
-        timeout: "Apollo search timed out. Please try again.",
-        rate_limited: "Apollo's API rate limit has been reached. Wait for the limit window to reset, then try again.",
-        invalid_request: "Apollo rejected one or more search filters. Review the highlighted filters and try again.",
-        provider_error: "Apollo search failed. Please try again.",
-      };
-      console.warn("[Apollo search]", {
-        provider: "apollo",
-        status: result.status || status,
-        code: result.errorCode || "provider_error",
-        route: "/api/contacts/apollo/search",
-      });
-      return res.status(status).json({
-        success: false,
-        code: result.errorCode || "provider_error",
-        message: messages[result.errorCode] || messages.provider_error,
-        detail: result.message || null,
-        retryAfter: result.retryAfter || null,
-        action: result.errorCode === "unauthorized"
-          ? "Replace the Apollo API key in backend settings."
-          : result.errorCode === "forbidden"
-            ? "Use an Apollo master key or enable People Search access for this API key."
-            : result.errorCode === "rate_limited"
-              ? "Wait for the Apollo rate-limit window to reset."
-              : result.errorCode === "invalid_request"
-                ? "Remove or correct the unsupported filter values."
-                : "Retry the search. If it continues, check Apollo API status and key permissions.",
-      });
-    }
-    await ApolloSearchRun.create({ workspaceId: req.auth.workspaceId, userId: req.auth.user._id, mode: "people", templateName: req.body?.templateName || "", filters: req.body, status: result.contacts.length ? "success" : "empty", totalMatches: result.total, resultsReturned: result.contacts.length, durationMs: Date.now() - startedAt });
-    return res.json({
-      success: true,
-      data: { results: result.contacts, total: result.total, page: result.page },
-      message: result.contacts.length ? "Apollo leads found" : "No Apollo leads matched these filters.",
-    });
-  } catch (err) {
-    console.error("[Apollo search]", {
-      provider: "apollo",
-      status: 500,
-      code: "backend_error",
-      route: "/api/contacts/apollo/search",
-    });
-    return res.status(500).json({
-      success: false,
-      code: "backend_error",
-      message: "Unable to search Apollo leads",
-    });
-  }
-});
-
-router.post("/import/apollo", async (req, res) => {
-  try {
-    const result = await importApolloLeads(req.body);
-    let apolloListSync = null;
-    if (req.body?.apolloListName) {
-      try {
-        apolloListSync = await savePeopleToApolloList(req.body.leads, req.body.apolloListName);
-      } catch (error) {
-        apolloListSync = {
-          success: false,
-          message: error.message || "Contacts reached Ellie CRM, but Apollo list synchronization failed.",
-        };
-      }
-    }
-    const latestRun = await ApolloSearchRun.findOne({
-      workspaceId: req.auth.workspaceId,
-      mode: "people",
-    }).sort({ createdAt: -1 });
-    if (latestRun) {
-      latestRun.importedCount += result.created || 0;
-      await latestRun.save();
-    }
-    return res.json({ success: true, data: result, apolloListSync });
-  } catch (err) {
-    return res.status(400).json({ success: false, message: err.message || "Unable to import Apollo leads" });
   }
 });
 

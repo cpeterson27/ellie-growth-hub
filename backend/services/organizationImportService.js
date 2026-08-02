@@ -11,7 +11,7 @@ const FIELD_ALIASES = {
   location: "location", "company location": "location", headquarters: "location", "headquarters location": "location",
   linkedin: "linkedinUrl", "linkedin url": "linkedinUrl", "company linkedin url": "linkedinUrl",
   phone: "phone", "company phone": "phone", founded: "founded", "founded year": "founded", keywords: "keywords", description: "description",
-  "apollo account id": "apolloId", "apollo organization id": "apolloId", "organization id": "apolloId", "account id": "apolloId",
+  "provider account id": "providerId", "organization id": "providerId", "account id": "providerId",
 };
 
 function split(value) {
@@ -35,7 +35,7 @@ function normalizeOrganizationRow(row = {}) {
   data.name = String(data.name || "").trim();
   data.website = String(data.website || "").trim();
   data.domain = domainFrom(data.domain || data.website);
-  data.apolloId = String(data.apolloId || "").trim() || null;
+  data.providerId = String(data.providerId || "").trim() || null;
   data.employeeCount = Number(String(data.employeeCount || "").replace(/,/g, "")) || null;
   data.founded = Number(data.founded) || null;
   data.keywords = split(data.keywords);
@@ -44,7 +44,7 @@ function normalizeOrganizationRow(row = {}) {
 
 function matchFilter(data) {
   if (data.domain) return { domain: data.domain };
-  if (data.apolloId) return { apolloId: data.apolloId };
+  if (data.providerId) return { "externalSources.import.id": data.providerId };
   return { name: data.name };
 }
 
@@ -55,7 +55,7 @@ async function previewOrganizationImport(rows) {
   for (let index = 0; index < rows.length; index += 1) {
     const data = normalizeOrganizationRow(rows[index]);
     if (!data.name) { preview.push({ index, rowNumber: index + 2, status: "invalid", name: "", reason: "Company name is required" }); continue; }
-    const signature = data.domain ? `domain:${data.domain}` : data.apolloId ? `apollo:${data.apolloId}` : `name:${data.name.toLowerCase()}`;
+    const signature = data.domain ? `domain:${data.domain}` : data.providerId ? `provider:${data.providerId}` : `name:${data.name.toLowerCase()}`;
     if (seen.has(signature)) { preview.push({ index, rowNumber: index + 2, status: "file_duplicate", name: data.name, domain: data.domain || "", duplicateOfRow: seen.get(signature) + 2 }); continue; }
     seen.set(signature, index);
     const existing = await Organization.findOne(matchFilter(data)).select("_id name domain website").lean();
@@ -80,15 +80,15 @@ async function importOrganizations({ rows, name = "" }) {
   for (const raw of rows) {
     const data = normalizeOrganizationRow(raw);
     if (!data.name) { failed += 1; continue; }
-    const signature = data.domain ? `domain:${data.domain}` : data.apolloId ? `apollo:${data.apolloId}` : `name:${data.name.toLowerCase()}`;
+    const signature = data.domain ? `domain:${data.domain}` : data.providerId ? `provider:${data.providerId}` : `name:${data.name.toLowerCase()}`;
     if (importedSignatures.has(signature)) continue;
     importedSignatures.add(signature);
     const filter = matchFilter(data);
     const existing = await Organization.findOne(filter);
     const { score, tier, reasons } = scoreOrganization(data);
     const doc = {
-      name: data.name, domain: data.domain, source: "apollo", apolloId: data.apolloId,
-      externalSources: { apollo: { id: data.apolloId, enrichedAt: null } },
+      name: data.name, domain: data.domain, source: "import",
+      externalSources: data.providerId ? { import: { id: data.providerId, importedAt: now } } : {},
       website: data.website || "", industry: data.industry || "", description: data.description || "",
       employeeCount: data.employeeCount, location: data.location || "", linkedinUrl: data.linkedinUrl || "",
       founded: data.founded, phone: data.phone || "", keywords: data.keywords,
@@ -102,8 +102,8 @@ async function importOrganizations({ rows, name = "" }) {
     } catch { failed += 1; }
   }
   const audience = await Audience.create({
-    name: String(name || `Apollo organization import · ${now.toLocaleDateString("en-US")}`).trim().slice(0, 160),
-    description: "Organizations pasted from Apollo and reviewed in Ellie.", status: "draft", source: "import",
+    name: String(name || `Organization import · ${now.toLocaleDateString("en-US")}`).trim().slice(0, 160),
+    description: "Organizations imported and reviewed in Ellie.", status: "draft", source: "import",
     organizationIds, totalOrgs: organizationIds.length, lastDiscoveredAt: now,
   });
   await DiscoveryRun.create({

@@ -3,8 +3,7 @@ const mongoose = require("mongoose");
 const organizationSchema = new mongoose.Schema(
   {
     // -------------------------------------------------------------------------
-    // Identity — domain is the source-of-truth deduplication key.
-    // Apollo IDs and other external IDs are metadata, not keys.
+    // Identity — domain is the preferred deduplication key.
     // -------------------------------------------------------------------------
 
     name: {
@@ -23,29 +22,16 @@ const organizationSchema = new mongoose.Schema(
 
     source: {
       type: String,
-      enum: ["apollo", "manual", "eventbrite", "meetup"],
+      enum: ["manual", "import", "eventbrite", "meetup", "public_web", "legacy"],
       required: true,
-      default: "apollo",
+      default: "manual",
     },
 
     // -------------------------------------------------------------------------
-    // Apollo external metadata.
-    // apolloId is a convenience lookup only — never used as a DB key.
-    // externalSources stores additional per-provider raw identifiers for
-    // deduplication and future re-enrichment without over-fetching.
+    // Optional source evidence and identifiers for future refreshes.
     // -------------------------------------------------------------------------
 
-    apolloId: {
-      type: String,
-      default: null,
-    },
-
-    externalSources: {
-      apollo: {
-        id: { type: String, default: null },
-        enrichedAt: { type: Date, default: null },
-      },
-    },
+    externalSources: { type: mongoose.Schema.Types.Mixed, default: {} },
 
     // -------------------------------------------------------------------------
     // Company intelligence — populated from organizations/enrich.
@@ -99,7 +85,7 @@ const organizationSchema = new mongoose.Schema(
     },
 
     // -------------------------------------------------------------------------
-    // Audience intelligence — scored by Ellie AI, not by Apollo.
+    // Audience intelligence — scored by Ellie AI.
     // audienceScore: 0–100 composite fit score.
     // audienceTier:  human-readable priority tier derived from score.
     // scoreReasons:  plain-language explanations for the score.
@@ -205,8 +191,6 @@ const organizationSchema = new mongoose.Schema(
 // do not collide on null. Only one record allowed per unique domain value.
 organizationSchema.index({ domain: 1 }, { unique: true, sparse: true });
 
-// Apollo external ID lookup — sparse so null apolloIds don't conflict.
-organizationSchema.index({ apolloId: 1 }, { sparse: true });
 
 // Audience filtering — Ellie AI queries orgs by tier for outreach targeting.
 organizationSchema.index({ audienceTier: 1 });
@@ -225,6 +209,11 @@ organizationSchema.index({ priorityTier: 1 });
 
 // Priority recency — identify stale priorities that need recalculation.
 organizationSchema.index({ priorityCalculatedAt: -1 });
+
+organizationSchema.pre("validate", function normalizeRetiredSource() {
+  const activeSources = new Set(["manual", "import", "eventbrite", "meetup", "public_web", "legacy"]);
+  if (!activeSources.has(this.source)) this.source = "legacy";
+});
 
 // Composite: priority + audience tier — for combined views.
 organizationSchema.index({ priorityTier: 1, audienceTier: 1 });

@@ -3,7 +3,7 @@
 ## Recommended operating model
 
 MongoDB is Ellie AI's single contact database and source of truth. CSV is the
-primary bulk import path for signup sheets, Apollo exports, and external lists.
+primary bulk import path for signup sheets, Ellie research exports, and external lists.
 Contact creation, research status, qualification, campaign membership, and
 outreach history remain in Ellie AI; contact imports do not synchronize to
 Monday CRM.
@@ -102,9 +102,9 @@ For the $15K program, use tags such as `15k-program`, `multifamily`, and
 verification, research, and human qualification, Ellie's audience matcher adds
 safe contacts to the appropriate campaign.
 
-## How Apollo targeting works
+## How Ellie market targeting works
 
-Apollo does not infer Ellie's goal. Every search needs a target definition:
+Every research run needs an explicit, reviewable target definition:
 
 - titles identify the people who can buy or influence;
 - industries identify relevant company categories;
@@ -121,16 +121,12 @@ Discovery includes starting profiles for:
 
 Profiles are editable per search. Choosing a different profile does not erase or
 change earlier contacts. Organization Search finds and scores companies first.
-People Search then finds decision-makers using titles, keywords, locations, and
-company domains when the Apollo plan provides People Search API access.
-
-On the current free Apollo plan, Organization Search is available and People
-Search is not. The practical workflow is:
+People research then identifies decision-makers only when there is evidence from
+an approved source. The practical workflow is:
 
 1. Choose or edit a target profile.
 2. Run Organization Search.
 3. Review the matching organizations.
-4. Export matching people from Apollo to CSV, or upgrade Apollo for API People
-   Search.
-5. Import people and assign them to the relevant Ellie campaign.
-6. Approve prospects before generating outreach.
+4. Research decision-makers and keep source evidence with each claim.
+5. Verify email addresses before they become outreach-eligible.
+6. Approve prospects and assign them to the relevant Ellie campaign.

@@ -4,7 +4,6 @@ const Contact = require("../models/Contact");
 const Organization = require("../models/Organization");
 const Audience = require("../models/Audience");
 const DiscoveryRun = require("../models/DiscoveryRun");
-const ApolloSearchRun = require("../models/ApolloSearchRun");
 
 const {
   discoverAudienceSources,
@@ -921,7 +920,7 @@ router.get("/organizations", async (req, res) => {
 // ======================================
 // DISCOVER ORGANIZATIONS FOR AUDIENCE
 // Triggers discovery flow for a given Audience:
-// - Search Apollo (max 500 orgs)
+// - Search Ellie's organization intelligence records
 // - Enrich each organization
 // - Score and filter by criteria
 // - Save/update to MongoDB
@@ -943,16 +942,6 @@ router.post("/:id/discover", async (req, res) => {
     const result = await discoverOrganizationsForAudience(id);
 
     if (!result.success) {
-      await ApolloSearchRun.create({
-        workspaceId: req.auth.workspaceId,
-        userId: req.auth.user._id,
-        mode: "organizations",
-        templateName: result.audience?.name || "",
-        status: "error",
-        durationMs: Date.now() - startedAt,
-        errorCode: result.errorCode || "organization_search_failed",
-        errorMessage: result.error || "",
-      });
       const status = result.status === 401 || result.status === 403 || result.status === 429
         ? result.status
         : 400;
@@ -961,29 +950,10 @@ router.post("/:id/discover", async (req, res) => {
         error: result.error,
         code: result.errorCode || "organization_search_failed",
         retryAfter: result.retryAfter || null,
-        action: result.errorCode === "unauthorized"
-          ? "Replace the Apollo API key in backend settings."
-          : result.errorCode === "forbidden"
-            ? (/free plan|all paid plans/i.test(result.error || "")
-              ? "Upgrade Apollo for API access, or open this saved filter set in Apollo to search there today."
-              : "Enable Company Search access for the Apollo API key or use a master key.")
-            : result.errorCode === "rate_limited"
-              ? "Wait for Apollo's rate-limit window to reset."
-              : "Review the company filters and Apollo permissions, then retry.",
+        action: "Review the research criteria, then retry.",
       });
     }
 
-    await ApolloSearchRun.create({
-      workspaceId: req.auth.workspaceId,
-      userId: req.auth.user._id,
-      mode: "organizations",
-      templateName: result.audience?.name || "",
-      filters: result.audience?.criteria || {},
-      status: result.organizationsFound ? "success" : "empty",
-      totalMatches: result.organizationsFound || 0,
-      resultsReturned: result.organizationsFound || 0,
-      durationMs: Date.now() - startedAt,
-    });
     return res.json({
       success: result.success,
       audienceId: result.audienceId,
@@ -1006,7 +976,7 @@ router.post("/:id/discover", async (req, res) => {
 
 // ======================================
 // DISCOVER AUDIENCE
-// Apollo + Meetup + Future Sources
+// Community and future first-party research sources
 // ======================================
 
 router.post("/discover", async (req, res) => {

@@ -107,7 +107,7 @@ export default function Dashboard() {
             status: "Needs confirmation",
             tone: "needs-attention",
             title: "Confirm the targeting brief",
-            body: "This campaign already has assigned contacts. Confirming the target audience makes Ellie’s matching, Apollo searches, and future outreach use one approved source of truth.",
+            body: "This campaign already has assigned contacts. Confirming the target audience makes Ellie’s research, matching, and future outreach use one approved source of truth.",
             label: "Confirm audience",
             path: `/events?eventId=${selected._id}&tab=strategy`,
           }

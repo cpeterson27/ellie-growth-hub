@@ -6,7 +6,6 @@
 const ResendAdapter = require("./email/ResendAdapter");
 const EventbriteAdapter = require("./EventbriteAdapter");
 const MondayAdapter = require("./MondayAdapter");
-const ApolloAdapter = require("./ApolloAdapter");
 const MeetupAdapter = require("./events/MeetupAdapter");
 const LinkedInAdapter = require("./social/LinkedInAdapter");
 const FacebookAdapter = require("./social/FacebookAdapter");
@@ -39,7 +38,6 @@ class IntegrationRegistry {
     );
 
     this.register("monday", new MondayAdapter());
-    this.register("apollo", new ApolloAdapter());
 
     this.register(
       "meetup",

@@ -75,7 +75,7 @@ export default function Landing() {
 
         <section className="ellie-delivery">
           <div><p className="site-kicker">Professional email operations</p><h2>The right channel for every message.</h2></div>
-          <div className="ellie-delivery__grid"><article><strong>Prospecting</strong><h3>Targeted B2B outreach</h3><p>Apollo sequences for researched cold prospects, paced carefully with clear opt-out controls.</p></article><article><strong>Marketing</strong><h3>Subscribed campaigns</h3><p>Resend broadcasts for event invitations, program offers, and educational newsletters.</p></article><article><strong>Conversations</strong><h3>Personal follow-up</h3><p>Gmail for replies and direct correspondence, kept beside the complete contact history.</p></article></div>
+          <div className="ellie-delivery__grid"><article><strong>Prospecting</strong><h3>Targeted B2B outreach</h3><p>Evidence-backed lead research and carefully paced outreach with clear opt-out controls.</p></article><article><strong>Marketing</strong><h3>Subscribed campaigns</h3><p>Resend broadcasts for event invitations, program offers, and educational newsletters.</p></article><article><strong>Conversations</strong><h3>Personal follow-up</h3><p>Gmail for replies and direct correspondence, kept beside the complete contact history.</p></article></div>
         </section>
 
         <section className="ellie-pricing" id="pricing">

@@ -2,14 +2,14 @@ const assert = require("assert");
 const { canonicalFieldMap, normalizeIncoming } = require("./services/contactIngestionService");
 const { applyResearchClassification, getMissingTargetingFields } = require("./services/contactResearchService");
 
-assert.strictEqual(canonicalFieldMap["Apollo Contact Id"], "apolloContactId");
+assert.strictEqual(canonicalFieldMap["Provider Contact Id"], "providerContactId");
 const contact = normalizeIncoming({
   "First Name": "Ada",
   "Last Name": "Lovelace",
   Email: " ADA@EXAMPLE.COM ",
   "# Employees": "42",
   "Person Linkedin Url": "https://linkedin.com/in/ada/",
-  "Apollo Record Id": "record-1",
+  "Provider Record Id": "record-1",
 }, "csv");
 assert.strictEqual(contact.name, "Ada Lovelace");
 assert.strictEqual(contact.email, "ada@example.com");

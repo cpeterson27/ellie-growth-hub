@@ -3,7 +3,7 @@
  *
  * Handles:
  * - Monday → Mongo contact sync
- * - Mongo/Apollo → Monday contact creation
+ * - Ellie CRM → Monday contact creation
  */
 
 const BaseIntegration = require("./BaseIntegration");
@@ -52,7 +52,7 @@ class MondayAdapter extends BaseIntegration {
     const columns = { ...defaults, ...configured };
     const values = {};
     const missingMappings = [];
-    const fields = ["firstName", "lastName", "email", "phone", "company", "title", "industry", "employeeCount", "city", "state", "country", "linkedin", "website", "source", "status", "stage", "apolloContactId", "apolloRecordId", "notes", "campaign"];
+    const fields = ["firstName", "lastName", "email", "phone", "company", "title", "industry", "employeeCount", "city", "state", "country", "linkedin", "website", "source", "status", "stage", "providerContactId", "providerRecordId", "notes", "campaign"];
     const valueFor = (field) => {
       if (field === "source") return contact.sourceProvider || contact.sources?.[0] || "";
       if (field === "campaign") return contact.campaignName || "";
@@ -60,9 +60,7 @@ class MondayAdapter extends BaseIntegration {
         if (contact.stage) return contact.stage;
         return ["inactive", "archived"].includes(contact.status) ? "Unqualified" : "New Lead";
       }
-      if (field === "apolloContactId") return contact.providerContactId || contact.apolloFields?.apolloContactId || "";
-      if (field === "apolloRecordId") return contact.providerRecordId || contact.apolloFields?.apolloRecordId || "";
-      return contact[field] ?? contact.apolloFields?.[field] ?? "";
+      return contact[field] ?? "";
     };
     fields.forEach((field) => {
       const value = valueFor(field);
@@ -161,10 +159,10 @@ class MondayAdapter extends BaseIntegration {
     const items = data.boards?.[0]?.items_page?.items || [];
     const value = (item, columnId) => item.column_values?.find((column) => column.id === columnId)?.text?.trim() || "";
     const candidates = items.filter((item) => {
-      const apolloContact = contact.providerContactId || contact.apolloFields?.apolloContactId;
-      const apolloRecord = contact.providerRecordId || contact.apolloFields?.apolloRecordId;
-      if (apolloContact && configured.apolloContactId && value(item, configured.apolloContactId) === String(apolloContact)) return true;
-      if (apolloRecord && configured.apolloRecordId && value(item, configured.apolloRecordId) === String(apolloRecord)) return true;
+      const providerContact = contact.providerContactId;
+      const providerRecord = contact.providerRecordId;
+      if (providerContact && configured.providerContactId && value(item, configured.providerContactId) === String(providerContact)) return true;
+      if (providerRecord && configured.providerRecordId && value(item, configured.providerRecordId) === String(providerRecord)) return true;
       if (contact.email && value(item, configured.email).toLowerCase() === contact.email.toLowerCase()) return true;
       if (contact.linkedin && configured.linkedin && value(item, configured.linkedin).replace(/\/$/, "").toLowerCase() === contact.linkedin.replace(/\/$/, "").toLowerCase()) return true;
       if (contact.phone && configured.phone && value(item, configured.phone).replace(/\D/g, "") === String(contact.phone).replace(/\D/g, "")) return true;

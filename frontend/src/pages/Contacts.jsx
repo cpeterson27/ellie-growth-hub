@@ -12,16 +12,14 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import {
-  APOLLO_PEOPLE_TEMPLATE_HEADERS,
-  downloadApolloTemplate,
-  normalizeApolloRows,
-  parseApolloPeoplePaste,
-} from "../utils/apolloImport.js";
+  CONTACT_TEMPLATE_HEADERS,
+  downloadContactTemplate,
+  normalizeContactRows,
+} from "../utils/contactImport.js";
 import {
   fetchContacts,
   fetchContactOverview,
   fetchCampaigns,
-  importContactsFromApollo,
   ingestContacts,
   previewContactIngestion,
   fetchLatestContactImport,
@@ -29,7 +27,6 @@ import {
   deleteContact,
   updateContact,
   bulkAssignContactsToCampaign,
-  searchApolloLeads,
   createEmailVerificationBatch,
   fetchEmailVerificationBatch,
 } from "../services/api.js";
@@ -66,16 +63,7 @@ const recognizedImportHeaders = [
   "Qualify Contact",
   "Tags",
   "Notes",
-  "Apollo Contact Id",
-  "Apollo Record Id",
 ];
-
-const importCopy = {
-  apollo: {
-    title: "Import Contacts from Apollo?",
-    body: "This will use Apollo API credits to pull contacts into Ellie AI. Do you want to continue?",
-  },
-};
 
 function contactNameParts(contact = {}) {
   const firstName = String(contact.firstName || "").trim();
@@ -477,8 +465,6 @@ export default function Contacts() {
   const [contactOverview, setContactOverview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
-  const [selectedSource, setSelectedSource] = useState(null);
-  const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState("");
   const [campaigns, setCampaigns] = useState([]);
   const [campaignId, setCampaignId] = useState(() =>
@@ -487,16 +473,6 @@ export default function Contacts() {
       : searchParams.get("campaignId") ||
         (initiativeId === "all" ? "" : initiativeId),
   );
-  const [filters, setFilters] = useState({
-    title: "",
-    location: "",
-    industry: "",
-    employeeSize: "",
-  });
-  const [apolloResults, setApolloResults] = useState([]);
-  const [selectedLeads, setSelectedLeads] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [searchMessage, setSearchMessage] = useState("");
   const [importSummary, setImportSummary] = useState(null);
   const [isContactFormOpen, setContactFormOpen] = useState(false);
   const [isUploadOpen, setUploadOpen] = useState(false);
@@ -853,25 +829,6 @@ export default function Contacts() {
       setSearchTerm(searchParams.get("search") || "");
   }, [initiativeId, searchParams]);
 
-  useEffect(() => {
-    if (searchParams.get("import") !== "apollo-people") return;
-    const pasted = sessionStorage.getItem("ellie.apolloPeoplePaste") || "";
-    openCsvImport();
-    setImportPasteText(pasted);
-    if (pasted) {
-      setImportFileName("Apollo people pasted into Ellie");
-      prepareImport(pasted, "apollo");
-      sessionStorage.removeItem("ellie.apolloPeoplePaste");
-    }
-    navigate("/contacts", { replace: true });
-  }, [navigate, searchParams]);
-
-  function openImportConfirmation(source) {
-    setError("");
-    setSelectedSource(source);
-    setConfirmOpen(true);
-  }
-
   function openCsvImport() {
     setImportWorkspaceMode("import");
     setImportCampaignId(
@@ -893,10 +850,10 @@ export default function Contacts() {
     setImportMenuOpen(false);
   }
 
-  function openApolloPreparationWorkspace() {
+  function openPreparationWorkspace() {
     openCsvImport();
     setImportWorkspaceMode("prepare");
-    setImportSource("apollo");
+    setImportSource("csv");
   }
 
   async function assignSelectedContacts() {
@@ -985,94 +942,15 @@ export default function Contacts() {
     }
   }
 
-  function closeImportConfirmation() {
-    if (importing) return;
-    setConfirmOpen(false);
-    setSelectedSource(null);
-  }
-
-  async function confirmImport() {
-    if (!selectedSource) return;
-
-    try {
-      setImporting(true);
-      setError("");
-
-      const response = await importContactsFromApollo({
-        campaignId,
-        leads: selectedLeads,
-      });
-      setImportSummary(response.data);
-
-      setConfirmOpen(false);
-      setSelectedSource(null);
-      await loadContacts();
-    } catch (err) {
-      setError(err.response?.data?.message || "Unable to import contacts");
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  const selectedCopy = selectedSource ? importCopy[selectedSource] : null;
-
-  async function searchApollo() {
-    try {
-      setSearching(true);
-      setError("");
-      setSearchMessage("");
-      setImportSummary(null);
-      const response = await searchApolloLeads({
-        titles: filters.title ? [filters.title] : [],
-        locations: filters.location ? [filters.location] : [],
-        keywords: [filters.industry, filters.employeeSize].filter(Boolean),
-      });
-      setApolloResults(response.data?.results || []);
-      setSelectedLeads([]);
-      setSearchMessage(
-        response.message || "No Apollo leads matched these filters.",
-      );
-    } catch (err) {
-      setApolloResults([]);
-      setSelectedLeads([]);
-      setError(
-        err.response?.data?.message ||
-          "Apollo search failed. Please try again.",
-      );
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  function toggleLead(lead) {
-    const id = lead.apolloPersonId || lead.email || lead.linkedinUrl;
-    setSelectedLeads((current) =>
-      current.some(
-        (item) =>
-          (item.apolloPersonId || item.email || item.linkedinUrl) === id,
-      )
-        ? current.filter(
-            (item) =>
-              (item.apolloPersonId || item.email || item.linkedinUrl) !== id,
-          )
-        : [...current, lead],
-    );
-  }
-
   function prepareImport(text, source = "csv") {
     setImportSource(source);
-    const apolloPaste =
-      source === "apollo" ? parseApolloPeoplePaste(text) : { detected: false };
-    const importText = apolloPaste.detected
-      ? Papa.unparse(apolloPaste.rows)
-      : String(text || "");
-    Papa.parse(importText, {
+    Papa.parse(String(text || ""), {
       header: true,
       skipEmptyLines: "greedy",
       delimiter: String(text || "").includes("\t") ? "\t" : "",
       transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(),
       complete: async ({ data, meta, errors }) => {
-        const normalizedData = normalizeApolloRows(data, "people");
+        const normalizedData = normalizeContactRows(data);
         const normalizedHeaders = [
           ...new Set(normalizedData.flatMap((row) => Object.keys(row))),
         ];
@@ -1117,9 +995,6 @@ export default function Contacts() {
           missingName: rows.length - valid,
           missingEmail: emails,
           malformed: errors.length,
-          apolloPasteDetected: apolloPaste.detected,
-          apolloCandidates: apolloPaste.total || 0,
-          excludedIncompleteName: apolloPaste.excludedIncompleteName || 0,
         });
         setImportError(
           errors.length ? "Some rows have malformed column counts." : "",
@@ -1200,9 +1075,9 @@ export default function Contacts() {
 
   function downloadPreparedContactCsv() {
     const fields = [
-      ...APOLLO_PEOPLE_TEMPLATE_HEADERS,
+      ...CONTACT_TEMPLATE_HEADERS,
       ...importHeaders.filter(
-        (header) => !APOLLO_PEOPLE_TEMPLATE_HEADERS.includes(header),
+        (header) => !CONTACT_TEMPLATE_HEADERS.includes(header),
       ),
     ];
     const csv = Papa.unparse({ fields, data: importRows });
@@ -1596,8 +1471,8 @@ export default function Contacts() {
             </Button>
             {importMenuOpen ? (
               <div className="crm-menu crm-import-menu">
-                <button onClick={openApolloPreparationWorkspace}>
-                  Prepare Apollo list / CSV
+                <button onClick={openPreparationWorkspace}>
+                  Prepare lead list / CSV
                 </button>
                 <button onClick={openCsvImport}>Import completed CSV</button>
                 <button
@@ -2308,24 +2183,22 @@ export default function Contacts() {
 
       {false ? (
         <DashboardCard title="Find Leads">
-          <div className="apollo-locked">
+          <div className="lead-search-retired">
             <p>
-              🔒 Apollo prospect search requires a paid Apollo plan. Export your
-              contacts from Apollo and import the CSV here.
+              Direct provider search has been retired. Use Ellie Market
+              Intelligence or import a completed CSV here.
             </p>
             <p>
               <small>
-                Apollo connection: configured · Plan: Free · People search:
-                unavailable · Credits: no people-search API access.
+                Ellie now uses its own research and review workflow.
               </small>
             </p>
-            <Button onClick={openCsvImport}>Import Apollo CSV</Button>
+            <Button onClick={openCsvImport}>Import contact CSV</Button>
             <Button variant="outline" onClick={() => navigate("/marketing")}>
               Open Organization Discovery
             </Button>
             <small>
-              Direct Apollo people search can be enabled later when the account
-              has API access.
+              Native lead research is available from Discovery.
             </small>
           </div>
           <div style={{ display: "none" }}>
@@ -2357,21 +2230,19 @@ export default function Contacts() {
                 }
               />
             ))}
-            <Button loading={searching} onClick={searchApollo}>
+            <Button loading={false} onClick={() => navigate("/discovery")}>
               Search Leads
             </Button>
           </div>
-          {searchMessage ? <p>{searchMessage}</p> : null}
-          {apolloResults.length ? (
+          {false ? <p /> : null}
+          {false ? (
             <>
-              <p>{selectedLeads.length} selected</p>
+              <p>0 selected</p>
               <Button
                 variant="outline"
                 onClick={() =>
                   setSelectedLeads(
-                    selectedLeads.length === apolloResults.length
-                      ? []
-                      : apolloResults,
+                    [],
                   )
                 }
               >
@@ -2391,22 +2262,17 @@ export default function Contacts() {
                     </tr>
                   </thead>
                   <tbody>
-                    {apolloResults.map((lead) => {
+                    {[].map((lead) => {
                       const id =
-                        lead.apolloPersonId || lead.email || lead.linkedinUrl;
-                      const selected = selectedLeads.some(
-                        (item) =>
-                          (item.apolloPersonId ||
-                            item.email ||
-                            item.linkedinUrl) === id,
-                      );
+                        lead.providerContactId || lead.email || lead.linkedinUrl;
+                      const selected = false;
                       return (
                         <tr key={id}>
                           <td>
                             <input
                               type="checkbox"
                               checked={selected}
-                              onChange={() => toggleLead(lead)}
+                              onChange={() => {}}
                             />
                           </td>
                           <td>{lead.name}</td>
@@ -2435,13 +2301,13 @@ export default function Contacts() {
               </div>
               <Button
                 variant="primary"
-                disabled={!selectedLeads.length}
+                disabled
                 onClick={() => {
                   if (!campaignId)
                     return setError(
                       "Select a campaign before importing selected leads.",
                     );
-                  openImportConfirmation("apollo");
+                  navigate("/discovery");
                 }}
               >
                 Import to Ellie AI
@@ -2449,7 +2315,7 @@ export default function Contacts() {
               </Button>
             </>
           ) : (
-            <p>Search Apollo to review leads before importing.</p>
+            <p>Use Discovery to research and review leads.</p>
           )}
           {importSummary ? (
             <p>
@@ -2462,19 +2328,19 @@ export default function Contacts() {
       ) : null}
 
       <Modal
-        isOpen={isConfirmOpen}
-        onClose={closeImportConfirmation}
-        title={selectedCopy?.title || "Import Contacts"}
+        isOpen={false}
+        onClose={() => {}}
+        title="Import Contacts"
         footer={
           <>
             <Button
               variant="outline"
-              onClick={closeImportConfirmation}
+              onClick={() => {}}
               disabled={importing}
             >
               Cancel
             </Button>
-            <Button loading={importing} onClick={confirmImport}>
+            <Button loading={importing} onClick={() => {}}>
               Confirm Import
             </Button>
           </>
@@ -2844,7 +2710,7 @@ export default function Contacts() {
         }
         title={
           importWorkspaceMode === "prepare"
-            ? "Prepare Apollo list / CSV"
+            ? "Prepare lead list / CSV"
             : "Import people"
         }
         size="workspace"
@@ -2912,11 +2778,11 @@ export default function Contacts() {
           </select>
           </section>
         ) : (
-          <section className="apollo-workspace-intro">
+          <section className="lead-workspace-intro">
             <span>Preparation only</span>
             <strong>No contacts will be added to your CRM here.</strong>
             <p>
-              Paste Apollo, edit the structured list, and download the clean
+              Upload or paste a structured list, edit it, and download the clean
               CSV. After your email-finder fills it in, return through Import →
               Import completed CSV.
             </p>
@@ -2928,7 +2794,7 @@ export default function Contacts() {
               <div className="active">
                 <span>2</span>
                 <strong>Add people</strong>
-                <small>Paste Apollo results or upload a file</small>
+                <small>Paste tabular rows or upload a file</small>
               </div>
               <div>
                 <span>3</span>
@@ -2941,14 +2807,14 @@ export default function Contacts() {
                 <small>Contacts appear here immediately</small>
               </div>
             </div>
-            <section className="apollo-paste-intake">
+            <section className="lead-paste-intake">
               <header>
                 <div>
                   <span>List preparation workspace</span>
-                  <strong>Turn a copied Apollo page into a clean CSV</strong>
+                  <strong>Turn a contact table into a clean CSV</strong>
                   <small>
-                    Paste the whole Apollo results page. Ellie separates the
-                    people into editable fields, removes masked last names, and
+                    Paste rows with column headings. Ellie separates the people
+                    into editable fields, flags incomplete records, and
                     prepares a CSV for your email-finder website. Nothing is
                     added to the CRM until you choose to import it.
                   </small>
@@ -2956,27 +2822,27 @@ export default function Contacts() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => downloadApolloTemplate("people")}
+                  onClick={downloadContactTemplate}
                 >
                   Download people template
                 </Button>
               </header>
               <div
-                className="apollo-clipboard-target"
+                className="lead-clipboard-target"
                 tabIndex={0}
                 role="button"
-                aria-label="Paste copied Apollo contacts"
+                aria-label="Paste copied contacts"
                 onPaste={(event) => {
                   const pasted = event.clipboardData.getData("text/plain");
                   if (!pasted.trim()) return;
                   event.preventDefault();
                   setImportPasteText(pasted);
-                  setImportFileName("Apollo people pasted into Ellie");
-                  prepareImport(pasted, "apollo");
+                  setImportFileName("People pasted into Ellie");
+                  prepareImport(pasted, "csv");
                 }}
               >
-                <span className="apollo-clipboard-target__icon">⌘V</span>
-                <strong>Click here, then paste from Apollo</strong>
+                <span className="lead-clipboard-target__icon">⌘V</span>
+                <strong>Click here, then paste tabular contacts</strong>
                 <p>
                   Ellie immediately converts the clipboard into spreadsheet
                   columns. The unstructured source text is not kept on screen.
@@ -2984,11 +2850,11 @@ export default function Contacts() {
                 <small>Mac: Command + V · Windows: Ctrl + V</small>
               </div>
             </section>
-            <div className="apollo-import-divider">
+            <div className="lead-import-divider">
               <span>or upload a file</span>
             </div>
             <p>
-              Upload a CSV exported from Apollo, a spreadsheet, or another CRM.
+              Upload a CSV exported from a spreadsheet or another CRM.
               Ellie recognizes common people columns automatically.
             </p>
             <label className="crm-file-drop">
@@ -3003,7 +2869,7 @@ export default function Contacts() {
                     reader.onload = () =>
                       prepareImport(
                         reader.result,
-                        /apollo/i.test(file.name) ? "apollo" : "csv",
+                        "csv",
                       );
                     reader.readAsText(file);
                   }
@@ -3039,22 +2905,6 @@ export default function Contacts() {
               {previewStats?.missingEmail || 0}; malformed:{" "}
               {previewStats?.malformed || 0}.
             </p>
-            {previewStats?.apolloPasteDetected ? (
-              <section className="apollo-paste-result" role="status">
-                <strong>
-                  {previewStats.parsed} complete Apollo name
-                  {previewStats.parsed === 1 ? "" : "s"} kept
-                </strong>
-                <p>
-                  {previewStats.excludedIncompleteName} record
-                  {previewStats.excludedIncompleteName === 1 ? " was" : "s were"}{" "}
-                  removed because the last name was missing or masked. Apollo’s
-                  “Access email” label is not an address; reveal the email in
-                  Apollo and copy again, or upload an Apollo CSV containing Email
-                  and Email Status, before verification.
-                </p>
-              </section>
-            ) : null}
             <section className="contact-list-workbench">
               <div>
                 <span>Working CSV</span>
@@ -3211,7 +3061,7 @@ export default function Contacts() {
                 <div className="email-verification-heading">
                   <strong>Choose how to verify these emails</strong>
                   <p>
-                    Apollo verification can be used as imported, or you can run
+                    Imported verification can be used as provided, or you can run
                     an optional fresh Emailable check.
                   </p>
                 </div>

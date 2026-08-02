@@ -16,7 +16,7 @@ Ellie AI Growth Hub is an event growth operator: it connects event platforms, ma
    Ellie can suggest audience segments from the event listing or from the event draft. Those suggestions are not contacts. They are the campaign targeting rule.
 
 4. **Bring contacts into the CRM.**
-   Contacts can come from manual entry, CSV uploads, Apollo exports/searches, existing Ellie CRM records, and later external CRMs or Gmail. Importing contacts does not send email.
+   Contacts can come from manual entry, CSV uploads, Ellie research exports/searches, existing Ellie CRM records, and later external CRMs or Gmail. Importing contacts does not send email.
 
 5. **Match contacts to the campaign.**
    Ellie compares the approved targeting brief against contact signals like title, industry, company, tags, lists, keywords, notes, and audience profile. Contacts can also be manually assigned.
@@ -29,15 +29,15 @@ Ellie AI Growth Hub is an event growth operator: it connects event platforms, ma
 
 ## How to explain the Deal to Close Bootcamp state
 
-Deal to Close already has campaign contacts assigned. The remaining audience step is not about importing contacts from scratch. It is about confirming the official targeting brief so Ellie has one source of truth for future matching, Apollo searches, and outreach language.
+Deal to Close already has campaign contacts assigned. The remaining audience step is not about importing contacts from scratch. It is about confirming the official targeting brief so Ellie has one source of truth for future matching, Ellie research searches, and outreach language.
 
 Current suggested segments include beginner multifamily investors, capital raisers, passive investors, real estate professionals, entrepreneurs, W-2 professionals, medical professionals, and people looking to build passive income through commercial real estate.
 
 ## Where contacts come from
 
 - **Ellie CRM:** existing contacts already saved in the system.
-- **CSV import:** exported spreadsheets from Apollo, another CRM, or a manual list.
-- **Apollo:** organization discovery is available; people search depends on Apollo plan/API permissions.
+- **CSV import:** exported spreadsheets from Ellie research, another CRM, or a manual list.
+- **Ellie research:** organization discovery is available; people search depends on Ellie research plan/API permissions.
 - **Manual entry:** add one relationship directly.
 - **Future CRM integrations:** HubSpot, Salesforce, monday CRM after their real connectors are built.
 - **Future Gmail integration:** email threads and replies after Gmail OAuth, sync, and send permissions are built.

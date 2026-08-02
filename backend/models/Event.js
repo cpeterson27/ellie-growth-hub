@@ -215,7 +215,7 @@ const eventSchema = new mongoose.Schema(
         },
       },
 
-      apollo: {
+      research: {
         enabled: {
           type: Boolean,
           default: false,

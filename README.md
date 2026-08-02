@@ -22,7 +22,7 @@ Ellie AI organizes the work surrounding an event:
 - Use Jarvis to summarize workspace information and help plan next actions.
 
 The system uses MongoDB as its primary operational database. External services
-such as Eventbrite, Emailable, Resend, Apollo, OpenAI, and the Jarvis memory
+such as Eventbrite, Emailable, Resend, OpenAI, and the Jarvis memory
 bridge contribute specialized capabilities, but Ellie AI remains the central
 workspace.
 
@@ -170,12 +170,12 @@ not delete the contact or erase their history.
 ### 5. Discovery
 
 Discovery is the review area for prospective people and organizations before
-they enter the CRM. It is for net-new prospects found through Apollo or another
-discovery source—not for CSV files or people the team already knows. Approving a
-discovered prospect adds that relationship to the CRM; all later work happens
-from Contacts.
+they enter the CRM. It is for net-new prospects found by Ellie's market
+intelligence workflow—not for CSV files or people the team already knows.
+Approving a discovered prospect adds that relationship to the CRM; all later
+work happens from Contacts.
 
-Apollo organization discovery can use configurable targeting such as:
+Organization research uses configurable targeting such as:
 
 - Target profile
 - Titles
@@ -184,9 +184,9 @@ Apollo organization discovery can use configurable targeting such as:
 - Locations
 - Company size
 
-This makes it possible to search for a different audience each time rather than
-locking the application to one permanent profile. Apollo People Search depends
-on the connected Apollo plan and its API permissions.
+This makes it possible to research a different audience each time rather than
+locking the application to one permanent profile. Research profiles, matching,
+scoring, review, and CRM handoff are owned by Ellie.
 
 Approving a discovery prospect accepts the record into the contact workflow. It
 does not automatically make an unsafe email deliverable or send outreach.
@@ -265,7 +265,7 @@ deployed application does not directly read a private local vault.
 | Eventbrite | Events, publishing, orders, attendees, check-ins, and sales |
 | Emailable | Email deliverability verification |
 | Resend | Transactional and campaign email delivery |
-| Apollo | Organization and eligible people discovery |
+| Ellie Market Intelligence | Organization research, scoring, and prospect review |
 | OpenAI | Jarvis response generation and workspace assistance |
 | Obsidian bridge | Approved long-term notes for Jarvis |
 | MongoDB | Primary application data and workflow history |

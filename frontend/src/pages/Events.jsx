@@ -1119,7 +1119,7 @@ export default function Events() {
                     <h3>Campaign audience</h3>
                     <p>
                       This is Ellie’s internal targeting brief. It guides
-                      contact matching, Apollo searches, and campaign messaging.
+                      contact matching, lead research, and campaign messaging.
                       It does not change the public Eventbrite listing and it
                       does not remove contacts you already assigned.
                     </p>
@@ -1191,7 +1191,7 @@ export default function Events() {
                     placeholder="Choose suggestions above or type audience groups separated with commas"
                   />
                   <small>
-                    Ellie compares these labels against CRM contacts, Apollo
+                    Ellie compares these labels against CRM contacts, native
                     imports, titles, industries, companies, tags, keywords,
                     lists, and notes. Contacts can already be assigned; this
                     confirms the targeting rule for future matching.
@@ -1427,7 +1427,7 @@ export default function Events() {
               <div className="event-strategy">
                 <div className="event-strategy__header">
                   <div><h3>Audience recommendations</h3>
-                    <p>Ellie analyzes the event draft and your ideal-attendee notes to suggest targeting segments. Contacts come from the CRM, CSV imports, Apollo, or future CRM/Gmail integrations.</p>
+                    <p>Ellie analyzes the event draft and your ideal-attendee notes to suggest targeting segments. Contacts come from Ellie research, the CRM, CSV imports, or future approved integrations.</p>
                   </div>
                   <Button loading={loading} onClick={generateAudience}>Generate recommendations</Button>
                 </div>
@@ -1438,7 +1438,7 @@ export default function Events() {
                 <p className="event-form-note">
                   These are targeting segments, not people. After you select
                   and approve segments, Ellie can match them against existing
-                  CRM contacts and future Apollo/CRM imports with known
+                  CRM contacts and future research or CRM imports with known
                   professional or interest signals.
                   Name-and-email-only contacts stay “Audience unknown” until a
                   real signal is added.

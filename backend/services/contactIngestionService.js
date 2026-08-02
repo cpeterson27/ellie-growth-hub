@@ -16,8 +16,8 @@ const canonicalFieldMap = Object.fromEntries([
   ["Annual Revenue", "annualRevenue"], ["Total Funding", "totalFunding"],
   ["Latest Funding Amount", "latestFundingAmount"], ["Last Raised At", "lastRaisedAt"],
   ["Last Contacted", "lastContacted"], ["Stage", "stage"], ["Do Not Call", "doNotCall"],
-  ["Apollo Contact Id", "apolloContactId"], ["Apollo Account Id", "apolloAccountId"],
-  ["Apollo Record Id", "apolloRecordId"], ["Secondary Email", "secondaryEmail"],
+  ["Provider Contact Id", "providerContactId"], ["Provider Account Id", "providerAccountId"],
+  ["Provider Record Id", "providerRecordId"], ["Secondary Email", "secondaryEmail"],
   ["Tertiary Email", "tertiaryEmail"], ["Email Open", "emailOpen"],
   ["Email Bounced", "emailBounced"], ["Replied", "replied"], ["Demoed", "demoed"],
   ["Number of Retail Locations", "retailLocations"],
@@ -26,11 +26,11 @@ const canonicalFieldMap = Object.fromEntries([
   ["Contact Owner", "contactOwner"], ["Other Phone", "otherPhone"], ["Account Owner", "accountOwner"],
   ["Company LinkedIn URL", "companyLinkedinUrl"], ["Facebook URL", "facebookUrl"], ["Twitter URL", "twitterUrl"],
   ["Company Address", "companyAddress"], ["Company City", "companyCity"], ["Company State", "companyState"], ["Company Country", "companyCountry"], ["Company Phone", "companyPhone"],
-  ["Latest Funding", "latestFunding"], ["Apollo Account ID", "apolloAccountId"], ["Secondary Email Status", "secondaryEmailStatus"], ["Tertiary Email Status", "tertiaryEmailStatus"], ["Qualify Contact", "qualifyContact"],
+  ["Latest Funding", "latestFunding"], ["Provider Account ID", "providerAccountId"], ["Secondary Email Status", "secondaryEmailStatus"], ["Tertiary Email Status", "tertiaryEmailStatus"], ["Qualify Contact", "qualifyContact"],
   ["Name", "name"], ["Phone", "phone"], ["LinkedIn", "linkedin"], ["Notes", "notes"], ["Tags", "tags"], ["Audience Profiles", "audienceProfiles"],
   ["Job Title", "title"], ["Company", "company"], ["Location", "location"],
   ["Company Employees", "employeeCount"], ["Industries", "industry"], ["Status", "stage"],
-  ["Apollo Contact ID", "apolloContactId"], ["Apollo Record ID", "apolloRecordId"], ["Secondary Email Source", "secondaryEmailSource"], ["Secondary Email Verification Source", "secondaryEmailVerificationSource"], ["Tertiary Email Source", "tertiaryEmailSource"], ["Tertiary Email Verification Source", "tertiaryEmailVerificationSource"],
+  ["Provider Contact ID", "providerContactId"], ["Provider Record ID", "providerRecordId"], ["Secondary Email Source", "secondaryEmailSource"], ["Secondary Email Verification Source", "secondaryEmailVerificationSource"], ["Tertiary Email Source", "tertiaryEmailSource"], ["Tertiary Email Verification Source", "tertiaryEmailVerificationSource"],
 ]);
 
 const arrayFields = new Set(["departments", "subDepartments", "lists", "keywords", "technologies", "sicCodes", "naicsCodes", "tags", "audienceProfiles"]);
@@ -89,16 +89,16 @@ function normalizeIncoming(row, source = "manual") {
   }
   if (!mapped.title && mapped.seniority && !/^[+()\d\s.-]{7,}$/.test(String(mapped.seniority))) mapped.title = mapped.seniority;
   mapped.name = String(mapped.name || `${mapped.firstName || ""} ${mapped.lastName || ""}`).trim();
-  mapped.sourceProvider = source === "apollo" ? "apollo" : mapped.sourceProvider || source;
-  mapped.providerContactId = String(mapped.apolloContactId || mapped.apolloPersonId || mapped.providerContactId || "").trim() || undefined;
-  mapped.providerRecordId = String(mapped.apolloRecordId || mapped.providerRecordId || "").trim() || undefined;
+  mapped.sourceProvider = mapped.sourceProvider || source;
+  mapped.providerContactId = String(mapped.providerContactId || "").trim() || undefined;
+  mapped.providerRecordId = String(mapped.providerRecordId || "").trim() || undefined;
   mapped.additionalFields = { ...(mapped.additionalFields || {}), ...additionalFields };
   return mapped;
 }
 
 function contactMatchKeys(data) {
   const keys = [];
-  if (data.providerContactId) keys.push({ field: "providerContactId", label: "Apollo contact ID", query: { sourceProvider: data.sourceProvider, providerContactId: data.providerContactId } });
+  if (data.providerContactId) keys.push({ field: "providerContactId", label: "provider contact ID", query: { sourceProvider: data.sourceProvider, providerContactId: data.providerContactId } });
   if (data.email) keys.push({ field: "email", label: "email address", query: { email: data.email } });
   if (data.linkedin) keys.push({ field: "linkedin", label: "LinkedIn URL", query: { linkedin: data.linkedin } });
   if (data.mondayItemId) keys.push({ field: "mondayItemId", label: "Monday item ID", query: { mondayItemId: data.mondayItemId } });
@@ -194,8 +194,7 @@ async function ingestContacts({
     const contactExisted = Boolean(contact);
     if (contact) {
       Object.entries(data).forEach(([key, value]) => {
-        if (key === "apolloFields") contact.apolloFields = { ...(contact.apolloFields || {}), ...(value || {}) };
-        else if (arrayFields.has(key) && Array.isArray(value)) contact[key] = [...new Set([...(contact[key] || []), ...value])];
+        if (arrayFields.has(key) && Array.isArray(value)) contact[key] = [...new Set([...(contact[key] || []), ...value])];
         else if (key === "emailStatus" && contact.emailStatus === "verified" && value !== "verified") return;
         else if (value !== undefined && value !== "" && value !== null) contact[key] = value;
       });
@@ -214,7 +213,7 @@ async function ingestContacts({
         type: "lead",
         // Imported contacts already belong to the business's CRM. Only leads
         // originating from an actual discovery workflow wait in Discovery.
-        status: ["discovery", "apollo_search"].includes(source) ? "prospect" : "active",
+        status: source === "discovery" ? "prospect" : "active",
         importedAt: new Date(),
       });
     }

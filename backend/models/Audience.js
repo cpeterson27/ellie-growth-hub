@@ -37,12 +37,12 @@ const audienceSchema = new mongoose.Schema(
     },
 
     // -------------------------------------------------------------------------
-    // Discovery criteria — passed to Apollo organizations/search
+    // Discovery criteria used by Ellie's organization research engine
     // and used to filter/score saved organizations.
     // -------------------------------------------------------------------------
 
     criteria: {
-      // Apollo search keywords (e.g. "multifamily", "real estate")
+      // Business keywords (e.g. "multifamily", "real estate")
       keywords: {
         type: [String],
         default: [],

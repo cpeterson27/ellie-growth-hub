@@ -15,7 +15,6 @@ plan is reviewed.
 
 | Provider | Current secret/config location | Current consumers | Migration target |
 | --- | --- | --- | --- |
-| Apollo | `APOLLO_API_KEY` | `services/apollo.js` | encrypted API key in `IntegrationConnection` for `apollo` |
 | Monday CRM | `IntegrationConnection.credentials` if present; fallback `MONDAY_API_KEY`, `MONDAY_CONTACTS_BOARD_ID` | `services/mondaySyncService.js`, `integrations/MondayAdapter.js`, `services/monday.js` | encrypted API key; non-secret board/workspace values in `settings` |
 | Resend | `RESEND_API_KEY`; one existing connection fallback in `marketingCampaignExecution.js`; `EMAIL_FROM` is configuration | `services/email.js`, `marketingCampaignExecution.js`, `ResendAdapter` | encrypted API key; sender/domain configuration in `settings` |
 | Eventbrite | `EVENTBRITE_PRIVATE_TOKEN`, `EVENTBRITE_EVENT_IDS`; legacy registry reads `EVENTBRITE_API_KEY` | `services/eventbrite.js`, `eventbriteSyncService.js`, Eventbrite adapters | encrypted token; event IDs in `settings` |
@@ -36,8 +35,8 @@ Add the following Phase 2 fields:
 
 ```js
 {
-  provider: "apollo",
-  category: "lead_provider",
+  provider: "resend",
+  category: "communication",
   status: "configured", // configured | connected | failed | disconnected
   settings: {},          // non-secret provider options only
 
@@ -127,7 +126,7 @@ Migrate one provider at a time, starting with a reversible low-risk provider.
 6. Keep the environment fallback enabled for a defined observation window.
 7. Remove plaintext connection and environment fallback only after approval.
 
-Recommended order: Resend, Monday CRM, Eventbrite, Apollo, OpenAI, then the
+Recommended order: Resend, Monday CRM, Eventbrite, OpenAI, then the
 remaining providers. This separates email delivery, sync, discovery, and AI
 rollback domains.
 
@@ -148,7 +147,7 @@ authorization-code flow.
 - Mark the connection `failed` or `configuration_required` on refresh failure
   without deleting the encrypted record. Require explicit reauthorization.
 
-API-key providers (Apollo, Resend, OpenAI, and many Stripe deployments) use the
+API-key providers (Resend, OpenAI, and many Stripe deployments) use the
 same encrypted connection path but do not use OAuth fields.
 
 ## Security controls
@@ -208,7 +207,6 @@ In staging, run one provider at a time using provider sandbox/test credentials:
 | Resend | Send a test email to a controlled inbox; verify message ID and no secret logging. |
 | Monday CRM | Verify connection and sync a controlled board without duplicate contacts. |
 | Eventbrite | Verify account and sync attendees from a controlled event. |
-| Apollo | Run a minimal discovery query and verify normalization without automatic import. |
 | OpenAI | Run a non-production health/completion check with redacted telemetry. |
 
 Production release gates: security review of the KMS design, schema migration

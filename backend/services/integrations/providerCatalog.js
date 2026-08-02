@@ -1,13 +1,5 @@
 const providers = [
   {
-    id: "apollo",
-    name: "Apollo",
-    category: "lead_provider",
-    description: "Lead discovery",
-    capabilities: ["searchLeads", "normalizeContacts"],
-    environmentKeys: ["APOLLO_API_KEY"],
-  },
-  {
     id: "csv",
     name: "CSV Upload",
     category: "lead_provider",
