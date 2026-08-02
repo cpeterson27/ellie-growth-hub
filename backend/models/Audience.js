@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const audienceSchema = new mongoose.Schema(
   {
+    workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", default: null, index: true },
     // -------------------------------------------------------------------------
     // Core identity
     // -------------------------------------------------------------------------

@@ -11,7 +11,10 @@ import {
   fetchContacts,
   fetchDiscoveryTemplates,
   fetchMarketResearchResults,
+  fetchMarketResearchSources,
+  fetchMarketResearchJob,
   saveDiscoveryTemplates,
+  startExternalMarketResearch,
   updateContact,
 } from "../services/api.js";
 import "./Discovery.css";
@@ -81,6 +84,9 @@ export default function Discovery() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [researchResult, setResearchResult] = useState(null);
   const [researchOrganizations, setResearchOrganizations] = useState([]);
+  const [researchSource, setResearchSource] = useState(null);
+  const [externalJob, setExternalJob] = useState(null);
+  const [externalRunning, setExternalRunning] = useState(false);
 
   const loadProspects = async () => {
     const response = await fetchContacts({ status: "prospect", limit: 500 });
@@ -91,6 +97,7 @@ export default function Discovery() {
     loadProspects().catch(() => setNotice("Unable to load prospects."));
     fetchCampaigns().then((items) => setCampaigns(Array.isArray(items) ? items : [])).catch(() => {});
     fetchDiscoveryTemplates().then((data) => setTemplates(data.templates || [])).catch(() => {});
+    fetchMarketResearchSources().then((data) => setResearchSource(data.sources?.[0] || null)).catch(() => {});
   }, []);
 
   const filtered = useMemo(() => prospects.filter((item) => {
@@ -177,6 +184,38 @@ export default function Discovery() {
     }
   };
 
+  const runExternalResearch = async () => {
+    if (!marketPlan) return setNotice("Build and review a research plan first.");
+    try {
+      setExternalRunning(true);
+      const response = await startExternalMarketResearch({ question: marketQuestion, plan: marketPlan, maxResults: 1000 });
+      setExternalJob(response.job);
+      if (response.job.status === "source_required") {
+        setNotice(response.job.error);
+        return;
+      }
+      setNotice("External research started. You can keep this page open while Ellie collects and deduplicates results.");
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const current = await fetchMarketResearchJob(response.job._id);
+        setExternalJob(current.job);
+        if (["completed", "failed", "source_required"].includes(current.job.status)) {
+          if (current.job.status === "completed") {
+            const resultList = await fetchMarketResearchResults(current.job.audienceId);
+            setResearchOrganizations(resultList.organizations || []);
+            setResearchResult({ organizationsFound: current.job.statistics.received, organizationsCreated: current.job.statistics.created, organizationsUpdated: current.job.statistics.updated });
+            setNotice(`Research complete: ${current.job.statistics.created} new and ${current.job.statistics.updated} refreshed organizations.`);
+          } else setNotice(current.job.error || "External research did not complete.");
+          break;
+        }
+      }
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Ellie could not start external research.");
+    } finally {
+      setExternalRunning(false);
+    }
+  };
+
   const exportResearchList = () => {
     if (!researchOrganizations.length) return;
     const headers = ["Company Name", "Website", "Industry", "Location", "Employees", "Fit Score", "Fit Tier", "Evidence URLs", "Last Verified"];
@@ -236,6 +275,14 @@ export default function Discovery() {
       </section> : null}
     </DashboardCard>
 
+    <DashboardCard title="External research source">
+      <div className={`research-source-status ${researchSource?.configured ? "is-ready" : "is-needed"}`}>
+        <div><span>{researchSource?.configured ? "Connected" : "Source required"}</span><strong>{researchSource?.name || "Checking source…"}</strong><p>{researchSource?.message || "Ellie is checking the external-data configuration."}</p></div>
+        <Button loading={externalRunning} disabled={!marketPlan || !researchSource?.configured} onClick={runExternalResearch}>Discover up to 1,000 organizations</Button>
+      </div>
+      {externalJob ? <div className="research-job-progress"><strong>{externalJob.status.replace(/_/g, " ")}</strong><span>{externalJob.statistics?.received || 0} received · {externalJob.statistics?.created || 0} new · {externalJob.statistics?.updated || 0} refreshed · {externalJob.statistics?.duplicates || 0} duplicates</span></div> : null}
+    </DashboardCard>
+
     <DashboardCard title="Research criteria" action={<select value={targetPreset} onChange={(event) => selectTemplate(event.target.value)}><option value="custom">New profile</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}>
       <div className="target-grid">
         <label><span>Profile name</span><input value={target.name} onChange={(event) => setField("name", event.target.value)} placeholder="Sacramento event venues" /></label>
@@ -245,7 +292,7 @@ export default function Discovery() {
         <label><span>Minimum employees</span><input type="number" min="0" value={target.employeeMin} onChange={(event) => setField("employeeMin", event.target.value)} /></label>
         <label><span>Maximum employees</span><input type="number" min="0" value={target.employeeMax} onChange={(event) => setField("employeeMax", event.target.value)} /></label>
       </div>
-      <div className="target-actions"><Button variant="outline" loading={savingTemplate} onClick={saveTemplate}>Save profile</Button><Button loading={running} onClick={runResearch}>Research organizations</Button></div>
+      <div className="target-actions"><Button variant="outline" loading={savingTemplate} onClick={saveTemplate}>Save profile</Button><Button loading={running} onClick={runResearch}>Match saved organizations</Button></div>
       {researchResult ? <div className="discovery-result-summary"><strong>{researchResult.organizationsFound || 0} matched organizations</strong><span>{researchResult.organizationsCreated || 0} new · {researchResult.organizationsUpdated || 0} refreshed</span></div> : null}
     </DashboardCard>
 

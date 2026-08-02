@@ -4,6 +4,7 @@ const Contact = require("../models/Contact");
 const Organization = require("../models/Organization");
 const Audience = require("../models/Audience");
 const DiscoveryRun = require("../models/DiscoveryRun");
+const MarketResearchJob = require("../models/MarketResearchJob");
 
 const {
   discoverAudienceSources,
@@ -11,8 +12,14 @@ const {
 } = require("../services/audience");
 const { previewOrganizationImport, importOrganizations } = require("../services/organizationImportService");
 const { compileMarketQuestion } = require("../services/marketResearchService");
+const { sourceStatus } = require("../services/businessDataSourceService");
+const { runMarketResearchJob } = require("../services/externalMarketResearchService");
 
 const router = express.Router();
+
+router.get("/research/sources", (_req, res) => {
+  return res.json({ success: true, sources: [sourceStatus()] });
+});
 
 router.post("/research/plan", async (req, res) => {
   try {
@@ -29,9 +36,9 @@ router.post("/research/plan", async (req, res) => {
 
 router.get("/research/results/:audienceId", async (req, res) => {
   try {
-    const audience = await Audience.findById(req.params.audienceId).lean();
+    const audience = await Audience.findOne({ _id: req.params.audienceId, workspaceId: req.auth.workspaceId }).lean();
     if (!audience) return res.status(404).json({ success: false, error: "Research list not found." });
-    const organizations = await Organization.find({ _id: { $in: audience.organizationIds || [] } })
+    const organizations = await Organization.find({ _id: { $in: audience.organizationIds || [] }, workspaceId: req.auth.workspaceId })
       .sort({ audienceScore: -1, name: 1 })
       .limit(500)
       .lean();
@@ -39,6 +46,58 @@ router.get("/research/results/:audienceId", async (req, res) => {
   } catch (error) {
     return res.status(400).json({ success: false, error: "Unable to load research results." });
   }
+});
+
+router.get("/research/results/:audienceId/people", async (req, res) => {
+  const audience = await Audience.findOne({ _id: req.params.audienceId, workspaceId: req.auth.workspaceId }).lean();
+  if (!audience) return res.status(404).json({ success: false, error: "Research list not found." });
+  const organizations = await Organization.find({ _id: { $in: audience.organizationIds || [] }, workspaceId: req.auth.workspaceId })
+    .select("name domain decisionMakers")
+    .lean();
+  const people = organizations.flatMap((organization) => (organization.decisionMakers || []).map((person) => ({
+    ...person,
+    organizationId: organization._id,
+    company: organization.name,
+    domain: organization.domain,
+    verificationRequired: Boolean(person.email && person.emailStatus !== "verified"),
+  })));
+  return res.json({ success: true, people });
+});
+
+router.post("/research/run", async (req, res) => {
+  try {
+    const question = String(req.body?.question || "").trim();
+    const plan = req.body?.plan || await compileMarketQuestion(question);
+    const maxResults = Math.min(5000, Math.max(1, Number(req.body?.maxResults) || 1000));
+    const status = sourceStatus();
+    const audience = await Audience.create({
+      workspaceId: req.auth.workspaceId,
+      name: String(plan.name || "Ellie market research").slice(0, 160),
+      description: String(plan.summary || question),
+      source: "ai",
+      criteria: plan.criteria || {},
+    });
+    const job = await MarketResearchJob.create({
+      workspaceId: req.auth.workspaceId,
+      userId: req.auth.user?._id || null,
+      audienceId: audience._id,
+      question: question || plan.summary || plan.name,
+      plan,
+      sourceId: status.id,
+      status: status.configured ? "queued" : "source_required",
+      error: status.configured ? "" : status.message,
+    });
+    if (status.configured) setImmediate(() => runMarketResearchJob(job._id, { maxResults }).catch(() => {}));
+    return res.status(202).json({ success: true, job, audience, source: status });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to start market research." });
+  }
+});
+
+router.get("/research/jobs/:jobId", async (req, res) => {
+  const job = await MarketResearchJob.findOne({ _id: req.params.jobId, workspaceId: req.auth.workspaceId }).lean();
+  if (!job) return res.status(404).json({ success: false, error: "Research job not found." });
+  return res.json({ success: true, job });
 });
 
 // ===================================================================
@@ -260,6 +319,7 @@ router.post("/", async (req, res) => {
     }
 
     const audience = await Audience.create({
+      workspaceId: req.auth.workspaceId,
       name: name.trim(),
       description: description ? description.trim() : "",
       status,

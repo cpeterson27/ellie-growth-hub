@@ -33,6 +33,53 @@
 .market-plan-review article span {
   color: var(--text-muted);
 }
+.research-source-status {
+  align-items: center;
+  border: 1px solid var(--border);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
+}
+.research-source-status > div {
+  display: grid;
+  gap: 0.2rem;
+}
+.research-source-status span {
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.research-source-status p {
+  color: var(--text-muted);
+  margin: 0;
+}
+.research-source-status.is-ready {
+  background: #edf7f3;
+  border-color: #bad8cd;
+}
+.research-source-status.is-ready span {
+  color: #1f6a57;
+}
+.research-source-status.is-needed {
+  background: #fff8e8;
+  border-color: #ddc98f;
+}
+.research-source-status.is-needed span {
+  color: #8a671f;
+}
+.research-job-progress {
+  background: #f5f4ef;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  margin-top: 0.7rem;
+  padding: 0.7rem;
+}
+.research-job-progress span {
+  color: var(--text-muted);
+}
 .market-plan-review p {
   margin: 0;
 }
@@ -220,6 +267,11 @@
   .market-plan-review > div,
   .market-result-list article {
     grid-template-columns: 1fr;
+  }
+  .research-source-status,
+  .research-job-progress {
+    align-items: flex-start;
+    flex-direction: column;
   }
   .market-result-rank {
     display: none;

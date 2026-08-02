@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const organizationSchema = new mongoose.Schema(
   {
+    workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", default: null, index: true },
     // -------------------------------------------------------------------------
     // Identity — domain is the preferred deduplication key.
     // -------------------------------------------------------------------------
@@ -95,6 +96,15 @@ const organizationSchema = new mongoose.Schema(
       observedAt: { type: Date, default: null },
     }],
     lastResearchVerifiedAt: { type: Date, default: null },
+    decisionMakers: [{
+      name: { type: String, default: "" },
+      title: { type: String, default: "" },
+      linkedinUrl: { type: String, default: "" },
+      email: { type: String, default: "", lowercase: true, trim: true },
+      emailStatus: { type: String, enum: ["unknown", "published_unverified", "verified", "invalid"], default: "unknown" },
+      evidenceUrl: { type: String, default: "" },
+      observedAt: { type: Date, default: null },
+    }],
 
     // -------------------------------------------------------------------------
     // Audience intelligence — scored by Ellie AI.

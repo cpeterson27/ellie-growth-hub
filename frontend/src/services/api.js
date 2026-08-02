@@ -283,6 +283,15 @@ export const createMarketResearchPlan = (question) =>
 export const fetchMarketResearchResults = (audienceId) =>
   api.get(`/audience/research/results/${audienceId}`).then((res) => res.data);
 
+export const fetchMarketResearchSources = () =>
+  api.get("/audience/research/sources").then((res) => res.data);
+
+export const startExternalMarketResearch = (payload) =>
+  api.post("/audience/research/run", payload).then((res) => res.data);
+
+export const fetchMarketResearchJob = (jobId) =>
+  api.get(`/audience/research/jobs/${jobId}`).then((res) => res.data);
+
 export const discoverAudienceOrganizations = (audienceId) =>
   api.post(`/audience/${audienceId}/discover`).then((res) => res.data);
 
