@@ -10,8 +10,36 @@ const {
   discoverOrganizationsForAudience,
 } = require("../services/audience");
 const { previewOrganizationImport, importOrganizations } = require("../services/organizationImportService");
+const { compileMarketQuestion } = require("../services/marketResearchService");
 
 const router = express.Router();
+
+router.post("/research/plan", async (req, res) => {
+  try {
+    const question = String(req.body?.question || "").trim();
+    if (question.length < 8 || question.length > 1000) {
+      return res.status(400).json({ success: false, error: "Enter a market question between 8 and 1,000 characters." });
+    }
+    const plan = await compileMarketQuestion(question);
+    return res.json({ success: true, plan });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to build a research plan." });
+  }
+});
+
+router.get("/research/results/:audienceId", async (req, res) => {
+  try {
+    const audience = await Audience.findById(req.params.audienceId).lean();
+    if (!audience) return res.status(404).json({ success: false, error: "Research list not found." });
+    const organizations = await Organization.find({ _id: { $in: audience.organizationIds || [] } })
+      .sort({ audienceScore: -1, name: 1 })
+      .limit(500)
+      .lean();
+    return res.json({ success: true, audience, organizations });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: "Unable to load research results." });
+  }
+});
 
 // ===================================================================
 // AUDIENCE CRUD ROUTES

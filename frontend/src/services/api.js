@@ -277,6 +277,12 @@ export const fetchIntegrationHub = () =>
 export const createAudienceDefinition = (payload) =>
   api.post("/audience", payload).then((res) => res.data);
 
+export const createMarketResearchPlan = (question) =>
+  api.post("/audience/research/plan", { question }).then((res) => res.data);
+
+export const fetchMarketResearchResults = (audienceId) =>
+  api.get(`/audience/research/results/${audienceId}`).then((res) => res.data);
+
 export const discoverAudienceOrganizations = (audienceId) =>
   api.post(`/audience/${audienceId}/discover`).then((res) => res.data);
 

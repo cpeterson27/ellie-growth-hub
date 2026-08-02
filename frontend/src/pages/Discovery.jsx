@@ -4,11 +4,13 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
 import {
   createAudienceDefinition,
+  createMarketResearchPlan,
   deleteContact,
   discoverAudienceOrganizations,
   fetchCampaigns,
   fetchContacts,
   fetchDiscoveryTemplates,
+  fetchMarketResearchResults,
   saveDiscoveryTemplates,
   updateContact,
 } from "../services/api.js";
@@ -68,6 +70,8 @@ export default function Discovery() {
   const [target, setTarget] = useState(EMPTY_TARGET);
   const [targetPreset, setTargetPreset] = useState("custom");
   const [marketQuestion, setMarketQuestion] = useState("");
+  const [marketPlan, setMarketPlan] = useState(null);
+  const [planning, setPlanning] = useState(false);
   const [campaignId, setCampaignId] = useState("");
   const [query, setQuery] = useState("");
   const [emailFilter, setEmailFilter] = useState("verified");
@@ -76,6 +80,7 @@ export default function Discovery() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [researchResult, setResearchResult] = useState(null);
+  const [researchOrganizations, setResearchOrganizations] = useState([]);
 
   const loadProspects = async () => {
     const response = await fetchContacts({ status: "prospect", limit: 500 });
@@ -96,6 +101,32 @@ export default function Discovery() {
   }), [prospects, query, campaignId, emailFilter]);
 
   const setField = (field, value) => setTarget((current) => ({ ...current, [field]: value }));
+
+  const buildResearchPlan = async () => {
+    if (!marketQuestion.trim()) return;
+    try {
+      setPlanning(true);
+      setNotice("");
+      const response = await createMarketResearchPlan(marketQuestion);
+      const plan = response.plan;
+      setMarketPlan(plan);
+      setTarget((current) => ({
+        ...current,
+        name: plan.name || current.name,
+        industries: (plan.criteria?.industries || []).join(", "),
+        keywords: (plan.criteria?.keywords || []).join(", "),
+        locations: (plan.criteria?.locations || []).join("; "),
+        employeeMin: plan.criteria?.employeeRange?.min ?? "",
+        employeeMax: plan.criteria?.employeeRange?.max ?? "",
+      }));
+      setTargetPreset("custom");
+      setNotice(plan.compilerWarning || "Research plan created. Review the evidence requirements and criteria before running it.");
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Ellie could not build this research plan.");
+    } finally {
+      setPlanning(false);
+    }
+  };
 
   const selectTemplate = (id) => {
     setTargetPreset(id);
@@ -136,12 +167,38 @@ export default function Discovery() {
       const created = await createAudienceDefinition(buildAudiencePayload(target));
       const result = await discoverAudienceOrganizations(created.audience._id);
       setResearchResult(result);
+      const resultList = await fetchMarketResearchResults(created.audience._id);
+      setResearchOrganizations(resultList.organizations || []);
       setNotice(`${result.organizationsFound || 0} organizations found; ${result.organizationsCreated || 0} added and ${result.organizationsUpdated || 0} updated.`);
     } catch (error) {
       setNotice(error.response?.data?.error || "Ellie could not complete this research run.");
     } finally {
       setRunning(false);
     }
+  };
+
+  const exportResearchList = () => {
+    if (!researchOrganizations.length) return;
+    const headers = ["Company Name", "Website", "Industry", "Location", "Employees", "Fit Score", "Fit Tier", "Evidence URLs", "Last Verified"];
+    const escape = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = researchOrganizations.map((organization) => [
+      organization.name,
+      organization.website || organization.domain,
+      organization.industry,
+      organization.location,
+      organization.employeeCount,
+      organization.audienceScore,
+      organization.audienceTier,
+      (organization.researchEvidence || []).map((evidence) => evidence.sourceUrl).filter(Boolean).join(" | "),
+      organization.lastResearchVerifiedAt,
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${(target.name || "ellie-research-list").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const approve = async (prospect) => {
@@ -168,10 +225,15 @@ export default function Discovery() {
     <DashboardCard title="Ask Ellie to find a market">
       <div className="discovery-agent-prompt">
         <textarea value={marketQuestion} onChange={(event) => setMarketQuestion(event.target.value)} placeholder="Example: Find hair salons in San Francisco with 2+ locations" />
-        <Button disabled={!marketQuestion.trim()} onClick={() => setNotice("Natural-language research is the next native Ellie milestone. For now, review the structured criteria below so every result stays explainable.")}>Build research plan</Button>
+        <Button loading={planning} disabled={!marketQuestion.trim()} onClick={buildResearchPlan}>Build research plan</Button>
       </div>
       <div className="discovery-query-examples">{examples.map((example) => <button key={example} type="button" onClick={() => setMarketQuestion(example)}>{example}</button>)}</div>
       <p className="discovery-safety-note"><strong>Professional standard:</strong> results must show their source and freshness. An email is never labeled verified unless a verification check supports it.</p>
+      {marketPlan ? <section className="market-plan-review">
+        <header><div><span>{marketPlan.compiler === "openai" ? "AI-structured plan" : "Ellie rules-based plan"}</span><strong>{marketPlan.name}</strong></div><small>Review before research</small></header>
+        <p>{marketPlan.summary}</p>
+        <div><article><strong>Ranking</strong><span>{(marketPlan.rankingDimensions || []).join(" · ")}</span></article><article><strong>Needs attention</strong><span>{[...(marketPlan.assumptions || []), ...(marketPlan.unresolved || [])].join(" ") || "No unresolved criteria."}</span></article></div>
+      </section> : null}
     </DashboardCard>
 
     <DashboardCard title="Research criteria" action={<select value={targetPreset} onChange={(event) => selectTemplate(event.target.value)}><option value="custom">New profile</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}>
@@ -186,6 +248,15 @@ export default function Discovery() {
       <div className="target-actions"><Button variant="outline" loading={savingTemplate} onClick={saveTemplate}>Save profile</Button><Button loading={running} onClick={runResearch}>Research organizations</Button></div>
       {researchResult ? <div className="discovery-result-summary"><strong>{researchResult.organizationsFound || 0} matched organizations</strong><span>{researchResult.organizationsCreated || 0} new · {researchResult.organizationsUpdated || 0} refreshed</span></div> : null}
     </DashboardCard>
+
+    {researchResult ? <DashboardCard title="Ranked organization list" action={<Button variant="outline" disabled={!researchOrganizations.length} onClick={exportResearchList}>Export CSV</Button>}>
+      {researchOrganizations.length ? <div className="market-result-list">{researchOrganizations.map((organization, index) => <article key={organization._id}>
+        <span className="market-result-rank">{index + 1}</span>
+        <div><strong>{organization.name}</strong><small>{[organization.industry, organization.location].filter(Boolean).join(" · ") || "Business details need research"}</small><p>{(organization.scoreReasons || []).join(" · ") || "No scoring evidence recorded yet."}</p></div>
+        <div className="market-result-score"><strong>{organization.audienceScore || 0}</strong><span>{organization.audienceTier || "unscored"}</span></div>
+        <div className="market-result-evidence"><strong>{organization.researchEvidence?.length || 0} sources</strong><span>{organization.lastResearchVerifiedAt ? `Checked ${new Date(organization.lastResearchVerifiedAt).toLocaleDateString()}` : "Verification needed"}</span></div>
+      </article>)}</div> : <div className="table-state table-state--empty">No stored organizations match this plan yet. Ellie did not manufacture results.</div>}
+    </DashboardCard> : null}
 
     <DashboardCard title="Prospect review" action={<div className="discovery-review-filters"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search prospects" /><select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select><select value={emailFilter} onChange={(event) => setEmailFilter(event.target.value)}><option value="verified">Verified email</option><option value="review">Needs review</option><option value="all">All</option></select></div>}>
       {filtered.length ? <div className="discovery-review-list">{filtered.map((prospect) => <article key={prospect._id}><div><strong>{prospect.name || "Unnamed prospect"}</strong><span>{[prospect.title, prospect.company].filter(Boolean).join(" · ") || "Company details needed"}</span><small>{prospect.email || "No email"} · {prospect.emailStatus || "unverified"}</small></div><div><Button size="sm" onClick={() => approve(prospect)}>Approve</Button><Button size="sm" variant="outline" onClick={() => setDeleteTarget(prospect)}>Delete</Button></div></article>)}</div> : <div className="table-state table-state--empty">No prospects match this review view.</div>}

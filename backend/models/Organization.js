@@ -84,6 +84,18 @@ const organizationSchema = new mongoose.Schema(
       default: [],
     },
 
+    locationCount: { type: Number, default: null, min: 0 },
+    rating: { type: Number, default: null, min: 0, max: 5 },
+    reviewCount: { type: Number, default: null, min: 0 },
+    researchEvidence: [{
+      sourceType: { type: String, default: "" },
+      sourceUrl: { type: String, default: "" },
+      field: { type: String, default: "" },
+      observedValue: { type: String, default: "" },
+      observedAt: { type: Date, default: null },
+    }],
+    lastResearchVerifiedAt: { type: Date, default: null },
+
     // -------------------------------------------------------------------------
     // Audience intelligence — scored by Ellie AI.
     // audienceScore: 0–100 composite fit score.
