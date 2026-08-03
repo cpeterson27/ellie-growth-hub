@@ -17,6 +17,7 @@ OPENAI_API_KEY=your_openai_key
 JARVIS_OPENAI_ENABLED=true
 JARVIS_OPENAI_MODEL=gpt-4.1-mini
 JARVIS_RESEARCH_OPENAI_MODEL=gpt-5.6-sol
+JARVIS_TTS_MODEL=gpt-4o-mini-tts
 JARVIS_OBSIDIAN_MEMORY_ENABLED=true
 JARVIS_MEMORY_SOURCE=cloud
 JARVIS_MEMORY_SYNC_SECRET=a-long-random-secret-you-create-once
@@ -48,8 +49,17 @@ With OpenAI API billing active and `JARVIS_OPENAI_ENABLED=true`, a request such
 as “Find 20 Sacramento multifamily decision-makers” runs a public-web search
 inside Jarvis. Every retained person must have non-LinkedIn HTTPS evidence.
 Emails are stored only when visibly published by the cited source and remain
-`published_unverified`. Results are staged in **Discovery → Jarvis Research
-Previews**; no CRM import or outreach occurs without a separate confirmation.
+`published_unverified`. The people, evidence, duplicate status, and two-step
+import approval are displayed directly in the Jarvis conversation. The latest
+saved preview also reloads there after returning to the page. No outreach is
+sent by a research or import approval.
+
+## Jarvis voice
+
+Jarvis uses the OpenAI Speech API with `gpt-4o-mini-tts` by default. The voice
+picker and test control stay on the Jarvis page. Speech generation happens on
+the backend so the OpenAI key is never exposed to the browser. The interface
+discloses that the voice is AI-generated.
 
 ## Frontend SPA routing on Render
 
@@ -60,7 +70,7 @@ The frontend uses React Router. In the Render **frontend Static Site**, open
 | --- | --- | --- |
 | `/*` | `/index.html` | `Rewrite` |
 
-Without this rule, navigation works inside Ellie but directly opening or hard
+Without this rule, navigation works inside Growth Operator but directly opening or hard
 refreshing `/jarvis`, `/discovery`, or another nested route returns Render's
 black `Not Found` page before React can load.
 
@@ -73,7 +83,7 @@ conversation.
 1. Generate a long random secret with `openssl rand -hex 32`.
 2. Add it to the backend environment as `DEVELOPMENT_APPROVAL_SECRET`.
 3. Add the same variable to the Render backend service.
-4. Open **Development Requests** in Ellie and enter the secret.
+4. Open **Development Requests** in Growth Operator and enter the secret.
 5. Approve a request, then use **Copy for Codex** to hand the approved brief to
    a Codex task attached to this repository.
 
@@ -91,14 +101,14 @@ cp .env.example .env
 Set `OBSIDIAN_VAULT_PATH`, `JARVIS_API_URL`, and the same
 `JARVIS_MEMORY_SYNC_SECRET` in that file. Then load the values into your shell
 and run `npm run sync`. Use `npm run watch` to refresh the cloud copy every
-minute. No local Ellie backend is involved.
+minute. No local Growth Operator backend is involved.
 
 The bridge mirrors only the explicitly approved operational folders. It does
 not upload `01 Inbox`, `09 Archive`, attachments, or credentials.
 
 ## Daily operation
 
-- The client only opens the deployed Ellie frontend and speaks or types to
+- The client only opens the deployed Growth Operator frontend and speaks or types to
   Jarvis. She does not run a sync command.
 - The last synchronized notes remain available from MongoDB while the
   developer's Mac is off.
@@ -116,7 +126,7 @@ bridge as a macOS LaunchAgent on the vault owner's Mac.
 
 ## Voice and hotkeys
 
-- In Ellie: press `Command + J` while the page is focused to start a voice turn.
+- In Growth Operator: press `Command + J` while the page is focused to start a voice turn.
 - System-wide: compile/run the optional Mac Companion from
   `tools/jarvis-mac-companion`. Its hotkey is `Option + Command + J`.
 - Allow Microphone, Speech Recognition, and (when prompted) Input Monitoring in

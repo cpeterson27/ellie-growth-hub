@@ -11,6 +11,8 @@ function getStatus() {
     model: process.env.JARVIS_OPENAI_MODEL || "gpt-4.1-mini",
     researchModel: process.env.JARVIS_RESEARCH_OPENAI_MODEL || "gpt-5.6-sol",
     webSearchEnabled: isEnabled(),
+    voiceEnabled: isEnabled(),
+    voiceModel: process.env.JARVIS_TTS_MODEL || "gpt-4o-mini-tts",
   };
 }
 

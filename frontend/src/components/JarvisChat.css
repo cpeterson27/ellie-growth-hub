@@ -50,6 +50,18 @@
 .jarvis-orb.is-speaking { animation: jarvis-speaking 0.78s ease-in-out infinite; }
 .jarvis-voice-test { padding: .4rem .6rem; border: 1px solid #b8cbc4; border-radius: 8px; background: #f4f7f5; color: #17463e; font: inherit; font-size: .76rem; font-weight: 750; cursor: pointer; }
 .jarvis-voice-test:disabled { opacity: .55; cursor: not-allowed; }
+.jarvis-ai-voice-disclosure{margin:.35rem 0 0;color:var(--text-muted);font-size:.7rem}
+.jarvis-message-content:has(.jarvis-research-preview){width:100%;max-width:100%;padding:.9rem}
+.jarvis-research-preview{display:grid;gap:.8rem;margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border)}
+.jarvis-research-preview__header{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}
+.jarvis-research-preview__header div{display:grid;gap:.12rem}.jarvis-research-preview__header span{color:#4b7167;font-size:.67rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.jarvis-research-preview__header strong{font-size:1rem}.jarvis-research-preview__header p{margin:0;color:var(--text-muted);font-size:.76rem}
+.jarvis-research-preview__state{flex:none;padding:.34rem .55rem;border:1px solid #b4d5ca;border-radius:999px;background:#edf8f4;color:#175f50!important;white-space:nowrap}
+.jarvis-research-people{display:grid;gap:.55rem;max-height:440px;padding-right:.25rem;overflow:auto}
+.jarvis-research-person{display:grid;grid-template-columns:minmax(140px,1fr) minmax(145px,.9fr);gap:.65rem;padding:.7rem;border:1px solid #d8e4df;border-radius:12px;background:#fcfefd}
+.jarvis-research-person__identity,.jarvis-research-person__email{display:grid;align-content:start;gap:.12rem;min-width:0}.jarvis-research-person__identity strong,.jarvis-research-person__email strong{overflow:hidden;text-overflow:ellipsis}.jarvis-research-person__identity span,.jarvis-research-person__identity p,.jarvis-research-person__email span{margin:0;color:var(--text-muted);font-size:.73rem}.jarvis-research-person__email small{color:#58756d;font-size:.63rem;font-weight:850;letter-spacing:.07em;text-transform:uppercase}.jarvis-research-person__email span{width:max-content;padding:.16rem .3rem;border-radius:4px;background:#f0f3f2;text-transform:capitalize}
+.jarvis-research-person details{grid-column:1/-1;padding-top:.45rem;border-top:1px solid #e5ece9;color:var(--text-muted);font-size:.74rem}.jarvis-research-person summary{color:#285c50;font-weight:800;cursor:pointer}.jarvis-research-person details p{margin:.45rem 0}.jarvis-research-person details a{color:#176b5a;font-weight:800}.jarvis-research-person__review{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.4rem}.jarvis-research-person__review span{padding:.16rem .32rem;border-radius:4px;background:#eef4f1}
+.jarvis-research-approval{display:grid;gap:.65rem;padding:.75rem;border:1px solid #d7e3de;border-radius:12px;background:#f7faf8}.jarvis-research-approval>p{margin:0;color:var(--text-muted);font-size:.75rem;line-height:1.45}.jarvis-prepare-import,.jarvis-confirm-import button{width:100%;padding:.7rem .8rem;border:0;border-radius:9px;background:#1c5147;color:#fff;font:inherit;font-size:.82rem;font-weight:850;cursor:pointer}.jarvis-prepare-import:disabled,.jarvis-confirm-import button:disabled{opacity:.58;cursor:wait}
+.jarvis-confirm-import{display:grid;gap:.65rem}.jarvis-confirm-import div{display:grid;gap:.12rem}.jarvis-confirm-import span{color:#7a5d16;font-size:.65rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.jarvis-confirm-import strong{font-size:.76rem;word-break:break-word}.jarvis-confirm-import small{color:var(--text-muted);font-size:.68rem}.jarvis-import-success{padding:.65rem;border-radius:8px;background:#e7f6f0;color:#155c4d;font-size:.8rem;font-weight:800}.jarvis-inline-error{padding:.55rem;border-radius:8px;background:#fff0f0;color:#982525;font-size:.75rem}
 @keyframes jarvis-speaking { 50% { transform: scale(1.14); box-shadow: 0 0 0 16px rgba(216,183,108,.13), 0 0 50px rgba(216,183,108,.82); } }
 @media (prefers-reduced-motion:reduce){.jarvis-header::after,.jarvis-circuit-field path,.jarvis-signal,.jarvis-core,.jarvis-core-ring,.jarvis-core-light,.jarvis-visual-state span{animation:none!important}}
 
@@ -140,6 +152,8 @@
 
 @media (max-width:720px){
   .jarvis-core{width:300px;height:300px}
+  .jarvis-research-person{grid-template-columns:1fr}
+  .jarvis-research-person details{grid-column:1}
 }
 
 /* 2026 visual system: fluid light, dimensional glass, and ambient motion. */

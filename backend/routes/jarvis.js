@@ -4,15 +4,40 @@
  */
 
 const express = require("express");
+const OpenAI = require("openai");
+const Contact = require("../models/Contact");
+const GrowthActionApproval = require("../models/GrowthActionApproval");
+const PeopleResearchPreview = require("../models/PeopleResearchPreview");
 const jarvisService = require("../services/jarvisService");
 const llmService = require("../services/llmService");
 const jarvisMemoryService = require("../services/jarvisMemoryService");
 const jarvisProfileService = require("../services/jarvisProfileService");
 const developmentRequestService = require("../services/developmentRequestService");
 const { compileMarketQuestion } = require("../services/marketResearchService");
-const { isJarvisWebResearchEnabled, researchAndStagePublicPeople } = require("../services/publicPeopleResearchService");
+const { ingestContacts } = require("../services/contactIngestionService");
+const { isJarvisWebResearchEnabled, normalizePublicPeople, researchAndStagePublicPeople } = require("../services/publicPeopleResearchService");
 
 const router = express.Router();
+const OPENAI_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"]);
+
+function requireJarvisOperator(req, res) {
+  if (["owner", "admin"].includes(req.auth?.role)) return true;
+  res.status(403).json({ success: false, error: "A Growth Operator owner or admin must approve CRM imports." });
+  return false;
+}
+
+function previewPeopleAsImportRows(preview) {
+  return normalizePublicPeople((preview.people || []).map((person) => ({
+    firstName: person.firstName,
+    lastName: person.lastName,
+    title: person.title,
+    company: person.company,
+    companyWebsite: person.companyWebsite,
+    email: person.email,
+    evidenceUrl: person.evidenceUrl,
+    evidenceSummary: person.evidenceSummary,
+  })));
+}
 
 /**
  * POST /api/jarvis/chat
@@ -60,7 +85,7 @@ router.post("/chat", async (req, res) => {
                 people: result.savedPreview.people,
                 model: result.model,
               },
-              actionsAvailable: ["review_research_preview"],
+              actionsAvailable: [],
               activity: [
                 { status: "complete", label: "Searched public web sources" },
                 { status: "complete", label: `Validated evidence for ${summary.total} people` },
@@ -122,6 +147,111 @@ router.post("/chat", async (req, res) => {
       success: false,
       error: error.message || "Failed to process query",
     });
+  }
+});
+
+router.post("/research-previews/:previewId/prepare-import", async (req, res) => {
+  if (!requireJarvisOperator(req, res)) return;
+  try {
+    const preview = await PeopleResearchPreview.findOne({ _id: req.params.previewId, workspaceId: req.auth.workspaceId });
+    if (!preview) return res.status(404).json({ success: false, error: "Research preview not found." });
+    if (preview.status === "imported") return res.status(409).json({ success: false, error: "This research preview has already been imported." });
+    const people = previewPeopleAsImportRows(preview);
+    const phrase = `IMPORT ${people.length} PUBLIC-WEB PROSPECTS`;
+    const approval = await GrowthActionApproval.create({
+      workspaceId: req.auth.workspaceId,
+      userId: req.auth.user._id,
+      action: "import_public_people",
+      payload: { people, previewId: preview._id },
+      summary: preview.summary,
+      confirmationPhrase: phrase,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+    preview.status = "approval_pending";
+    preview.approvalId = approval._id;
+    await preview.save();
+    return res.json({
+      success: true,
+      data: {
+        approvalId: approval._id,
+        confirmationPhrase: phrase,
+        expiresAt: approval.expiresAt,
+        preview: preview.summary,
+        warning: "This adds the staged people as needs-review CRM prospects. It does not permit or send outreach.",
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to prepare this import." });
+  }
+});
+
+router.post("/research-previews/:previewId/confirm-import", async (req, res) => {
+  if (!requireJarvisOperator(req, res)) return;
+  try {
+    const approval = await GrowthActionApproval.findOne({
+      _id: req.body?.approvalId,
+      workspaceId: req.auth.workspaceId,
+      userId: req.auth.user._id,
+      action: "import_public_people",
+      usedAt: null,
+      expiresAt: { $gt: new Date() },
+      "payload.previewId": req.params.previewId,
+    });
+    if (!approval) return res.status(400).json({ success: false, error: "This approval is missing, expired, already used, or belongs to another workspace." });
+    if (String(req.body?.confirmation || "") !== approval.confirmationPhrase) {
+      return res.status(400).json({ success: false, error: `Confirmation must exactly match: ${approval.confirmationPhrase}` });
+    }
+    const batchId = `jarvis-public-web-${approval._id}`;
+    const result = await ingestContacts({
+      contacts: approval.payload.people,
+      source: "public_web_research",
+      marketingPermission: false,
+      importBatchId: batchId,
+      importFileName: "Jarvis public-web people research",
+    });
+    await Contact.updateMany(
+      { lastImportBatchId: batchId },
+      { $set: { status: "prospect" }, $addToSet: { tags: { $each: ["public-web-research", "needs-review"] } } },
+    );
+    approval.usedAt = new Date();
+    await approval.save();
+    await PeopleResearchPreview.updateOne(
+      { _id: req.params.previewId, workspaceId: req.auth.workspaceId },
+      { $set: { status: "imported", importedAt: new Date(), importResult: result } },
+    );
+    return res.json({
+      success: true,
+      data: {
+        ...result,
+        previewId: req.params.previewId,
+        marketingPermission: false,
+        nextStep: "Review and qualify these prospects before verifying emails or approving outreach.",
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to import this research preview." });
+  }
+});
+
+router.post("/voice/speech", async (req, res) => {
+  try {
+    if (!isJarvisWebResearchEnabled()) return res.status(503).json({ success: false, error: "OpenAI voice is not enabled yet." });
+    const input = String(req.body?.text || "").trim().slice(0, 4000);
+    const voice = OPENAI_VOICES.has(req.body?.voice) ? req.body.voice : "marin";
+    if (!input) return res.status(400).json({ success: false, error: "Text is required for voice playback." });
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim() });
+    const speech = await client.audio.speech.create({
+      model: process.env.JARVIS_TTS_MODEL || "gpt-4o-mini-tts",
+      voice,
+      input,
+      instructions: "Speak as a polished, warm, confident business assistant. Use natural pacing and clear pronunciation.",
+      response_format: "mp3",
+    });
+    const audio = Buffer.from(await speech.arrayBuffer());
+    res.set({ "Content-Type": "audio/mpeg", "Content-Length": audio.length, "Cache-Control": "no-store" });
+    return res.send(audio);
+  } catch (error) {
+    return res.status(502).json({ success: false, error: error.message || "Jarvis could not generate voice audio." });
   }
 });
 

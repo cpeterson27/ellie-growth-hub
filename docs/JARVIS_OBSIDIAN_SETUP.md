@@ -55,11 +55,12 @@ OPENAI_API_KEY=your_key_here
 JARVIS_OPENAI_ENABLED=true
 JARVIS_OPENAI_MODEL=gpt-4.1-mini
 JARVIS_RESEARCH_OPENAI_MODEL=gpt-5.6-sol
+JARVIS_TTS_MODEL=gpt-4o-mini-tts
 ```
 
 `JARVIS_OPENAI_MODEL` remains the lower-cost model for ordinary workspace summaries. `JARVIS_RESEARCH_OPENAI_MODEL` performs evidence-backed public-web lead research through the Responses API web-search tool.
 
-With `JARVIS_OPENAI_ENABLED=false`, Jarvis continues using verified Growth Operator workspace summaries and does not call OpenAI. With it enabled, Jarvis can search public sources, stage supported decision-makers in **Discovery → Jarvis Research Previews**, and answer from verified workspace context. It never imports contacts or sends outreach merely because a search was requested.
+With `JARVIS_OPENAI_ENABLED=false`, Jarvis continues using verified Growth Operator workspace summaries and does not call OpenAI. With it enabled, Jarvis can search public sources, display supported decision-makers and their evidence directly in its conversation, and speak replies with the selected OpenAI voice. Import uses a separate two-step approval on the same page. Research and import never send outreach.
 
 ## 4. Recommended first notes
 

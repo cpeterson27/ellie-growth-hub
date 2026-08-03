@@ -2,8 +2,59 @@ import { useState, useRef, useEffect } from "react";
 import { FiMaximize2, FiMinimize2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { useJarvis } from "../hooks/useJarvis";
-import { createContentBrief, fetchJarvisProfile, updateJarvisProfile } from "../services/api.js";
+import {
+  confirmJarvisResearchImport,
+  createContentBrief,
+  fetchJarvisProfile,
+  fetchPeopleResearchPreviews,
+  prepareJarvisResearchImport,
+  synthesizeJarvisSpeech,
+  updateJarvisProfile,
+} from "../services/api.js";
 import "./JarvisChat.css";
+
+const OPENAI_VOICES = [
+  { value: "marin", label: "Marin · natural and polished" },
+  { value: "cedar", label: "Cedar · warm and confident" },
+  { value: "coral", label: "Coral · bright and conversational" },
+  { value: "nova", label: "Nova · clear and energetic" },
+  { value: "sage", label: "Sage · calm and professional" },
+  { value: "alloy", label: "Alloy · balanced and neutral" },
+  { value: "ash", label: "Ash · direct and composed" },
+  { value: "ballad", label: "Ballad · expressive and smooth" },
+  { value: "echo", label: "Echo · steady and focused" },
+  { value: "fable", label: "Fable · warm and expressive" },
+  { value: "onyx", label: "Onyx · deep and authoritative" },
+  { value: "shimmer", label: "Shimmer · friendly and upbeat" },
+  { value: "verse", label: "Verse · versatile and natural" },
+];
+const OPENAI_VOICE_NAMES = new Set(OPENAI_VOICES.map((voice) => voice.value));
+
+function JarvisResearchPreview({ message, approval, busy, onPrepare, onConfirm }) {
+  const people = Array.isArray(message?.data?.people) ? message.data.people : [];
+  const summary = message?.data?.preview || {};
+  const previewId = String(message?.data?.previewId || "");
+  if (!people.length || !previewId) return null;
+  const imported = approval?.status === "imported" || message.data.previewStatus === "imported";
+  return <section className="jarvis-research-preview">
+    <header className="jarvis-research-preview__header">
+      <div><span>Research preview</span><strong>{summary.total || people.length} people found</strong><p>{summary.newContacts || 0} new · {summary.existingContacts || 0} CRM matches · {summary.publishedEmails || 0} published emails</p></div>
+      <span className="jarvis-research-preview__state">{imported ? "Imported" : approval ? "Approval ready" : "Review first"}</span>
+    </header>
+    <div className="jarvis-research-people">
+      {people.map((person, index) => <article className="jarvis-research-person" key={`${previewId}-${person.firstName}-${person.lastName}-${index}`}>
+        <div className="jarvis-research-person__identity"><strong>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Unnamed person"}</strong><span>{person.title || "Role needs review"}</span><p>{person.company}</p></div>
+        <div className="jarvis-research-person__email"><small>Email</small><strong>{person.email || "Not publicly listed"}</strong><span>{String(person.emailStatus || "missing").replaceAll("_", " ")}</span></div>
+        <details><summary>Evidence and duplicate review</summary><p>{person.evidenceSummary || "Public evidence is attached for review."}</p><div className="jarvis-research-person__review"><span>{String(person.reviewStatus || "new").replaceAll("_", " ")}</span>{person.matchReason ? <span>{person.matchReason}</span> : null}</div><a href={person.evidenceUrl} target="_blank" rel="noreferrer">Open public source</a></details>
+      </article>)}
+    </div>
+    <div className="jarvis-research-approval">
+      <p><strong>Nothing is sent.</strong> Importing only adds these people as needs-review prospects. Published emails remain unverified and blocked from campaigns.</p>
+      {imported ? <div className="jarvis-import-success">Imported into the CRM for review. No outreach was sent.</div> : approval ? <div className="jarvis-confirm-import"><div><span>Second confirmation</span><strong>{approval.confirmationPhrase}</strong><small>Expires {new Date(approval.expiresAt).toLocaleTimeString()}</small></div><button type="button" disabled={busy} onClick={() => onConfirm(previewId, approval)}>{busy ? "Importing…" : `Confirm import of ${summary.total || people.length} prospects`}</button></div> : <button type="button" className="jarvis-prepare-import" disabled={busy} onClick={() => onPrepare(previewId)}>{busy ? "Preparing approval…" : "Approve for CRM import"}</button>}
+      {approval?.error ? <div className="jarvis-inline-error">{approval.error}</div> : null}
+    </div>
+  </section>;
+}
 
 // Speech synthesis handles plain prose much better than rendered Markdown.
 // Keep the visual response intact, but remove formatting and add natural pauses
@@ -49,11 +100,11 @@ export default function JarvisChat() {
   const messagesEndRef = useRef(null);
   const [status, setStatus] = useState(null);
   const [savingDraftId, setSavingDraftId] = useState(null);
-  const [voices, setVoices] = useState([]);
-  const [voiceName, setVoiceName] = useState("");
+  const [voiceName, setVoiceName] = useState("marin");
   const [speakingId, setSpeakingId] = useState(null);
   const [speechError, setSpeechError] = useState("");
-  const speechStartTimerRef = useRef(null);
+  const audioRef = useRef(null);
+  const audioUrlRef = useRef("");
   const recognitionRef = useRef(null);
   const [listening, setListening] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
@@ -61,6 +112,8 @@ export default function JarvisChat() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [researchApprovals, setResearchApprovals] = useState({});
+  const [researchActionId, setResearchActionId] = useState("");
 
   useEffect(() => {
     getStatus().then(setStatus);
@@ -70,23 +123,25 @@ export default function JarvisChat() {
     fetchJarvisProfile().then((response) => {
       if (!response?.success) return;
       setProfile(response.data);
-      setVoiceName(response.data.voiceName || "");
+      setVoiceName(OPENAI_VOICE_NAMES.has(response.data.voiceName) ? response.data.voiceName : "marin");
       setAutoSpeak(response.data.autoSpeak !== false);
       setMessages((current) => current.map((item) => item.id === 1 ? { ...item, text: response.data.greeting || item.text } : item));
     }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!("speechSynthesis" in window)) return undefined;
-    const loadVoices = () => {
-      const available = window.speechSynthesis.getVoices();
-      setVoices(available);
-      if (!voiceName && available[0]) setVoiceName(available[0].name);
-    };
-    loadVoices();
-    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
-    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
-  }, [voiceName]);
+    fetchPeopleResearchPreviews(1).then((response) => {
+      const preview = response?.previews?.[0];
+      if (!preview?.people?.length) return;
+      setMessages((current) => current.some((item) => item.previewHistoryId === String(preview._id)) ? current : [...current, {
+        id: `research-${preview._id}`,
+        previewHistoryId: String(preview._id),
+        type: "assistant",
+        text: preview.status === "imported" ? "Your latest research preview has already been imported into the CRM." : "Your latest staged research is ready below. Review every person and source, then approve the CRM import here when you are comfortable.",
+        data: { previewId: preview._id, previewStatus: preview.status, preview: preview.summary, people: preview.people },
+      }]);
+    }).catch(() => {});
+  }, []);
 
   const scrollToBottom = () => {
     const messagePanel = messagesEndRef.current?.parentElement;
@@ -97,49 +152,41 @@ export default function JarvisChat() {
     scrollToBottom();
   }, [messages]);
 
-  const speakText = (text, id) => {
+  const stopSpeaking = () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = "";
+    setSpeakingId(null);
+  };
+
+  const speakText = async (text, id) => {
     const spokenText = prepareTextForSpeech(text);
-    if (!("speechSynthesis" in window) || !spokenText) {
-      setSpeechError("Voice playback is not available in this browser.");
-      return;
-    }
+    if (!spokenText) return;
     setSpeechError("");
-    if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(spokenText);
-    utterance.voice = voices.find((voice) => voice.name === voiceName) || null;
-    utterance.rate = profile?.voiceRate || 1;
-    utterance.pitch = profile?.voicePitch || 1;
-    utterance.onstart = () => {
-      if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
-      setSpeakingId(id);
-    };
-    utterance.onend = () => {
-      if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
-      setSpeakingId(null);
-    };
-    utterance.onerror = (event) => {
-      if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
-      setSpeakingId(null);
-      if (event.error !== "canceled" && event.error !== "interrupted") {
-        setSpeechError("Browser voice playback was blocked. Click Test voice once, then ask Jarvis again.");
-      }
-    };
-    window.speechSynthesis.resume();
-    window.speechSynthesis.speak(utterance);
-    speechStartTimerRef.current = window.setTimeout(() => {
-      setSpeechError("Your browser did not start voice playback. Check macOS Sound output, then try Test voice in Chrome.");
-    }, 1500);
+    stopSpeaking();
+    setSpeakingId(id);
+    try {
+      const blob = await synthesizeJarvisSpeech(spokenText, OPENAI_VOICE_NAMES.has(voiceName) ? voiceName : "marin");
+      const url = URL.createObjectURL(blob);
+      audioUrlRef.current = url;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.playbackRate = profile?.voiceRate || 1;
+      audio.onended = stopSpeaking;
+      audio.onerror = () => { stopSpeaking(); setSpeechError("Jarvis voice could not be played."); };
+      await audio.play();
+    } catch (voiceError) {
+      stopSpeaking();
+      setSpeechError(voiceError.response?.data?.error || "OpenAI voice needs an active API key and billing in the Render backend.");
+    }
   };
 
   const testVoice = () => {
     speakText(`Hi, I am ${profile?.name || "Jarvis"}. Voice playback is ready.`, "voice-test");
   };
 
-  useEffect(() => () => {
-    if (speechStartTimerRef.current) clearTimeout(speechStartTimerRef.current);
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-  }, []);
+  useEffect(() => () => stopSpeaking(), []);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -204,7 +251,6 @@ export default function JarvisChat() {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if ("speechSynthesis" in window) window.speechSynthesis.resume();
     const prompt = input;
     setInput("");
     submitPrompt(prompt);
@@ -216,7 +262,7 @@ export default function JarvisChat() {
         const question = message?.data?.researchQuestion || "";
         navigate(`/discovery${question ? `?question=${encodeURIComponent(question)}` : ""}`);
       } else if (action === "review_research_preview") {
-        navigate("/discovery#people-research-previews");
+        scrollToBottom();
       } else if (action === "view_development_requests") {
         navigate("/development-requests");
       } else if (action === "create_campaign") {
@@ -337,8 +383,7 @@ export default function JarvisChat() {
   const startListening = () => {
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition || listening || loading) return;
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    setSpeakingId(null);
+    stopSpeaking();
     const recognition = new Recognition();
     recognitionRef.current = recognition;
     recognition.lang = "en-US";
@@ -360,8 +405,7 @@ export default function JarvisChat() {
       return;
     }
     if (speakingId) {
-      window.speechSynthesis?.cancel();
-      setSpeakingId(null);
+      stopSpeaking();
       return;
     }
     startListening();
@@ -391,6 +435,35 @@ export default function JarvisChat() {
       }
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const prepareResearchImport = async (previewId) => {
+    try {
+      setResearchActionId(previewId);
+      const response = await prepareJarvisResearchImport(previewId);
+      setResearchApprovals((current) => ({ ...current, [previewId]: response.data }));
+    } catch (importError) {
+      setResearchApprovals((current) => ({ ...current, [previewId]: { error: importError.response?.data?.error || "Unable to prepare this import." } }));
+    } finally {
+      setResearchActionId("");
+    }
+  };
+
+  const confirmResearchImport = async (previewId, approval) => {
+    try {
+      setResearchActionId(previewId);
+      const response = await confirmJarvisResearchImport(previewId, approval.approvalId, approval.confirmationPhrase);
+      setResearchApprovals((current) => ({ ...current, [previewId]: { ...approval, status: "imported", result: response.data } }));
+      setMessages((current) => [...current, {
+        id: `imported-${previewId}-${Date.now()}`,
+        type: "assistant",
+        text: `Imported ${response.data.mongoCreated || 0} new prospect${response.data.mongoCreated === 1 ? "" : "s"} and updated ${response.data.mongoUpdated || 0} existing CRM record${response.data.mongoUpdated === 1 ? "" : "s"}. No outreach was sent.`,
+      }]);
+    } catch (importError) {
+      setResearchApprovals((current) => ({ ...current, [previewId]: { ...approval, error: importError.response?.data?.error || "Unable to import this preview." } }));
+    } finally {
+      setResearchActionId("");
     }
   };
 
@@ -451,7 +524,7 @@ export default function JarvisChat() {
         <label>Visual style<select value={profile.theme} onChange={(event) => setProfile({ ...profile, theme: event.target.value })}><option value="executive">Executive</option><option value="midnight">Midnight</option><option value="copper">Copper</option></select></label>
         <label>Response style<select value={profile.responseStyle} onChange={(event) => setProfile({ ...profile, responseStyle: event.target.value })}><option value="concise">Concise</option><option value="collaborative">Collaborative</option><option value="detailed">Detailed</option></select></label>
         <label>Voice pace<input type="range" min="0.5" max="1.5" step="0.1" value={profile.voiceRate} onChange={(event) => setProfile({ ...profile, voiceRate: Number(event.target.value) })} /></label>
-        <label>Voice pitch<input type="range" min="0" max="2" step="0.1" value={profile.voicePitch} onChange={(event) => setProfile({ ...profile, voicePitch: Number(event.target.value) })} /></label>
+        <label>OpenAI voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{OPENAI_VOICES.map((voice) => <option key={voice.value} value={voice.value}>{voice.label}</option>)}</select></label>
         <button type="submit" disabled={savingProfile}>{savingProfile ? "Saving…" : "Save Jarvis"}</button>
       </form> : null}
 
@@ -465,6 +538,8 @@ export default function JarvisChat() {
               <div className="jarvis-message-text">{msg.text}</div>
 
               {msg.type === "assistant" ? <div className="jarvis-response-tools"><button onClick={() => speakMessage(msg)} disabled={speakingId === msg.id}>{speakingId === msg.id ? "Speaking…" : "Speak"}</button></div> : null}
+
+              <JarvisResearchPreview message={msg} approval={researchApprovals[String(msg.data?.previewId || "")]} busy={researchActionId === String(msg.data?.previewId || "")} onPrepare={prepareResearchImport} onConfirm={confirmResearchImport} />
 
               {msg.activity?.length ? <div className="jarvis-activity"><p>Jarvis completed</p>{msg.activity.map((step, index) => <div key={`${msg.id}-${index}`}><span>{step.status === "warning" ? "!" : "✓"}</span>{step.label}</div>)}</div> : null}
               {msg.memorySources?.length ? <div className="jarvis-memory-sources"><strong>Vault notes consulted</strong>{msg.memorySources.map((source) => <span key={source}>{source}</span>)}</div> : null}
@@ -487,7 +562,7 @@ export default function JarvisChat() {
                 </div>
               )}
 
-              {msg.type === "assistant" && !msg.savedAs ? (
+              {msg.type === "assistant" && !msg.savedAs && !msg.data?.people?.length ? (
                 <div className="jarvis-draft-actions">
                   <button disabled={savingDraftId === msg.id} onClick={() => saveJarvisDraft(msg, "email_template")}>Save as email template</button>
                   <button disabled={savingDraftId === msg.id} onClick={() => saveJarvisDraft(msg, "social")}>Save as social draft</button>
@@ -529,7 +604,8 @@ export default function JarvisChat() {
           {voiceInputSupported ? <button type="button" className="jarvis-mic-btn" onClick={startListening} disabled={loading || listening}>{listening ? "Listening…" : "Talk"}</button> : null}
         </div>
 
-        {voices.length ? <div className="jarvis-voice-controls"><label className="jarvis-voice-picker">Jarvis voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{voices.map((voice) => <option key={`${voice.name}-${voice.lang}`} value={voice.name}>{voice.name} ({voice.lang})</option>)}</select></label><button type="button" className="jarvis-voice-test" onClick={testVoice} disabled={Boolean(speakingId)}>{speakingId ? "Speaking…" : "Test voice"}</button><label className="jarvis-auto-speak"><input type="checkbox" checked={autoSpeak} onChange={(event) => setAutoSpeak(event.target.checked)} /> Speak replies automatically</label></div> : <p className="jarvis-input-note">Voice playback is not available in this browser.</p>}
+        <div className="jarvis-voice-controls"><label className="jarvis-voice-picker">OpenAI voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{OPENAI_VOICES.map((voice) => <option key={voice.value} value={voice.value}>{voice.label}</option>)}</select></label><button type="button" className="jarvis-voice-test" onClick={testVoice} disabled={Boolean(speakingId)}>{speakingId ? "Speaking…" : "Test voice"}</button><label className="jarvis-auto-speak"><input type="checkbox" checked={autoSpeak} onChange={(event) => setAutoSpeak(event.target.checked)} /> Speak replies automatically</label></div>
+        <p className="jarvis-ai-voice-disclosure">Jarvis voice audio is AI-generated using OpenAI.</p>
 
         {selectedCampaignId && (
           <div className="jarvis-test-email-group">

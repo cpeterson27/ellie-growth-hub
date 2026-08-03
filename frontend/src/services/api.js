@@ -443,6 +443,21 @@ export const updateJarvisProfile = (profile) =>
     .put("/jarvis/profile", profile)
     .then((res) => res.data);
 
+export const prepareJarvisResearchImport = (previewId) =>
+  api
+    .post(`/jarvis/research-previews/${previewId}/prepare-import`)
+    .then((res) => res.data);
+
+export const confirmJarvisResearchImport = (previewId, approvalId, confirmation) =>
+  api
+    .post(`/jarvis/research-previews/${previewId}/confirm-import`, { approvalId, confirmation })
+    .then((res) => res.data);
+
+export const synthesizeJarvisSpeech = (text, voice) =>
+  api
+    .post("/jarvis/voice/speech", { text, voice }, { responseType: "blob" })
+    .then((res) => res.data);
+
 
 
 export const jarvisRecommendCampaign = (options) =>
