@@ -47,7 +47,7 @@ const examples = [
 function buildAudiencePayload(target) {
   return {
     name: target.name || `Market research · ${new Date().toLocaleDateString()}`,
-    description: "Organization research created inside Ellie AI.",
+    description: "Organization research created inside Growth Operator.",
     source: "manual",
     criteria: {
       keywords: splitValues(target.keywords),
@@ -136,7 +136,7 @@ export default function Discovery() {
       setTargetPreset("custom");
       setNotice(plan.compilerWarning || "Research plan created. Review the evidence requirements and criteria before running it.");
     } catch (error) {
-      setNotice(error.response?.data?.error || "Ellie could not build this research plan.");
+      setNotice(error.response?.data?.error || "Growth Operator could not build this research plan.");
     } finally {
       setPlanning(false);
     }
@@ -185,7 +185,7 @@ export default function Discovery() {
       setResearchOrganizations(resultList.organizations || []);
       setNotice(`${result.organizationsFound || 0} organizations found; ${result.organizationsCreated || 0} added and ${result.organizationsUpdated || 0} updated.`);
     } catch (error) {
-      setNotice(error.response?.data?.error || "Ellie could not complete this research run.");
+      setNotice(error.response?.data?.error || "Growth Operator could not complete this research run.");
     } finally {
       setRunning(false);
     }
@@ -201,7 +201,7 @@ export default function Discovery() {
         setNotice(response.job.error);
         return;
       }
-      setNotice("External research started. You can keep this page open while Ellie collects and deduplicates results.");
+      setNotice("External research started. You can keep this page open while Growth Operator collects and deduplicates results.");
       for (let attempt = 0; attempt < 90; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const current = await fetchMarketResearchJob(response.job._id);
@@ -217,7 +217,7 @@ export default function Discovery() {
         }
       }
     } catch (error) {
-      setNotice(error.response?.data?.error || "Ellie could not start external research.");
+      setNotice(error.response?.data?.error || "Growth Operator could not start external research.");
     } finally {
       setExternalRunning(false);
     }
@@ -242,7 +242,7 @@ export default function Discovery() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${(target.name || "ellie-research-list").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.csv`;
+    link.download = `${(target.name || "growth-operator-research-list").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -263,12 +263,12 @@ export default function Discovery() {
 
   return <div className="discovery-page">
     <header className="discovery-header">
-      <div><span className="eyebrow">Ellie Market Intelligence</span><h1>Research a market, rank the fit, then build your list</h1><p>Ellie owns the workflow: research profiles, evidence, scoring, review, CRM records, and outreach handoff.</p></div>
+      <div><span className="eyebrow">Growth Operator Market Intelligence</span><h1>Research a market, rank the fit, then build your list</h1><p>Growth Operator owns the workflow: research profiles, evidence, scoring, review, CRM records, and outreach handoff.</p></div>
     </header>
 
     {notice ? <div className="notice-banner" role="status">{notice}</div> : null}
 
-    <DashboardCard title="Ask Ellie to find a market">
+    <DashboardCard title="Ask Growth Operator to find a market">
       <div className="discovery-agent-prompt">
         <textarea value={marketQuestion} onChange={(event) => setMarketQuestion(event.target.value)} placeholder="Example: Find hair salons in San Francisco with 2+ locations" />
         <Button loading={planning} disabled={!marketQuestion.trim()} onClick={buildResearchPlan}>Build research plan</Button>
@@ -276,7 +276,7 @@ export default function Discovery() {
       <div className="discovery-query-examples">{examples.map((example) => <button key={example} type="button" onClick={() => setMarketQuestion(example)}>{example}</button>)}</div>
       <p className="discovery-safety-note"><strong>Professional standard:</strong> results must show their source and freshness. An email is never labeled verified unless a verification check supports it.</p>
       {marketPlan ? <section className="market-plan-review">
-        <header><div><span>{marketPlan.compiler === "openai" ? "AI-structured plan" : "Ellie rules-based plan"}</span><strong>{marketPlan.name}</strong></div><small>Review before research</small></header>
+        <header><div><span>{marketPlan.compiler === "openai" ? "AI-structured plan" : "Growth Operator rules-based plan"}</span><strong>{marketPlan.name}</strong></div><small>Review before research</small></header>
         <p>{marketPlan.summary}</p>
         <div><article><strong>Ranking</strong><span>{(marketPlan.rankingDimensions || []).join(" · ")}</span></article><article><strong>Needs attention</strong><span>{[...(marketPlan.assumptions || []), ...(marketPlan.unresolved || [])].join(" ") || "No unresolved criteria."}</span></article></div>
       </section> : null}
@@ -284,7 +284,7 @@ export default function Discovery() {
 
     <DashboardCard title="External research source">
       <div className={`research-source-status ${researchSource?.configured ? "is-ready" : "is-needed"}`}>
-        <div><span>{researchSource?.configured ? "Connected" : "Source required"}</span><strong>{researchSource?.name || "Checking source…"}</strong><p>{researchSource?.message || "Ellie is checking the external-data configuration."}</p></div>
+        <div><span>{researchSource?.configured ? "Connected" : "Source required"}</span><strong>{researchSource?.name || "Checking source…"}</strong><p>{researchSource?.message || "Growth Operator is checking the external-data configuration."}</p></div>
         <Button loading={externalRunning} disabled={!marketPlan || !researchSource?.configured} onClick={runExternalResearch}>Discover up to 1,000 organizations</Button>
       </div>
       {externalJob ? <div className="research-job-progress"><strong>{externalJob.status.replace(/_/g, " ")}</strong><span>{externalJob.statistics?.received || 0} received · {externalJob.statistics?.created || 0} new · {externalJob.statistics?.updated || 0} refreshed · {externalJob.statistics?.duplicates || 0} duplicates</span></div> : null}
@@ -309,13 +309,13 @@ export default function Discovery() {
         <div><strong>{organization.name}</strong><small>{[organization.industry, organization.location].filter(Boolean).join(" · ") || "Business details need research"}</small><p>{(organization.scoreReasons || []).join(" · ") || "No scoring evidence recorded yet."}</p></div>
         <div className="market-result-score"><strong>{organization.audienceScore || 0}</strong><span>{organization.audienceTier || "unscored"}</span></div>
         <div className="market-result-evidence"><strong>{organization.researchEvidence?.length || 0} sources</strong><span>{organization.lastResearchVerifiedAt ? `Checked ${new Date(organization.lastResearchVerifiedAt).toLocaleDateString()}` : "Verification needed"}</span></div>
-      </article>)}</div> : <div className="table-state table-state--empty">No stored organizations match this plan yet. Ellie did not manufacture results.</div>}
+      </article>)}</div> : <div className="table-state table-state--empty">No stored organizations match this plan yet. Growth Operator did not manufacture results.</div>}
     </DashboardCard> : null}
 
     <DashboardCard title="Prospect review" action={<div className="discovery-review-filters"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search prospects" /><select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select><select value={emailFilter} onChange={(event) => setEmailFilter(event.target.value)}><option value="verified">Verified email</option><option value="review">Needs review</option><option value="all">All</option></select></div>}>
       {filtered.length ? <div className="discovery-review-list">{filtered.map((prospect) => <article key={prospect._id}><div><strong>{prospect.name || "Unnamed prospect"}</strong><span>{[prospect.title, prospect.company].filter(Boolean).join(" · ") || "Company details needed"}</span><small>{prospect.email || "No email"} · {prospect.emailStatus || "unverified"}</small></div><div><Button size="sm" onClick={() => approve(prospect)}>Approve</Button><Button size="sm" variant="outline" onClick={() => setDeleteTarget(prospect)}>Delete</Button></div></article>)}</div> : <div className="table-state table-state--empty">No prospects match this review view.</div>}
     </DashboardCard>
 
-    <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete this prospect?" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}><p>This removes {deleteTarget?.name || "this prospect"} from Ellie. This cannot be undone.</p></Modal>
+    <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete this prospect?" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}><p>This removes {deleteTarget?.name || "this prospect"} from Growth Operator. This cannot be undone.</p></Modal>
   </div>;
 }

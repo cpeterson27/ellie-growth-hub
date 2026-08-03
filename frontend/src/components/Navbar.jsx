@@ -28,9 +28,9 @@ export default function Navbar({ onMenuClick }) {
     jarvis: ["Jarvis", "Your voice-first growth intelligence workspace."],
     "development-requests": ["Development requests", "Approve and hand software changes to Codex safely."],
     analytics: ["Analytics", "See what is working and where to focus next."],
-    integrations: ["Integrations", "Connect the systems behind Ellie’s growth engine."],
+    integrations: ["Integrations", "Connect the systems behind Growth Operator’s growth engine."],
     settings: ["Settings", "Personalize the workspace and operating rules."],
-  }[pageKey] || ["Growth workspace", "Operate Ellie’s growth engine from one place."];
+  }[pageKey] || ["Growth workspace", "Operate Growth Operator’s growth engine from one place."];
   const changeInitiative = (value) => {
     setSelectedId(value);
     if (value !== "all") navigate(`/campaigns/${value}`);

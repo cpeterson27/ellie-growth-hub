@@ -506,7 +506,7 @@ router.post("/from-event/:eventId", async (req, res) => {
 
 // ==================================
 // CREATE BRAND NEW EVENT + CAMPAIGN
-// Future Ellie AI Event Builder
+// Future Growth Operator Event Builder
 // ==================================
 router.post("/", async (req, res) => {
 

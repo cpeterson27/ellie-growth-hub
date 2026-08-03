@@ -107,7 +107,7 @@ const organizationSchema = new mongoose.Schema(
     }],
 
     // -------------------------------------------------------------------------
-    // Audience intelligence — scored by Ellie AI.
+    // Audience intelligence — scored by Growth Operator.
     // audienceScore: 0–100 composite fit score.
     // audienceTier:  human-readable priority tier derived from score.
     // scoreReasons:  plain-language explanations for the score.
@@ -146,7 +146,7 @@ const organizationSchema = new mongoose.Schema(
       default: Date.now,
     },
 
-    // Ellie-level enrichment timestamp — set when Ellie processes and
+    // Growth Operator-level enrichment timestamp — set when Growth Operator processes and
     // scores this org, regardless of which external source was used.
     enrichedAt: {
       type: Date,
@@ -157,7 +157,7 @@ const organizationSchema = new mongoose.Schema(
     // Organization priority and action readiness.
     // Priority is different from audienceScore:
     // - audienceScore: "How well does this org match the audience?"
-    // - priorityScore: "How important should Ellie consider this org right now?"
+    // - priorityScore: "How important should Growth Operator consider this org right now?"
     // -------------------------------------------------------------------------
 
     priorityScore: {
@@ -214,7 +214,7 @@ const organizationSchema = new mongoose.Schema(
 organizationSchema.index({ domain: 1 }, { unique: true, sparse: true });
 
 
-// Audience filtering — Ellie AI queries orgs by tier for outreach targeting.
+// Audience filtering — Growth Operator queries orgs by tier for outreach targeting.
 organizationSchema.index({ audienceTier: 1 });
 
 // Score sorting — for ranked org lists in discovery results.

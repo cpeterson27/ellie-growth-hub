@@ -75,7 +75,7 @@ async function validateAuthorizationQuery(query) {
 
 router.get("/oauth/authorize", async (req, res) => {
   const client = await validateAuthorizationQuery(req.query);
-  if (!client) return res.status(400).send("Invalid Ellie authorization request.");
+  if (!client) return res.status(400).send("Invalid Growth Operator authorization request.");
   const params = new URLSearchParams(Object.entries(req.query).map(([key, value]) => [key, String(value)]));
   res.redirect(`${frontendUrl()}/oauth/consent?${params}`);
 });

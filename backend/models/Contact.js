@@ -5,7 +5,7 @@
  *
  * Supports:
  * - Monday CRM
- * - imports and Ellie research
+ * - imports and Growth Operator research
  * - Eventbrite
  * - Manual imports
  * - Future integrations

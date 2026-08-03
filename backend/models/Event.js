@@ -148,7 +148,7 @@ const eventSchema = new mongoose.Schema(
     },
     audienceConfirmedAt: { type: Date, default: null },
 
-    // Draft-first planning information. These fields are owned by Ellie AI
+    // Draft-first planning information. These fields are owned by Growth Operator
     // until the user explicitly creates an Eventbrite draft.
     planning: {
       attendeeOutcomes: { type: String, default: "" },

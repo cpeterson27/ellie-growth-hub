@@ -23,7 +23,7 @@ const requireScope = (scope) => (req, res, next) => hasScope(req, scope) ? next(
 const confirmationExpiry = () => new Date(Date.now() + 15 * 60 * 1000);
 async function requireOperator(req, res, next) {
   const membership = await WorkspaceMembership.findOne({ workspaceId: req.mcpAuth.workspaceId, userId: req.mcpAuth.userId, status: "active" }).lean();
-  if (!membership || !["owner", "admin"].includes(membership.role)) return res.status(403).json({ error: "An Ellie owner or admin must perform this action." });
+  if (!membership || !["owner", "admin"].includes(membership.role)) return res.status(403).json({ error: "An Growth Operator owner or admin must perform this action." });
   req.operatorRole = membership.role;
   next();
 }
@@ -169,7 +169,7 @@ router.post("/gpt-actions/templates/apply", requireScope("campaigns:write"), req
     campaign.emailTemplate = { ...item.payload.after, status: "draft", currentVersion: campaign.emailTemplate?.currentVersion || 0, approvedAt: null };
     await campaign.save();
     audit(req, "apply_template", true);
-    res.json({ campaignId: campaign._id, template: effectiveTemplate(campaign), requiresEllieApprovalBeforeSending: true });
+    res.json({ campaignId: campaign._id, template: effectiveTemplate(campaign), requiresOperatorApprovalBeforeSending: true });
   } catch (error) { audit(req, "apply_template", false, error.message); res.status(400).json({ error: error.message }); }
 });
 
@@ -177,7 +177,7 @@ router.post("/gpt-actions/campaigns/prepare-send", requireScope("campaigns:write
   try {
     const campaign = await Campaign.findById(req.body?.campaignId);
     if (!campaign) return res.status(404).json({ error: "Campaign not found." });
-    if (campaign.emailTemplate?.status !== "approved") return res.status(409).json({ error: "The campaign template must be approved in Ellie first." });
+    if (campaign.emailTemplate?.status !== "approved") return res.status(409).json({ error: "The campaign template must be approved in Growth Operator first." });
     const requested = [...new Set((Array.isArray(req.body?.outreachIds) ? req.body.outreachIds : []).map(String))].slice(0, 250);
     if (!requested.length) return res.status(400).json({ error: "Provide 1 to 250 outreachIds." });
     const items = await Outreach.find({ _id: { $in: requested }, campaignId: campaign._id, status: "approved" }).select("_id contactId contactEmail status").lean();
@@ -234,7 +234,7 @@ router.post("/gpt-actions/contacts/archive", requireScope("crm:write"), requireO
 });
 
 router.post("/gpt-actions/linkedin/preview", requireScope("crm:read"), async (req, res) => {
-  try { const preview = await previewContactIngestion({ contacts: req.body?.connections }); audit(req, "preview_linkedin", true); res.json({ ...preview, note: "Only owner-provided export rows are accepted. Ellie does not access or scrape LinkedIn." }); }
+  try { const preview = await previewContactIngestion({ contacts: req.body?.connections }); audit(req, "preview_linkedin", true); res.json({ ...preview, note: "Only owner-provided export rows are accepted. Growth Operator does not access or scrape LinkedIn." }); }
   catch (error) { audit(req, "preview_linkedin", false, error.message); res.status(400).json({ error: error.message }); }
 });
 
@@ -255,7 +255,7 @@ router.post("/gpt-actions/linkedin/import", requireScope("imports:write"), requi
     const result = await ingestContacts({ contacts: item.payload.connections, source: "linkedin_owner_export", marketingPermission: false, importBatchId: `growth-${item._id}`, importFileName: "ChatGPT LinkedIn owner export" });
     await Contact.updateMany({ lastImportBatchId: `growth-${item._id}` }, { $set: { status: "prospect" }, $addToSet: { tags: { $each: ["linkedin-owner-export", "needs-review"] } } });
     audit(req, "import_linkedin", true, result.mongoCreated + result.mongoUpdated);
-    res.json({ ...result, marketingPermission: false, nextStep: "Review and qualify these prospects in Ellie before outreach." });
+    res.json({ ...result, marketingPermission: false, nextStep: "Review and qualify these prospects in Growth Operator before outreach." });
   } catch (error) { audit(req, "import_linkedin", false, error.message); res.status(400).json({ error: error.message }); }
 });
 

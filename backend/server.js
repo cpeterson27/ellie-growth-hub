@@ -132,7 +132,7 @@ connectDatabase(mongoUri)
 
     app.get("/api/health", (req, res) => {
       res.json({
-        status: "Ellie backend running 🚀",
+        status: "Growth Operator backend running 🚀",
       });
     });
 

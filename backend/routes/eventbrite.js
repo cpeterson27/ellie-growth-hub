@@ -168,7 +168,7 @@ router.post("/webhook", async (req, res) => {
 
   if (isEventbriteTestRequest(req)) {
     await recordWebhookStatus(req, "verified", {
-      message: "Test received. Eventbrite can reach Ellie automatically.",
+      message: "Test received. Eventbrite can reach Growth Operator automatically.",
     });
     return res.status(202).json({ accepted: true, test: true });
   }
@@ -184,7 +184,7 @@ router.post("/webhook", async (req, res) => {
     return res.status(400).json({ error: "Unexpected webhook source resource" });
   }
 
-  await recordWebhookStatus(req, "accepted", { message: "Webhook accepted by Ellie." });
+  await recordWebhookStatus(req, "accepted", { message: "Webhook accepted by Growth Operator." });
   res.status(202).json({ accepted: true });
   setImmediate(async () => {
     try {
@@ -206,7 +206,7 @@ router.post("/webhook", async (req, res) => {
         });
       } else {
         await recordWebhookStatus(req, "accepted", {
-          message: "Webhook accepted; no matching Ellie event was found yet.",
+          message: "Webhook accepted; no matching Growth Operator event was found yet.",
         });
       }
     } catch (error) {
@@ -243,7 +243,7 @@ router.post("/webhook/configure", async (req, res) => {
       return res.status(409).json({
         configured: false,
         manualSetupRequired: true,
-        error: "Ellie’s backend webhook token is not configured yet.",
+        error: "Growth Operator’s backend webhook token is not configured yet.",
         receiverUrl: maskedWebhookReceiverUrl(req),
       });
     }
@@ -264,7 +264,7 @@ router.post("/webhook/configure", async (req, res) => {
       return res.status(409).json({
         configured: false,
         manualSetupRequired: true,
-        error: "Ellie could not find an Eventbrite organization for this account.",
+        error: "Growth Operator could not find an Eventbrite organization for this account.",
         receiverUrl: maskedWebhookReceiverUrl(req),
       });
     }
@@ -277,8 +277,8 @@ router.post("/webhook/configure", async (req, res) => {
     const webhook = existing || await createEventbriteWebhook(token, organizationId, receiverUrl);
     const providerWebhookId = String(webhook.id || webhook.webhook?.id || existing?.id || "");
     const message = existing
-      ? "Webhook already exists. Ellie can receive automatic Eventbrite updates."
-      : "Webhook created. Ellie can receive automatic Eventbrite updates.";
+      ? "Webhook already exists. Growth Operator can receive automatic Eventbrite updates."
+      : "Webhook created. Growth Operator can receive automatic Eventbrite updates.";
 
     await recordWebhookConfiguration(req, { providerWebhookId, organizationId, message });
     res.json({
@@ -296,7 +296,7 @@ router.post("/webhook/configure", async (req, res) => {
       manualSetupRequired: true,
       error: error.response?.data?.error_description ||
         error.response?.data?.error ||
-        "Eventbrite did not allow Ellie to create the webhook automatically.",
+        "Eventbrite did not allow Growth Operator to create the webhook automatically.",
       receiverUrl: maskedWebhookReceiverUrl(req),
       message: "Use the manual screen-share setup if Eventbrite requires the webhook to be created from the client’s Developer Links page.",
     });
@@ -445,7 +445,7 @@ router.post("/import/:eventId", async (req, res) => {
     }
 
     // Fetch the complete listing. Audience is intentionally not imported as
-    // Eventbrite data because it is an Ellie campaign decision.
+    // Eventbrite data because it is an Growth Operator campaign decision.
     const {
       event: eventbriteEvent,
       ticketClasses,

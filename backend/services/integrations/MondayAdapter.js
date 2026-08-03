@@ -3,7 +3,7 @@
  *
  * Handles:
  * - Monday → Mongo contact sync
- * - Ellie CRM → Monday contact creation
+ * - Growth Operator CRM → Monday contact creation
  */
 
 const BaseIntegration = require("./BaseIntegration");

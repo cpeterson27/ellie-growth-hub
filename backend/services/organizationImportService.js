@@ -103,7 +103,7 @@ async function importOrganizations({ rows, name = "" }) {
   }
   const audience = await Audience.create({
     name: String(name || `Organization import · ${now.toLocaleDateString("en-US")}`).trim().slice(0, 160),
-    description: "Organizations imported and reviewed in Ellie.", status: "draft", source: "import",
+    description: "Organizations imported and reviewed in Growth Operator.", status: "draft", source: "import",
     organizationIds, totalOrgs: organizationIds.length, lastDiscoveredAt: now,
   });
   await DiscoveryRun.create({

@@ -439,7 +439,7 @@ function contactWorkflowState(contact = {}) {
     return {
       key: "audience",
       label: "Add audience info",
-      detail: "Tell Ellie what this person is interested in.",
+      detail: "Tell Growth Operator what this person is interested in.",
     };
   }
   if (contact.campaignIds?.length) {
@@ -906,7 +906,7 @@ export default function Contacts() {
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `ellie-selected-contacts-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `growth-operator-selected-contacts-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     setBulkNotice(
@@ -1010,7 +1010,7 @@ export default function Contacts() {
         } catch (previewError) {
           setImportError(
             previewError.response?.data?.message ||
-              "Ellie could not check this CSV for duplicates. Import is paused.",
+              "Growth Operator could not check this CSV for duplicates. Import is paused.",
           );
         }
       },
@@ -1029,7 +1029,7 @@ export default function Contacts() {
     } catch (previewError) {
       setImportError(
         previewError.response?.data?.message ||
-          "Ellie could not recheck this working list for duplicates.",
+          "Growth Operator could not recheck this working list for duplicates.",
       );
     }
   }
@@ -1085,7 +1085,7 @@ export default function Contacts() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "ellie-email-finder-working-list.csv";
+    link.download = "growth-operator-email-finder-working-list.csv";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -1388,7 +1388,7 @@ export default function Contacts() {
       }
     }
     throw new Error(
-      "Email verification is taking longer than expected. Keep this window open and click Verify again shortly; Ellie will reuse the existing check.",
+      "Email verification is taking longer than expected. Keep this window open and click Verify again shortly; Growth Operator will reuse the existing check.",
     );
   }
 
@@ -1495,7 +1495,7 @@ export default function Contacts() {
       <section className="crm-mode-banner" aria-label="CRM connection options">
         <div>
           <span className="crm-mode-banner__eyebrow">Your contact system</span>
-          <strong>Ellie CRM is active.</strong>
+          <strong>Growth Operator CRM is active.</strong>
           <p>
             Use this CRM on its own, or connect another CRM and keep the same
             review, audience, and campaign workflow.
@@ -1684,7 +1684,7 @@ export default function Contacts() {
               </strong>
               <p>
                 Latest: {unsubscribedContacts[0]?.name || "Contact"} ·{" "}
-                {unsubscribeDate(unsubscribedContacts[0])}. Ellie blocks campaign
+                {unsubscribeDate(unsubscribedContacts[0])}. Growth Operator blocks campaign
                 email to every unsubscribed contact.
               </p>
             </div>
@@ -2049,7 +2049,7 @@ export default function Contacts() {
                         {!hasAudienceSignals(contact) ? (
                           <span
                             className="contact-status-badge contact-status-badge--unknown"
-                            title="Ellie has only identity information and will not guess this person’s interests."
+                            title="Growth Operator has only identity information and will not guess this person’s interests."
                           >
                             Audience unknown
                           </span>
@@ -2185,12 +2185,12 @@ export default function Contacts() {
         <DashboardCard title="Find Leads">
           <div className="lead-search-retired">
             <p>
-              Direct provider search has been retired. Use Ellie Market
+              Direct provider search has been retired. Use Growth Operator Market
               Intelligence or import a completed CSV here.
             </p>
             <p>
               <small>
-                Ellie now uses its own research and review workflow.
+                Growth Operator now uses its own research and review workflow.
               </small>
             </p>
             <Button onClick={openCsvImport}>Import contact CSV</Button>
@@ -2310,7 +2310,7 @@ export default function Contacts() {
                   navigate("/discovery");
                 }}
               >
-                Import to Ellie AI
+                Import to Growth Operator
                 {campaignId ? " and Add to Selected Campaign" : ""}
               </Button>
             </>
@@ -2379,23 +2379,23 @@ export default function Contacts() {
             <span>Networking intake</span>
             <h3>Scan once. Review once. Keep the relationship connected.</h3>
             <p>
-              Ellie reads a digital-card QR code or copied contact details,
+              Growth Operator reads a digital-card QR code or copied contact details,
               checks for an existing CRM record, and then creates or updates one
               contact.
             </p>
           </section>
           <ol className="business-card-steps">
             <li>
-              <strong>Stay signed into Ellie</strong>
+              <strong>Stay signed into Growth Operator</strong>
               <span>
-                Only your team needs an Ellie login. The person sharing the card
+                Only your team needs an Growth Operator login. The person sharing the card
                 does not.
               </span>
             </li>
             <li>
               <strong>Scan or paste the card</strong>
               <span>
-                Ellie keeps you on this screen instead of silently saving or
+                Growth Operator keeps you on this screen instead of silently saving or
                 launching a link.
               </span>
             </li>
@@ -2558,7 +2558,7 @@ export default function Contacts() {
           </fieldset>
           <p className="business-card-consent">
             <strong>Email safety:</strong> Receiving a business card does not
-            automatically grant bulk-marketing consent. Ellie stores the contact
+            automatically grant bulk-marketing consent. Growth Operator stores the contact
             for relationship follow-up; campaign permission remains off until it
             is recorded separately.
           </p>
@@ -2585,7 +2585,7 @@ export default function Contacts() {
         }
       >
         <p className="contact-modal-intro">
-          Only a usable name is required. Ellie AI saves this contact directly
+          Only a usable name is required. Growth Operator saves this contact directly
           to MongoDB.
         </p>
         {contactEditorSections.map(([section, fields]) => (
@@ -2673,7 +2673,7 @@ export default function Contacts() {
                 <strong>I personally confirmed this email address</strong>
                 <small>
                   Use this only when the person gave you the address directly or
-                  you already confirmed it. Ellie records this as
+                  you already confirmed it. Growth Operator records this as
                   owner-confirmed, not Emailable-verified.
                 </small>
               </span>
@@ -2695,7 +2695,7 @@ export default function Contacts() {
               <strong>Can receive campaign email</strong>
               <small>
                 {manualContact.email
-                  ? "Turn this on when this person gave permission. Ellie will include unsubscribe options automatically."
+                  ? "Turn this on when this person gave permission. Growth Operator will include unsubscribe options automatically."
                   : "Enter an email address above to enable this setting."}
               </small>
             </span>
@@ -2813,7 +2813,7 @@ export default function Contacts() {
                   <span>List preparation workspace</span>
                   <strong>Turn a contact table into a clean CSV</strong>
                   <small>
-                    Paste rows with column headings. Ellie separates the people
+                    Paste rows with column headings. Growth Operator separates the people
                     into editable fields, flags incomplete records, and
                     prepares a CSV for your email-finder website. Nothing is
                     added to the CRM until you choose to import it.
@@ -2837,14 +2837,14 @@ export default function Contacts() {
                   if (!pasted.trim()) return;
                   event.preventDefault();
                   setImportPasteText(pasted);
-                  setImportFileName("People pasted into Ellie");
+                  setImportFileName("People pasted into Growth Operator");
                   prepareImport(pasted, "csv");
                 }}
               >
                 <span className="lead-clipboard-target__icon">⌘V</span>
                 <strong>Click here, then paste tabular contacts</strong>
                 <p>
-                  Ellie immediately converts the clipboard into spreadsheet
+                  Growth Operator immediately converts the clipboard into spreadsheet
                   columns. The unstructured source text is not kept on screen.
                 </p>
                 <small>Mac: Command + V · Windows: Ctrl + V</small>
@@ -2855,7 +2855,7 @@ export default function Contacts() {
             </div>
             <p>
               Upload a CSV exported from a spreadsheet or another CRM.
-              Ellie recognizes common people columns automatically.
+              Growth Operator recognizes common people columns automatically.
             </p>
             <label className="crm-file-drop">
               <input
@@ -2912,7 +2912,7 @@ export default function Contacts() {
                 <p>
                   Download this clean file for your email-finder website. When
                   it returns the emails, upload that completed CSV back here so
-                  Ellie keeps every field in the correct column.
+                  Growth Operator keeps every field in the correct column.
                 </p>
               </div>
               <Button variant="outline" onClick={downloadPreparedContactCsv}>
@@ -2926,7 +2926,7 @@ export default function Contacts() {
                     <span>Duplicate protection complete</span>
                     <h3>
                       {duplicatePreview.newContacts} new ·{" "}
-                      {duplicatePreview.existingContacts} already in Ellie ·{" "}
+                      {duplicatePreview.existingContacts} already in Growth Operator ·{" "}
                       {duplicatePreview.duplicatesInFile} repeated in this
                       import
                     </h3>
@@ -2938,7 +2938,7 @@ export default function Contacts() {
                   </strong>
                 </header>
                 <p>
-                  Ellie will never create another contact for a matched row.
+                  Growth Operator will never create another contact for a matched row.
                   Existing contacts are updated with useful new information.
                   Repeated rows in this file resolve to the same contact.
                 </p>
@@ -2963,7 +2963,7 @@ export default function Contacts() {
                               {row.company ? ` · ${row.company}` : ""}
                             </small>
                           </div>
-                          <p>No matching contact was found in Ellie.</p>
+                          <p>No matching contact was found in Growth Operator.</p>
                         </article>
                       ))}
                   </section>
@@ -2985,7 +2985,7 @@ export default function Contacts() {
                               className={`duplicate-preflight__status is-${row.status}`}
                             >
                               {row.status === "existing"
-                                ? "Already in Ellie"
+                                ? "Already in Growth Operator"
                                 : "Repeated in import"}
                             </span>
                             <div>
@@ -3013,7 +3013,7 @@ export default function Contacts() {
               </section>
             ) : (
               <section className="duplicate-preflight is-checking">
-                <strong>Checking every row against Ellie…</strong>
+                <strong>Checking every row against Growth Operator…</strong>
                 <span>
                   Import stays disabled until duplicate protection finishes.
                 </span>
@@ -3051,7 +3051,7 @@ export default function Contacts() {
                 <strong>Approve these people for campaign email</strong>
                 <small>
                   Turn this on only when everyone in this import is eligible to
-                  receive this campaign. Ellie applies it to the whole group and
+                  receive this campaign. Growth Operator applies it to the whole group and
                   adds unsubscribe options automatically.
                 </small>
               </span>
@@ -3234,9 +3234,9 @@ export default function Contacts() {
                   <tr>
                     {importHeaders.map((header) => (
                       <th key={header}>
-                        <span>Map to Ellie field</span>
+                        <span>Map to Growth Operator field</span>
                         <select
-                          aria-label={`Map ${header} column to Ellie field`}
+                          aria-label={`Map ${header} column to Growth Operator field`}
                           value={header}
                           onChange={(event) =>
                             remapImportHeader(header, event.target.value)
@@ -3414,7 +3414,7 @@ export default function Contacts() {
                   {unsubscribeSourceLabel(
                     detailContact.emailPreferences?.unsubscribeSource,
                   )}{" "}
-                  on {unsubscribeDate(detailContact)}. Ellie will keep campaign
+                  on {unsubscribeDate(detailContact)}. Growth Operator will keep campaign
                   sending blocked unless the contact explicitly opts in again.
                 </p>
               </section>
@@ -3481,7 +3481,7 @@ export default function Contacts() {
         onClose={() => setEditingContact(null)}
         title={
           contactEditMode === "audience"
-            ? "Tell Ellie who this contact is"
+            ? "Tell Growth Operator who this contact is"
             : "Edit contact & campaign"
         }
         footer={
@@ -3539,7 +3539,7 @@ export default function Contacts() {
                   a future campaign?
                 </h3>
                 <p>
-                  Add only information you know. Ellie uses these categories to
+                  Add only information you know. Growth Operator uses these categories to
                   suggest the right campaigns—it will never guess from a name or
                   email.
                 </p>

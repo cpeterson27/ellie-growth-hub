@@ -31,8 +31,8 @@ export default function Login() {
   return (
     <main className="login-page">
       <section className="login-panel">
-        <a className="login-brand" href="/" aria-label="Ellie AI home">E</a>
-        <p className="login-eyebrow">Ellie AI</p>
+        <a className="login-brand" href="/" aria-label="Growth Operator home">G</a>
+        <p className="login-eyebrow">Growth Operator</p>
         <h1>Welcome back</h1>
         <p className="login-intro">Sign in to your private growth workspace.</p>
         <form onSubmit={submit}>
@@ -47,7 +47,7 @@ export default function Login() {
           {error ? <p className="login-error" role="alert">{error}</p> : null}
           <button type="submit" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
         </form>
-        <small>New customers start from the Ellie AI website. Team members join an existing workspace by invitation.</small>
+        <small>New customers start from the Growth Operator website. Team members join an existing workspace by invitation.</small>
       </section>
     </main>
   );

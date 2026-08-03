@@ -1,5 +1,5 @@
 export const defaultWorkspaceSettings = {
-  workspaceName: "Ellie AI Growth Operator",
+  workspaceName: "Growth Operator",
   defaultCampaignKind: "event",
   senderName: "Ellie’s Coaching",
   customContactFields: [],
@@ -10,7 +10,9 @@ export function getWorkspaceSettings() {
     const stored = JSON.parse(localStorage.getItem("ellie-settings") || "{}");
     const legacyFields = ["Relationship type", "Referral source", "Investment interests"];
     if (JSON.stringify(stored.customContactFields) === JSON.stringify(legacyFields)) stored.customContactFields = [];
-    return { ...defaultWorkspaceSettings, ...stored };
+    const settings = { ...defaultWorkspaceSettings, ...stored };
+    if (["Ellie AI Growth Operator", "Growth Operator Growth Operator"].includes(settings.workspaceName)) settings.workspaceName = "Growth Operator";
+    return settings;
   } catch {
     return defaultWorkspaceSettings;
   }

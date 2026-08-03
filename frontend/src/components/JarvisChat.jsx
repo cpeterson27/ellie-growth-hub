@@ -540,7 +540,7 @@ export default function JarvisChat() {
           </div>
         )}
 
-        <p className="jarvis-input-note">Press ⌘J while Ellie is open to start a voice turn. Talk records one request and sends it to Jarvis. Jarvis never sends outreach or changes records without a confirmed action.</p>
+        <p className="jarvis-input-note">Press ⌘J while Growth Operator is open to start a voice turn. Talk records one request and sends it to Jarvis. Jarvis never sends outreach or changes records without a confirmed action.</p>
         {speechError ? <div className="jarvis-error">{speechError}</div> : null}
         {error && <div className="jarvis-error">{error}</div>}
       </form>

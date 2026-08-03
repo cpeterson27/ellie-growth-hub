@@ -1,6 +1,6 @@
 /**
  * Jarvis Assistant Routes
- * AI control layer for Ellie systems
+ * AI control layer for Growth Operator systems
  */
 
 const express = require("express");

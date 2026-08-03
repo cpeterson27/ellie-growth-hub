@@ -1,6 +1,6 @@
 /**
  * Jarvis Assistant Service
- * AI control layer for Ellie AI systems
+ * AI control layer for Growth Operator systems
  * Provides intelligent insights and recommendations
  * Executes marketing actions (campaigns, email delivery)
  */
@@ -28,7 +28,7 @@ class JarvisService {
       throw new Error("Message is required");
     }
 
-    const activity = [{ label: "Checking Ellie workspace data", status: "complete" }];
+    const activity = [{ label: "Checking Growth Operator workspace data", status: "complete" }];
     const profile = await jarvisProfileService.getProfile();
     const memory = await jarvisMemoryService.retrieveRelevantNotes(message);
     if (memory.available) activity.push({ label: memory.sources.length ? `Consulted ${memory.sources.length} relevant vault note${memory.sources.length === 1 ? "" : "s"}` : "No matching vault notes found", status: "complete", sources: memory.sources });

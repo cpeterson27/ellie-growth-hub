@@ -22,7 +22,7 @@ router.post("/", async (req, res) => {
     prefix: rawToken.slice(0, 18),
     expiresAt: new Date(Date.now() + days * 86400000),
   });
-  res.status(201).json({ success: true, data: { id: token._id, name, token: rawToken, prefix: token.prefix, expiresAt: token.expiresAt, warning: "Copy this token now. Ellie stores only its hash and cannot show it again." } });
+  res.status(201).json({ success: true, data: { id: token._id, name, token: rawToken, prefix: token.prefix, expiresAt: token.expiresAt, warning: "Copy this token now. Growth Operator stores only its hash and cannot show it again." } });
 });
 
 router.delete("/:id", async (req, res) => {

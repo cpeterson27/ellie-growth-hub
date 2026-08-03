@@ -239,7 +239,7 @@ export default function CampaignWorkspace() {
           <div className="program-brand-editor">
             {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.programName || campaign.name} logo`} /> : <div className="program-brand-placeholder">Add the program logo</div>}
             <label><span>Logo image URL</span><input type="url" value={campaign.brand?.logoUrl || ""} placeholder="https://your-site.com/logo.png" onChange={(event) => updateBrandField("logoUrl", event.target.value)} /></label>
-            {imageUpload.configured ? <label><span>Or upload a new logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label> : <p className="image-hosting-note"><strong>Direct file upload is optional and not connected.</strong> For the fastest setup, paste an existing hosted image URL above. Cloudinary is only needed if you want Ellie to upload files for you.</p>}
+            {imageUpload.configured ? <label><span>Or upload a new logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label> : <p className="image-hosting-note"><strong>Direct file upload is optional and not connected.</strong> For the fastest setup, paste an existing hosted image URL above. Cloudinary is only needed if you want Growth Operator to upload files for you.</p>}
             <label><span>Program website</span><input type="url" value={campaign.brand?.websiteUrl || ""} placeholder="https://" onChange={(event) => updateBrandField("websiteUrl", event.target.value)} /></label>
             <label><span>Brand color</span><input type="color" value={campaign.brand?.accentColor || "#173f36"} onChange={(event) => updateBrandField("accentColor", event.target.value)} /></label>
             <Button loading={brandSaving} onClick={saveBrand}>Save program brand</Button>
@@ -260,7 +260,7 @@ export default function CampaignWorkspace() {
         {activeSection === "audience" ? <DashboardCard title="Confirmed target audience">
           {audienceMatch ? <>
             <div className="campaign-audience-source">
-              <div><strong>Source of truth</strong><p>The confirmed target audience below is the audience Ellie uses for matching, templates, and future searches.</p></div>
+              <div><strong>Source of truth</strong><p>The confirmed target audience below is the audience Growth Operator uses for matching, templates, and future searches.</p></div>
               {eventId ? <Button variant="outline" size="sm" onClick={() => navigate(`/events?eventId=${eventId}&tab=strategy`)}>Edit target audience</Button> : null}
             </div>
             <div className="campaign-audience-groups">
@@ -268,9 +268,9 @@ export default function CampaignWorkspace() {
             </div>
             {campaign.eventId?.audienceSuggestions?.length ? <details className="campaign-audience-suggestions"><summary>Suggestions found in the Eventbrite listing</summary><p>These are suggestions only. They do not become active unless you select and save them in Event strategy.</p><div>{campaign.eventId.audienceSuggestions.map((audience) => <span key={audience}>{audience}</span>)}</div></details> : null}
             <div className="audience-flow">
-              <div><span>1</span><p><strong>Confirm the targeting brief</strong>Ellie can suggest segments from the event, but you decide the official audience for this campaign.</p></div>
-              <div><span>2</span><p><strong>Use real contact sources</strong>Contacts come from Ellie research, CRM records, CSV uploads, manual entry, and future approved integrations.</p></div>
-              <div><span>3</span><p><strong>Match safely</strong>Ellie compares the brief with titles, industries, tags, keywords, companies, lists, and notes. Nothing is emailed automatically.</p></div>
+              <div><span>1</span><p><strong>Confirm the targeting brief</strong>Growth Operator can suggest segments from the event, but you decide the official audience for this campaign.</p></div>
+              <div><span>2</span><p><strong>Use real contact sources</strong>Contacts come from Growth Operator research, CRM records, CSV uploads, manual entry, and future approved integrations.</p></div>
+              <div><span>3</span><p><strong>Match safely</strong>Growth Operator compares the brief with titles, industries, tags, keywords, companies, lists, and notes. Nothing is emailed automatically.</p></div>
             </div>
             {eventId ? <div className="audience-strategy-action"><p><strong>Targeting brief</strong><span>{campaign.audience?.join(", ") || "Not approved yet"}</span></p><Button variant="outline" size="sm" onClick={() => navigate(`/events?eventId=${eventId}&tab=strategy`)}>Review targeting brief</Button></div> : null}
             <div className="campaign-audience-counts">

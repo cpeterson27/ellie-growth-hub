@@ -9,9 +9,13 @@ const router = express.Router();
 router.get("/", async (_req, res) => {
   const config = await WorkspaceConfig.findOneAndUpdate(
     { key: "primary" },
-    { $setOnInsert: { workspaceName: "Ellie AI Growth Operator" } },
+    { $setOnInsert: { workspaceName: "Growth Operator" } },
     { upsert: true, new: true },
   );
+  if (["Ellie AI Growth Operator", "Growth Operator Growth Operator"].includes(config.workspaceName)) {
+    config.workspaceName = "Growth Operator";
+    await config.save();
+  }
   res.json({
     workspaceName: config.workspaceName,
     legalBusinessName: config.legalBusinessName,
@@ -103,7 +107,7 @@ router.post("/members", async (req, res) => {
 router.get("/discovery-templates", async (_req, res) => {
   const config = await WorkspaceConfig.findOneAndUpdate(
     { key: "primary" },
-    { $setOnInsert: { workspaceName: "Ellie AI Growth Operator" } },
+    { $setOnInsert: { workspaceName: "Growth Operator" } },
     { upsert: true, new: true },
   );
   res.json({ templates: config.discoveryTemplates || [] });

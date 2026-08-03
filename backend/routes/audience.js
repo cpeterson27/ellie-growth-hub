@@ -72,7 +72,7 @@ router.post("/research/run", async (req, res) => {
     const status = sourceStatus();
     const audience = await Audience.create({
       workspaceId: req.auth.workspaceId,
-      name: String(plan.name || "Ellie market research").slice(0, 160),
+      name: String(plan.name || "Growth Operator market research").slice(0, 160),
       description: String(plan.summary || question),
       source: "ai",
       criteria: plan.criteria || {},
@@ -1008,7 +1008,7 @@ router.get("/organizations", async (req, res) => {
 // ======================================
 // DISCOVER ORGANIZATIONS FOR AUDIENCE
 // Triggers discovery flow for a given Audience:
-// - Search Ellie's organization intelligence records
+// - Search Growth Operator's organization intelligence records
 // - Enrich each organization
 // - Score and filter by criteria
 // - Save/update to MongoDB

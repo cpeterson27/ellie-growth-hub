@@ -104,7 +104,7 @@ export default function Integrations() {
         <div>
           <p className="page-eyebrow">Data & connections</p>
           <h1 className="page-title">Integrations</h1>
-          <p className="page-subtitle">Set up the accounts Ellie uses for events, contacts, discovery, marketing, and outreach.</p>
+          <p className="page-subtitle">Set up the accounts Growth Operator uses for events, contacts, discovery, marketing, and outreach.</p>
         </div>
         <Button variant="outline" onClick={loadProviders}>Refresh status</Button>
       </div>
@@ -112,7 +112,7 @@ export default function Integrations() {
       <h2 className="integration-section-title">CRM and contact sources</h2>
       <section className="crm-connection-grid">
         <article className="crm-connection-card">
-          <div><span className="integration-status integration-status--connected">Active</span><h2>Ellie CRM</h2></div>
+          <div><span className="integration-status integration-status--connected">Active</span><h2>Growth Operator CRM</h2></div>
           <p>Your built-in CRM for contacts, audience profiles, campaign assignments, outreach history, and CSV imports. No external CRM account is required.</p>
           <div className="crm-connection-actions">
             <Button onClick={() => navigate("/contacts")}>Open CRM</Button>
@@ -131,7 +131,7 @@ export default function Integrations() {
       <section className="crm-connection-grid">
         <article className="crm-connection-card">
           <div><span className={`integration-status integration-status--${gmail?.connected ? "connected" : "configuration_required"}`}>{gmail?.connected ? "Connected" : gmail?.configured ? "Ready to connect" : "App setup required"}</span><h2>Gmail</h2></div>
-          <p>{gmail?.connected ? `${gmail.email} is authorized for inbox visibility and approved sending.` : "Connect a client’s Google account so Ellie can read relevant threads, prepare replies, and send only after user approval."}</p>
+          <p>{gmail?.connected ? `${gmail.email} is authorized for inbox visibility and approved sending.` : "Connect a client’s Google account so Growth Operator can read relevant threads, prepare replies, and send only after user approval."}</p>
           <div className="crm-connection-actions">
             {gmail?.connected ? <><Button onClick={() => navigate("/inbox")}>Open inbox</Button><Button variant="outline" onClick={removeGmail}>Disconnect Gmail</Button></> : <><Button onClick={connectGmail} disabled={!gmail?.configured}>Connect Gmail</Button><Button variant="outline" onClick={() => navigate("/integrations/gmail")}>Setup details</Button></>}
           </div>

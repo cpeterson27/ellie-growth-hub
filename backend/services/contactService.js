@@ -3,7 +3,7 @@
  *
  * Handles contacts from:
  * - Monday CRM
- * - Ellie research and imports
+ * - Growth Operator research and imports
  * - Eventbrite
  * - Future integrations
  *

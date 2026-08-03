@@ -98,7 +98,7 @@ export default function Dashboard() {
           status: "Needs approval",
           tone: "needs-attention",
           title: "Approve the selected audience",
-          body: "Audience groups have been selected, but Ellie will not use them for matching or outreach until you approve them.",
+          body: "Audience groups have been selected, but Growth Operator will not use them for matching or outreach until you approve them.",
           label: "Approve target audience",
           path: `/events?eventId=${selected._id}&tab=strategy`,
         }
@@ -107,7 +107,7 @@ export default function Dashboard() {
             status: "Needs confirmation",
             tone: "needs-attention",
             title: "Confirm the targeting brief",
-            body: "This campaign already has assigned contacts. Confirming the target audience makes Ellie’s research, matching, and future outreach use one approved source of truth.",
+            body: "This campaign already has assigned contacts. Confirming the target audience makes Growth Operator’s research, matching, and future outreach use one approved source of truth.",
             label: "Confirm audience",
             path: `/events?eventId=${selected._id}&tab=strategy`,
           }
@@ -116,7 +116,7 @@ export default function Dashboard() {
             status: "Needs decision",
             tone: "needs-attention",
             title: "Choose the target audience",
-            body: "Ellie has suggestions from the event listing. Pick the groups this campaign should target, then approve them before matching new contacts.",
+            body: "Growth Operator has suggestions from the event listing. Pick the groups this campaign should target, then approve them before matching new contacts.",
             label: "Choose audience",
             path: `/events?eventId=${selected._id}&tab=strategy`,
           }
@@ -124,7 +124,7 @@ export default function Dashboard() {
             status: "Needs strategy",
             tone: "needs-attention",
             title: "Generate audience recommendations",
-            body: "Add or review event strategy so Ellie can suggest audience segments before matching contacts.",
+            body: "Add or review event strategy so Growth Operator can suggest audience segments before matching contacts.",
             label: "Open audience strategy",
             path: `/events?eventId=${selected._id}&tab=strategy`,
           };

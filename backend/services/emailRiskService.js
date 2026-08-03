@@ -30,7 +30,7 @@ async function assessEmail(rawEmail) {
     checks: { syntaxValid, domain, hasMx: mxRecords.length > 0, mxHosts: mxRecords.map((item) => item.exchange), disposable, roleAddress, suppressed: Boolean(suppression) },
     explanation: classification === "domain_valid"
       ? "The address format and receiving domain are valid. This does not prove that the individual mailbox exists."
-      : "Ellie found a risk signal that should be resolved before outreach.",
+      : "Growth Operator found a risk signal that should be resolved before outreach.",
   };
 }
 

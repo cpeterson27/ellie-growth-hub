@@ -24,7 +24,7 @@ router.post("/email-risk/check", async (req, res) => {
     if (!emails.length) return res.status(400).json({ success: false, message: "Provide at least one email address." });
     const results = [];
     for (const email of emails) results.push(await assessEmail(email));
-    return res.json({ success: true, data: { results, policy: "Ellie does not probe mailboxes or claim an address is verified from DNS alone." } });
+    return res.json({ success: true, data: { results, policy: "Growth Operator does not probe mailboxes or claim an address is verified from DNS alone." } });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || "Unable to assess email risk." });
   }

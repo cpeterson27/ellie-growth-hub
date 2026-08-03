@@ -38,7 +38,7 @@ const audienceSchema = new mongoose.Schema(
     },
 
     // -------------------------------------------------------------------------
-    // Discovery criteria used by Ellie's organization research engine
+    // Discovery criteria used by Growth Operator's organization research engine
     // and used to filter/score saved organizations.
     // -------------------------------------------------------------------------
 

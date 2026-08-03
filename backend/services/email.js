@@ -126,7 +126,7 @@ const replyTo =
   String(gmailConnection?.settings?.email || "").trim();
 
 const response = await integrationHub.execute("resend", "sendEmail", {
-  from: process.env.EMAIL_FROM || "Ellie AI <onboarding@resend.dev>",
+  from: process.env.EMAIL_FROM || "Growth Operator <onboarding@resend.dev>",
   to: recipient,
   subject: outreachItem.subject || "A message from Ellie's Coaching",
   text,
@@ -199,7 +199,7 @@ async function sendTestEmail(outreachItem, recipient = "team@elliescoaching.com"
       String(process.env.EMAIL_REPLY_TO || "").trim() ||
       String(gmailConnection?.settings?.email || "").trim();
     const response = await integrationHub.execute("resend", "sendEmail", {
-      from: process.env.EMAIL_FROM || "Ellie AI <onboarding@resend.dev>",
+      from: process.env.EMAIL_FROM || "Growth Operator <onboarding@resend.dev>",
       to: recipient,
       subject: `[TEST] ${outreachItem.subject || "A message from Ellie's Coaching"}`,
       text,

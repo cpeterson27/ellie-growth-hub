@@ -22,7 +22,7 @@ async function testResendIntegration() {
   console.log(`📧 Sending test email:`);
   console.log(`   From: ${fromEmail}`);
   console.log(`   To: ${testEmail}`);
-  console.log(`   Subject: Ellie AI - Test Email from Resend Integration\n`);
+  console.log(`   Subject: Growth Operator - Test Email from Resend Integration\n`);
 
   try {
     const response = await fetch(
@@ -34,9 +34,9 @@ async function testResendIntegration() {
         },
         body: JSON.stringify({
           to: testEmail,
-          subject: "Ellie AI - Test Email from Resend Integration",
+          subject: "Growth Operator - Test Email from Resend Integration",
           html: `
-          <h1>Welcome to Ellie AI</h1>
+          <h1>Welcome to Growth Operator</h1>
           <p>This is a test email sent via the Resend integration.</p>
           <p>If you received this, the integration is working correctly!</p>
           <hr>

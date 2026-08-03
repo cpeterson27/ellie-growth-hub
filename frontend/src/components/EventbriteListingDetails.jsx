@@ -165,7 +165,7 @@ export default function EventbriteListingDetails({ event }) {
             ))
           ) : (
             <EmptyField>
-              The public API did not expose Eventbrite’s Lineup section. Ellie
+              The public API did not expose Eventbrite’s Lineup section. Growth Operator
               will not invent speaker names.
             </EmptyField>
           )}
@@ -299,7 +299,7 @@ export default function EventbriteListingDetails({ event }) {
             through its public API.
           </strong>
           <p>
-            Ellie shows everything Eventbrite returns and sends unsupported
+            Growth Operator shows everything Eventbrite returns and sends unsupported
             edits to the authoritative Eventbrite editor.
           </p>
         </div>

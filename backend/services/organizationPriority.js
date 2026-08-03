@@ -11,7 +11,7 @@
  *
  * Priority is different from audienceScore:
  * - audienceScore: "How well does this org match the audience definition?"
- * - priorityScore: "How important should Ellie consider this org right now?"
+ * - priorityScore: "How important should Growth Operator consider this org right now?"
  */
 
 // =========================================================================

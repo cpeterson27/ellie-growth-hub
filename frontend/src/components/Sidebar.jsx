@@ -37,9 +37,9 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   return (
     <aside className={`${isOpen ? "sidebar sidebar--open" : "sidebar"} ${isCollapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebar__brand">
-        <div className="sidebar__logo">E</div>
+        <div className="sidebar__logo">G</div>
         <div>
-          <p>Ellie</p>
+          <p>Growth Operator</p>
           <small>Growth intelligence</small>
         </div>
       </div>
