@@ -43,11 +43,42 @@ function audit(req, action, success, detail = "") {
   McpAuditLog.create({ ...req.mcpAuth, tool: `gpt_action:${action}`, success, detail: String(detail).slice(0, 500) }).catch(() => {});
 }
 
+function normalizePublicPeople(rows) {
+  if (!Array.isArray(rows) || !rows.length || rows.length > 100) throw new Error("Provide between 1 and 100 researched people.");
+  return rows.map((row, index) => {
+    const firstName = String(row.firstName || "").trim().slice(0, 100);
+    const lastName = String(row.lastName || "").trim().slice(0, 100);
+    const company = String(row.company || "").trim().slice(0, 200);
+    const evidenceUrl = String(row.evidenceUrl || "").trim().slice(0, 1000);
+    let evidence;
+    try { evidence = new URL(evidenceUrl); } catch { throw new Error(`Person ${index + 1} needs a valid evidence URL.`); }
+    if (evidence.protocol !== "https:") throw new Error(`Person ${index + 1} evidence must use HTTPS.`);
+    if (/(^|\.)linkedin\.com$/i.test(evidence.hostname)) throw new Error(`Person ${index + 1} must use a public company, association, registry, or news source as evidence—not scraped LinkedIn data.`);
+    if ((!firstName && !lastName) || !company) throw new Error(`Person ${index + 1} needs a name and company.`);
+    const email = String(row.email || "").trim().toLowerCase().slice(0, 320);
+    return {
+      "First Name": firstName,
+      "Last Name": lastName,
+      "Company Name": company,
+      "Title": String(row.title || "").trim().slice(0, 200),
+      "Website": String(row.companyWebsite || "").trim().slice(0, 1000),
+      "Email": email,
+      "Email Status": email ? "published_unverified" : "missing",
+      "Primary Email Source": email ? evidenceUrl : "",
+      "Email Confidence": email ? "published_unverified" : "missing",
+      "Evidence URL": evidenceUrl,
+      "Evidence Summary": String(row.evidenceSummary || "").trim().slice(0, 1000),
+      "Evidence Observed At": new Date().toISOString(),
+      "Tags": ["public-web-research", "needs-review"],
+    };
+  });
+}
+
 router.get("/gpt-actions/openapi.json", (req, res) => {
   const base = serverUrl(req);
   res.json({
     openapi: "3.1.0",
-    info: { title: "Growth Operator", version: "1.1.1", description: "Research leads and prepare guarded CRM operations. High-impact changes require a short-lived approval and an exact second confirmation." },
+    info: { title: "Growth Operator", version: "1.2.0", description: "Research leads and prepare guarded CRM operations. High-impact changes require a short-lived approval and an exact second confirmation." },
     servers: [{ url: base }],
     components: {
       securitySchemes: { GrowthOperatorToken: { type: "http", scheme: "bearer", bearerFormat: "Growth Operator connection token" } },
@@ -55,6 +86,7 @@ router.get("/gpt-actions/openapi.json", (req, res) => {
         ResearchRequest: { type: "object", required: ["question"], properties: { question: { type: "string", minLength: 8, maxLength: 1000, description: "Natural-language description of the businesses or leads to research." }, maxResults: { type: "integer", minimum: 1, maximum: 1000, default: 250 } } },
         ConfirmationRequest: { type: "object", required: ["approvalId", "confirmation"], properties: { approvalId: { type: "string" }, confirmation: { type: "string", description: "The exact confirmation phrase returned by the prepare action." } } },
         ConnectionRow: { type: "object", required: ["First Name", "Last Name"], additionalProperties: true, properties: { "First Name": { type: "string" }, "Last Name": { type: "string" }, "Email": { type: "string" }, "Company Name": { type: "string" }, "Title": { type: "string" }, "Person Linkedin Url": { type: "string" } } },
+        PublicPersonRow: { type: "object", required: ["company", "evidenceUrl"], properties: { firstName: { type: "string" }, lastName: { type: "string" }, title: { type: "string" }, company: { type: "string" }, companyWebsite: { type: "string" }, email: { type: "string", description: "Only include an email visibly published by the cited source. Never submit a guessed email." }, evidenceUrl: { type: "string", description: "Public non-LinkedIn source proving the person's role or published email." }, evidenceSummary: { type: "string" } } },
       },
     },
     security: [{ GrowthOperatorToken: [] }],
@@ -75,6 +107,9 @@ router.get("/gpt-actions/openapi.json", (req, res) => {
       "/gpt-actions/linkedin/preview": { post: { operationId: "previewLinkedInConnections", summary: "Preview owner-provided LinkedIn connection rows", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["connections"], properties: { connections: { type: "array", maxItems: 500, items: { $ref: "#/components/schemas/ConnectionRow" } } } } } } }, responses: { 200: { description: "Deduplication preview" } } } },
       "/gpt-actions/linkedin/prepare-import": { post: { operationId: "prepareLinkedInImport", summary: "Prepare owner-provided LinkedIn rows for CRM review", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["connections"], properties: { connections: { type: "array", maxItems: 500, items: { $ref: "#/components/schemas/ConnectionRow" } } } } } } }, responses: { 200: { description: "Import confirmation" } } } },
       "/gpt-actions/linkedin/import": { post: { operationId: "confirmLinkedInImport", summary: "Import confirmed LinkedIn rows as unmarketable prospects", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ConfirmationRequest" } } } }, responses: { 200: { description: "Import receipt" } } } },
+      "/gpt-actions/people/preview": { post: { operationId: "previewPublicPeople", summary: "Preview evidence-backed people researched from public non-LinkedIn sources", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["people"], properties: { people: { type: "array", maxItems: 100, items: { $ref: "#/components/schemas/PublicPersonRow" } } } } } } }, responses: { 200: { description: "Deduplication and evidence preview" } } } },
+      "/gpt-actions/people/prepare-import": { post: { operationId: "preparePublicPeopleImport", summary: "Prepare evidence-backed public-web prospects for confirmed import", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["people"], properties: { people: { type: "array", maxItems: 100, items: { $ref: "#/components/schemas/PublicPersonRow" } } } } } } }, responses: { 200: { description: "Import preview and confirmation" } } } },
+      "/gpt-actions/people/import": { post: { operationId: "confirmPublicPeopleImport", summary: "Import confirmed evidence-backed people as needs-review prospects", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ConfirmationRequest" } } } }, responses: { 200: { description: "Import receipt" } } } },
       "/gpt-actions/crm-fields/prepare": { post: { operationId: "prepareCrmField", summary: "Preview a new custom CRM field", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["label"], properties: { label: { type: "string" }, key: { type: "string" }, type: { type: "string", enum: ["text", "number", "date", "boolean"] } } } } } }, responses: { 200: { description: "Field proposal" } } } },
       "/gpt-actions/crm-fields/apply": { post: { operationId: "applyCrmField", summary: "Add a confirmed custom CRM field", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ConfirmationRequest" } } } }, responses: { 200: { description: "Updated fields" } } } },
     },
@@ -86,7 +121,7 @@ router.get("/gpt-actions/privacy", (_req, res) => res.type("html").send("<!docty
 router.use("/gpt-actions", requireMcpAuth);
 router.get("/gpt-actions/status", (req, res) => {
   audit(req, "status", true);
-  res.json({ connected: true, workspaceScoped: true, capabilities: ["research planning", "ranked lead search", "prospect lists", "start research", "template drafts with approval", "guarded campaign sends", "reversible contact archiving", "custom CRM fields", "owner-provided LinkedIn connection imports"], safeguards: ["exact second confirmation", "15-minute approvals", "admin role checks", "suppression and consent enforcement", "audit logs"], unavailable: ["permanent deletion", "LinkedIn scraping or network access", "unconfirmed bulk sending", "guaranteed coverage of every US business"] });
+  res.json({ connected: true, workspaceScoped: true, capabilities: ["research planning", "ranked lead search", "prospect lists", "start research", "public-web decision-maker review and import", "template drafts with approval", "guarded campaign sends", "reversible contact archiving", "custom CRM fields", "owner-provided LinkedIn connection imports"], safeguards: ["source evidence required", "published emails remain unverified", "exact second confirmation", "15-minute approvals", "admin role checks", "suppression and consent enforcement", "audit logs"], unavailable: ["permanent deletion", "LinkedIn scraping or network access", "unconfirmed bulk sending", "guaranteed coverage of every US business"] });
 });
 router.get("/gpt-actions/prospect-lists", requireScope("research:read"), async (req, res) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
@@ -257,6 +292,37 @@ router.post("/gpt-actions/linkedin/import", requireScope("imports:write"), requi
     audit(req, "import_linkedin", true, result.mongoCreated + result.mongoUpdated);
     res.json({ ...result, marketingPermission: false, nextStep: "Review and qualify these prospects in Growth Operator before outreach." });
   } catch (error) { audit(req, "import_linkedin", false, error.message); res.status(400).json({ error: error.message }); }
+});
+
+router.post("/gpt-actions/people/preview", requireScope("crm:read"), async (req, res) => {
+  try {
+    const people = normalizePublicPeople(req.body?.people);
+    const preview = await previewContactIngestion({ contacts: people, source: "public_web_research" });
+    audit(req, "preview_public_people", true, preview.total);
+    res.json({ ...preview, people, rules: { evidenceRequired: true, linkedinScrapingAccepted: false, publishedEmailStatus: "published_unverified", marketingPermission: false } });
+  } catch (error) { audit(req, "preview_public_people", false, error.message); res.status(400).json({ error: error.message }); }
+});
+
+router.post("/gpt-actions/people/prepare-import", requireScope("imports:write"), requireOperator, async (req, res) => {
+  try {
+    const people = normalizePublicPeople(req.body?.people);
+    const preview = await previewContactIngestion({ contacts: people, source: "public_web_research" });
+    const phrase = `IMPORT ${people.length} PUBLIC-WEB PROSPECTS`;
+    const item = await approval(req, "import_public_people", { people }, { total: preview.total, newContacts: preview.newContacts, existingContacts: preview.existingContacts, duplicatesInFile: preview.duplicatesInFile }, phrase);
+    audit(req, "prepare_public_people_import", true, people.length);
+    res.json({ approvalId: item._id, expiresAt: item.expiresAt, confirmationPhrase: phrase, preview, marketingPermission: false, emailPolicy: "Published emails are stored as published_unverified and remain blocked from campaign sending." });
+  } catch (error) { audit(req, "prepare_public_people_import", false, error.message); res.status(400).json({ error: error.message }); }
+});
+
+router.post("/gpt-actions/people/import", requireScope("imports:write"), requireOperator, async (req, res) => {
+  try {
+    const item = await consumeApproval(req, "import_public_people");
+    const batchId = `public-web-${item._id}`;
+    const result = await ingestContacts({ contacts: item.payload.people, source: "public_web_research", marketingPermission: false, importBatchId: batchId, importFileName: "ChatGPT public-web people research" });
+    await Contact.updateMany({ lastImportBatchId: batchId }, { $set: { status: "prospect" }, $addToSet: { tags: { $each: ["public-web-research", "needs-review"] } } });
+    audit(req, "import_public_people", true, result.mongoCreated + result.mongoUpdated);
+    res.json({ ...result, marketingPermission: false, emailStatus: "published_unverified", nextStep: "Review evidence and verify any published email before approving outreach." });
+  } catch (error) { audit(req, "import_public_people", false, error.message); res.status(400).json({ error: error.message }); }
 });
 
 router.post("/gpt-actions/crm-fields/prepare", requireScope("settings:write"), requireOperator, async (req, res) => {
