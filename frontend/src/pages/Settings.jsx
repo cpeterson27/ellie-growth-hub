@@ -27,7 +27,7 @@ export default function Settings() {
   const [newMember, setNewMember] = useState({ name: "", email: "", role: "member", temporaryPassword: "" });
   const [mcpTokens, setMcpTokens] = useState([]);
   const [newMcpToken, setNewMcpToken] = useState(null);
-  const [mcpName, setMcpName] = useState("My AI assistant");
+  const [mcpName, setMcpName] = useState("Growth Operator");
   const [oauthConnections, setOauthConnections] = useState([]);
 
   useEffect(() => {
@@ -218,7 +218,7 @@ export default function Settings() {
         <header><p className="page-eyebrow">Security</p><h2>Account protection</h2><p>Review the security controls currently protecting this workspace.</p></header>
         <section className="settings-section security-check-list"><p><FiShield /><span><strong>Secure server-side sessions</strong><small>Sessions expire automatically after 14 days.</small></span><em>Active</em></p><p><FiLock /><span><strong>Protected account changes</strong><small>Passwords are hashed and current-password verification is required.</small></span><em>Active</em></p><p><FiUsers /><span><strong>Role-based workspace access</strong><small>Your current role is {session?.role || "member"}.</small></span><em>Active</em></p></section>
       </div> : activeSection === "ai" ? <div className="account-settings-panel account-settings-panel--refined">
-        <header><p className="page-eyebrow">AI connections</p><h2>Connect a private ChatGPT, Claude, Codex, or MCP client</h2><p>Give your own AI assistant controlled access to Ellie research and ranked lead lists. Email sending is not available through this connection.</p></header>
+        <header><p className="page-eyebrow">Growth Operator connections</p><h2>Connect Growth Operator to ChatGPT, Claude, Codex, or an MCP client</h2><p>Growth Operator receives controlled access to Ellie research and ranked lead lists. Email sending is not available through this connection.</p></header>
         <section className="settings-section">
           <div className="settings-section__heading"><FiCpu /><div><h3>Create a secure private connection</h3><p>For a ChatGPT Plus Custom GPT, create one token here and configure it as a Bearer API key. Tokens expire after 90 days and can be revoked at any time.</p></div></div>
           <div className="settings-ai-create"><input value={mcpName} onChange={(event) => setMcpName(event.target.value)} placeholder="Connection name" /><Button loading={saving} disabled={mcpName.trim().length < 2} onClick={connectAi}>Create connection</Button></div>

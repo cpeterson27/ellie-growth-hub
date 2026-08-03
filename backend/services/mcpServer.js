@@ -11,7 +11,7 @@ const { runMarketResearchJob } = require("./externalMarketResearchService");
 function jsonResult(value) { return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: value }; }
 
 function createServer(auth) {
-  const server = new McpServer({ name: "Ellie AI Growth Hub", version: "1.0.0" });
+  const server = new McpServer({ name: "Growth Operator by Ellie", version: "1.0.0" });
   const hasScope = (scope) => auth.scopes?.includes(scope);
   const audited = (tool, handler) => async (args) => {
     try {

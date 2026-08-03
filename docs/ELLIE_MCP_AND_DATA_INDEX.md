@@ -10,9 +10,9 @@ Sacramento-area searches can also use Ellie's small live OpenStreetMap pilot whe
 
 An owner or admin can load normalized records through `POST /api/business-index/imports`. Required fields per row are `name` and `sourceUrl`; the request also requires `sourceDataset`. Upserts use `sourceDataset + sourceRecordId`, so refreshes do not create duplicates.
 
-## Ellie MCP
+## Growth Operator MCP
 
-Ellie exposes a stateless Streamable HTTP MCP endpoint at `/mcp`. Development access uses revocable, expiring personal access tokens created through `/api/mcp-access-tokens`. The plaintext token is displayed once; MongoDB stores only its SHA-256 hash.
+Growth Operator by Ellie exposes a stateless Streamable HTTP MCP endpoint at `/mcp`. Development access uses revocable, expiring personal access tokens created through `/api/mcp-access-tokens`. The plaintext token is displayed once; MongoDB stores only its SHA-256 hash.
 
 Available tools:
 

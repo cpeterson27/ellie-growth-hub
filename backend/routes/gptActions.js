@@ -20,7 +20,7 @@ router.get("/gpt-actions/openapi.json", (req, res) => {
   const base = serverUrl(req);
   res.json({
     openapi: "3.1.0",
-    info: { title: "Ellie AI Lead Research", version: "1.0.0", description: "Securely search an Ellie workspace, review ranked leads, and create evidence-backed lead-research jobs. Never sends campaigns or deletes CRM data." },
+    info: { title: "Growth Operator by Ellie", version: "1.0.0", description: "Securely search an Ellie workspace, review ranked leads, and create evidence-backed lead-research jobs. Never sends campaigns or deletes CRM data." },
     servers: [{ url: base }],
     components: {
       securitySchemes: { EllieToken: { type: "http", scheme: "bearer", bearerFormat: "Ellie connection token" } },
@@ -40,7 +40,7 @@ router.get("/gpt-actions/openapi.json", (req, res) => {
   });
 });
 
-router.get("/gpt-actions/privacy", (_req, res) => res.type("html").send("<!doctype html><title>Ellie AI Privacy</title><main style='max-width:760px;margin:60px auto;font:16px system-ui;line-height:1.6'><h1>Ellie AI action privacy</h1><p>Ellie AI actions access only the authenticated Ellie workspace and only the permissions granted by its connection token. Tool calls are audit logged. Ellie does not expose passwords to ChatGPT and these actions do not send campaigns or delete CRM records.</p><p>Revoke access at any time from Ellie Settings → AI connections. Do not share an Ellie connection token or publish a private GPT containing one.</p></main>"));
+router.get("/gpt-actions/privacy", (_req, res) => res.type("html").send("<!doctype html><title>Growth Operator Privacy</title><main style='max-width:760px;margin:60px auto;font:16px system-ui;line-height:1.6'><h1>Growth Operator by Ellie</h1><p>Growth Operator actions access only the authenticated Ellie workspace and only the permissions granted by its connection token. Tool calls are audit logged. Ellie does not expose passwords to ChatGPT and these actions do not send campaigns or delete CRM records.</p><p>Revoke access at any time from Ellie Settings → AI connections. Do not share an Ellie connection token or publish a private GPT containing one.</p></main>"));
 
 router.use("/gpt-actions", requireMcpAuth);
 router.get("/gpt-actions/status", (req, res) => {
