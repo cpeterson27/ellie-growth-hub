@@ -1,10 +1,10 @@
 # Jarvis + Obsidian setup
 
-Jarvis can work immediately from verified Ellie data. OpenAI-written replies and Obsidian memory are explicit opt-ins, so no customer or campaign information is sent to OpenAI or written to disk until you turn either on.
+Jarvis can work immediately from verified Growth Operator data. OpenAI-written replies, live public-web research, and Obsidian memory are explicit opt-ins, so no customer or campaign information is sent to OpenAI or written to disk until you turn either on.
 
 ## 1. Create the vault
 
-In Obsidian, choose **Create new vault** and name it `Ellie AI Command Center`. Keep it in a local folder that the backend process can access.
+In Obsidian, choose **Create new vault** and name it `Growth Operator Command Center`. Existing vaults may keep their current folder name; the product-facing name remains Growth Operator.
 
 Create these folders:
 
@@ -54,9 +54,12 @@ Do not add `JARVIS_OBSIDIAN_MEMORY_PATH`; the application uses `OBSIDIAN_VAULT_P
 OPENAI_API_KEY=your_key_here
 JARVIS_OPENAI_ENABLED=true
 JARVIS_OPENAI_MODEL=gpt-4.1-mini
+JARVIS_RESEARCH_OPENAI_MODEL=gpt-5.6-sol
 ```
 
-With `JARVIS_OPENAI_ENABLED=false`, Jarvis continues using Ellie’s verified workspace summaries and does not call OpenAI. With it enabled, Jarvis sends your chat request plus the verified summary needed to answer it; do not enable it if that data should not leave your environment.
+`JARVIS_OPENAI_MODEL` remains the lower-cost model for ordinary workspace summaries. `JARVIS_RESEARCH_OPENAI_MODEL` performs evidence-backed public-web lead research through the Responses API web-search tool.
+
+With `JARVIS_OPENAI_ENABLED=false`, Jarvis continues using verified Growth Operator workspace summaries and does not call OpenAI. With it enabled, Jarvis can search public sources, stage supported decision-makers in **Discovery → Jarvis Research Previews**, and answer from verified workspace context. It never imports contacts or sends outreach merely because a search was requested.
 
 ## 4. Recommended first notes
 

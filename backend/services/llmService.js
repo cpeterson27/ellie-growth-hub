@@ -9,6 +9,8 @@ function getStatus() {
     configured: Boolean(process.env.OPENAI_API_KEY?.trim()),
     enabled: isEnabled(),
     model: process.env.JARVIS_OPENAI_MODEL || "gpt-4.1-mini",
+    researchModel: process.env.JARVIS_RESEARCH_OPENAI_MODEL || "gpt-5.6-sol",
+    webSearchEnabled: isEnabled(),
   };
 }
 

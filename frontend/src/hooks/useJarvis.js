@@ -28,7 +28,7 @@ export function useJarvis() {
         throw new Error(response.error || "Failed to get response from Jarvis");
       }
     } catch (err) {
-      const errorMsg = err.message || "Error communicating with Jarvis";
+      const errorMsg = err.response?.data?.error || err.message || "Error communicating with Jarvis";
       setError(errorMsg);
       return null;
     } finally {

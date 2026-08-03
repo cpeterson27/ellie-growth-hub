@@ -1,12 +1,12 @@
-# Ellie Jarvis Vault Bridge
+# Growth Operator Jarvis Vault Bridge
 
-This is a local courier, not an Ellie backend. It reads only approved Markdown
+This is a local courier, not a Growth Operator backend. It reads only approved Markdown
 folders from the local Obsidian vault and mirrors them to the deployed Jarvis
 memory collection in MongoDB. The deployed app never receives the vault path.
 
 ## How client use works
 
-Your client uses the deployed Ellie website normally. She does not run this
+Your client uses the deployed Growth Operator website normally. She does not run this
 bridge, keep your Mac online, or know the sync secret. The notes from the most
 recent successful sync remain in MongoDB and are available to Jarvis even when
 this bridge and your Mac are off.

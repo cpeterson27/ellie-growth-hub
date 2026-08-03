@@ -215,6 +215,8 @@ export default function JarvisChat() {
       if (action === "open_lead_discovery") {
         const question = message?.data?.researchQuestion || "";
         navigate(`/discovery${question ? `?question=${encodeURIComponent(question)}` : ""}`);
+      } else if (action === "review_research_preview") {
+        navigate("/discovery#people-research-previews");
       } else if (action === "view_development_requests") {
         navigate("/development-requests");
       } else if (action === "create_campaign") {
@@ -309,6 +311,7 @@ export default function JarvisChat() {
       launch_campaign: "🚀 Launch Campaign",
       view_development_requests: "Review Development Request",
       open_lead_discovery: "Review Lead Search",
+      review_research_preview: "Review Jarvis Research Preview",
     };
     return labels[action] || action;
   };
@@ -435,7 +438,7 @@ export default function JarvisChat() {
           <p className="jarvis-voice-hint">{listening ? "Speak naturally. Jarvis will respond when you pause." : "Tap the core or press Command + J to begin."}</p>
         </div>
         <div className="jarvis-statuses" aria-label="Jarvis connection status">
-          <span className={status?.openai?.enabled ? "is-ready" : ""}>OpenAI {status?.openai?.enabled ? "ready" : "not enabled"}</span>
+          <span className={status?.openai?.webSearchEnabled ? "is-ready" : ""}>Web research {status?.openai?.webSearchEnabled ? "ready" : "not enabled"}</span>
           <span className={status?.obsidian?.enabled && status?.obsidian?.writable ? "is-ready" : ""}>Memory {status?.obsidian?.enabled && status?.obsidian?.writable ? "connected" : "not connected"}</span>
           <button type="button" className="jarvis-persona-button" onClick={() => setProfileOpen((value) => !value)}>Personalize</button>
           <button type="button" className="jarvis-fullscreen-button" onClick={toggleFullscreen}>{isFullscreen ? <FiMinimize2 /> : <FiMaximize2 />}<span>{isFullscreen ? "Exit" : "Full screen"}</span></button>
@@ -512,7 +515,7 @@ export default function JarvisChat() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask Jarvis to review priorities, plan a campaign, or prepare leads..."
+            placeholder="Ask Jarvis to find decision-makers, review priorities, or plan a campaign..."
             disabled={loading}
             className="jarvis-input"
           />

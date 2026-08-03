@@ -21,7 +21,7 @@ const peopleResearchPreviewSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   fingerprint: { type: String, required: true, trim: true },
   name: { type: String, required: true, trim: true, maxlength: 180 },
-  source: { type: String, enum: ["chatgpt_public_web"], default: "chatgpt_public_web" },
+  source: { type: String, enum: ["jarvis_public_web", "chatgpt_public_web"], default: "jarvis_public_web" },
   status: { type: String, enum: ["staged", "approval_pending", "imported"], default: "staged", index: true },
   people: { type: [previewPersonSchema], default: [] },
   summary: {

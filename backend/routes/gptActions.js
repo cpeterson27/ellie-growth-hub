@@ -10,12 +10,12 @@ const WorkspaceMembership = require("../models/WorkspaceMembership");
 const GrowthActionApproval = require("../models/GrowthActionApproval");
 const PeopleResearchPreview = require("../models/PeopleResearchPreview");
 const McpAuditLog = require("../models/McpAuditLog");
-const crypto = require("crypto");
 const { requireMcpAuth } = require("../middleware/mcpAuth");
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
 const { effectiveTemplate } = require("../services/campaignMasterTemplate");
 const { previewContactIngestion, ingestContacts } = require("../services/contactIngestionService");
+const { normalizePublicPeople, savePublicPeoplePreview } = require("../services/publicPeopleResearchService");
 const { sendEmail } = require("../services/email");
 
 const router = express.Router();
@@ -43,99 +43,6 @@ async function consumeApproval(req, action) {
 
 function audit(req, action, success, detail = "") {
   McpAuditLog.create({ ...req.mcpAuth, tool: `gpt_action:${action}`, success, detail: String(detail).slice(0, 500) }).catch(() => {});
-}
-
-function normalizePublicPeople(rows) {
-  if (!Array.isArray(rows) || !rows.length || rows.length > 100) throw new Error("Provide between 1 and 100 researched people.");
-  return rows.map((row, index) => {
-    const firstName = String(row.firstName || "").trim().slice(0, 100);
-    const lastName = String(row.lastName || "").trim().slice(0, 100);
-    const company = String(row.company || "").trim().slice(0, 200);
-    const evidenceUrl = String(row.evidenceUrl || "").trim().slice(0, 1000);
-    let evidence;
-    try { evidence = new URL(evidenceUrl); } catch { throw new Error(`Person ${index + 1} needs a valid evidence URL.`); }
-    if (evidence.protocol !== "https:") throw new Error(`Person ${index + 1} evidence must use HTTPS.`);
-    if (/(^|\.)linkedin\.com$/i.test(evidence.hostname)) throw new Error(`Person ${index + 1} must use a public company, association, registry, or news source as evidence—not scraped LinkedIn data.`);
-    if ((!firstName && !lastName) || !company) throw new Error(`Person ${index + 1} needs a name and company.`);
-    const email = String(row.email || "").trim().toLowerCase().slice(0, 320);
-    return {
-      "First Name": firstName,
-      "Last Name": lastName,
-      "Company Name": company,
-      "Title": String(row.title || "").trim().slice(0, 200),
-      "Website": String(row.companyWebsite || "").trim().slice(0, 1000),
-      "Email": email,
-      "Email Status": email ? "published_unverified" : "missing",
-      "Primary Email Source": email ? evidenceUrl : "",
-      "Email Confidence": email ? "published_unverified" : "missing",
-      "Evidence URL": evidenceUrl,
-      "Evidence Summary": String(row.evidenceSummary || "").trim().slice(0, 1000),
-      "Evidence Observed At": new Date().toISOString(),
-      "Tags": ["public-web-research", "needs-review"],
-    };
-  });
-}
-
-function publicPeopleFingerprint(people) {
-  const stableRows = people.map((person) => [
-    person["First Name"],
-    person["Last Name"],
-    person["Company Name"],
-    person.Email,
-    person["Evidence URL"],
-  ].map((value) => String(value || "").trim().toLowerCase()).join("|"));
-  return crypto.createHash("sha256").update(stableRows.sort().join("\n")).digest("hex");
-}
-
-function publicPeoplePreviewName(people) {
-  const companies = [...new Set(people.map((person) => person["Company Name"]).filter(Boolean))];
-  const companyLabel = companies.length > 1 ? `${companies[0]} + ${companies.length - 1} more` : companies[0] || "Public-web research";
-  return `${people.length} decision-makers · ${companyLabel}`.slice(0, 180);
-}
-
-async function savePublicPeoplePreview(req, people, preview, status = "staged") {
-  const rowsByIndex = new Map((preview.rows || []).map((row) => [row.index, row]));
-  const previewPeople = people.map((person, index) => {
-    const row = rowsByIndex.get(index) || {};
-    return {
-      firstName: person["First Name"],
-      lastName: person["Last Name"],
-      title: person.Title,
-      company: person["Company Name"],
-      companyWebsite: person.Website,
-      email: person.Email,
-      emailStatus: person["Email Status"],
-      evidenceUrl: person["Evidence URL"],
-      evidenceSummary: person["Evidence Summary"],
-      evidenceObservedAt: person["Evidence Observed At"],
-      reviewStatus: row.status || "new",
-      matchReason: row.matchReason || "",
-      existingContactId: row.existingContact?.id || null,
-    };
-  });
-  const fingerprint = publicPeopleFingerprint(people);
-  const existing = await PeopleResearchPreview.findOne({ workspaceId: req.mcpAuth.workspaceId, fingerprint });
-  if (existing?.status === "imported") return existing;
-  return PeopleResearchPreview.findOneAndUpdate(
-    { workspaceId: req.mcpAuth.workspaceId, fingerprint },
-    {
-      $set: {
-        userId: req.mcpAuth.userId,
-        name: publicPeoplePreviewName(people),
-        source: "chatgpt_public_web",
-        status,
-        people: previewPeople,
-        summary: {
-          total: preview.total,
-          newContacts: preview.newContacts,
-          existingContacts: preview.existingContacts,
-          duplicatesInFile: preview.duplicatesInFile,
-          publishedEmails: people.filter((person) => Boolean(person.Email)).length,
-        },
-      },
-    },
-    { new: true, upsert: true, setDefaultsOnInsert: true },
-  );
 }
 
 router.get("/gpt-actions/openapi.json", (req, res) => {
@@ -362,7 +269,7 @@ router.post("/gpt-actions/people/preview", requireScope("crm:read"), async (req,
   try {
     const people = normalizePublicPeople(req.body?.people);
     const preview = await previewContactIngestion({ contacts: people, source: "public_web_research" });
-    const savedPreview = await savePublicPeoplePreview(req, people, preview);
+    const savedPreview = await savePublicPeoplePreview({ workspaceId: req.mcpAuth.workspaceId, userId: req.mcpAuth.userId, people, preview, source: "chatgpt_public_web" });
     audit(req, "preview_public_people", true, preview.total);
     res.json({ ...preview, people, previewId: savedPreview._id, previewStatus: savedPreview.status, webAppPath: "/discovery#people-research-previews", rules: { evidenceRequired: true, linkedinScrapingAccepted: false, publishedEmailStatus: "published_unverified", marketingPermission: false } });
   } catch (error) { audit(req, "preview_public_people", false, error.message); res.status(400).json({ error: error.message }); }
@@ -372,7 +279,7 @@ router.post("/gpt-actions/people/prepare-import", requireScope("imports:write"),
   try {
     const people = normalizePublicPeople(req.body?.people);
     const preview = await previewContactIngestion({ contacts: people, source: "public_web_research" });
-    const savedPreview = await savePublicPeoplePreview(req, people, preview, "approval_pending");
+    const savedPreview = await savePublicPeoplePreview({ workspaceId: req.mcpAuth.workspaceId, userId: req.mcpAuth.userId, people, preview, status: "approval_pending", source: "chatgpt_public_web" });
     const phrase = `IMPORT ${people.length} PUBLIC-WEB PROSPECTS`;
     const item = await approval(req, "import_public_people", { people, previewId: savedPreview._id }, { total: preview.total, newContacts: preview.newContacts, existingContacts: preview.existingContacts, duplicatesInFile: preview.duplicatesInFile }, phrase);
     savedPreview.approvalId = item._id;

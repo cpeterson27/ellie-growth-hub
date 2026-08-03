@@ -10,6 +10,7 @@ const jarvisMemoryService = require("../services/jarvisMemoryService");
 const jarvisProfileService = require("../services/jarvisProfileService");
 const developmentRequestService = require("../services/developmentRequestService");
 const { compileMarketQuestion } = require("../services/marketResearchService");
+const { isJarvisWebResearchEnabled, researchAndStagePublicPeople } = require("../services/publicPeopleResearchService");
 
 const router = express.Router();
 
@@ -30,16 +31,63 @@ router.post("/chat", async (req, res) => {
       });
     }
 
-    const leadResearchRequest = /\b(find|discover|research|search for|build).{0,40}\b(new )?(leads|prospects|businesses|companies|owners|founders)\b/i.test(message);
+    const leadResearchRequest = /\b(find|discover|research|search for|build)\b/i.test(message)
+      && /\b(leads|prospects|businesses|companies|owners|founders|decision[- ]makers|principals|presidents|ceos)\b/i.test(message);
     if (leadResearchRequest) {
       const plan = await compileMarketQuestion(message);
+      if (isJarvisWebResearchEnabled()) {
+        try {
+          const requestedCount = [...message.matchAll(/\b(\d{1,2})\b/g)]
+            .map((match) => Number(match[1]))
+            .find((value) => value >= 1 && value <= 50) || 20;
+          const result = await researchAndStagePublicPeople({
+            question: message,
+            maxResults: requestedCount,
+            workspaceId: req.auth.workspaceId,
+            userId: req.auth.user?._id || null,
+          });
+          const summary = result.savedPreview.summary;
+          const answer = `I searched public sources and saved a staged preview of ${summary.total} evidence-backed decision-maker${summary.total === 1 ? "" : "s"}. ${summary.publishedEmails} visibly published email${summary.publishedEmails === 1 ? " was" : "s were"} found; those emails remain unverified. ${summary.existingContacts} existing CRM match${summary.existingContacts === 1 ? " was" : "es were"} detected. Nothing was imported and no outreach was sent. Open Jarvis Research Previews to review every person and source.`;
+          const memory = await jarvisMemoryService.recordConversation({ userMessage: message, assistantMessage: answer }).catch(() => ({ recorded: false }));
+          return res.json({
+            success: true,
+            data: {
+              answer,
+              data: {
+                researchQuestion: message,
+                previewId: result.savedPreview._id,
+                preview: summary,
+                people: result.savedPreview.people,
+                model: result.model,
+              },
+              actionsAvailable: ["review_research_preview"],
+              activity: [
+                { status: "complete", label: "Searched public web sources" },
+                { status: "complete", label: `Validated evidence for ${summary.total} people` },
+                { status: "complete", label: "Saved a staged review preview without importing contacts" },
+              ],
+              memory,
+              memorySources: [],
+            },
+          });
+        } catch (error) {
+          return res.status(503).json({
+            success: false,
+            error: error.message || "Jarvis could not complete public-web lead research.",
+            data: { researchQuestion: message, plan },
+          });
+        }
+      }
       return res.json({
         success: true,
         data: {
-          answer: `I built a lead-research plan for “${plan.name}.” Review the filters, evidence requirements, and result limit before starting it. I will not add contacts or send outreach without your approval.`,
+          answer: `I built a lead-research plan for “${plan.name},” but live Jarvis web research is not enabled yet. Add OpenAI API billing and set JARVIS_OPENAI_ENABLED=true in the Render backend. I will not add contacts or send outreach without your approval.`,
           data: { researchQuestion: message, plan },
           actionsAvailable: ["open_lead_discovery"],
-          activity: [{ status: "complete", label: "Converted your request into a reviewable lead-search plan" }],
+          activity: [
+            { status: "complete", label: "Converted your request into a reviewable lead-search plan" },
+            { status: "warning", label: "Live web research is waiting for OpenAI API billing and enablement" },
+          ],
           memorySources: [],
         },
       });

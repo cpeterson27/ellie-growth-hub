@@ -146,6 +146,14 @@ export default function Discovery() {
     return () => window.clearInterval(refreshHistory);
   }, []);
 
+  useEffect(() => {
+    if (window.location.hash !== "#people-research-previews") return;
+    const scrollTimer = window.setTimeout(() => {
+      document.getElementById("people-research-previews")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => window.clearTimeout(scrollTimer);
+  }, []);
+
   const openSavedResearch = async (entry) => {
     try {
       setOpeningHistoryId(String(entry._id));
@@ -357,13 +365,13 @@ export default function Discovery() {
     </DashboardCard>
 
     <div id="people-research-previews">
-      <DashboardCard title="ChatGPT people research previews" action={<Button variant="outline" loading={peoplePreviewsLoading} onClick={loadPeoplePreviews}>Refresh</Button>}>
+      <DashboardCard title="Jarvis research previews" action={<Button variant="outline" loading={peoplePreviewsLoading} onClick={loadPeoplePreviews}>Refresh</Button>}>
         <p className="people-preview-intro">People found by Growth Operator stay here for review before they become CRM contacts. A published email is still unverified and cannot be used for outreach until it passes your verification rules.</p>
         {peoplePreviews.length ? <div className="people-preview-list">{peoplePreviews.map((preview) => {
           const isOpen = openPeoplePreviewId === String(preview._id);
           return <article key={preview._id} className={`people-preview-batch is-${preview.status}`}>
             <header>
-              <div><span>{preview.status.replaceAll("_", " ")}</span><strong>{preview.name}</strong><small>{new Date(preview.updatedAt).toLocaleString()} · ChatGPT public-web research</small></div>
+              <div><span>{preview.status.replaceAll("_", " ")}</span><strong>{preview.name}</strong><small>{new Date(preview.updatedAt).toLocaleString()} · {preview.source === "chatgpt_public_web" ? "ChatGPT connection" : "Jarvis"} public-web research</small></div>
               <div className="people-preview-summary"><strong>{preview.summary?.total || preview.people?.length || 0}</strong><span>people</span><small>{preview.summary?.newContacts || 0} new · {preview.summary?.existingContacts || 0} existing · {preview.summary?.publishedEmails || 0} published emails</small></div>
               <Button size="sm" variant="outline" onClick={() => setOpenPeoplePreviewId(isOpen ? "" : String(preview._id))}>{isOpen ? "Hide people" : "Review people"}</Button>
             </header>
@@ -373,9 +381,9 @@ export default function Discovery() {
               <div><small>CRM review</small><strong>{String(person.reviewStatus || "new").replaceAll("_", " ")}</strong>{person.matchReason ? <span>{person.matchReason}</span> : null}</div>
               <div className="people-preview-evidence"><small>Evidence</small><p>{person.evidenceSummary || "Public source attached for manual review."}</p><a href={person.evidenceUrl} target="_blank" rel="noreferrer">Open source</a></div>
             </div>)}</div> : null}
-            {preview.status !== "imported" ? <p className="people-preview-footnote">Staged only—these people have not been added to Contacts. Import still requires the exact confirmation in your Growth Operator ChatGPT conversation.</p> : <p className="people-preview-footnote is-imported">Imported as needs-review prospects. Open Prospect review below to qualify them.</p>}
+            {preview.status !== "imported" ? <p className="people-preview-footnote">Staged only—these people have not been added to Contacts. Import remains a separate confirmed step.</p> : <p className="people-preview-footnote is-imported">Imported as needs-review prospects. Open Prospect review below to qualify them.</p>}
           </article>;
-        })}</div> : <div className="table-state table-state--empty">No staged people previews yet. Ask Growth Operator in ChatGPT to preview public-web decision-makers; the next preview will appear here automatically.</div>}
+        })}</div> : <div className="table-state table-state--empty">No staged people previews yet. Ask Jarvis to find public-web decision-makers; the preview will appear here automatically.</div>}
       </DashboardCard>
     </div>
 

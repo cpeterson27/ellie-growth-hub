@@ -2,7 +2,7 @@
 
 ## What runs where
 
-Render runs the Ellie frontend, backend, MongoDB connection, and Jarvis API.
+Render runs the Growth Operator frontend, backend, MongoDB connection, and Jarvis API.
 Your Mac keeps the Obsidian vault. The Vault Bridge mirrors only approved notes
 to the `jarvis_memory_notes` MongoDB collection so Render can use them for
 Jarvis responses. Render never needs, receives, or exposes the Mac vault path.
@@ -16,6 +16,7 @@ same commit containing the Jarvis routes:
 OPENAI_API_KEY=your_openai_key
 JARVIS_OPENAI_ENABLED=true
 JARVIS_OPENAI_MODEL=gpt-4.1-mini
+JARVIS_RESEARCH_OPENAI_MODEL=gpt-5.6-sol
 JARVIS_OBSIDIAN_MEMORY_ENABLED=true
 JARVIS_MEMORY_SOURCE=cloud
 JARVIS_MEMORY_SYNC_SECRET=a-long-random-secret-you-create-once
@@ -40,6 +41,15 @@ Set the result in Render and in the Vault Bridge `.env`; it must match exactly.
 3. Configure and run the Vault Bridge on the Mac.
 4. Open Jarvis. Its Memory badge will say connected after the first successful
    bridge sync.
+
+## Jarvis public-web lead research
+
+With OpenAI API billing active and `JARVIS_OPENAI_ENABLED=true`, a request such
+as “Find 20 Sacramento multifamily decision-makers” runs a public-web search
+inside Jarvis. Every retained person must have non-LinkedIn HTTPS evidence.
+Emails are stored only when visibly published by the cited source and remain
+`published_unverified`. Results are staged in **Discovery → Jarvis Research
+Previews**; no CRM import or outreach occurs without a separate confirmation.
 
 ## Frontend SPA routing on Render
 
