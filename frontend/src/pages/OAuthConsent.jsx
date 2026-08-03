@@ -6,8 +6,13 @@ import "./Login.css";
 
 const LABELS = {
   "crm:read": "Read contacts and organizations",
+  "crm:write": "Prepare and confirm reversible CRM changes",
   "research:read": "Read prospect lists and research results",
   "research:write": "Create reviewed research jobs and prospect lists",
+  "campaigns:read": "Read campaigns and template status",
+  "campaigns:write": "Prepare template drafts and confirmed campaign sends",
+  "imports:write": "Import owner-provided lead files after confirmation",
+  "settings:write": "Add confirmed custom CRM fields",
   offline_access: "Stay connected until you disconnect the app",
   openid: "Confirm your Ellie account identity",
 };

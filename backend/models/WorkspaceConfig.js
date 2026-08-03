@@ -13,6 +13,10 @@ const workspaceConfigSchema = new mongoose.Schema({
   addressCountry: { type: String, default: "", trim: true, maxlength: 100 },
   websiteUrl: { type: String, default: "", trim: true, maxlength: 300 },
   organizationLogoUrl: { type: String, default: "", trim: true, maxlength: 600 },
+  customContactFields: {
+    type: [{ _id: false, key: { type: String, required: true }, label: { type: String, required: true }, type: { type: String, enum: ["text", "number", "date", "boolean"], default: "text" } }],
+    default: [],
+  },
   discoveryTemplates: {
     type: [{
       _id: false,

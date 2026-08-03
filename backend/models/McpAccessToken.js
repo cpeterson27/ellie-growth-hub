@@ -6,7 +6,7 @@ const mcpAccessTokenSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 100 },
   tokenHash: { type: String, required: true, unique: true, select: false },
   prefix: { type: String, required: true },
-  scopes: { type: [String], default: ["research:read", "research:write", "crm:read"] },
+  scopes: { type: [String], default: ["research:read", "research:write", "crm:read", "crm:write", "campaigns:read", "campaigns:write", "imports:write", "settings:write"] },
   lastUsedAt: { type: Date, default: null },
   expiresAt: { type: Date, required: true, index: true },
   revokedAt: { type: Date, default: null },

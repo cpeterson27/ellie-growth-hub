@@ -5,7 +5,7 @@ const OAuthCredential = require("../models/OAuthCredential");
 const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
-const SCOPES = ["openid", "offline_access", "crm:read", "research:read", "research:write"];
+const SCOPES = ["openid", "offline_access", "crm:read", "crm:write", "research:read", "research:write", "campaigns:read", "campaigns:write", "imports:write", "settings:write"];
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const randomValue = (prefix) => `${prefix}_${crypto.randomBytes(32).toString("base64url")}`;
 const frontendUrl = () => String(process.env.FRONTEND_URL || "http://localhost:5173").split(",")[0].trim().replace(/\/$/, "");
