@@ -80,6 +80,49 @@
 .research-job-progress span {
   color: var(--text-muted);
 }
+
+.research-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.research-history-item {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e4e8e6;
+  border-left: 4px solid #9aa6a1;
+  border-radius: 14px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 140px 170px;
+  padding: 18px;
+}
+
+.research-history-item.is-completed { border-left-color: #25835d; }
+.research-history-item.is-running,
+.research-history-item.is-queued { border-left-color: #b98724; }
+.research-history-item.is-failed,
+.research-history-item.is-source_required { border-left-color: #b84c4c; }
+.research-history-main { min-width: 0; }
+.research-history-main > span {
+  color: #66736e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.research-history-main strong,
+.research-history-main p,
+.research-history-counts span,
+.research-history-counts small { display: block; }
+.research-history-main strong { font-size: 16px; margin-top: 5px; }
+.research-history-main p { color: #66736e; margin: 5px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.research-history-counts strong { font-size: 24px; }
+.research-history-counts span,
+.research-history-counts small,
+.research-history-actions small { color: #66736e; font-size: 12px; }
+.research-history-actions { align-items: flex-end; display: grid; gap: 9px; justify-items: end; }
+.research-history-error { color: #a13f3f; grid-column: 1 / -1; margin: 0; }
 .market-plan-review p {
   margin: 0;
 }
@@ -272,6 +315,14 @@
   .research-job-progress {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .research-history-item {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+  .research-history-actions {
+    align-items: stretch;
+    justify-items: stretch;
   }
   .market-result-rank {
     display: none;

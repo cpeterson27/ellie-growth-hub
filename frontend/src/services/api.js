@@ -301,6 +301,9 @@ export const fetchMarketResearchResults = (audienceId) =>
 export const fetchMarketResearchSources = () =>
   api.get("/audience/research/sources").then((res) => res.data);
 
+export const fetchMarketResearchHistory = (limit = 30) =>
+  api.get("/audience/research/history", { params: { limit } }).then((res) => res.data);
+
 export const startExternalMarketResearch = (payload) =>
   api.post("/audience/research/run", payload).then((res) => res.data);
 

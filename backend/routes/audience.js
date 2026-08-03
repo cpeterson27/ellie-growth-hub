@@ -34,6 +34,36 @@ router.post("/research/plan", async (req, res) => {
   }
 });
 
+router.get("/research/history", async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+    const audiences = await Audience.find({ workspaceId: req.auth.workspaceId })
+      .select("name description status source totalOrgs lastDiscoveredAt createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    const audienceIds = audiences.map((audience) => audience._id);
+    const jobs = await MarketResearchJob.find({ workspaceId: req.auth.workspaceId, audienceId: { $in: audienceIds } })
+      .select("audienceId question sourceId status statistics error startedAt completedAt createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .lean();
+    const latestJobByAudience = new Map();
+    jobs.forEach((job) => {
+      const key = String(job.audienceId || "");
+      if (key && !latestJobByAudience.has(key)) latestJobByAudience.set(key, job);
+    });
+    return res.json({
+      success: true,
+      history: audiences.map((audience) => ({
+        ...audience,
+        job: latestJobByAudience.get(String(audience._id)) || null,
+      })),
+    });
+  } catch (_error) {
+    return res.status(500).json({ success: false, error: "Unable to load saved research history." });
+  }
+});
+
 router.get("/research/results/:audienceId", async (req, res) => {
   try {
     const audience = await Audience.findOne({ _id: req.params.audienceId, workspaceId: req.auth.workspaceId }).lean();
@@ -118,7 +148,7 @@ router.get("/", async (req, res) => {
       limit = "25",
     } = req.query;
 
-    const filter = {};
+    const filter = { workspaceId: req.auth.workspaceId };
 
     if (status) {
       const validStatuses = ["draft", "active", "archived"];

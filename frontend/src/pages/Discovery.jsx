@@ -12,6 +12,7 @@ import {
   fetchContacts,
   fetchDiscoveryTemplates,
   fetchMarketResearchResults,
+  fetchMarketResearchHistory,
   fetchMarketResearchSources,
   fetchMarketResearchJob,
   saveDiscoveryTemplates,
@@ -89,6 +90,9 @@ export default function Discovery() {
   const [researchSource, setResearchSource] = useState(null);
   const [externalJob, setExternalJob] = useState(null);
   const [externalRunning, setExternalRunning] = useState(false);
+  const [researchHistory, setResearchHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [openingHistoryId, setOpeningHistoryId] = useState("");
 
   useEffect(() => {
     const question = String(searchParams.get("question") || "").trim();
@@ -100,12 +104,47 @@ export default function Discovery() {
     setProspects(Array.isArray(response?.data) ? response.data.filter(Boolean) : []);
   };
 
+  const loadResearchHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const response = await fetchMarketResearchHistory(50);
+      setResearchHistory(response.history || []);
+    } catch {
+      setNotice("Unable to load saved research history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadProspects().catch(() => setNotice("Unable to load prospects."));
     fetchCampaigns().then((items) => setCampaigns(Array.isArray(items) ? items : [])).catch(() => {});
     fetchDiscoveryTemplates().then((data) => setTemplates(data.templates || [])).catch(() => {});
     fetchMarketResearchSources().then((data) => setResearchSource(data.sources?.[0] || null)).catch(() => {});
+    loadResearchHistory();
+    const refreshHistory = window.setInterval(() => loadResearchHistory(), 15000);
+    return () => window.clearInterval(refreshHistory);
   }, []);
+
+  const openSavedResearch = async (entry) => {
+    try {
+      setOpeningHistoryId(String(entry._id));
+      const resultList = await fetchMarketResearchResults(entry._id);
+      setResearchOrganizations(resultList.organizations || []);
+      setResearchResult({
+        organizationsFound: resultList.organizations?.length || 0,
+        organizationsCreated: entry.job?.statistics?.created || 0,
+        organizationsUpdated: entry.job?.statistics?.updated || 0,
+      });
+      setTarget((current) => ({ ...current, name: entry.name || current.name }));
+      setNotice(`Opened ${entry.name}. ${resultList.organizations?.length || 0} ranked organizations are available.`);
+      window.setTimeout(() => document.getElementById("ranked-research-results")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Unable to open this saved research list.");
+    } finally {
+      setOpeningHistoryId("");
+    }
+  };
 
   const filtered = useMemo(() => prospects.filter((item) => {
     const text = [item?.name, item?.company, item?.email].filter(Boolean).join(" ").toLowerCase();
@@ -197,6 +236,7 @@ export default function Discovery() {
       setExternalRunning(true);
       const response = await startExternalMarketResearch({ question: marketQuestion, plan: marketPlan, maxResults: 1000 });
       setExternalJob(response.job);
+      loadResearchHistory();
       if (response.job.status === "source_required") {
         setNotice(response.job.error);
         return;
@@ -212,6 +252,7 @@ export default function Discovery() {
             setResearchOrganizations(resultList.organizations || []);
             setResearchResult({ organizationsFound: current.job.statistics.received, organizationsCreated: current.job.statistics.created, organizationsUpdated: current.job.statistics.updated });
             setNotice(`Research complete: ${current.job.statistics.created} new and ${current.job.statistics.updated} refreshed organizations.`);
+            loadResearchHistory();
           } else setNotice(current.job.error || "External research did not complete.");
           break;
         }
@@ -282,6 +323,19 @@ export default function Discovery() {
       </section> : null}
     </DashboardCard>
 
+    <DashboardCard title="Saved research and prospect lists" action={<Button variant="outline" loading={historyLoading} onClick={loadResearchHistory}>Refresh</Button>}>
+      {researchHistory.length ? <div className="research-history-list">{researchHistory.map((entry) => {
+        const jobStatus = entry.job?.status || (entry.totalOrgs ? "completed" : "saved");
+        const statistics = entry.job?.statistics || {};
+        return <article key={entry._id} className={`research-history-item is-${jobStatus}`}>
+          <div className="research-history-main"><span>{jobStatus.replaceAll("_", " ")}</span><strong>{entry.name}</strong><p>{entry.description || entry.job?.question || "Saved prospect list"}</p></div>
+          <div className="research-history-counts"><strong>{entry.totalOrgs || statistics.received || 0}</strong><span>organizations</span><small>{entry.job ? `${statistics.created || 0} new · ${statistics.updated || 0} refreshed` : entry.source}</small></div>
+          <div className="research-history-actions"><small>{new Date(entry.createdAt).toLocaleString()}</small><Button size="sm" variant="outline" loading={openingHistoryId === String(entry._id)} onClick={() => openSavedResearch(entry)}>Open results</Button></div>
+          {entry.job?.error ? <p className="research-history-error">{entry.job.error}</p> : null}
+        </article>;
+      })}</div> : <div className="table-state table-state--empty">No saved research yet. Research started in ChatGPT or on this page will appear here automatically.</div>}
+    </DashboardCard>
+
     <DashboardCard title="External research source">
       <div className={`research-source-status ${researchSource?.configured ? "is-ready" : "is-needed"}`}>
         <div><span>{researchSource?.configured ? "Connected" : "Source required"}</span><strong>{researchSource?.name || "Checking source…"}</strong><p>{researchSource?.message || "Growth Operator is checking the external-data configuration."}</p></div>
@@ -303,14 +357,14 @@ export default function Discovery() {
       {researchResult ? <div className="discovery-result-summary"><strong>{researchResult.organizationsFound || 0} matched organizations</strong><span>{researchResult.organizationsCreated || 0} new · {researchResult.organizationsUpdated || 0} refreshed</span></div> : null}
     </DashboardCard>
 
-    {researchResult ? <DashboardCard title="Ranked organization list" action={<Button variant="outline" disabled={!researchOrganizations.length} onClick={exportResearchList}>Export CSV</Button>}>
+    {researchResult ? <div id="ranked-research-results"><DashboardCard title="Ranked organization list" action={<Button variant="outline" disabled={!researchOrganizations.length} onClick={exportResearchList}>Export CSV</Button>}>
       {researchOrganizations.length ? <div className="market-result-list">{researchOrganizations.map((organization, index) => <article key={organization._id}>
         <span className="market-result-rank">{index + 1}</span>
         <div><strong>{organization.name}</strong><small>{[organization.industry, organization.location].filter(Boolean).join(" · ") || "Business details need research"}</small><p>{(organization.scoreReasons || []).join(" · ") || "No scoring evidence recorded yet."}</p></div>
         <div className="market-result-score"><strong>{organization.audienceScore || 0}</strong><span>{organization.audienceTier || "unscored"}</span></div>
         <div className="market-result-evidence"><strong>{organization.researchEvidence?.length || 0} sources</strong><span>{organization.lastResearchVerifiedAt ? `Checked ${new Date(organization.lastResearchVerifiedAt).toLocaleDateString()}` : "Verification needed"}</span></div>
       </article>)}</div> : <div className="table-state table-state--empty">No stored organizations match this plan yet. Growth Operator did not manufacture results.</div>}
-    </DashboardCard> : null}
+    </DashboardCard></div> : null}
 
     <DashboardCard title="Prospect review" action={<div className="discovery-review-filters"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search prospects" /><select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select><select value={emailFilter} onChange={(event) => setEmailFilter(event.target.value)}><option value="verified">Verified email</option><option value="review">Needs review</option><option value="all">All</option></select></div>}>
       {filtered.length ? <div className="discovery-review-list">{filtered.map((prospect) => <article key={prospect._id}><div><strong>{prospect.name || "Unnamed prospect"}</strong><span>{[prospect.title, prospect.company].filter(Boolean).join(" · ") || "Company details needed"}</span><small>{prospect.email || "No email"} · {prospect.emailStatus || "unverified"}</small></div><div><Button size="sm" onClick={() => approve(prospect)}>Approve</Button><Button size="sm" variant="outline" onClick={() => setDeleteTarget(prospect)}>Delete</Button></div></article>)}</div> : <div className="table-state table-state--empty">No prospects match this review view.</div>}
