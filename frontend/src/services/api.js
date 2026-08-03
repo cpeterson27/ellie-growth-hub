@@ -9,6 +9,18 @@ const api = axios.create({
 
 export const getMcpEndpoint = () => String(api.defaults.baseURL || "").replace(/\/api\/?$/, "/mcp");
 
+export const fetchOAuthAuthorizationDetails = (search = "") =>
+  api.get(`/oauth/authorize/details${search}`).then((res) => res.data);
+
+export const approveOAuthConnection = (values) =>
+  api.post("/oauth/authorize", values).then((res) => res.data);
+
+export const fetchOAuthConnections = () =>
+  api.get("/oauth/connections").then((res) => res.data);
+
+export const revokeOAuthConnection = (clientId) =>
+  api.delete(`/oauth/connections/${encodeURIComponent(clientId)}`).then((res) => res.data);
+
 api.interceptors.request.use((config) => {
   const csrfToken = sessionStorage.getItem("ellie-csrf-token");
   const sessionToken = sessionStorage.getItem("ellie-session-token");

@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  if (session) return <Navigate to="/dashboard" replace />;
+  if (session) return <Navigate to={location.state?.from || "/dashboard"} replace />;
 
   const submit = async (event) => {
     event.preventDefault();

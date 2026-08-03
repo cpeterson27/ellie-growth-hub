@@ -29,6 +29,7 @@ const authRouter = require("./routes/auth");
 const businessIndexRouter = require("./routes/businessIndex");
 const mcpAccessRouter = require("./routes/mcpAccess");
 const mcpRouter = require("./routes/mcp");
+const oauthRouter = require("./routes/oauth");
 const { requireAuth } = require("./middleware/auth");
 
 const app = express();
@@ -89,6 +90,7 @@ connectDatabase(mongoUri)
     }
 
     app.use("/api/auth", authRouter);
+    app.use("/", oauthRouter);
     app.use("/mcp", mcpRouter);
     app.use("/api", (req, res, next) => {
       const publicRequest =

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FiArrowUpRight, FiBriefcase, FiCpu, FiImage, FiLock, FiMail, FiShield, FiTrash2, FiUser, FiUsers } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { changePassword, createMcpAccessToken, createWorkspaceMember, fetchCampaigns, fetchGmailConnection, fetchMcpAccessTokens, fetchWorkspaceConfig, fetchWorkspaceMembers, getMcpEndpoint, revokeMcpAccessToken, updateWorkspaceConfig, uploadEventImage } from "../services/api.js";
+import { changePassword, createMcpAccessToken, createWorkspaceMember, fetchCampaigns, fetchGmailConnection, fetchMcpAccessTokens, fetchOAuthConnections, fetchWorkspaceConfig, fetchWorkspaceMembers, getMcpEndpoint, revokeMcpAccessToken, revokeOAuthConnection, updateWorkspaceConfig, uploadEventImage } from "../services/api.js";
 import { getWorkspaceSettings, saveWorkspaceSettings } from "../utils/workspaceSettings.js";
 import "./Settings.css";
 
@@ -28,6 +28,7 @@ export default function Settings() {
   const [mcpTokens, setMcpTokens] = useState([]);
   const [newMcpToken, setNewMcpToken] = useState(null);
   const [mcpName, setMcpName] = useState("My AI assistant");
+  const [oauthConnections, setOauthConnections] = useState([]);
 
   useEffect(() => {
     fetchWorkspaceConfig().then((config) => {
@@ -48,6 +49,7 @@ export default function Settings() {
     fetchCampaigns().then((items) => setCampaigns(items || [])).catch(() => {});
     fetchWorkspaceMembers().then((data) => setMembers(data.members || [])).catch(() => {});
     fetchMcpAccessTokens().then((data) => setMcpTokens(data.data || [])).catch(() => {});
+    fetchOAuthConnections().then((data) => setOauthConnections(data.connections || [])).catch(() => {});
   }, []);
 
   const connectAi = async () => {
@@ -64,6 +66,11 @@ export default function Settings() {
   const revokeAi = async (id) => {
     try { await revokeMcpAccessToken(id); setMcpTokens((items) => items.filter((item) => (item._id || item.id) !== id)); }
     catch (err) { setError(err.response?.data?.error || "Unable to revoke the AI connection."); }
+  };
+
+  const disconnectAiApp = async (clientId) => {
+    try { await revokeOAuthConnection(clientId); setOauthConnections((items) => items.filter((item) => item.clientId !== clientId)); }
+    catch (err) { setError(err.response?.data?.error || "Unable to disconnect the AI app."); }
   };
 
   const savePassword = async () => {
@@ -217,7 +224,7 @@ export default function Settings() {
           <div className="settings-ai-create"><input value={mcpName} onChange={(event) => setMcpName(event.target.value)} placeholder="Connection name" /><Button loading={saving} disabled={mcpName.trim().length < 2} onClick={connectAi}>Create connection</Button></div>
           {newMcpToken ? <div className="settings-token-reveal"><strong>Copy this token now—it will not be shown again.</strong><code>{newMcpToken.token}</code><small>MCP URL: {getMcpEndpoint()}</small></div> : null}
         </section>
-        <section className="settings-section"><div className="settings-section__heading"><FiShield /><div><h3>Active connections</h3><p>Every tool call is workspace-scoped and recorded in Ellie's audit log.</p></div></div><div className="team-member-list">{mcpTokens.length ? mcpTokens.map((token) => <div key={token._id || token.id}><span><strong>{token.name}</strong><small>{token.prefix}… · expires {new Date(token.expiresAt).toLocaleDateString()}</small></span><button className="settings-revoke" onClick={() => revokeAi(token._id || token.id)} aria-label={`Revoke ${token.name}`}><FiTrash2 /></button></div>) : <p>No AI assistants connected yet.</p>}</div></section>
+        <section className="settings-section"><div className="settings-section__heading"><FiShield /><div><h3>Active connections</h3><p>Every tool call is workspace-scoped and recorded in Ellie's audit log.</p></div></div><div className="team-member-list">{oauthConnections.map((connection) => <div key={connection.id}><span><strong>{connection.name}</strong><small>OAuth connection · {connection.scopes.join(" · ")}</small></span><button className="settings-revoke" onClick={() => disconnectAiApp(connection.clientId)} aria-label={`Disconnect ${connection.name}`}><FiTrash2 /></button></div>)}{mcpTokens.map((token) => <div key={token._id || token.id}><span><strong>{token.name}</strong><small>{token.prefix}… · expires {new Date(token.expiresAt).toLocaleDateString()}</small></span><button className="settings-revoke" onClick={() => revokeAi(token._id || token.id)} aria-label={`Revoke ${token.name}`}><FiTrash2 /></button></div>)}{!oauthConnections.length && !mcpTokens.length ? <p>No AI assistants connected yet.</p> : null}</div></section>
       </div> : <form className="account-settings-panel account-settings-panel--refined" onSubmit={(event) => { event.preventDefault(); addMember(); }}>
         <header><p className="page-eyebrow">Team access</p><h2>Workspace members</h2><p>Add a teammate with a temporary password, then send their login details securely.</p></header>
         <section className="settings-section"><div className="team-member-list">{members.map((member) => <div key={member.id}><span><strong>{member.name}</strong><small>{member.email}</small></span><em>{member.role}</em></div>)}</div></section>

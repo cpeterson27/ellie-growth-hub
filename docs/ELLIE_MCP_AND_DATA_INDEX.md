@@ -22,7 +22,13 @@ Available tools:
 - `plan_market_research`
 - `start_market_research`
 
-The first release intentionally does not expose email sending. All calls are workspace-scoped and written to an MCP audit log. Public self-service connections should add OAuth 2.1 authorization-code flow with PKCE, consent, narrow scopes, HTTPS, and rate limits before launch.
+The first release intentionally does not expose email sending. All calls are workspace-scoped and written to an MCP audit log.
+
+## Public OAuth connection
+
+Ellie implements OAuth discovery, dynamic client registration, authorization-code flow with mandatory PKCE S256, one-time codes, one-hour access tokens, rotating 90-day refresh tokens, a browser consent screen, scoped MCP tools, audit logging, and user-initiated disconnect.
+
+Production should set `PUBLIC_BACKEND_URL` to the HTTPS backend origin if Render does not expose `RENDER_EXTERNAL_URL`; `FRONTEND_URL` must contain the deployed Ellie frontend origin. Public app availability still depends on the connected AI product's plan, developer-mode access, review requirements, and app configuration. A ChatGPT subscription does not fund OpenAI API usage inside Ellie.
 
 ## Email risk policy
 

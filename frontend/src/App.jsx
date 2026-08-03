@@ -25,6 +25,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import Login from "./pages/Login.jsx";
 import Landing from "./pages/Landing.jsx";
 import CampaignLaunch from "./pages/CampaignLaunch.jsx";
+import OAuthConsent from "./pages/OAuthConsent.jsx";
 
 function ProtectedApp() {
   const { loading, session } = useAuth();
@@ -71,6 +72,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/oauth/consent" element={<OAuthConsent />} />
           <Route path="*" element={<ProtectedApp />} />
         </Routes>
       </AuthProvider>
