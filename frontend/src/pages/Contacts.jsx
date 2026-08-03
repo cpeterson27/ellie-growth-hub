@@ -2328,28 +2328,6 @@ export default function Contacts() {
       ) : null}
 
       <Modal
-        isOpen={false}
-        onClose={() => {}}
-        title="Import Contacts"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => {}}
-              disabled={importing}
-            >
-              Cancel
-            </Button>
-            <Button loading={importing} onClick={() => {}}>
-              Confirm Import
-            </Button>
-          </>
-        }
-      >
-        <p>{selectedCopy?.body}</p>
-      </Modal>
-
-      <Modal
         isOpen={isCardCaptureOpen}
         onClose={closeCardCapture}
         title="Capture a digital business card"
