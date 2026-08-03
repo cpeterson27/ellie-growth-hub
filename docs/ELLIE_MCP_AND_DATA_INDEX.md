@@ -6,6 +6,8 @@ The index is Ellie's own searchable MongoDB collection of business facts importe
 
 The owner does **not** need to create `ELLIE_BUSINESS_DATA_API_URL` or `ELLIE_BUSINESS_DATA_API_KEY`. Ellie searches the owned index by default. Those variables remain optional for a future licensed feed.
 
+Sacramento-area searches can also use Ellie's small live OpenStreetMap pilot when the owned index has no matching records. Results retain their individual OpenStreetMap evidence URL and attribution. This pilot is deliberately bounded; national-scale ingestion should use downloadable regional extracts or an Ellie-hosted data service instead of placing bulk load on a public API.
+
 An owner or admin can load normalized records through `POST /api/business-index/imports`. Required fields per row are `name` and `sourceUrl`; the request also requires `sourceDataset`. Upserts use `sourceDataset + sourceRecordId`, so refreshes do not create duplicates.
 
 ## Ellie MCP

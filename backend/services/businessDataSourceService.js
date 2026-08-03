@@ -12,10 +12,10 @@ function sourceStatus() {
     name: "Ellie-owned Business Index",
     configured: true,
     mode: endpoint ? "owned_index_plus_feed" : "owned_index",
-    supports: ["organization_search", "evidence", "pagination"],
+    supports: ["organization_search", "evidence", "pagination", "sacramento_open_data_pilot"],
     message: endpoint
       ? "Ellie will search its owned index and the configured licensed feed."
-      : "Ellie will search its owned index. No external API URL or key is required.",
+      : "Ellie will search its owned index, with a live OpenStreetMap pilot for Sacramento-area business searches. No external API URL or key is required.",
   };
 }
 
@@ -52,6 +52,45 @@ async function searchOwnedIndex({ plan, cursor = null, limit = 100 }) {
     cursor: rows.length === Math.min(500, Math.max(1, limit)) ? String(rows.at(-1)._id) : null,
     total: rows.length,
   };
+}
+
+function websiteDomain(website) {
+  try { return new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`).hostname.replace(/^www\./, ""); }
+  catch (_error) { return ""; }
+}
+
+async function searchSacramentoOpenData({ plan, limit = 100 }) {
+  const locations = (plan?.criteria?.locations || []).join(" ").toLowerCase();
+  if (!locations.includes("sacramento")) return { success: true, results: [], cursor: null, total: 0 };
+  const bbox = "38.437,-121.560,38.685,-121.362";
+  const query = `[out:json][timeout:25];(nwr["name"]["shop"](${bbox});nwr["name"]["office"](${bbox});nwr["name"]["amenity"](${bbox});nwr["name"]["tourism"](${bbox});nwr["name"]["craft"](${bbox}););out center ${Math.min(500, Math.max(25, limit * 3))};`;
+  const response = await axios.post("https://overpass-api.de/api/interpreter", new URLSearchParams({ data: query }).toString(), {
+    timeout: 30000,
+    maxContentLength: 8 * 1024 * 1024,
+    headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "User-Agent": "EllieGrowthHub/1.0 (business-research; support@elliescoaching.com)" },
+  });
+  const keywords = [...(plan?.criteria?.keywords || []), ...(plan?.criteria?.industries || [])].map((value) => String(value).toLowerCase()).filter(Boolean);
+  const mapped = (response.data?.elements || []).map((element) => {
+    const tags = element.tags || {};
+    const category = tags.shop || tags.office || tags.amenity || tags.tourism || tags.craft || "business";
+    const searchable = [tags.name, category, tags.description, tags.cuisine].filter(Boolean).join(" ").toLowerCase();
+    if (keywords.length && !keywords.some((keyword) => searchable.includes(keyword) || keyword.includes(String(category).replace(/_/g, " ")))) return null;
+    const website = tags.website || tags["contact:website"] || "";
+    const street = [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ");
+    const city = tags["addr:city"] || "Sacramento";
+    return normalizeResult({
+      id: `${element.type}/${element.id}`,
+      name: tags.name,
+      website,
+      domain: websiteDomain(website),
+      industry: String(category).replace(/_/g, " "),
+      description: tags.description || "",
+      location: [street, city, tags["addr:state"] || "CA"].filter(Boolean).join(", "),
+      phone: tags.phone || tags["contact:phone"] || "",
+      evidence: [{ sourceType: "openstreetmap", sourceUrl: `https://www.openstreetmap.org/${element.type}/${element.id}`, field: "organization", observedValue: tags.name, observedAt: new Date() }],
+    }, "openstreetmap_sacramento");
+  }).filter(Boolean).slice(0, limit);
+  return { success: true, results: mapped, cursor: null, total: mapped.length, attribution: "© OpenStreetMap contributors, ODbL" };
 }
 
 async function validateEndpoint(rawUrl) {
@@ -107,7 +146,12 @@ function normalizeResult(item = {}, sourceId) {
 async function searchBusinessFeed({ plan, cursor = null, limit = 100 }) {
   const status = sourceStatus();
   const owned = await searchOwnedIndex({ plan, cursor, limit });
-  if (owned.results.length || !process.env.ELLIE_BUSINESS_DATA_API_URL?.trim()) return owned;
+  if (owned.results.length) return owned;
+  if (!cursor) {
+    const sacramentoPilot = await searchSacramentoOpenData({ plan, limit });
+    if (sacramentoPilot.results.length || !process.env.ELLIE_BUSINESS_DATA_API_URL?.trim()) return sacramentoPilot;
+  }
+  if (!process.env.ELLIE_BUSINESS_DATA_API_URL?.trim()) return owned;
   const endpoint = await validateEndpoint(process.env.ELLIE_BUSINESS_DATA_API_URL.trim());
   const response = await axios.post(endpoint, { plan, cursor, limit: Math.min(500, Math.max(1, limit)) }, {
     timeout: 30000,
@@ -127,4 +171,4 @@ async function searchBusinessFeed({ plan, cursor = null, limit = 100 }) {
   };
 }
 
-module.exports = { normalizeResult, searchBusinessFeed, searchOwnedIndex, sourceStatus, validateEndpoint };
+module.exports = { normalizeResult, searchBusinessFeed, searchOwnedIndex, searchSacramentoOpenData, sourceStatus, validateEndpoint };
