@@ -8,6 +8,7 @@ const api = axios.create({
 });
 
 export const getMcpEndpoint = () => String(api.defaults.baseURL || "").replace(/\/api\/?$/, "/mcp");
+export const getGptActionsSchemaEndpoint = () => String(api.defaults.baseURL || "").replace(/\/api\/?$/, "/gpt-actions/openapi.json");
 
 export const fetchOAuthAuthorizationDetails = (search = "") =>
   api.get(`/oauth/authorize/details${search}`).then((res) => res.data);

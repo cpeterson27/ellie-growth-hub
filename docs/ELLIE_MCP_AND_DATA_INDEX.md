@@ -30,6 +30,12 @@ Ellie implements OAuth discovery, dynamic client registration, authorization-cod
 
 Production should set `PUBLIC_BACKEND_URL` to the HTTPS backend origin if Render does not expose `RENDER_EXTERNAL_URL`; `FRONTEND_URL` must contain the deployed Ellie frontend origin. Public app availability still depends on the connected AI product's plan, developer-mode access, review requirements, and app configuration. A ChatGPT subscription does not fund OpenAI API usage inside Ellie.
 
+## ChatGPT Plus private GPT Actions
+
+ChatGPT Plus users can create a private Custom GPT and import Ellie's hosted OpenAPI schema from `/gpt-actions/openapi.json`. Configure the Action authentication as API Key, Bearer, using a 90-day token created in Ellie Settings → AI connections. Keep that GPT private because its creator-managed bearer token represents one Ellie user and workspace.
+
+The Action surface can check status, list prospect lists, search saved ranked leads, plan research, start a confirmed research job, and check job progress. It cannot send campaigns, delete CRM records, or change the CRM schema. The public privacy disclosure is available at `/gpt-actions/privacy`.
+
 ## Email risk policy
 
 Ellie's no-credit checker validates syntax, MX availability, known disposable domains, role addresses, and the Resend-backed suppression list. It does not use SMTP recipient probing, rotate IP addresses, enumerate mailboxes, or label a mailbox verified merely because its domain accepts email.
