@@ -11,7 +11,7 @@ const { runMarketResearchJob } = require("./externalMarketResearchService");
 function jsonResult(value) { return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: value }; }
 
 function createServer(auth) {
-  const server = new McpServer({ name: "Growth Operator by Ellie", version: "1.0.0" });
+  const server = new McpServer({ name: "Growth Operator", version: "1.0.1" });
   const hasScope = (scope) => auth.scopes?.includes(scope);
   const audited = (tool, handler) => async (args) => {
     try {
@@ -20,11 +20,11 @@ function createServer(auth) {
       return jsonResult(result);
     } catch (error) {
       McpAuditLog.create({ ...auth, tool, success: false, detail: String(error.message || error).slice(0, 500) }).catch(() => {});
-      return { isError: true, content: [{ type: "text", text: error.message || "Ellie could not complete this tool call." }] };
+      return { isError: true, content: [{ type: "text", text: error.message || "Growth Operator could not complete this tool call." }] };
     }
   };
 
-  server.registerTool("ellie_status", { title: "Ellie status", description: "Check the connected Ellie workspace and available capabilities.", inputSchema: {}, annotations: { readOnlyHint: true, openWorldHint: false } }, audited("ellie_status", async () => ({ connected: true, capabilities: ["market research", "ranked lead lists", "CRM search", "email risk evidence"], emailSendingAvailable: false })));
+  server.registerTool("growth_operator_status", { title: "Growth Operator status", description: "Check the connected workspace and available capabilities.", inputSchema: {}, annotations: { readOnlyHint: true, openWorldHint: false } }, audited("growth_operator_status", async () => ({ connected: true, capabilities: ["market research", "ranked lead lists", "CRM search", "email risk evidence"], emailSendingAvailable: false })));
   if (hasScope("research:read")) server.registerTool("list_prospect_lists", { title: "List prospect lists", description: "List research and prospect lists in this Ellie workspace.", inputSchema: { limit: z.number().int().min(1).max(100).optional() }, annotations: { readOnlyHint: true, openWorldHint: false } }, audited("list_prospect_lists", async ({ limit = 25 }) => Audience.find({ workspaceId: auth.workspaceId }).select("name status source totalOrgs createdAt").sort({ createdAt: -1 }).limit(limit).lean()));
   if (hasScope("crm:read")) server.registerTool("search_ranked_leads", { title: "Search ranked leads", description: "Search organizations already researched and saved in Ellie.", inputSchema: { query: z.string().max(200).optional(), limit: z.number().int().min(1).max(100).optional() }, annotations: { readOnlyHint: true, openWorldHint: false } }, audited("search_ranked_leads", async ({ query = "", limit = 25 }) => {
     const filter = { workspaceId: auth.workspaceId };

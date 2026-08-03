@@ -19,7 +19,7 @@ const { sendEmail } = require("../services/email");
 const router = express.Router();
 const serverUrl = (req) => String(process.env.PUBLIC_BACKEND_URL || process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
 const hasScope = (req, scope) => req.mcpAuth?.scopes?.includes(scope);
-const requireScope = (scope) => (req, res, next) => hasScope(req, scope) ? next() : res.status(403).json({ error: `The Ellie connection does not include ${scope}.` });
+const requireScope = (scope) => (req, res, next) => hasScope(req, scope) ? next() : res.status(403).json({ error: `The Growth Operator connection does not include ${scope}.` });
 const confirmationExpiry = () => new Date(Date.now() + 15 * 60 * 1000);
 async function requireOperator(req, res, next) {
   const membership = await WorkspaceMembership.findOne({ workspaceId: req.mcpAuth.workspaceId, userId: req.mcpAuth.userId, status: "active" }).lean();
@@ -47,23 +47,23 @@ router.get("/gpt-actions/openapi.json", (req, res) => {
   const base = serverUrl(req);
   res.json({
     openapi: "3.1.0",
-    info: { title: "Growth Operator by Ellie", version: "1.1.0", description: "Research leads and prepare guarded CRM operations. High-impact changes require a short-lived approval and an exact second confirmation." },
+    info: { title: "Growth Operator", version: "1.1.1", description: "Research leads and prepare guarded CRM operations. High-impact changes require a short-lived approval and an exact second confirmation." },
     servers: [{ url: base }],
     components: {
-      securitySchemes: { EllieToken: { type: "http", scheme: "bearer", bearerFormat: "Ellie connection token" } },
+      securitySchemes: { GrowthOperatorToken: { type: "http", scheme: "bearer", bearerFormat: "Growth Operator connection token" } },
       schemas: {
         ResearchRequest: { type: "object", required: ["question"], properties: { question: { type: "string", minLength: 8, maxLength: 1000, description: "Natural-language description of the businesses or leads to research." }, maxResults: { type: "integer", minimum: 1, maximum: 1000, default: 250 } } },
         ConfirmationRequest: { type: "object", required: ["approvalId", "confirmation"], properties: { approvalId: { type: "string" }, confirmation: { type: "string", description: "The exact confirmation phrase returned by the prepare action." } } },
         ConnectionRow: { type: "object", required: ["First Name", "Last Name"], additionalProperties: true, properties: { "First Name": { type: "string" }, "Last Name": { type: "string" }, "Email": { type: "string" }, "Company Name": { type: "string" }, "Title": { type: "string" }, "Person Linkedin Url": { type: "string" } } },
       },
     },
-    security: [{ EllieToken: [] }],
+    security: [{ GrowthOperatorToken: [] }],
     paths: {
-      "/gpt-actions/status": { get: { operationId: "getEllieStatus", summary: "Check the Ellie connection and available capabilities", responses: { 200: { description: "Connection status" } } } },
-      "/gpt-actions/prospect-lists": { get: { operationId: "listProspectLists", summary: "List research and prospect lists saved in Ellie", parameters: [{ name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 25 } }], responses: { 200: { description: "Prospect lists" } } } },
-      "/gpt-actions/leads/search": { get: { operationId: "searchRankedLeads", summary: "Search ranked organizations already saved in Ellie", parameters: [{ name: "query", in: "query", schema: { type: "string", maxLength: 200 } }, { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 25 } }], responses: { 200: { description: "Ranked leads" } } } },
+      "/gpt-actions/status": { get: { operationId: "getGrowthOperatorStatus", summary: "Check the Growth Operator connection and available capabilities", responses: { 200: { description: "Connection status" } } } },
+      "/gpt-actions/prospect-lists": { get: { operationId: "listProspectLists", summary: "List saved research and prospect lists", parameters: [{ name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 25 } }], responses: { 200: { description: "Prospect lists" } } } },
+      "/gpt-actions/leads/search": { get: { operationId: "searchRankedLeads", summary: "Search ranked organizations already saved in the CRM", parameters: [{ name: "query", in: "query", schema: { type: "string", maxLength: 200 } }, { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 25 } }], responses: { 200: { description: "Ranked leads" } } } },
       "/gpt-actions/research/plan": { post: { operationId: "planLeadResearch", summary: "Create a reviewable lead-research plan without changing CRM data", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ResearchRequest" } } } }, responses: { 200: { description: "Research plan" } } } },
-      "/gpt-actions/research/run": { post: { operationId: "startLeadResearch", summary: "Create a prospect list and start approved evidence-backed research", description: "This changes Ellie workspace data by creating a list and queued research job. Ask the user for confirmation before calling.", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ResearchRequest" } } } }, responses: { 202: { description: "Queued research job" } } } },
+      "/gpt-actions/research/run": { post: { operationId: "startLeadResearch", summary: "Create a prospect list and start approved evidence-backed research", description: "This changes workspace data by creating a list and queued research job. Ask the user for confirmation before calling.", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ResearchRequest" } } } }, responses: { 202: { description: "Queued research job" } } } },
       "/gpt-actions/research/jobs/{jobId}": { get: { operationId: "getLeadResearchJob", summary: "Check a lead-research job and its progress", parameters: [{ name: "jobId", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Research job" } } } },
       "/gpt-actions/campaigns": { get: { operationId: "listCampaigns", summary: "List campaigns and template status", responses: { 200: { description: "Campaigns" } } } },
       "/gpt-actions/templates/prepare": { post: { operationId: "prepareTemplateChange", summary: "Preview a campaign template change and create a confirmation", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["campaignId", "subject", "body"], properties: { campaignId: { type: "string" }, subject: { type: "string" }, body: { type: "string" }, callToAction: { type: "string" }, callToActionUrl: { type: "string" }, topic: { type: "string", enum: ["event_invitations", "program_offers", "educational_newsletter"] } } } } } }, responses: { 200: { description: "Before/after diff and confirmation" } } } },
@@ -81,7 +81,7 @@ router.get("/gpt-actions/openapi.json", (req, res) => {
   });
 });
 
-router.get("/gpt-actions/privacy", (_req, res) => res.type("html").send("<!doctype html><title>Growth Operator Privacy</title><main style='max-width:760px;margin:60px auto;font:16px system-ui;line-height:1.6'><h1>Growth Operator by Ellie</h1><p>Growth Operator actions access only the authenticated Ellie workspace and only the permissions granted by its connection token. Tool calls are audit logged. Ellie does not expose passwords to ChatGPT.</p><p>High-impact operations use short-lived previews and exact second confirmations. Sending also enforces suppression, verification, consent, and unsubscribe rules. Contact removal is reversible archiving, not permanent deletion. Ellie never stores LinkedIn passwords, scrapes LinkedIn, or silently messages connections.</p><p>Revoke access at any time from Ellie Settings → AI connections. Do not share an Ellie connection token or publish a private GPT containing one.</p></main>"));
+router.get("/gpt-actions/privacy", (_req, res) => res.type("html").send("<!doctype html><title>Growth Operator Privacy</title><main style='max-width:760px;margin:60px auto;font:16px system-ui;line-height:1.6'><h1>Growth Operator</h1><p>Growth Operator actions access only the authenticated workspace and only the permissions granted by its connection token. Tool calls are audit logged. Growth Operator does not expose passwords to ChatGPT.</p><p>High-impact operations use short-lived previews and exact second confirmations. Sending also enforces suppression, verification, consent, and unsubscribe rules. Contact removal is reversible archiving, not permanent deletion. Growth Operator never stores LinkedIn passwords, scrapes LinkedIn, or silently messages connections.</p><p>Revoke access at any time from Settings → AI connections. Do not share a connection token or publish a private GPT containing one.</p></main>"));
 
 router.use("/gpt-actions", requireMcpAuth);
 router.get("/gpt-actions/status", (req, res) => {
@@ -121,7 +121,7 @@ router.post("/gpt-actions/research/run", requireScope("research:write"), async (
     if (question.length < 8 || question.length > 1000) return res.status(400).json({ error: "Enter a research question between 8 and 1,000 characters." });
     const maxResults = Math.min(1000, Math.max(1, Number(req.body?.maxResults) || 250));
     const plan = await compileMarketQuestion(question);
-    const audience = await Audience.create({ workspaceId: req.mcpAuth.workspaceId, name: String(plan.name || "Ellie market research").slice(0, 160), description: plan.summary || question, source: "ai", criteria: plan.criteria || {} });
+    const audience = await Audience.create({ workspaceId: req.mcpAuth.workspaceId, name: String(plan.name || "Growth Operator market research").slice(0, 160), description: plan.summary || question, source: "ai", criteria: plan.criteria || {} });
     const job = await MarketResearchJob.create({ workspaceId: req.mcpAuth.workspaceId, userId: req.mcpAuth.userId, audienceId: audience._id, question, plan, sourceId: "ellie_business_data", status: "queued" });
     setImmediate(() => runMarketResearchJob(job._id, { maxResults }).catch(() => {}));
     audit(req, "start_research", true);
