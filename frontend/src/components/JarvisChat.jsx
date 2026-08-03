@@ -210,9 +210,12 @@ export default function JarvisChat() {
     submitPrompt(prompt);
   };
 
-  const handleAction = async (action) => {
+  const handleAction = async (action, message = null) => {
     try {
-      if (action === "view_development_requests") {
+      if (action === "open_lead_discovery") {
+        const question = message?.data?.researchQuestion || "";
+        navigate(`/discovery${question ? `?question=${encodeURIComponent(question)}` : ""}`);
+      } else if (action === "view_development_requests") {
         navigate("/development-requests");
       } else if (action === "create_campaign") {
         // Create a campaign draft and add result to chat
@@ -305,6 +308,7 @@ export default function JarvisChat() {
       view_analytics: "📈 View Analytics",
       launch_campaign: "🚀 Launch Campaign",
       view_development_requests: "Review Development Request",
+      open_lead_discovery: "Review Lead Search",
     };
     return labels[action] || action;
   };
@@ -470,7 +474,7 @@ export default function JarvisChat() {
                       <button
                         key={action}
                         className="jarvis-action-btn"
-                        onClick={() => handleAction(action)}
+                        onClick={() => handleAction(action, msg)}
                         disabled={loading}
                       >
                         {getActionLabel(action)}

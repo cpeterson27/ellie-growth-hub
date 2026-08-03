@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
@@ -67,6 +68,7 @@ function buildAudiencePayload(target) {
 }
 
 export default function Discovery() {
+  const [searchParams] = useSearchParams();
   const [prospects, setProspects] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -87,6 +89,11 @@ export default function Discovery() {
   const [researchSource, setResearchSource] = useState(null);
   const [externalJob, setExternalJob] = useState(null);
   const [externalRunning, setExternalRunning] = useState(false);
+
+  useEffect(() => {
+    const question = String(searchParams.get("question") || "").trim();
+    if (question) setMarketQuestion(question);
+  }, [searchParams]);
 
   const loadProspects = async () => {
     const response = await fetchContacts({ status: "prospect", limit: 500 });

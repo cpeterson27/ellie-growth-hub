@@ -9,6 +9,7 @@ const llmService = require("../services/llmService");
 const jarvisMemoryService = require("../services/jarvisMemoryService");
 const jarvisProfileService = require("../services/jarvisProfileService");
 const developmentRequestService = require("../services/developmentRequestService");
+const { compileMarketQuestion } = require("../services/marketResearchService");
 
 const router = express.Router();
 
@@ -26,6 +27,21 @@ router.post("/chat", async (req, res) => {
       return res.status(400).json({
         success: false,
         error: "Message is required and must be a string",
+      });
+    }
+
+    const leadResearchRequest = /\b(find|discover|research|search for|build).{0,40}\b(new )?(leads|prospects|businesses|companies|owners|founders)\b/i.test(message);
+    if (leadResearchRequest) {
+      const plan = await compileMarketQuestion(message);
+      return res.json({
+        success: true,
+        data: {
+          answer: `I built a lead-research plan for “${plan.name}.” Review the filters, evidence requirements, and result limit before starting it. I will not add contacts or send outreach without your approval.`,
+          data: { researchQuestion: message, plan },
+          actionsAvailable: ["open_lead_discovery"],
+          activity: [{ status: "complete", label: "Converted your request into a reviewable lead-search plan" }],
+          memorySources: [],
+        },
       });
     }
 
