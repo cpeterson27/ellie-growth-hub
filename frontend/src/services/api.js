@@ -304,6 +304,9 @@ export const fetchMarketResearchSources = () =>
 export const fetchMarketResearchHistory = (limit = 30) =>
   api.get("/audience/research/history", { params: { limit } }).then((res) => res.data);
 
+export const fetchPeopleResearchPreviews = (limit = 20) =>
+  api.get("/audience/research/people-previews", { params: { limit } }).then((res) => res.data);
+
 export const startExternalMarketResearch = (payload) =>
   api.post("/audience/research/run", payload).then((res) => res.data);
 

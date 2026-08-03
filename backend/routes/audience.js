@@ -5,6 +5,7 @@ const Organization = require("../models/Organization");
 const Audience = require("../models/Audience");
 const DiscoveryRun = require("../models/DiscoveryRun");
 const MarketResearchJob = require("../models/MarketResearchJob");
+const PeopleResearchPreview = require("../models/PeopleResearchPreview");
 
 const {
   discoverAudienceSources,
@@ -61,6 +62,19 @@ router.get("/research/history", async (req, res) => {
     });
   } catch (_error) {
     return res.status(500).json({ success: false, error: "Unable to load saved research history." });
+  }
+});
+
+router.get("/research/people-previews", async (req, res) => {
+  try {
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const previews = await PeopleResearchPreview.find({ workspaceId: req.auth.workspaceId })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .lean();
+    return res.json({ success: true, previews });
+  } catch (_error) {
+    return res.status(500).json({ success: false, error: "Unable to load staged people research." });
   }
 });
 

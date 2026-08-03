@@ -13,6 +13,7 @@ import {
   fetchDiscoveryTemplates,
   fetchMarketResearchResults,
   fetchMarketResearchHistory,
+  fetchPeopleResearchPreviews,
   fetchMarketResearchSources,
   fetchMarketResearchJob,
   saveDiscoveryTemplates,
@@ -93,6 +94,9 @@ export default function Discovery() {
   const [researchHistory, setResearchHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [openingHistoryId, setOpeningHistoryId] = useState("");
+  const [peoplePreviews, setPeoplePreviews] = useState([]);
+  const [peoplePreviewsLoading, setPeoplePreviewsLoading] = useState(false);
+  const [openPeoplePreviewId, setOpenPeoplePreviewId] = useState("");
 
   useEffect(() => {
     const question = String(searchParams.get("question") || "").trim();
@@ -116,13 +120,29 @@ export default function Discovery() {
     }
   };
 
+  const loadPeoplePreviews = async () => {
+    try {
+      setPeoplePreviewsLoading(true);
+      const response = await fetchPeopleResearchPreviews(20);
+      setPeoplePreviews(response.previews || []);
+    } catch {
+      setNotice("Unable to load staged people research.");
+    } finally {
+      setPeoplePreviewsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadProspects().catch(() => setNotice("Unable to load prospects."));
     fetchCampaigns().then((items) => setCampaigns(Array.isArray(items) ? items : [])).catch(() => {});
     fetchDiscoveryTemplates().then((data) => setTemplates(data.templates || [])).catch(() => {});
     fetchMarketResearchSources().then((data) => setResearchSource(data.sources?.[0] || null)).catch(() => {});
     loadResearchHistory();
-    const refreshHistory = window.setInterval(() => loadResearchHistory(), 15000);
+    loadPeoplePreviews();
+    const refreshHistory = window.setInterval(() => {
+      loadResearchHistory();
+      loadPeoplePreviews();
+    }, 15000);
     return () => window.clearInterval(refreshHistory);
   }, []);
 
@@ -335,6 +355,29 @@ export default function Discovery() {
         </article>;
       })}</div> : <div className="table-state table-state--empty">No saved research yet. Research started in ChatGPT or on this page will appear here automatically.</div>}
     </DashboardCard>
+
+    <div id="people-research-previews">
+      <DashboardCard title="ChatGPT people research previews" action={<Button variant="outline" loading={peoplePreviewsLoading} onClick={loadPeoplePreviews}>Refresh</Button>}>
+        <p className="people-preview-intro">People found by Growth Operator stay here for review before they become CRM contacts. A published email is still unverified and cannot be used for outreach until it passes your verification rules.</p>
+        {peoplePreviews.length ? <div className="people-preview-list">{peoplePreviews.map((preview) => {
+          const isOpen = openPeoplePreviewId === String(preview._id);
+          return <article key={preview._id} className={`people-preview-batch is-${preview.status}`}>
+            <header>
+              <div><span>{preview.status.replaceAll("_", " ")}</span><strong>{preview.name}</strong><small>{new Date(preview.updatedAt).toLocaleString()} · ChatGPT public-web research</small></div>
+              <div className="people-preview-summary"><strong>{preview.summary?.total || preview.people?.length || 0}</strong><span>people</span><small>{preview.summary?.newContacts || 0} new · {preview.summary?.existingContacts || 0} existing · {preview.summary?.publishedEmails || 0} published emails</small></div>
+              <Button size="sm" variant="outline" onClick={() => setOpenPeoplePreviewId(isOpen ? "" : String(preview._id))}>{isOpen ? "Hide people" : "Review people"}</Button>
+            </header>
+            {isOpen ? <div className="people-preview-rows">{(preview.people || []).map((person, index) => <div className="people-preview-person" key={`${person.firstName}-${person.lastName}-${person.company}-${index}`}>
+              <div><strong>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Unnamed person"}</strong><span>{[person.title, person.company].filter(Boolean).join(" · ") || "Role needs review"}</span></div>
+              <div><small>Email</small><strong>{person.email || "Not publicly listed"}</strong><span className={`people-email-state is-${person.emailStatus}`}>{String(person.emailStatus || "missing").replaceAll("_", " ")}</span></div>
+              <div><small>CRM review</small><strong>{String(person.reviewStatus || "new").replaceAll("_", " ")}</strong>{person.matchReason ? <span>{person.matchReason}</span> : null}</div>
+              <div className="people-preview-evidence"><small>Evidence</small><p>{person.evidenceSummary || "Public source attached for manual review."}</p><a href={person.evidenceUrl} target="_blank" rel="noreferrer">Open source</a></div>
+            </div>)}</div> : null}
+            {preview.status !== "imported" ? <p className="people-preview-footnote">Staged only—these people have not been added to Contacts. Import still requires the exact confirmation in your Growth Operator ChatGPT conversation.</p> : <p className="people-preview-footnote is-imported">Imported as needs-review prospects. Open Prospect review below to qualify them.</p>}
+          </article>;
+        })}</div> : <div className="table-state table-state--empty">No staged people previews yet. Ask Growth Operator in ChatGPT to preview public-web decision-makers; the next preview will appear here automatically.</div>}
+      </DashboardCard>
+    </div>
 
     <DashboardCard title="External research source">
       <div className={`research-source-status ${researchSource?.configured ? "is-ready" : "is-needed"}`}>

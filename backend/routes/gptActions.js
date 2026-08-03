@@ -8,7 +8,9 @@ const Outreach = require("../models/Outreach");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const GrowthActionApproval = require("../models/GrowthActionApproval");
+const PeopleResearchPreview = require("../models/PeopleResearchPreview");
 const McpAuditLog = require("../models/McpAuditLog");
+const crypto = require("crypto");
 const { requireMcpAuth } = require("../middleware/mcpAuth");
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
@@ -74,11 +76,73 @@ function normalizePublicPeople(rows) {
   });
 }
 
+function publicPeopleFingerprint(people) {
+  const stableRows = people.map((person) => [
+    person["First Name"],
+    person["Last Name"],
+    person["Company Name"],
+    person.Email,
+    person["Evidence URL"],
+  ].map((value) => String(value || "").trim().toLowerCase()).join("|"));
+  return crypto.createHash("sha256").update(stableRows.sort().join("\n")).digest("hex");
+}
+
+function publicPeoplePreviewName(people) {
+  const companies = [...new Set(people.map((person) => person["Company Name"]).filter(Boolean))];
+  const companyLabel = companies.length > 1 ? `${companies[0]} + ${companies.length - 1} more` : companies[0] || "Public-web research";
+  return `${people.length} decision-makers · ${companyLabel}`.slice(0, 180);
+}
+
+async function savePublicPeoplePreview(req, people, preview, status = "staged") {
+  const rowsByIndex = new Map((preview.rows || []).map((row) => [row.index, row]));
+  const previewPeople = people.map((person, index) => {
+    const row = rowsByIndex.get(index) || {};
+    return {
+      firstName: person["First Name"],
+      lastName: person["Last Name"],
+      title: person.Title,
+      company: person["Company Name"],
+      companyWebsite: person.Website,
+      email: person.Email,
+      emailStatus: person["Email Status"],
+      evidenceUrl: person["Evidence URL"],
+      evidenceSummary: person["Evidence Summary"],
+      evidenceObservedAt: person["Evidence Observed At"],
+      reviewStatus: row.status || "new",
+      matchReason: row.matchReason || "",
+      existingContactId: row.existingContact?.id || null,
+    };
+  });
+  const fingerprint = publicPeopleFingerprint(people);
+  const existing = await PeopleResearchPreview.findOne({ workspaceId: req.mcpAuth.workspaceId, fingerprint });
+  if (existing?.status === "imported") return existing;
+  return PeopleResearchPreview.findOneAndUpdate(
+    { workspaceId: req.mcpAuth.workspaceId, fingerprint },
+    {
+      $set: {
+        userId: req.mcpAuth.userId,
+        name: publicPeoplePreviewName(people),
+        source: "chatgpt_public_web",
+        status,
+        people: previewPeople,
+        summary: {
+          total: preview.total,
+          newContacts: preview.newContacts,
+          existingContacts: preview.existingContacts,
+          duplicatesInFile: preview.duplicatesInFile,
+          publishedEmails: people.filter((person) => Boolean(person.Email)).length,
+        },
+      },
+    },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
+}
+
 router.get("/gpt-actions/openapi.json", (req, res) => {
   const base = serverUrl(req);
   res.json({
     openapi: "3.1.0",
-    info: { title: "Growth Operator", version: "1.2.0", description: "Research leads and prepare guarded CRM operations. High-impact changes require a short-lived approval and an exact second confirmation." },
+    info: { title: "Growth Operator", version: "1.3.0", description: "Research leads and prepare guarded CRM operations. High-impact changes require a short-lived approval and an exact second confirmation." },
     servers: [{ url: base }],
     components: {
       securitySchemes: { GrowthOperatorToken: { type: "http", scheme: "bearer", bearerFormat: "Growth Operator connection token" } },
@@ -298,8 +362,9 @@ router.post("/gpt-actions/people/preview", requireScope("crm:read"), async (req,
   try {
     const people = normalizePublicPeople(req.body?.people);
     const preview = await previewContactIngestion({ contacts: people, source: "public_web_research" });
+    const savedPreview = await savePublicPeoplePreview(req, people, preview);
     audit(req, "preview_public_people", true, preview.total);
-    res.json({ ...preview, people, rules: { evidenceRequired: true, linkedinScrapingAccepted: false, publishedEmailStatus: "published_unverified", marketingPermission: false } });
+    res.json({ ...preview, people, previewId: savedPreview._id, previewStatus: savedPreview.status, webAppPath: "/discovery#people-research-previews", rules: { evidenceRequired: true, linkedinScrapingAccepted: false, publishedEmailStatus: "published_unverified", marketingPermission: false } });
   } catch (error) { audit(req, "preview_public_people", false, error.message); res.status(400).json({ error: error.message }); }
 });
 
@@ -307,10 +372,13 @@ router.post("/gpt-actions/people/prepare-import", requireScope("imports:write"),
   try {
     const people = normalizePublicPeople(req.body?.people);
     const preview = await previewContactIngestion({ contacts: people, source: "public_web_research" });
+    const savedPreview = await savePublicPeoplePreview(req, people, preview, "approval_pending");
     const phrase = `IMPORT ${people.length} PUBLIC-WEB PROSPECTS`;
-    const item = await approval(req, "import_public_people", { people }, { total: preview.total, newContacts: preview.newContacts, existingContacts: preview.existingContacts, duplicatesInFile: preview.duplicatesInFile }, phrase);
+    const item = await approval(req, "import_public_people", { people, previewId: savedPreview._id }, { total: preview.total, newContacts: preview.newContacts, existingContacts: preview.existingContacts, duplicatesInFile: preview.duplicatesInFile }, phrase);
+    savedPreview.approvalId = item._id;
+    await savedPreview.save();
     audit(req, "prepare_public_people_import", true, people.length);
-    res.json({ approvalId: item._id, expiresAt: item.expiresAt, confirmationPhrase: phrase, preview, marketingPermission: false, emailPolicy: "Published emails are stored as published_unverified and remain blocked from campaign sending." });
+    res.json({ approvalId: item._id, previewId: savedPreview._id, webAppPath: "/discovery#people-research-previews", expiresAt: item.expiresAt, confirmationPhrase: phrase, preview, marketingPermission: false, emailPolicy: "Published emails are stored as published_unverified and remain blocked from campaign sending." });
   } catch (error) { audit(req, "prepare_public_people_import", false, error.message); res.status(400).json({ error: error.message }); }
 });
 
@@ -320,6 +388,12 @@ router.post("/gpt-actions/people/import", requireScope("imports:write"), require
     const batchId = `public-web-${item._id}`;
     const result = await ingestContacts({ contacts: item.payload.people, source: "public_web_research", marketingPermission: false, importBatchId: batchId, importFileName: "ChatGPT public-web people research" });
     await Contact.updateMany({ lastImportBatchId: batchId }, { $set: { status: "prospect" }, $addToSet: { tags: { $each: ["public-web-research", "needs-review"] } } });
+    if (item.payload.previewId) {
+      await PeopleResearchPreview.updateOne(
+        { _id: item.payload.previewId, workspaceId: req.mcpAuth.workspaceId },
+        { $set: { status: "imported", importedAt: new Date(), importResult: result } },
+      );
+    }
     audit(req, "import_public_people", true, result.mongoCreated + result.mongoUpdated);
     res.json({ ...result, marketingPermission: false, emailStatus: "published_unverified", nextStep: "Review evidence and verify any published email before approving outreach." });
   } catch (error) { audit(req, "import_public_people", false, error.message); res.status(400).json({ error: error.message }); }

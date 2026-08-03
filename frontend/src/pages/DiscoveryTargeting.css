@@ -123,6 +123,70 @@
 .research-history-actions small { color: #66736e; font-size: 12px; }
 .research-history-actions { align-items: flex-end; display: grid; gap: 9px; justify-items: end; }
 .research-history-error { color: #a13f3f; grid-column: 1 / -1; margin: 0; }
+.people-preview-intro {
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0 0 1rem;
+}
+.people-preview-list,
+.people-preview-rows { display: grid; gap: 12px; }
+.people-preview-batch {
+  background: #fff;
+  border: 1px solid #e4e8e6;
+  border-left: 4px solid #b98724;
+  border-radius: 14px;
+  padding: 18px;
+}
+.people-preview-batch.is-imported { border-left-color: #25835d; }
+.people-preview-batch > header {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 230px auto;
+}
+.people-preview-batch > header > div:first-child,
+.people-preview-summary { display: grid; gap: 4px; }
+.people-preview-batch > header span:first-child {
+  color: #8a671f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.people-preview-batch.is-imported > header span:first-child { color: #25835d; }
+.people-preview-batch > header small,
+.people-preview-summary span,
+.people-preview-summary small { color: #66736e; font-size: 12px; }
+.people-preview-summary strong { font-size: 24px; }
+.people-preview-rows { border-top: 1px solid #e4e8e6; margin-top: 16px; padding-top: 16px; }
+.people-preview-person {
+  align-items: start;
+  background: #f8faf9;
+  border: 1px solid #e4e8e6;
+  border-radius: 12px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(170px, 1fr) minmax(130px, .7fr) minmax(240px, 1.5fr);
+  padding: 14px;
+}
+.people-preview-person > div { display: grid; gap: 3px; min-width: 0; }
+.people-preview-person span,
+.people-preview-person small,
+.people-preview-person p { color: #66736e; font-size: 12px; }
+.people-preview-person strong,
+.people-preview-person p { margin: 0; overflow-wrap: anywhere; }
+.people-preview-person small { font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.people-preview-evidence a { color: #176655; font-size: 12px; font-weight: 800; }
+.people-email-state { font-weight: 800; text-transform: capitalize; }
+.people-email-state.is-published_unverified { color: #8a671f; }
+.people-preview-footnote {
+  background: #fff8e8;
+  color: #72571c;
+  font-size: 12px;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+}
+.people-preview-footnote.is-imported { background: #edf7f3; color: #1f6a57; }
 .market-plan-review p {
   margin: 0;
 }
@@ -295,6 +359,10 @@
   text-transform: capitalize;
 }
 @media (max-width: 760px) {
+  .people-preview-batch > header,
+  .people-preview-person {
+    grid-template-columns: 1fr;
+  }
   .discovery-agent-prompt,
   .target-grid {
     grid-template-columns: 1fr;
