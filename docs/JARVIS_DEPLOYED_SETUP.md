@@ -50,7 +50,9 @@ as “Find 20 Sacramento multifamily decision-makers” runs a public-web search
 inside Jarvis. Every retained person must have non-LinkedIn HTTPS evidence.
 Emails are stored only when visibly published by the cited source and remain
 `published_unverified`. The people, evidence, duplicate status, and two-step
-import approval are displayed directly in the Jarvis conversation. The latest
+import approval are displayed directly in the Jarvis conversation. Users select
+individual people (or all new people) before the selected count enters the
+two-step approval. The latest
 saved preview also reloads there after returning to the page. No outreach is
 sent by a research or import approval.
 

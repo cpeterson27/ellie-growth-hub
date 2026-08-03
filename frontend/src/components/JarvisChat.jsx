@@ -34,15 +34,21 @@ function JarvisResearchPreview({ message, approval, busy, onPrepare, onConfirm }
   const people = Array.isArray(message?.data?.people) ? message.data.people : [];
   const summary = message?.data?.preview || {};
   const previewId = String(message?.data?.previewId || "");
+  const [selectedIndexes, setSelectedIndexes] = useState([]);
   if (!people.length || !previewId) return null;
   const imported = approval?.status === "imported" || message.data.previewStatus === "imported";
+  const selectionLocked = imported || Boolean(approval?.approvalId);
+  const togglePerson = (index) => setSelectedIndexes((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current, index]);
+  const selectNewPeople = () => setSelectedIndexes(people.map((person, index) => person.reviewStatus === "new" ? index : null).filter((index) => index !== null));
   return <section className="jarvis-research-preview">
     <header className="jarvis-research-preview__header">
       <div><span>Research preview</span><strong>{summary.total || people.length} people found</strong><p>{summary.newContacts || 0} new · {summary.existingContacts || 0} CRM matches · {summary.publishedEmails || 0} published emails</p></div>
       <span className="jarvis-research-preview__state">{imported ? "Imported" : approval ? "Approval ready" : "Review first"}</span>
     </header>
+    {!imported ? <div className="jarvis-research-selection"><strong>{selectedIndexes.length} selected for CRM import</strong><div><button type="button" disabled={selectionLocked} onClick={selectNewPeople}>Select all new</button><button type="button" disabled={selectionLocked} onClick={() => setSelectedIndexes([])}>Clear selection</button></div></div> : null}
     <div className="jarvis-research-people">
       {people.map((person, index) => <article className="jarvis-research-person" key={`${previewId}-${person.firstName}-${person.lastName}-${index}`}>
+        {!imported ? <label className="jarvis-research-person__select"><input type="checkbox" checked={selectedIndexes.includes(index)} disabled={selectionLocked} onChange={() => togglePerson(index)} /><span>{selectedIndexes.includes(index) ? "Selected" : "Select"}</span></label> : null}
         <div className="jarvis-research-person__identity"><strong>{[person.firstName, person.lastName].filter(Boolean).join(" ") || "Unnamed person"}</strong><span>{person.title || "Role needs review"}</span><p>{person.company}</p></div>
         <div className="jarvis-research-person__email"><small>Email</small><strong>{person.email || "Not publicly listed"}</strong><span>{String(person.emailStatus || "missing").replaceAll("_", " ")}</span></div>
         <details><summary>Evidence and duplicate review</summary><p>{person.evidenceSummary || "Public evidence is attached for review."}</p><div className="jarvis-research-person__review"><span>{String(person.reviewStatus || "new").replaceAll("_", " ")}</span>{person.matchReason ? <span>{person.matchReason}</span> : null}</div><a href={person.evidenceUrl} target="_blank" rel="noreferrer">Open public source</a></details>
@@ -50,7 +56,7 @@ function JarvisResearchPreview({ message, approval, busy, onPrepare, onConfirm }
     </div>
     <div className="jarvis-research-approval">
       <p><strong>Nothing is sent.</strong> Importing only adds these people as needs-review prospects. Published emails remain unverified and blocked from campaigns.</p>
-      {imported ? <div className="jarvis-import-success">Imported into the CRM for review. No outreach was sent.</div> : approval ? <div className="jarvis-confirm-import"><div><span>Second confirmation</span><strong>{approval.confirmationPhrase}</strong><small>Expires {new Date(approval.expiresAt).toLocaleTimeString()}</small></div><button type="button" disabled={busy} onClick={() => onConfirm(previewId, approval)}>{busy ? "Importing…" : `Confirm import of ${summary.total || people.length} prospects`}</button></div> : <button type="button" className="jarvis-prepare-import" disabled={busy} onClick={() => onPrepare(previewId)}>{busy ? "Preparing approval…" : "Approve for CRM import"}</button>}
+      {imported ? <div className="jarvis-import-success">Imported into the CRM for review. No outreach was sent.</div> : approval ? <div className="jarvis-confirm-import"><div><span>Second confirmation</span><strong>{approval.confirmationPhrase}</strong><small>{approval.preview?.total || selectedIndexes.length} selected · expires {new Date(approval.expiresAt).toLocaleTimeString()}</small></div><button type="button" disabled={busy} onClick={() => onConfirm(previewId, approval)}>{busy ? "Importing…" : `Confirm import of ${approval.preview?.total || selectedIndexes.length} prospects`}</button></div> : <button type="button" className="jarvis-prepare-import" disabled={busy || !selectedIndexes.length} onClick={() => onPrepare(previewId, selectedIndexes)}>{busy ? "Preparing approval…" : selectedIndexes.length ? `Approve ${selectedIndexes.length} selected for CRM import` : "Select people to import"}</button>}
       {approval?.error ? <div className="jarvis-inline-error">{approval.error}</div> : null}
     </div>
   </section>;
@@ -438,10 +444,10 @@ export default function JarvisChat() {
     }
   };
 
-  const prepareResearchImport = async (previewId) => {
+  const prepareResearchImport = async (previewId, selectedIndexes) => {
     try {
       setResearchActionId(previewId);
-      const response = await prepareJarvisResearchImport(previewId);
+      const response = await prepareJarvisResearchImport(previewId, selectedIndexes);
       setResearchApprovals((current) => ({ ...current, [previewId]: response.data }));
     } catch (importError) {
       setResearchApprovals((current) => ({ ...current, [previewId]: { error: importError.response?.data?.error || "Unable to prepare this import." } }));

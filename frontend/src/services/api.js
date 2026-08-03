@@ -443,9 +443,9 @@ export const updateJarvisProfile = (profile) =>
     .put("/jarvis/profile", profile)
     .then((res) => res.data);
 
-export const prepareJarvisResearchImport = (previewId) =>
+export const prepareJarvisResearchImport = (previewId, selectedIndexes) =>
   api
-    .post(`/jarvis/research-previews/${previewId}/prepare-import`)
+    .post(`/jarvis/research-previews/${previewId}/prepare-import`, { selectedIndexes })
     .then((res) => res.data);
 
 export const confirmJarvisResearchImport = (previewId, approvalId, confirmation) =>

@@ -26,8 +26,13 @@ function requireJarvisOperator(req, res) {
   return false;
 }
 
-function previewPeopleAsImportRows(preview) {
-  return normalizePublicPeople((preview.people || []).map((person) => ({
+function previewPeopleAsImportRows(preview, selectedIndexes) {
+  const people = preview.people || [];
+  const indexes = Array.isArray(selectedIndexes)
+    ? [...new Set(selectedIndexes.map(Number))].filter((index) => Number.isInteger(index) && index >= 0 && index < people.length)
+    : [];
+  if (!indexes.length) throw new Error("Select at least one person to import.");
+  return normalizePublicPeople(indexes.map((index) => people[index]).map((person) => ({
     firstName: person.firstName,
     lastName: person.lastName,
     title: person.title,
@@ -156,14 +161,24 @@ router.post("/research-previews/:previewId/prepare-import", async (req, res) => 
     const preview = await PeopleResearchPreview.findOne({ _id: req.params.previewId, workspaceId: req.auth.workspaceId });
     if (!preview) return res.status(404).json({ success: false, error: "Research preview not found." });
     if (preview.status === "imported") return res.status(409).json({ success: false, error: "This research preview has already been imported." });
-    const people = previewPeopleAsImportRows(preview);
+    const selectedIndexes = Array.isArray(req.body?.selectedIndexes)
+      ? [...new Set(req.body.selectedIndexes.map(Number))].filter((index) => Number.isInteger(index) && index >= 0 && index < preview.people.length)
+      : [];
+    const people = previewPeopleAsImportRows(preview, selectedIndexes);
     const phrase = `IMPORT ${people.length} PUBLIC-WEB PROSPECTS`;
+    const selectedSummary = {
+      total: people.length,
+      newContacts: selectedIndexes.filter((index) => preview.people[index]?.reviewStatus === "new").length,
+      existingContacts: selectedIndexes.filter((index) => preview.people[index]?.reviewStatus === "existing").length,
+      duplicatesInFile: selectedIndexes.filter((index) => preview.people[index]?.reviewStatus === "file_duplicate").length,
+      publishedEmails: people.filter((person) => Boolean(person.Email)).length,
+    };
     const approval = await GrowthActionApproval.create({
       workspaceId: req.auth.workspaceId,
       userId: req.auth.user._id,
       action: "import_public_people",
       payload: { people, previewId: preview._id },
-      summary: preview.summary,
+      summary: selectedSummary,
       confirmationPhrase: phrase,
       expiresAt: new Date(Date.now() + 15 * 60 * 1000),
     });
@@ -176,7 +191,7 @@ router.post("/research-previews/:previewId/prepare-import", async (req, res) => 
         approvalId: approval._id,
         confirmationPhrase: phrase,
         expiresAt: approval.expiresAt,
-        preview: preview.summary,
+        preview: selectedSummary,
         warning: "This adds the staged people as needs-review CRM prospects. It does not permit or send outreach.",
       },
     });
