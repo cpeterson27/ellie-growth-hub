@@ -23,6 +23,7 @@
 - “Research identity with Jarvis” now opens a dedicated lead-research task and starts it automatically. The task keeps the original post attached, returns to the exact lead, and distinguishes a supported real name or published contact from the honest outcome that only a manual public-platform reply/message is available.
 - Jarvis identity tasks now show elapsed time, a normal 1–3 minute expectation, explicit completion/failure states, and an always-visible result transcript. Findings speak automatically; when OpenAI speech is unavailable or out of credits, Jarvis uses the device's built-in browser voice and automatically returns to the selected OpenAI voice when service is available again.
 - If paid OpenAI web research is unavailable, exact public-account searches fall back to Growth Operator's Bing, Reddit, Bluesky, Hacker News, Stack Exchange, and DuckDuckGo adapters. Matching links are presented as clues for manual evidence review and never treated as proof that two usernames belong to the same person.
+- Singular requests such as “research 1 prospect/contact” are now routed into identity research instead of the generic workspace-summary chat. The identity screen uses an honest indeterminate activity bar (not a fabricated percentage), names the current search/validation stage, explains that interim zero counts are not results, and offers a restart after four minutes rather than waiting indefinitely.
 
 ## Product decisions
 
