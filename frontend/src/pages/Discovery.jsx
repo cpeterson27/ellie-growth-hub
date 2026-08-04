@@ -34,6 +34,7 @@ import {
 import "./Discovery.css";
 import "./DiscoveryTargeting.css";
 import "./DiscoveryReview.css";
+import "./DiscoveryExperience.css";
 
 const EMPTY_TARGET = {
   name: "",
@@ -50,6 +51,13 @@ const splitValues = (value) => String(value || "")
   .split(/[,;\n]+/)
   .map((item) => item.trim())
   .filter(Boolean);
+
+const displayText = (value) => String(value || "")
+  .replace(/<[^>]*>/g, " ")
+  .replace(/&(?:#32|nbsp);/gi, " ")
+  .replace(/&#(\d+);/g, (_match, code) => String.fromCodePoint(Number(code)))
+  .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+  .replace(/\s+/g, " ").trim();
 
 const examples = [
   "Find multifamily property managers in Florida and Texas with 10–100 employees",
@@ -118,12 +126,14 @@ export default function Discovery() {
   const [monitorActivity, setMonitorActivity] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showMonitorSetup, setShowMonitorSetup] = useState(false);
+  const [leadView, setLeadView] = useState("new");
   const [selectedSources, setSelectedSources] = useState(["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]);
   const [monitorDraft, setMonitorDraft] = useState({
     name: "Nationwide event buyer intent",
     query: "People in the United States discussing leaving a W-2 job, starting or buying a business, building wealth through real estate, scaling a company, needing business systems, coaching, or an entrepreneurial community",
     keywords: "leave my W-2, quit my job, start a business, buy a business, real estate investor, multifamily, build wealth, business systems, entrepreneur, business coach, scale my business",
-    negativeKeywords: "student assignment, fictional, video game",
+    negativeKeywords: "minor, high school, student assignment, homework, hypothetical, no money, can't afford, job seeker, hiring, promotion, fictional, video game",
     feedUrls: "",
     intervalMinutes: 60,
     intentCategories: [],
@@ -230,6 +240,8 @@ export default function Discovery() {
     setNotifications((items) => items.map((item) => item._id === notification._id ? { ...item, readAt: new Date().toISOString() } : item));
   };
 
+  const visibleSignals = intentSignals.filter((signal) => leadView === "all" ? signal.status !== "dismissed" : signal.status === leadView);
+
   const runMonitorNow = async (monitorId) => {
     try {
       setMonitorRunningId(monitorId);
@@ -259,7 +271,7 @@ export default function Discovery() {
     if (!name.trim()) return;
     try {
       setSignalBusyId(signal._id);
-      await convertIntentSignal(signal._id, { name, company: signal.organizationName || signal.organizationDomain || "" });
+      await convertIntentSignal(signal._id, { name, company: signal.identityResolution?.status === "supported" ? (signal.organizationName || signal.organizationDomain || "") : "" });
       setNotice(`${name} was added to the CRM as a needs-research lead. No outreach was sent.`);
       await loadAutomaticResearch();
       await loadProspects();
@@ -477,38 +489,38 @@ export default function Discovery() {
       </section> : null}
     </DashboardCard></> : null}
 
-    {activeTab === "monitoring" ? <><DashboardCard title="Automatic nationwide intent monitoring" action={<Button variant="outline" onClick={loadAutomaticResearch}>Refresh</Button>}>
-      <p className="intent-monitor-intro">Jarvis checks public conversations, news, forums, feeds, and open-web results on the backend. Chrome does not need to stay open. Matches are evidence-backed and stay in review until you choose what to do.</p>
-      {monitorPresets.map((preset) => <button className="monitor-preset" type="button" key={preset.id} onClick={() => applyMonitorPreset(preset)}><span>Recommended preset</span><strong>{preset.name}</strong><small>Nationwide · online event · organized editable intent categories</small></button>)}
-      <div className="intent-monitor-builder">
+    {activeTab === "monitoring" ? <><section className="monitoring-guide"><div><span>Runs automatically</span><h2>Growth Operator listens for likely adult buyers</h2><p>It scans public sources, removes minors and low-value noise, and sends plausible opportunities to Live Leads. Nothing is contacted or added to your CRM automatically.</p></div><ol><li><strong>1</strong><span><b>Listen</b>Checks public conversations while your browser is closed.</span></li><li><strong>2</strong><span><b>Filter</b>Rejects minors, students, promotions, job seekers, and no-budget posts.</span></li><li><strong>3</strong><span><b>You decide</b>Review evidence and approve one lead at a time.</span></li></ol></section>
+
+    <DashboardCard title="Your active monitors" action={<div className="monitor-header-actions"><Button variant="outline" onClick={loadAutomaticResearch}>Refresh</Button><Button onClick={() => setShowMonitorSetup((value) => !value)}>{showMonitorSetup ? "Close setup" : "Create a monitor"}</Button></div>}>
+      {showMonitorSetup ? <section className="monitor-setup-panel"><header><span>New monitor</span><h3>Choose what Growth Operator should listen for</h3><p>Start with the August 22 preset, then edit any language you want.</p></header>{monitorPresets.map((preset) => <button className="monitor-preset" type="button" key={preset.id} onClick={() => applyMonitorPreset(preset)}><span>Recommended starting point</span><strong>{preset.name}</strong><small>Nationwide adult buyer intent for your online event</small></button>)}<div className="intent-monitor-builder">
         <label><span>Monitor name</span><input value={monitorDraft.name} onChange={(event) => setMonitorDraft((current) => ({ ...current, name: event.target.value }))} /></label>
-        <label className="span-2"><span>Who or what should Jarvis listen for?</span><textarea value={monitorDraft.query} onChange={(event) => setMonitorDraft((current) => ({ ...current, query: event.target.value }))} /></label>
-        <label className="span-2"><span>Intent phrases and keywords</span><textarea value={monitorDraft.keywords} onChange={(event) => setMonitorDraft((current) => ({ ...current, keywords: event.target.value }))} /></label>
+        <label><span>Check frequency</span><select value={monitorDraft.intervalMinutes} onChange={(event) => setMonitorDraft((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}><option value={15}>Every 15 minutes</option><option value={30}>Every 30 minutes</option><option value={60}>Every hour</option><option value={360}>Every 6 hours</option><option value={1440}>Daily</option></select></label>
+        <label className="span-2"><span>Describe the adult buyer you want</span><textarea value={monitorDraft.query} onChange={(event) => setMonitorDraft((current) => ({ ...current, query: event.target.value }))} /></label>
+        <label className="span-2"><span>Buying-intent phrases</span><textarea value={monitorDraft.keywords} onChange={(event) => setMonitorDraft((current) => ({ ...current, keywords: event.target.value }))} /></label>
         {monitorDraft.intentCategories?.length ? <div className="intent-category-editor span-2">{monitorDraft.intentCategories.map((category, categoryIndex) => <label key={`${category.name}-${categoryIndex}`}><span>{category.name}</span><textarea value={(category.phrases || []).join("\n")} onChange={(event) => setMonitorDraft((current) => ({ ...current, intentCategories: current.intentCategories.map((item, index) => index === categoryIndex ? { ...item, phrases: splitValues(event.target.value) } : item) }))} /></label>)}</div> : null}
-        <label><span>Ignore these terms</span><input value={monitorDraft.negativeKeywords} onChange={(event) => setMonitorDraft((current) => ({ ...current, negativeKeywords: event.target.value }))} /></label>
-        <label><span>Check every</span><select value={monitorDraft.intervalMinutes} onChange={(event) => setMonitorDraft((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}><option value={15}>15 minutes</option><option value={30}>30 minutes</option><option value={60}>1 hour</option><option value={360}>6 hours</option><option value={1440}>Daily</option></select></label>
-        <label className="span-2"><span>Additional public RSS, Atom, or Discourse feed URLs (optional)</span><textarea value={monitorDraft.feedUrls} onChange={(event) => setMonitorDraft((current) => ({ ...current, feedUrls: event.target.value }))} placeholder="One public feed URL per line. Jarvis checks these automatically too." /></label>
+        <label className="span-2"><span>Always ignore</span><textarea value={monitorDraft.negativeKeywords} onChange={(event) => setMonitorDraft((current) => ({ ...current, negativeKeywords: event.target.value }))} /></label>
+        <details className="advanced-monitor-options span-2"><summary>Advanced source options</summary><label><span>Additional public feed URLs</span><textarea value={monitorDraft.feedUrls} onChange={(event) => setMonitorDraft((current) => ({ ...current, feedUrls: event.target.value }))} placeholder="One URL per line" /></label><div className="intent-source-chips">{[["bing_web", "Bing web"], ["bing_news", "Bing News"], ["gdelt", "News index"], ["sec_form_d", "SEC filings"], ["bluesky", "Bluesky"], ["hacker_news", "Hacker News"], ["stack_exchange", "Stack Exchange"], ["reddit_rss", "Reddit"], ["duckduckgo", "DuckDuckGo"]].map(([id, label]) => <button type="button" className={selectedSources.includes(id) ? "is-on" : ""} key={id} onClick={() => toggleDraftSource(id)}>{selectedSources.includes(id) ? "On · " : "Off · "}{label}</button>)}</div></details>
       </div>
-      <div className="intent-source-chips">{[["bing_web", "Bing open web"], ["bing_news", "Bing News"], ["gdelt", "GDELT news"], ["sec_form_d", "SEC Form D"], ["bluesky", "Bluesky"], ["hacker_news", "Hacker News"], ["stack_exchange", "Stack Exchange"], ["reddit_rss", "Reddit feeds"], ["duckduckgo", "DuckDuckGo"]].map(([id, label]) => <button type="button" className={selectedSources.includes(id) ? "is-on" : ""} key={id} onClick={() => toggleDraftSource(id)}>{selectedSources.includes(id) ? "On · " : "Off · "}{label}</button>)}</div>
-      <Button loading={monitorSaving} disabled={!monitorDraft.query.trim()} onClick={createMonitor}>Start automatic monitoring</Button>
-      {monitors.length ? <div className="intent-monitor-list">{monitors.map((monitor) => <article key={monitor._id}>
-        <div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? monitor.lastRunStatus : "paused"}</span><strong>{monitor.name}</strong><p>{monitor.query}</p><small>{(monitor.sources || []).map((source) => source.replaceAll("_", " ")).join(" · ")}</small></div>
-        <div className="intent-monitor-totals"><strong>{monitor.totals?.signalsFound || 0}</strong><span>signals found</span><small>{monitor.lastRunMessage || "Waiting for first run"}</small></div>
-        <div className="intent-monitor-actions"><Button size="sm" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Run now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button></div>
-        <div className="source-health-grid">{(monitor.sourceHealth || []).map((health) => <article key={health.source} className={`is-${health.state}`}><header><strong>{health.source.replaceAll("_", " ")}</strong><button type="button" onClick={() => toggleExistingSource(monitor, health.source)}>{(monitor.sources || []).includes(health.source) ? "Disable" : "Enable"}</button></header><span>{health.state.replaceAll("_", " ")}</span><small>Last success: {health.lastSuccessfulCheck ? new Date(health.lastSuccessfulCheck).toLocaleString() : "Not yet"}</small><small>Results: {health.resultsCollected || 0}</small>{health.lastError ? <small className="is-error">Last error: {health.lastError}</small> : null}<small>Next attempt: {health.nextScheduledAttempt ? new Date(health.nextScheduledAttempt).toLocaleString() : "Not scheduled"}</small></article>)}</div>
-      </article>)}</div> : null}
+      <div className="monitor-setup-actions"><Button loading={monitorSaving} disabled={!monitorDraft.query.trim()} onClick={createMonitor}>Start this monitor</Button><small>You can pause it at any time. No outreach is ever sent.</small></div></section> : null}
+      {monitors.length ? <div className="intent-monitor-list">{monitors.map((monitor) => { const failures = (monitor.sourceHealth || []).filter((health) => ["failed", "blocked", "rate_limited"].includes(health.state)); return <article key={monitor._id}>
+        <header className="monitor-card-header"><div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? "Monitoring is on" : "Monitoring paused"}</span><strong>{monitor.name}</strong></div><div className="intent-monitor-actions"><Button size="sm" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Check now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button></div></header>
+        <div className="monitor-card-summary"><div><strong>{monitor.totals?.signalsFound || 0}</strong><span>leads prepared for review</span></div><div><strong>{monitor.nextRunAt ? new Date(monitor.nextRunAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</strong><span>next automatic check</span></div><div><strong>{failures.length}</strong><span>sources needing attention</span></div></div>
+        <p className="monitor-last-result">{monitor.lastRunMessage || "Waiting for the first check."}</p>
+        <details className="monitor-details"><summary>View search details and source health</summary><p>{monitor.query}</p><div className="source-health-grid">{(monitor.sourceHealth || []).map((health) => <article key={health.source} className={`is-${health.state}`}><header><strong>{health.source.replaceAll("_", " ")}</strong><button type="button" onClick={() => toggleExistingSource(monitor, health.source)}>{(monitor.sources || []).includes(health.source) ? "Disable" : "Enable"}</button></header><span>{health.state.replaceAll("_", " ")}</span><small>Last checked: {health.lastSuccessfulCheck ? new Date(health.lastSuccessfulCheck).toLocaleString() : "Not yet"}</small><small>{health.resultsCollected || 0} results collected</small>{health.lastError ? <small className="is-error">{health.lastError}</small> : null}</article>)}</div></details>
+      </article>; })}</div> : <div className="friendly-empty"><strong>No monitors yet</strong><p>Create one above and Growth Operator will start listening automatically.</p></div>}
     </DashboardCard>
 
-    <DashboardCard title="Monitoring activity"><div className="monitor-timeline">{monitorActivity.length ? monitorActivity.slice(0, 50).map((item) => <article key={item._id} className={`is-${item.type}`}><span></span><div><strong>{item.message}</strong><small>{new Date(item.createdAt).toLocaleString()}</small></div></article>) : <p>No runs recorded yet. Start a monitor to see every collection and review step here.</p>}</div></DashboardCard></> : null}
+    <details className="activity-drawer"><summary>View monitoring activity</summary><div className="monitor-timeline">{monitorActivity.length ? monitorActivity.slice(0, 20).map((item) => <article key={item._id} className={`is-${item.type}`}><span></span><div><strong>{item.message}</strong><small>{new Date(item.createdAt).toLocaleString()}</small></div></article>) : <p>No activity yet.</p>}</div></details></> : null}
 
-    {activeTab === "leads" ? <><DashboardCard title="Live intent review" action={<span className="label-pill">{intentSignals.filter((signal) => signal.status === "new").length} new</span>}>
-      <p className="intent-monitor-intro">These are public signals, not automatically approved contacts. Review the evidence, qualify useful matches, dismiss noise, or add one person at a time to the CRM.</p>
-      {intentSignals.length ? <div className="intent-signal-list">{intentSignals.map((signal) => <article key={signal._id} className={`is-${signal.status}`}>
-        <div className="intent-signal-score"><strong>{signal.score}</strong><span>intent score</span></div>
-        <div className="intent-signal-main"><div><span>{signal.source.replaceAll("_", " ")}</span><small>{signal.publishedAt ? new Date(signal.publishedAt).toLocaleString() : "Recently discovered"}</small></div><strong>{signal.title || "Public intent signal"}</strong><p>{signal.excerpt || "Open the source to review the public context."}</p><small>{(signal.scoreReasons || []).join(" · ")}</small><a href={signal.sourceUrl} target="_blank" rel="noreferrer">Open public evidence</a></div>
-        <div className="intent-signal-person"><strong>{signal.authorName || signal.people?.[0]?.name || "Person needs identification"}</strong><span>{signal.identityResolution?.status === "supported" ? (signal.organizationName || signal.organizationDomain || "No company claimed") : "Company connection not established"}</span><small>{signal.classification?.replaceAll("_", " ")} · {signal.classificationMethod || "rules"}</small><small>{signal.identityResolution?.reason || "Identity requires evidence."}</small>{signal.publishedEmails?.length ? <small>{signal.publishedEmails.length} published email{signal.publishedEmails.length === 1 ? "" : "s"} · unverified</small> : null}<small>{signal.status.replaceAll("_", " ")}</small></div>
-        <div className="intent-signal-actions"><Button size="sm" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => addSignalToCrm(signal)}>{signal.status === "converted" ? "In CRM" : "Add to CRM"}</Button><Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>Qualify</Button><Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "dismissed")}>Dismiss</Button></div>
-      </article>)}</div> : <div className="table-state table-state--empty">Start a monitor above. New public intent signals will appear here automatically after the first source run.</div>}
+    {activeTab === "leads" ? <><section className="lead-review-hero"><div><span>Your decision queue</span><h2>Potential buyers worth a human look</h2><p>Growth Operator already removed minors, student questions, promotions, job seekers, and obvious no-budget posts. These remaining signals still require your judgment.</p></div><div className="lead-review-stats"><div><strong>{intentSignals.filter((signal) => signal.status === "new").length}</strong><span>need a decision</span></div><div><strong>{intentSignals.filter((signal) => signal.status === "qualified").length}</strong><span>worth following up</span></div><div><strong>{intentSignals.filter((signal) => signal.publishedEmails?.length).length}</strong><span>with a published email</span></div></div></section>
+    <section className="lead-workflow"><div><strong>1. Read the signal</strong><span>See what the person actually said.</span></div><div><strong>2. Check the source</strong><span>Confirm the public evidence and identity.</span></div><div><strong>3. Make one decision</strong><span>Keep for follow-up or mark not a fit.</span></div></section>
+    <DashboardCard title="Buyer-intent review" action={<div className="lead-view-tabs"><button type="button" className={leadView === "new" ? "is-active" : ""} onClick={() => setLeadView("new")}>Needs review</button><button type="button" className={leadView === "qualified" ? "is-active" : ""} onClick={() => setLeadView("qualified")}>Worth following up</button><button type="button" className={leadView === "all" ? "is-active" : ""} onClick={() => setLeadView("all")}>All active</button></div>}>
+      {visibleSignals.length ? <div className="intent-signal-list">{visibleSignals.map((signal) => <article key={signal._id} className={`is-${signal.status}`}>
+        <div className="signal-priority"><span>Priority</span><strong>{signal.score >= 75 ? "High" : signal.score >= 55 ? "Medium" : "Review"}</strong><small>{signal.score}/100 match</small></div>
+        <div className="intent-signal-main"><div><span>{signal.source.replaceAll("_", " ")}</span><small>{signal.publishedAt ? new Date(signal.publishedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "New"}</small></div><h3>{displayText(signal.title) || "Public buyer-intent signal"}</h3><p>{displayText(signal.excerpt) || "Open the original source to review the context."}</p><div className="signal-why"><strong>Why it surfaced</strong><span>{signal.classification === "buyer_intent" ? "The person appears to be asking for help with a current goal." : "The language matches your event audience, but needs human review."}</span></div><a href={signal.sourceUrl} target="_blank" rel="noreferrer">View original public post ↗</a></div>
+        <aside className="signal-contact"><span>Public identity</span><strong>{displayText(signal.authorName) || "Name not established"}</strong><small>{signal.identityResolution?.status === "supported" ? "Identity supported by the source" : "Do not assume a real name or company"}</small>{signal.organizationName || signal.organizationDomain ? <><span>Possible organization</span><strong>{signal.identityResolution?.status === "supported" ? (signal.organizationName || signal.organizationDomain) : "Not established"}</strong></> : null}{signal.publishedEmails?.length ? <div className="published-email-note">Published email found · still unverified</div> : null}</aside>
+        <div className="intent-signal-actions">{signal.status === "converted" ? <Button size="sm" disabled>Added to CRM</Button> : signal.status === "qualified" ? <Button size="sm" disabled={signalBusyId === signal._id} onClick={() => addSignalToCrm(signal)}>Add this lead to CRM</Button> : <Button size="sm" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>Worth following up</Button>}<Button size="sm" variant="outline" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => reviewSignal(signal, "dismissed")}>Not a fit</Button></div>
+      </article>)}</div> : <div className="friendly-empty"><strong>{leadView === "new" ? "You’re caught up" : "No leads in this view"}</strong><p>{leadView === "new" ? "Growth Operator will place the next plausible adult buyer here after the automatic filters run." : "Change the view above or wait for the next monitoring check."}</p></div>}
     </DashboardCard></> : null}
 
     {activeTab === "saved" ? <><DashboardCard title="Saved research and prospect lists" action={<Button variant="outline" loading={historyLoading} onClick={loadResearchHistory}>Refresh</Button>}>

@@ -10,6 +10,8 @@
 - OpenAI classification is optional. Rules-based classification remains the automatic fallback.
 - In-app notifications cover high scores, published emails, completion, source failures, and qualified leads.
 - Identity and company affiliation remain unresolved unless public evidence supports them. CRM addition is one lead at a time, outreach is never automatic, and published emails remain unverified.
+- Live Leads now acts as a plain-language adult-buyer decision queue. Explicit minors, school assignments, hypothetical questions, job seekers, promotions, and no-budget posts are rejected before review; existing ineligible signals are dismissed when the queue reloads.
+- Monitoring setup, source health, and technical activity are progressively disclosed so the primary screen explains what is running, what will happen next, and what—if anything—the user needs to do.
 
 ## Product decisions
 

@@ -27,6 +27,8 @@ const intentSignalSchema = new mongoose.Schema({
   classification: { type: String, enum: ["buyer_intent", "hypothetical_or_student", "promotion", "job_seeker", "irrelevant", "uncertain"], default: "uncertain", index: true },
   classificationMethod: { type: String, enum: ["rules", "openai"], default: "rules" },
   classificationReason: { type: String, default: "", trim: true },
+  audienceEligible: { type: Boolean, default: true, index: true },
+  audienceRejectionReason: { type: String, default: "", trim: true },
   identityResolution: {
     status: { type: String, enum: ["unresolved", "supported", "conflicting"], default: "unresolved" },
     reason: { type: String, default: "" },

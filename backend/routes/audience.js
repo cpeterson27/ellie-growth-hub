@@ -19,7 +19,7 @@ const { previewOrganizationImport, importOrganizations } = require("../services/
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
-const { requestResearchMonitorRun } = require("../services/researchMonitorService");
+const { audienceEligibility, requestResearchMonitorRun } = require("../services/researchMonitorService");
 
 const AUGUST_22_PRESET = {
   id: "august-22-nationwide-online-event",
@@ -135,7 +135,9 @@ router.get("/research/signals", async (req, res) => {
   if (req.query.monitorId) filter.monitorId = req.query.monitorId;
   if (req.query.status) filter.status = req.query.status;
   const signals = await IntentSignal.find(filter).sort({ score: -1, publishedAt: -1, discoveredAt: -1 }).limit(limit).lean();
-  return res.json({ success: true, signals });
+  const rejected = signals.map((signal) => ({ signal, eligibility: audienceEligibility(signal) })).filter((item) => !item.eligibility.eligible);
+  if (rejected.length) await Promise.all(rejected.map(({ signal, eligibility }) => IntentSignal.updateOne({ _id: signal._id }, { $set: { audienceEligible: false, audienceRejectionReason: eligibility.reason, status: "dismissed", classification: "irrelevant", classificationReason: eligibility.reason } })));
+  return res.json({ success: true, signals: signals.filter((signal) => audienceEligibility(signal).eligible && signal.audienceEligible !== false), automaticallyRejected: rejected.length });
 });
 
 router.patch("/research/signals/:signalId", async (req, res) => {

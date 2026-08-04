@@ -8,7 +8,9 @@ const REQUEST_TIMEOUT = 20000;
 const clean = (value) => String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const decodeEntities = (value) => String(value || "")
   .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-  .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
+  .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+  .replace(/&#(\d+);/g, (_match, code) => String.fromCodePoint(Number(code)))
+  .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCodePoint(parseInt(code, 16)));
 const hashId = (value) => crypto.createHash("sha256").update(String(value)).digest("hex").slice(0, 32);
 
 function queryFor(monitor) {
@@ -35,7 +37,7 @@ function normalizeSignal(source, item = {}) {
     sourceUrl,
     title: decodeEntities(clean(item.title)).slice(0, 1000),
     excerpt: decodeEntities(clean(item.excerpt)).slice(0, 6000),
-    authorName: decodeEntities(clean(item.authorName)),
+    authorName: decodeEntities(clean(decodeEntities(item.authorName))).replace(/^submitted by\s+/i, "").replace(/^u\//i, "u/"),
     authorUrl: String(item.authorUrl || "").trim(),
     organizationName: decodeEntities(clean(item.organizationName)),
     organizationDomain: String(item.organizationDomain || "").trim().toLowerCase(),

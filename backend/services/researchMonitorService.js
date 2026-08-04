@@ -42,6 +42,19 @@ function rulesClassify(signal) {
   return { classification: match?.[0] || "uncertain", method: "rules", reason: match ? "Matched a transparent rules-based intent pattern." : "No decisive buyer or exclusion pattern was present." };
 }
 
+function audienceEligibility(signal) {
+  const text = `${signal.title || ""} ${signal.excerpt || ""}`.toLowerCase();
+  const minorPatterns = [
+    /\b(?:i(?:'m| am)|aged?)\s*(?:1[0-7]|[0-9])\b/,
+    /\b(?:1[0-7]|[0-9])\s*(?:years? old|yo)\b/,
+    /\bminor\b|\bmiddle school\b|\bhigh school(?:er)?\b|\bfreshman in high school\b/,
+  ];
+  if (minorPatterns.some((pattern) => pattern.test(text))) return { eligible: false, reason: "Minor or school-age person—not an eligible ticket buyer." };
+  if (/\b(?:no money|broke|can't afford|cannot afford|zero budget|no budget)\b/.test(text)) return { eligible: false, reason: "The post explicitly indicates no current purchasing ability." };
+  if (/\b(?:homework|assignment|school project|for (?:my|a) class|student survey|hypothetical)\b/.test(text)) return { eligible: false, reason: "Student or hypothetical research—not buyer intent." };
+  return { eligible: true, reason: "" };
+}
+
 async function classifySignal(signal) {
   const fallback = rulesClassify(signal);
   if (process.env.JARVIS_OPENAI_ENABLED !== "true" || !process.env.OPENAI_API_KEY?.trim()) return fallback;
@@ -101,11 +114,13 @@ async function runResearchMonitor(monitorId) {
       for (const signal of group.signals) {
         const ranking = scoreSignal(signal, monitor);
         if (!ranking.matched.length || ranking.score < 30) { rejected += 1; continue; }
+        const eligibility = audienceEligibility(signal);
+        if (!eligibility.eligible) { rejected += 1; continue; }
         const classification = await classifySignal(signal);
         if (["hypothetical_or_student", "promotion", "job_seeker", "irrelevant"].includes(classification.classification)) { rejected += 1; continue; }
         const saved = await IntentSignal.findOneAndUpdate(
           { workspaceId: monitor.workspaceId, source: signal.source, sourceId: signal.sourceId },
-          { $setOnInsert: { workspaceId: monitor.workspaceId, monitorId: monitor._id, ...signal }, $set: { matchedKeywords: ranking.matched, score: ranking.score, scoreReasons: ranking.reasons, discoveredAt: new Date(), classification: classification.classification, classificationMethod: classification.method, classificationReason: classification.reason, identityResolution: identityResolution(signal) } },
+          { $setOnInsert: { workspaceId: monitor.workspaceId, monitorId: monitor._id, ...signal }, $set: { matchedKeywords: ranking.matched, score: ranking.score, scoreReasons: ranking.reasons, discoveredAt: new Date(), classification: classification.classification, classificationMethod: classification.method, classificationReason: classification.reason, audienceEligible: true, audienceRejectionReason: "", identityResolution: identityResolution(signal) } },
           { upsert: true, new: true, setDefaultsOnInsert: true },
         );
         found += 1;
@@ -175,4 +190,4 @@ function startResearchMonitorRunner() {
   return timer;
 }
 
-module.exports = { classifySignal, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, startResearchMonitorRunner, scoreSignal };
+module.exports = { audienceEligibility, classifySignal, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, startResearchMonitorRunner, scoreSignal };
