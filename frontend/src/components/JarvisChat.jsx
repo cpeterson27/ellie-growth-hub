@@ -116,6 +116,9 @@ export default function JarvisChat() {
   const [status, setStatus] = useState(null);
   const [savingDraftId, setSavingDraftId] = useState(null);
   const [voiceName, setVoiceName] = useState("marin");
+  const [voiceMode, setVoiceMode] = useState(() => localStorage.getItem("jarvisVoiceMode") || "automatic");
+  const [browserVoices, setBrowserVoices] = useState([]);
+  const [browserVoiceName, setBrowserVoiceName] = useState(() => localStorage.getItem("jarvisBrowserVoice") || "");
   const [speakingId, setSpeakingId] = useState(null);
   const [speechError, setSpeechError] = useState("");
   const audioRef = useRef(null);
@@ -140,6 +143,14 @@ export default function JarvisChat() {
   useEffect(() => {
     getStatus().then(setStatus);
   }, [getStatus]);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return undefined;
+    const loadVoices = () => setBrowserVoices(window.speechSynthesis.getVoices().filter((voice) => /^en/i.test(voice.lang)));
+    loadVoices();
+    window.speechSynthesis.addEventListener?.("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener?.("voiceschanged", loadVoices);
+  }, []);
 
   useEffect(() => {
     fetchJarvisProfile().then((response) => {
@@ -188,7 +199,7 @@ export default function JarvisChat() {
     if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) return false;
     const utterance = new window.SpeechSynthesisUtterance(prepareTextForSpeech(text));
     const voices = window.speechSynthesis.getVoices();
-    utterance.voice = voices.find((voice) => /^en-US/i.test(voice.lang) && /Samantha|Alex|Google|Microsoft/i.test(voice.name)) || voices.find((voice) => /^en/i.test(voice.lang)) || null;
+    utterance.voice = voices.find((voice) => voice.name === browserVoiceName) || voices.find((voice) => /^en-US/i.test(voice.lang) && /Samantha|Alex|Google|Microsoft/i.test(voice.name)) || voices.find((voice) => /^en/i.test(voice.lang)) || null;
     utterance.rate = profile?.voiceRate || 1;
     utterance.onend = stopSpeaking;
     utterance.onerror = () => { stopSpeaking(); setSpeechError("Browser voice playback was interrupted."); };
@@ -204,7 +215,7 @@ export default function JarvisChat() {
     setSpeechError("");
     stopSpeaking();
     setSpeakingId(id);
-    if (status?.openai?.voiceEnabled === false && speakWithBrowser(spokenText, id)) return;
+    if ((voiceMode === "browser" || (voiceMode === "automatic" && status?.openai?.voiceEnabled === false)) && speakWithBrowser(spokenText, id)) return;
     try {
       const blob = await synthesizeJarvisSpeech(spokenText, OPENAI_VOICE_NAMES.has(voiceName) ? voiceName : "marin");
       const url = URL.createObjectURL(blob);
@@ -217,7 +228,8 @@ export default function JarvisChat() {
       await audio.play();
     } catch (voiceError) {
       stopSpeaking();
-      if (!speakWithBrowser(spokenText, id)) setSpeechError(voiceError.response?.data?.error || "Neither OpenAI voice nor this browser’s backup voice is available.");
+      if (voiceMode !== "openai" && speakWithBrowser(spokenText, id)) return;
+      setSpeechError("OpenAI voice is unavailable. Choose Automatic or Browser voice to keep Jarvis speaking without API credits.");
     }
   };
 
@@ -535,6 +547,7 @@ export default function JarvisChat() {
   const voiceInputSupported = typeof window !== "undefined" && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
   const visualState = listening ? "listening" : speakingId ? "speaking" : loading ? "thinking" : "idle";
   const visualLabel = { idle: "Systems ready", listening: "Listening", thinking: "Analyzing workspace", speaking: "Responding" }[visualState];
+  const friendlyJarvisError = /429|credits? remaining|billing/i.test(String(error || "")) ? "OpenAI credits are unavailable. Jarvis will keep using browser voice and the no-credit public-source search. Restart this identity search to run the fallback sources." : error;
 
   return (
     <div ref={containerRef} className={`jarvis-chat-container jarvis-chat-container--${profile?.theme || "executive"} ${intentResearchTask ? "jarvis-chat-container--intent-task" : ""} ${isFullscreen ? "jarvis-chat-container--fullscreen" : ""}`}>
@@ -598,7 +611,7 @@ export default function JarvisChat() {
         <div className="jarvis-research-progress" role="progressbar" aria-label="Identity research progress" aria-valuetext={intentResearchState === "complete" ? "Complete" : intentResearchState === "failed" ? "Finished without supported identity" : intentResearchState === "delayed" ? "Delayed, restart required" : "Searching and validating public evidence"}><span className={intentResearchState === "complete" ? "is-complete" : ["failed", "delayed"].includes(intentResearchState) ? "is-stopped" : "is-running"} /></div>
         <div className="jarvis-research-now"><strong>{intentResearchState === "complete" ? "Done—review findings below" : intentResearchState === "failed" ? "Done—no supported contact found" : intentResearchState === "delayed" ? "Stopped waiting" : researchElapsedSeconds < 25 ? "Searching public sources" : researchElapsedSeconds < 70 ? "Comparing account and business clues" : "Validating identity and contact evidence"}</strong><span>{["searching", "waiting"].includes(intentResearchState) ? "Results appear only after evidence is checked; temporary zeros are not final results." : intentResearchState === "delayed" ? "Use Restart search below." : "The final outcome is shown in the transcript below."}</span></div>
         <ol><li className="is-done">Original post attached</li><li className={["searching", "waiting"].includes(intentResearchState) ? "is-active" : "is-done"}>Public identity search</li><li className={["complete", "failed"].includes(intentResearchState) ? "is-done" : ""}>Review evidence and contact option</li></ol>
-        <div className="jarvis-intent-task__actions"><button type="button" onClick={() => navigate(researchReturnTo.startsWith("/") ? researchReturnTo : "/discovery?tab=leads")}>Back to this lead</button>{researchSourceUrl ? <a href={researchSourceUrl} target="_blank" rel="noreferrer">Open original post or account ↗</a> : null}</div>
+        <div className="jarvis-intent-task__actions"><button type="button" onClick={() => navigate(researchReturnTo.startsWith("/") ? researchReturnTo : "/discovery?tab=leads")}>Back to this lead</button>{researchSourceUrl ? <a href={researchSourceUrl} target="_blank" rel="noreferrer">Open original post or account ↗</a> : null}<a href={`https://www.google.com/search?q=${encodeURIComponent(`"${researchLeadLabel}" ${researchSourceUrl}`)}`} target="_blank" rel="noreferrer">Search this account on Google ↗</a></div>
         {intentResearchState === "delayed" ? <button type="button" className="jarvis-restart-search" onClick={() => window.location.reload()}>Restart identity search</button> : null}
         <p className="jarvis-intent-task__outcome"><strong>Possible result:</strong> Jarvis may find a supported name and published contact, or conclude that the Reddit account cannot be safely connected to a real person. In that case, the only responsible contact method is a manual public reply or platform message—never a guessed email.</p>
       </section> : null}
@@ -680,8 +693,8 @@ export default function JarvisChat() {
           {voiceInputSupported ? <button type="button" className="jarvis-mic-btn" onClick={startListening} disabled={loading || listening}>{listening ? "Listening…" : "Talk"}</button> : null}
         </div>
 
-        <div className="jarvis-voice-controls"><label className="jarvis-voice-picker">Preferred OpenAI voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{OPENAI_VOICES.map((voice) => <option key={voice.value} value={voice.value}>{voice.label}</option>)}</select></label><button type="button" className="jarvis-voice-test" onClick={testVoice} disabled={Boolean(speakingId)}>{speakingId ? "Speaking…" : "Test voice"}</button><label className="jarvis-auto-speak"><input type="checkbox" checked={autoSpeak} onChange={(event) => setAutoSpeak(event.target.checked)} /> Speak findings automatically</label></div>
-        <p className="jarvis-ai-voice-disclosure">Voice automatically falls back to this device’s built-in speech when OpenAI voice has no credits or is unavailable.</p>
+        <div className="jarvis-voice-controls"><label className="jarvis-voice-picker">Voice source<select value={voiceMode} onChange={(event) => { setVoiceMode(event.target.value); localStorage.setItem("jarvisVoiceMode", event.target.value); }}><option value="automatic">Automatic · OpenAI then browser backup</option><option value="browser">Browser voice · no API credits</option><option value="openai">OpenAI voice only</option></select></label>{voiceMode !== "browser" ? <label className="jarvis-voice-picker">Preferred OpenAI voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{OPENAI_VOICES.map((voice) => <option key={voice.value} value={voice.value}>{voice.label}</option>)}</select></label> : null}{voiceMode !== "openai" ? <label className="jarvis-voice-picker">Browser backup voice<select value={browserVoiceName} onChange={(event) => { setBrowserVoiceName(event.target.value); localStorage.setItem("jarvisBrowserVoice", event.target.value); }}><option value="">Best available English voice</option>{browserVoices.map((voice) => <option key={`${voice.name}-${voice.lang}`} value={voice.name}>{voice.name} · {voice.lang}</option>)}</select></label> : null}<button type="button" className="jarvis-voice-test" onClick={testVoice} disabled={Boolean(speakingId)}>{speakingId ? "Speaking…" : "Test selected voice"}</button><label className="jarvis-auto-speak"><input type="checkbox" checked={autoSpeak} onChange={(event) => setAutoSpeak(event.target.checked)} /> Speak findings automatically</label></div>
+        <p className="jarvis-ai-voice-disclosure">Browser voices are free and stay on this device. Automatic mode returns to the selected OpenAI voice whenever API service is available.</p>
 
         {selectedCampaignId && (
           <div className="jarvis-test-email-group">
@@ -697,7 +710,7 @@ export default function JarvisChat() {
 
         <p className="jarvis-input-note">Press ⌘J while Growth Operator is open to start a voice turn. Talk records one request and sends it to Jarvis. Jarvis never sends outreach or changes records without a confirmed action.</p>
         {speechError ? <div className={speechError.startsWith("Using this device") ? "jarvis-voice-notice" : "jarvis-error"}>{speechError}</div> : null}
-        {error && <div className="jarvis-error">{intentResearchTask ? `${error} No identity was added. Open the original public post above if you want to reply or message through that platform.` : error}</div>}
+        {error && <div className="jarvis-error">{intentResearchTask ? `${friendlyJarvisError} No identity was added unless supported evidence appears above.` : friendlyJarvisError}</div>}
       </form>
     </div>
   );
