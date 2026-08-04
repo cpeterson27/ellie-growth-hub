@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { FiMaximize2, FiMinimize2 } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useJarvis } from "../hooks/useJarvis";
 import {
   confirmJarvisResearchImport,
@@ -89,6 +89,7 @@ const prepareTextForSpeech = (text = "") =>
  */
 export default function JarvisChat() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const containerRef = useRef(null);
   const [messages, setMessages] = useState([
     {
@@ -97,7 +98,7 @@ export default function JarvisChat() {
       text: "Hello! I'm Jarvis, your AI assistant for marketing insights and campaign management. Ask me anything about your organizations, contacts, campaigns, or growth opportunities.",
     },
   ]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(() => String(searchParams.get("prompt") || ""));
   const [nextId, setNextId] = useState(2);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [testEmail, setTestEmail] = useState("");

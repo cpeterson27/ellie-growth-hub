@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
@@ -89,6 +89,7 @@ function buildAudiencePayload(target) {
 }
 
 export default function Discovery() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [prospects, setProspects] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
@@ -128,6 +129,10 @@ export default function Discovery() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMonitorSetup, setShowMonitorSetup] = useState(false);
   const [leadView, setLeadView] = useState("new");
+  const [qualityEditingId, setQualityEditingId] = useState("");
+  const [qualitySaving, setQualitySaving] = useState(false);
+  const [qualityDraft, setQualityDraft] = useState({ query: "", keywords: "", negativeKeywords: "" });
+  const [peopleSearchPrompt, setPeopleSearchPrompt] = useState("Find 20 owners, founders, real estate investors, or business decision-makers in the United States who are likely able to purchase a ticket for the August 22 online event. Exclude minors, students, job seekers, and people without evidence of a real business or investment role.");
   const [selectedSources, setSelectedSources] = useState(["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]);
   const [monitorDraft, setMonitorDraft] = useState({
     name: "Nationwide event buyer intent",
@@ -233,6 +238,23 @@ export default function Discovery() {
     const sources = (monitor.sources || []).includes(source) ? monitor.sources.filter((item) => item !== source) : [...(monitor.sources || []), source];
     await updateResearchMonitor(monitor._id, { sources });
     await loadAutomaticResearch();
+  };
+
+  const openQualityEditor = (monitor) => {
+    setQualityEditingId(String(monitor._id));
+    setQualityDraft({ query: monitor.query || "", keywords: (monitor.keywords || []).join("\n"), negativeKeywords: (monitor.negativeKeywords || []).join("\n") });
+  };
+
+  const saveLeadQuality = async (monitor) => {
+    try {
+      setQualitySaving(true);
+      await updateResearchMonitor(monitor._id, { query: qualityDraft.query, keywords: splitValues(qualityDraft.keywords), negativeKeywords: splitValues(qualityDraft.negativeKeywords) });
+      await runResearchMonitor(monitor._id);
+      setQualityEditingId("");
+      setNotice("Lead-quality rules saved. A fresh check is queued with your improved audience definition.");
+      await loadAutomaticResearch();
+    } catch (error) { setNotice(error.response?.data?.error || "Unable to save the lead-quality rules."); }
+    finally { setQualitySaving(false); }
   };
 
   const markNotificationRead = async (notification) => {
@@ -503,10 +525,12 @@ export default function Discovery() {
       </div>
       <div className="monitor-setup-actions"><Button loading={monitorSaving} disabled={!monitorDraft.query.trim()} onClick={createMonitor}>Start this monitor</Button><small>You can pause it at any time. No outreach is ever sent.</small></div></section> : null}
       {monitors.length ? <div className="intent-monitor-list">{monitors.map((monitor) => { const failures = (monitor.sourceHealth || []).filter((health) => ["failed", "blocked", "rate_limited"].includes(health.state)); return <article key={monitor._id}>
-        <header className="monitor-card-header"><div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? "Monitoring is on" : "Monitoring paused"}</span><strong>{monitor.name}</strong></div><div className="intent-monitor-actions"><Button size="sm" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Check now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button></div></header>
-        <div className="monitor-card-summary"><div><strong>{monitor.totals?.signalsFound || 0}</strong><span>leads prepared for review</span></div><div><strong>{monitor.nextRunAt ? new Date(monitor.nextRunAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</strong><span>next automatic check</span></div><div><strong>{failures.length}</strong><span>sources needing attention</span></div></div>
-        <p className="monitor-last-result">{monitor.lastRunMessage || "Waiting for the first check."}</p>
-        <details className="monitor-details"><summary>View search details and source health</summary><p>{monitor.query}</p><div className="source-health-grid">{(monitor.sourceHealth || []).map((health) => <article key={health.source} className={`is-${health.state}`}><header><strong>{health.source.replaceAll("_", " ")}</strong><button type="button" onClick={() => toggleExistingSource(monitor, health.source)}>{(monitor.sources || []).includes(health.source) ? "Disable" : "Enable"}</button></header><span>{health.state.replaceAll("_", " ")}</span><small>Last checked: {health.lastSuccessfulCheck ? new Date(health.lastSuccessfulCheck).toLocaleString() : "Not yet"}</small><small>{health.resultsCollected || 0} results collected</small>{health.lastError ? <small className="is-error">{health.lastError}</small> : null}</article>)}</div></details>
+        <header className="monitor-card-header"><div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? "Monitoring is on" : "Monitoring paused"}</span><strong>{monitor.name}</strong></div><div className="intent-monitor-actions"><Button size="sm" onClick={() => openQualityEditor(monitor)}>Improve lead quality</Button><Button size="sm" variant="outline" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Check now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button></div></header>
+        <div className="monitor-card-summary"><div><strong>{monitor.totals?.signalsFound || 0}</strong><span>historical matches across all runs</span></div><div><strong>{monitor.nextRunAt ? new Date(monitor.nextRunAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</strong><span>next automatic check</span></div><div><strong>{failures.length}</strong><span>sources needing attention</span></div></div>
+        <div className="monitor-count-explainer"><strong>Why this is not your Live Leads count</strong><span>The historical total includes repeat discoveries and signals later rejected or dismissed. Live Leads shows only the current, deduplicated review queue.</span><button type="button" onClick={() => setActiveTab("leads")}>Open Live Leads</button></div>
+        <p className="monitor-last-result">Latest check: {monitor.lastRunMessage || "Waiting for the first check."}</p>
+        {qualityEditingId === String(monitor._id) ? <section className="quality-editor"><header><div><span>Improve future results</span><h3>Teach Growth Operator what a good lead looks like</h3></div><button type="button" onClick={() => setQualityEditingId("")}>Close</button></header><div><label><span>Who is a good buyer?</span><textarea value={qualityDraft.query} onChange={(event) => setQualityDraft((current) => ({ ...current, query: event.target.value }))} /><small>Describe an adult with the role, business situation, and reason they could benefit from the event.</small></label><label><span>Language that signals buying interest</span><textarea value={qualityDraft.keywords} onChange={(event) => setQualityDraft((current) => ({ ...current, keywords: event.target.value }))} /><small>Use specific phrases such as “looking for a business coach” or “need systems to scale.”</small></label><label><span>Always reject</span><textarea value={qualityDraft.negativeKeywords} onChange={(event) => setQualityDraft((current) => ({ ...current, negativeKeywords: event.target.value }))} /><small>Minors, schoolwork, no-budget posts, promotions, and job seekers are also blocked automatically.</small></label></div><footer><Button loading={qualitySaving} onClick={() => saveLeadQuality(monitor)}>Save and check again</Button><span>This changes future monitoring. It does not contact anyone.</span></footer></section> : null}
+        <details className="monitor-details"><summary>Advanced: source health</summary><p>{monitor.query}</p><div className="source-health-list">{(monitor.sourceHealth || []).map((health) => <div key={health.source} className={`is-${health.state}`}><span className="source-health-dot"></span><strong>{health.source.replaceAll("_", " ")}</strong><span>{health.state.replaceAll("_", " ")}</span><small>{health.resultsCollected || 0} collected</small><small>{health.lastSuccessfulCheck ? `Checked ${new Date(health.lastSuccessfulCheck).toLocaleString()}` : "Not checked yet"}</small>{health.lastError ? <small className="is-error">{health.lastError}</small> : null}<button type="button" onClick={() => toggleExistingSource(monitor, health.source)}>{(monitor.sources || []).includes(health.source) ? "Disable" : "Enable"}</button></div>)}</div></details>
       </article>; })}</div> : <div className="friendly-empty"><strong>No monitors yet</strong><p>Create one above and Growth Operator will start listening automatically.</p></div>}
     </DashboardCard>
 
@@ -536,7 +560,9 @@ export default function Discovery() {
       })}</div> : <div className="table-state table-state--empty">No saved research yet. Research started in ChatGPT or on this page will appear here automatically.</div>}
     </DashboardCard></> : null}
 
-    {activeTab === "people" ? <div id="people-research-previews">
+    {activeTab === "people" ? <div id="people-research-previews" className="people-research-workspace">
+      <section className="people-search-guide"><div><span>People Research</span><h2>Find named decision-makers at real organizations</h2><p>This is different from Intent Monitoring. Instead of listening for public conversations, Jarvis searches public websites for owners, founders, executives, and other roles you describe.</p></div><div className="people-search-steps"><div><strong>1</strong><span><b>Describe the people</b>Include role, industry, location, and how many you want.</span></div><div><strong>2</strong><span><b>Jarvis researches</b>It finds public evidence, company details, and published emails when available.</span></div><div><strong>3</strong><span><b>You review</b>Nothing enters the CRM until you select and confirm each import.</span></div></div></section>
+      <DashboardCard title="Start a people search"><div className="people-search-launcher"><label><span>Tell Jarvis exactly who to find</span><textarea value={peopleSearchPrompt} onChange={(event) => setPeopleSearchPrompt(event.target.value)} /></label><div><Button disabled={!peopleSearchPrompt.trim()} onClick={() => navigate(`/jarvis?prompt=${encodeURIComponent(peopleSearchPrompt)}`)}>Open this request in Jarvis</Button><small>Jarvis will show the request before searching. Public emails remain unverified.</small></div></div><div className="people-search-examples"><span>Good requests include:</span><button type="button" onClick={() => setPeopleSearchPrompt("Find 20 owners of property-management companies in the United States with evidence of an active business. Exclude students, job seekers, and companies without a public website.")}>Property-management owners</button><button type="button" onClick={() => setPeopleSearchPrompt("Find 20 founders or CEOs of established service businesses in the United States who may need systems to scale. Require a public leadership or company source.")}>Established service-business founders</button><button type="button" onClick={() => setPeopleSearchPrompt("Find 20 adult real estate investors or multifamily principals in the United States with a public company, portfolio, or leadership page.")}>Real estate investors</button></div></DashboardCard>
       <DashboardCard title="Jarvis research previews" action={<Button variant="outline" loading={peoplePreviewsLoading} onClick={loadPeoplePreviews}>Refresh</Button>}>
         <p className="people-preview-intro">People found by Growth Operator stay here for review before they become CRM contacts. A published email is still unverified and cannot be used for outreach until it passes your verification rules.</p>
         {peoplePreviews.length ? <div className="people-preview-list">{peoplePreviews.map((preview) => {
