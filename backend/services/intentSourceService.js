@@ -242,10 +242,16 @@ async function collectMonitorSignals(monitor) {
   const work = selected.filter((source) => ADAPTERS[source]).map(async (source) => ({ source, signals: await ADAPTERS[source](monitor, limit) }));
   if ((monitor.feedUrls || []).length) work.push(searchConfiguredFeeds(monitor, limit).then((signals) => ({ source: "feeds", signals })));
   const settled = await Promise.allSettled(work);
-  const failures = settled.map((item, index) => ({ item, source: selected.filter((source) => ADAPTERS[source])[index] || "feeds" })).filter(({ item }) => item.status === "rejected");
+  const sourceOrder = [...selected.filter((source) => ADAPTERS[source]), ...((monitor.feedUrls || []).length ? ["feeds"] : [])];
+  const failures = settled.map((item, index) => ({ item, source: sourceOrder[index] || "feeds" })).filter(({ item }) => item.status === "rejected");
   return {
     groups: settled.filter((item) => item.status === "fulfilled").map((item) => item.value),
     errors: failures.map(({ item, source }) => `${source}: ${item.reason?.response?.status || item.reason?.message || "source failed"}`),
+    failures: failures.map(({ item, source }) => {
+      const status = item.reason?.response?.status;
+      const message = String(status || item.reason?.message || "Source failed");
+      return { source, message, state: status === 429 ? "rate_limited" : /challenge|blocked|forbidden|403/i.test(message) ? "blocked" : "failed" };
+    }),
   };
 }
 

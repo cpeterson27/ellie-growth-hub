@@ -139,7 +139,7 @@ connectDatabase(mongoUri)
 
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
-      startResearchMonitorRunner();
+      if (process.env.RESEARCH_WORKER_MODE !== "external") startResearchMonitorRunner();
     });
 
     server.on("error", (error) => {

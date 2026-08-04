@@ -1,5 +1,16 @@
 # Current build status — July 28, 2026
 
+## Organization Discovery professional monitoring upgrade — August 4, 2026
+
+- Five separate interface tabs distinguish company discovery, intent monitoring, live lead review, people research, and saved searches.
+- The August 22 nationwide online-event preset groups editable phrases into career transition, business ownership, growth and systems, and real-estate wealth intent.
+- Every source reports its last success, last error, cumulative results, blocked or rate-limited state, next attempt, and individual enabled state.
+- Monitoring activity records source checks, candidates, rejected weak matches, website research, prepared leads, failures, and completion.
+- Database-backed leases provide restart recovery and duplicate-run prevention across backend instances.
+- OpenAI classification is optional. Rules-based classification remains the automatic fallback.
+- In-app notifications cover high scores, published emails, completion, source failures, and qualified leads.
+- Identity and company affiliation remain unresolved unless public evidence supports them. CRM addition is one lead at a time, outreach is never automatic, and published emails remain unverified.
+
 ## Product decisions
 
 - Settings is for client account and workspace identity only.

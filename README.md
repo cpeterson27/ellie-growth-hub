@@ -8,6 +8,14 @@ It is designed to help a small team move from an event idea to a measurable
 campaign without maintaining separate spreadsheets, disconnected contact lists,
 and manual outreach records.
 
+## Growth Operator research workspaces
+
+Organization Discovery is organized into five focused workspaces: Company Discovery, Intent Monitoring, Live Leads, People Research, and Saved Searches. Intent Monitoring runs on the backend and does not require an open browser. It includes an editable August 22 nationwide online-event preset, per-source controls and health, a durable activity timeline, and in-app notifications.
+
+Monitoring uses database-backed worker leases. A deployment restart safely releases expired work for retry, and multiple application instances cannot run the same monitor concurrently. For a dedicated worker service, run `npm run start:worker` from `backend/` and set `RESEARCH_WORKER_MODE=external` on the web service; the web process keeps a safe built-in worker by default so existing deployments continue monitoring until the separate worker is configured. Optional OpenAI intent classification uses the existing Jarvis OpenAI environment configuration; rules-based classification remains the automatic fallback.
+
+Every signal remains an individual review decision. Growth Operator does not infer a username's company affiliation without supporting public evidence, bulk-import leads, send outreach, or call a published email verified.
+
 ## What the product does
 
 Ellie AI organizes the work surrounding an event:

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "start:worker": "node worker.js",
     "create-owner": "node scripts/create-owner.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

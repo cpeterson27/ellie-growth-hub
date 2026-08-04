@@ -17,6 +17,10 @@ import {
   fetchPeopleResearchPreviews,
   fetchMarketResearchSources,
   fetchResearchMonitors,
+  fetchResearchMonitorPresets,
+  fetchResearchActivity,
+  fetchResearchNotifications,
+  updateResearchNotification,
   fetchIntentSignals,
   fetchMarketResearchJob,
   saveDiscoveryTemplates,
@@ -109,6 +113,12 @@ export default function Discovery() {
   const [monitorSaving, setMonitorSaving] = useState(false);
   const [monitorRunningId, setMonitorRunningId] = useState("");
   const [signalBusyId, setSignalBusyId] = useState("");
+  const [activeTab, setActiveTab] = useState("company");
+  const [monitorPresets, setMonitorPresets] = useState([]);
+  const [monitorActivity, setMonitorActivity] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedSources, setSelectedSources] = useState(["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]);
   const [monitorDraft, setMonitorDraft] = useState({
     name: "Nationwide event buyer intent",
     query: "People in the United States discussing leaving a W-2 job, starting or buying a business, building wealth through real estate, scaling a company, needing business systems, coaching, or an entrepreneurial community",
@@ -116,6 +126,7 @@ export default function Discovery() {
     negativeKeywords: "student assignment, fictional, video game",
     feedUrls: "",
     intervalMinutes: 60,
+    intentCategories: [],
   });
 
   useEffect(() => {
@@ -154,9 +165,11 @@ export default function Discovery() {
 
   const loadAutomaticResearch = async () => {
     try {
-      const [monitorResponse, signalResponse] = await Promise.all([fetchResearchMonitors(), fetchIntentSignals({ limit: 150 })]);
+      const [monitorResponse, signalResponse, activityResponse, notificationResponse] = await Promise.all([fetchResearchMonitors(), fetchIntentSignals({ limit: 150 }), fetchResearchActivity({ limit: 100 }), fetchResearchNotifications()]);
       setMonitors(monitorResponse.monitors || []);
       setIntentSignals(signalResponse.signals || []);
+      setMonitorActivity(activityResponse.activity || []);
+      setNotifications(notificationResponse.notifications || []);
     } catch {
       setNotice("Unable to load automatic intent monitoring.");
     }
@@ -167,6 +180,7 @@ export default function Discovery() {
     fetchCampaigns().then((items) => setCampaigns(Array.isArray(items) ? items : [])).catch(() => {});
     fetchDiscoveryTemplates().then((data) => setTemplates(data.templates || [])).catch(() => {});
     fetchMarketResearchSources().then((data) => setResearchSource(data.sources?.[0] || null)).catch(() => {});
+    fetchResearchMonitorPresets().then((data) => setMonitorPresets(data.presets || [])).catch(() => {});
     loadResearchHistory();
     loadPeoplePreviews();
     loadAutomaticResearch();
@@ -187,7 +201,7 @@ export default function Discovery() {
         negativeKeywords: splitValues(monitorDraft.negativeKeywords),
         locations: ["United States"],
         feedUrls: splitValues(monitorDraft.feedUrls),
-        sources: ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"],
+        sources: selectedSources,
         maxResultsPerSource: 35,
       });
       setNotice("Nationwide monitoring started. Jarvis will keep checking public sources in the background.");
@@ -195,6 +209,25 @@ export default function Discovery() {
     } catch (error) {
       setNotice(error.response?.data?.error || "Unable to start automatic monitoring.");
     } finally { setMonitorSaving(false); }
+  };
+
+  const applyMonitorPreset = (preset) => {
+    setMonitorDraft((current) => ({ ...current, name: preset.name, query: preset.query, keywords: (preset.intentCategories || []).flatMap((category) => category.phrases || []).join(", "), negativeKeywords: (preset.negativeKeywords || []).join(", "), intervalMinutes: preset.intervalMinutes || 30, intentCategories: preset.intentCategories || [] }));
+    setActiveTab("monitoring");
+    setNotice("August 22 nationwide preset loaded. Every phrase remains editable before you start it.");
+  };
+
+  const toggleDraftSource = (source) => setSelectedSources((current) => current.includes(source) ? current.filter((item) => item !== source) : [...current, source]);
+
+  const toggleExistingSource = async (monitor, source) => {
+    const sources = (monitor.sources || []).includes(source) ? monitor.sources.filter((item) => item !== source) : [...(monitor.sources || []), source];
+    await updateResearchMonitor(monitor._id, { sources });
+    await loadAutomaticResearch();
+  };
+
+  const markNotificationRead = async (notification) => {
+    await updateResearchNotification(notification._id, true);
+    setNotifications((items) => items.map((item) => item._id === notification._id ? { ...item, readAt: new Date().toISOString() } : item));
   };
 
   const runMonitorNow = async (monitorId) => {
@@ -420,12 +453,17 @@ export default function Discovery() {
 
   return <div className="discovery-page">
     <header className="discovery-header">
-      <div><span className="eyebrow">Growth Operator Market Intelligence</span><h1>Research a market, rank the fit, then build your list</h1><p>Growth Operator owns the workflow: research profiles, evidence, scoring, review, CRM records, and outreach handoff.</p></div>
+      <div><span className="eyebrow">Growth Operator Market Intelligence</span><h1>Find the right companies and buyer intent</h1><p>Five focused workspaces keep company discovery, continuous monitoring, lead decisions, people research, and saved work clear.</p></div>
+      <button className="notification-button" type="button" onClick={() => setShowNotifications((value) => !value)} aria-expanded={showNotifications}>Notifications <span>{notifications.filter((item) => !item.readAt).length}</span></button>
     </header>
+
+    {showNotifications ? <section className="notification-panel"><header><strong>Monitoring notifications</strong><button type="button" onClick={() => setShowNotifications(false)}>Close</button></header>{notifications.length ? notifications.slice(0, 20).map((item) => <button type="button" key={item._id} className={item.readAt ? "is-read" : ""} onClick={() => markNotificationRead(item)}><strong>{item.title}</strong><span>{item.message}</span><small>{new Date(item.createdAt).toLocaleString()}</small></button>) : <p>No notifications yet.</p>}</section> : null}
+
+    <nav className="discovery-tabs" aria-label="Organization discovery workspaces">{[["company", "Company Discovery"], ["monitoring", "Intent Monitoring"], ["leads", "Live Leads"], ["people", "People Research"], ["saved", "Saved Searches"]].map(([id, label]) => <button key={id} type="button" className={activeTab === id ? "is-active" : ""} onClick={() => setActiveTab(id)}>{label}{id === "leads" && intentSignals.filter((item) => item.status === "new").length ? <span>{intentSignals.filter((item) => item.status === "new").length}</span> : null}</button>)}</nav>
 
     {notice ? <div className="notice-banner" role="status">{notice}</div> : null}
 
-    <DashboardCard title="Ask Growth Operator to find a market">
+    {activeTab === "company" ? <><DashboardCard title="Ask Growth Operator to find a market">
       <div className="discovery-agent-prompt">
         <textarea value={marketQuestion} onChange={(event) => setMarketQuestion(event.target.value)} placeholder="Example: Find hair salons in San Francisco with 2+ locations" />
         <Button loading={planning} disabled={!marketQuestion.trim()} onClick={buildResearchPlan}>Build research plan</Button>
@@ -437,38 +475,43 @@ export default function Discovery() {
         <p>{marketPlan.summary}</p>
         <div><article><strong>Ranking</strong><span>{(marketPlan.rankingDimensions || []).join(" · ")}</span></article><article><strong>Needs attention</strong><span>{[...(marketPlan.assumptions || []), ...(marketPlan.unresolved || [])].join(" ") || "No unresolved criteria."}</span></article></div>
       </section> : null}
-    </DashboardCard>
+    </DashboardCard></> : null}
 
-    <DashboardCard title="Automatic nationwide intent monitoring" action={<Button variant="outline" onClick={loadAutomaticResearch}>Refresh</Button>}>
+    {activeTab === "monitoring" ? <><DashboardCard title="Automatic nationwide intent monitoring" action={<Button variant="outline" onClick={loadAutomaticResearch}>Refresh</Button>}>
       <p className="intent-monitor-intro">Jarvis checks public conversations, news, forums, feeds, and open-web results on the backend. Chrome does not need to stay open. Matches are evidence-backed and stay in review until you choose what to do.</p>
+      {monitorPresets.map((preset) => <button className="monitor-preset" type="button" key={preset.id} onClick={() => applyMonitorPreset(preset)}><span>Recommended preset</span><strong>{preset.name}</strong><small>Nationwide · online event · organized editable intent categories</small></button>)}
       <div className="intent-monitor-builder">
         <label><span>Monitor name</span><input value={monitorDraft.name} onChange={(event) => setMonitorDraft((current) => ({ ...current, name: event.target.value }))} /></label>
         <label className="span-2"><span>Who or what should Jarvis listen for?</span><textarea value={monitorDraft.query} onChange={(event) => setMonitorDraft((current) => ({ ...current, query: event.target.value }))} /></label>
         <label className="span-2"><span>Intent phrases and keywords</span><textarea value={monitorDraft.keywords} onChange={(event) => setMonitorDraft((current) => ({ ...current, keywords: event.target.value }))} /></label>
+        {monitorDraft.intentCategories?.length ? <div className="intent-category-editor span-2">{monitorDraft.intentCategories.map((category, categoryIndex) => <label key={`${category.name}-${categoryIndex}`}><span>{category.name}</span><textarea value={(category.phrases || []).join("\n")} onChange={(event) => setMonitorDraft((current) => ({ ...current, intentCategories: current.intentCategories.map((item, index) => index === categoryIndex ? { ...item, phrases: splitValues(event.target.value) } : item) }))} /></label>)}</div> : null}
         <label><span>Ignore these terms</span><input value={monitorDraft.negativeKeywords} onChange={(event) => setMonitorDraft((current) => ({ ...current, negativeKeywords: event.target.value }))} /></label>
         <label><span>Check every</span><select value={monitorDraft.intervalMinutes} onChange={(event) => setMonitorDraft((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}><option value={15}>15 minutes</option><option value={30}>30 minutes</option><option value={60}>1 hour</option><option value={360}>6 hours</option><option value={1440}>Daily</option></select></label>
         <label className="span-2"><span>Additional public RSS, Atom, or Discourse feed URLs (optional)</span><textarea value={monitorDraft.feedUrls} onChange={(event) => setMonitorDraft((current) => ({ ...current, feedUrls: event.target.value }))} placeholder="One public feed URL per line. Jarvis checks these automatically too." /></label>
       </div>
-      <div className="intent-source-chips"><span>Bing open web</span><span>Bing News</span><span>GDELT news</span><span>SEC Form D filings</span><span>Bluesky</span><span>Hacker News</span><span>Stack Exchange</span><span>Reddit public feeds</span><span>DuckDuckGo discovery</span><span>Public RSS/Discourse feeds</span></div>
+      <div className="intent-source-chips">{[["bing_web", "Bing open web"], ["bing_news", "Bing News"], ["gdelt", "GDELT news"], ["sec_form_d", "SEC Form D"], ["bluesky", "Bluesky"], ["hacker_news", "Hacker News"], ["stack_exchange", "Stack Exchange"], ["reddit_rss", "Reddit feeds"], ["duckduckgo", "DuckDuckGo"]].map(([id, label]) => <button type="button" className={selectedSources.includes(id) ? "is-on" : ""} key={id} onClick={() => toggleDraftSource(id)}>{selectedSources.includes(id) ? "On · " : "Off · "}{label}</button>)}</div>
       <Button loading={monitorSaving} disabled={!monitorDraft.query.trim()} onClick={createMonitor}>Start automatic monitoring</Button>
       {monitors.length ? <div className="intent-monitor-list">{monitors.map((monitor) => <article key={monitor._id}>
         <div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? monitor.lastRunStatus : "paused"}</span><strong>{monitor.name}</strong><p>{monitor.query}</p><small>{(monitor.sources || []).map((source) => source.replaceAll("_", " ")).join(" · ")}</small></div>
         <div className="intent-monitor-totals"><strong>{monitor.totals?.signalsFound || 0}</strong><span>signals found</span><small>{monitor.lastRunMessage || "Waiting for first run"}</small></div>
         <div className="intent-monitor-actions"><Button size="sm" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Run now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button></div>
+        <div className="source-health-grid">{(monitor.sourceHealth || []).map((health) => <article key={health.source} className={`is-${health.state}`}><header><strong>{health.source.replaceAll("_", " ")}</strong><button type="button" onClick={() => toggleExistingSource(monitor, health.source)}>{(monitor.sources || []).includes(health.source) ? "Disable" : "Enable"}</button></header><span>{health.state.replaceAll("_", " ")}</span><small>Last success: {health.lastSuccessfulCheck ? new Date(health.lastSuccessfulCheck).toLocaleString() : "Not yet"}</small><small>Results: {health.resultsCollected || 0}</small>{health.lastError ? <small className="is-error">Last error: {health.lastError}</small> : null}<small>Next attempt: {health.nextScheduledAttempt ? new Date(health.nextScheduledAttempt).toLocaleString() : "Not scheduled"}</small></article>)}</div>
       </article>)}</div> : null}
     </DashboardCard>
 
-    <DashboardCard title="Live intent review" action={<span className="label-pill">{intentSignals.filter((signal) => signal.status === "new").length} new</span>}>
+    <DashboardCard title="Monitoring activity"><div className="monitor-timeline">{monitorActivity.length ? monitorActivity.slice(0, 50).map((item) => <article key={item._id} className={`is-${item.type}`}><span></span><div><strong>{item.message}</strong><small>{new Date(item.createdAt).toLocaleString()}</small></div></article>) : <p>No runs recorded yet. Start a monitor to see every collection and review step here.</p>}</div></DashboardCard></> : null}
+
+    {activeTab === "leads" ? <><DashboardCard title="Live intent review" action={<span className="label-pill">{intentSignals.filter((signal) => signal.status === "new").length} new</span>}>
       <p className="intent-monitor-intro">These are public signals, not automatically approved contacts. Review the evidence, qualify useful matches, dismiss noise, or add one person at a time to the CRM.</p>
       {intentSignals.length ? <div className="intent-signal-list">{intentSignals.map((signal) => <article key={signal._id} className={`is-${signal.status}`}>
         <div className="intent-signal-score"><strong>{signal.score}</strong><span>intent score</span></div>
         <div className="intent-signal-main"><div><span>{signal.source.replaceAll("_", " ")}</span><small>{signal.publishedAt ? new Date(signal.publishedAt).toLocaleString() : "Recently discovered"}</small></div><strong>{signal.title || "Public intent signal"}</strong><p>{signal.excerpt || "Open the source to review the public context."}</p><small>{(signal.scoreReasons || []).join(" · ")}</small><a href={signal.sourceUrl} target="_blank" rel="noreferrer">Open public evidence</a></div>
-        <div className="intent-signal-person"><strong>{signal.authorName || signal.people?.[0]?.name || "Person needs identification"}</strong><span>{signal.organizationName || signal.organizationDomain || "Organization needs research"}</span>{signal.people?.length ? <small>{signal.people.length} public team member{signal.people.length === 1 ? "" : "s"} found</small> : null}{signal.publishedEmails?.length ? <small>{signal.publishedEmails.length} published email{signal.publishedEmails.length === 1 ? "" : "s"} · unverified</small> : null}<small>{signal.status.replaceAll("_", " ")}</small></div>
+        <div className="intent-signal-person"><strong>{signal.authorName || signal.people?.[0]?.name || "Person needs identification"}</strong><span>{signal.identityResolution?.status === "supported" ? (signal.organizationName || signal.organizationDomain || "No company claimed") : "Company connection not established"}</span><small>{signal.classification?.replaceAll("_", " ")} · {signal.classificationMethod || "rules"}</small><small>{signal.identityResolution?.reason || "Identity requires evidence."}</small>{signal.publishedEmails?.length ? <small>{signal.publishedEmails.length} published email{signal.publishedEmails.length === 1 ? "" : "s"} · unverified</small> : null}<small>{signal.status.replaceAll("_", " ")}</small></div>
         <div className="intent-signal-actions"><Button size="sm" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => addSignalToCrm(signal)}>{signal.status === "converted" ? "In CRM" : "Add to CRM"}</Button><Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>Qualify</Button><Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "dismissed")}>Dismiss</Button></div>
       </article>)}</div> : <div className="table-state table-state--empty">Start a monitor above. New public intent signals will appear here automatically after the first source run.</div>}
-    </DashboardCard>
+    </DashboardCard></> : null}
 
-    <DashboardCard title="Saved research and prospect lists" action={<Button variant="outline" loading={historyLoading} onClick={loadResearchHistory}>Refresh</Button>}>
+    {activeTab === "saved" ? <><DashboardCard title="Saved research and prospect lists" action={<Button variant="outline" loading={historyLoading} onClick={loadResearchHistory}>Refresh</Button>}>
       {researchHistory.length ? <div className="research-history-list">{researchHistory.map((entry) => {
         const jobStatus = entry.job?.status || (entry.totalOrgs ? "completed" : "saved");
         const statistics = entry.job?.statistics || {};
@@ -479,9 +522,9 @@ export default function Discovery() {
           {entry.job?.error ? <p className="research-history-error">{entry.job.error}</p> : null}
         </article>;
       })}</div> : <div className="table-state table-state--empty">No saved research yet. Research started in ChatGPT or on this page will appear here automatically.</div>}
-    </DashboardCard>
+    </DashboardCard></> : null}
 
-    <div id="people-research-previews">
+    {activeTab === "people" ? <div id="people-research-previews">
       <DashboardCard title="Jarvis research previews" action={<Button variant="outline" loading={peoplePreviewsLoading} onClick={loadPeoplePreviews}>Refresh</Button>}>
         <p className="people-preview-intro">People found by Growth Operator stay here for review before they become CRM contacts. A published email is still unverified and cannot be used for outreach until it passes your verification rules.</p>
         {peoplePreviews.length ? <div className="people-preview-list">{peoplePreviews.map((preview) => {
@@ -502,9 +545,9 @@ export default function Discovery() {
           </article>;
         })}</div> : <div className="table-state table-state--empty">No staged people previews yet. Ask Jarvis to find public-web decision-makers; the preview will appear here automatically.</div>}
       </DashboardCard>
-    </div>
+    </div> : null}
 
-    <DashboardCard title="External research source">
+    {activeTab === "company" ? <><DashboardCard title="External research source">
       <div className={`research-source-status ${researchSource?.configured ? "is-ready" : "is-needed"}`}>
         <div><span>{researchSource?.configured ? "Connected" : "Source required"}</span><strong>{researchSource?.name || "Checking source…"}</strong><p>{researchSource?.message || "Growth Operator is checking the external-data configuration."}</p></div>
         <Button loading={externalRunning} disabled={!marketPlan || !researchSource?.configured} onClick={runExternalResearch}>Discover up to 1,000 organizations</Button>
@@ -532,11 +575,11 @@ export default function Discovery() {
         <div className="market-result-score"><strong>{organization.audienceScore || 0}</strong><span>{organization.audienceTier || "unscored"}</span></div>
         <div className="market-result-evidence"><strong>{organization.researchEvidence?.length || 0} sources</strong><span>{organization.lastResearchVerifiedAt ? `Checked ${new Date(organization.lastResearchVerifiedAt).toLocaleDateString()}` : "Verification needed"}</span></div>
       </article>)}</div> : <div className="table-state table-state--empty">No stored organizations match this plan yet. Growth Operator did not manufacture results.</div>}
-    </DashboardCard></div> : null}
+    </DashboardCard></div> : null}</> : null}
 
-    <DashboardCard title="Prospect review" action={<div className="discovery-review-filters"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search prospects" /><select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select><select value={emailFilter} onChange={(event) => setEmailFilter(event.target.value)}><option value="verified">Verified email</option><option value="review">Needs review</option><option value="all">All</option></select></div>}>
+    {activeTab === "leads" ? <DashboardCard title="Prospect review" action={<div className="discovery-review-filters"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search prospects" /><select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">All campaigns</option>{campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}</select><select value={emailFilter} onChange={(event) => setEmailFilter(event.target.value)}><option value="verified">Verified email</option><option value="review">Needs review</option><option value="all">All</option></select></div>}>
       {filtered.length ? <div className="discovery-review-list">{filtered.map((prospect) => <article key={prospect._id}><div><strong>{prospect.name || "Unnamed prospect"}</strong><span>{[prospect.title, prospect.company].filter(Boolean).join(" · ") || "Company details needed"}</span><small>{prospect.email || "No email"} · {prospect.emailStatus || "unverified"}</small></div><div><Button size="sm" onClick={() => approve(prospect)}>Approve</Button><Button size="sm" variant="outline" onClick={() => setDeleteTarget(prospect)}>Delete</Button></div></article>)}</div> : <div className="table-state table-state--empty">No prospects match this review view.</div>}
-    </DashboardCard>
+    </DashboardCard> : null}
 
     <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete this prospect?" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}><p>This removes {deleteTarget?.name || "this prospect"} from Growth Operator. This cannot be undone.</p></Modal>
   </div>;

@@ -304,6 +304,18 @@ export const fetchMarketResearchSources = () =>
 export const fetchResearchMonitors = () =>
   api.get("/audience/research/monitors").then((res) => res.data);
 
+export const fetchResearchMonitorPresets = () =>
+  api.get("/audience/research/monitor-presets").then((res) => res.data);
+
+export const fetchResearchActivity = (params = {}) =>
+  api.get("/audience/research/activity", { params }).then((res) => res.data);
+
+export const fetchResearchNotifications = () =>
+  api.get("/audience/research/notifications").then((res) => res.data);
+
+export const updateResearchNotification = (notificationId, read = true) =>
+  api.patch(`/audience/research/notifications/${notificationId}`, { read }).then((res) => res.data);
+
 export const createResearchMonitor = (payload) =>
   api.post("/audience/research/monitors", payload).then((res) => res.data);
 

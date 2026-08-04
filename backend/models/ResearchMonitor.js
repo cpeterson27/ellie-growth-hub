@@ -6,6 +6,10 @@ const researchMonitorSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 160 },
   query: { type: String, required: true, trim: true, maxlength: 1200 },
   keywords: [{ type: String, trim: true }],
+  intentCategories: [{
+    name: { type: String, trim: true },
+    phrases: [{ type: String, trim: true }],
+  }],
   negativeKeywords: [{ type: String, trim: true }],
   locations: [{ type: String, trim: true }],
   sources: [{ type: String, enum: ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"] }],
@@ -17,6 +21,19 @@ const researchMonitorSchema = new mongoose.Schema({
   nextRunAt: { type: Date, default: Date.now, index: true },
   lastRunStatus: { type: String, enum: ["never", "running", "completed", "partial", "failed"], default: "never" },
   lastRunMessage: { type: String, default: "" },
+  runRequestedAt: { type: Date, default: Date.now, index: true },
+  leaseOwner: { type: String, default: "" },
+  leaseExpiresAt: { type: Date, default: null, index: true },
+  sourceHealth: [{
+    source: { type: String, required: true },
+    enabled: { type: Boolean, default: true },
+    lastSuccessfulCheck: { type: Date, default: null },
+    lastErrorAt: { type: Date, default: null },
+    lastError: { type: String, default: "" },
+    resultsCollected: { type: Number, default: 0 },
+    state: { type: String, enum: ["healthy", "rate_limited", "blocked", "failed", "never"], default: "never" },
+    nextScheduledAttempt: { type: Date, default: null },
+  }],
   totals: {
     runs: { type: Number, default: 0 },
     signalsFound: { type: Number, default: 0 },
@@ -25,5 +42,6 @@ const researchMonitorSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 researchMonitorSchema.index({ workspaceId: 1, enabled: 1, nextRunAt: 1 });
+researchMonitorSchema.index({ enabled: 1, runRequestedAt: 1, leaseExpiresAt: 1 });
 
 module.exports = mongoose.model("ResearchMonitor", researchMonitorSchema);

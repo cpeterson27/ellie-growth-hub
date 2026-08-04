@@ -8,6 +8,8 @@ const MarketResearchJob = require("../models/MarketResearchJob");
 const PeopleResearchPreview = require("../models/PeopleResearchPreview");
 const IntentSignal = require("../models/IntentSignal");
 const ResearchMonitor = require("../models/ResearchMonitor");
+const MonitorActivity = require("../models/MonitorActivity");
+const InAppNotification = require("../models/InAppNotification");
 
 const {
   discoverAudienceSources,
@@ -17,7 +19,22 @@ const { previewOrganizationImport, importOrganizations } = require("../services/
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
-const { runResearchMonitor } = require("../services/researchMonitorService");
+const { requestResearchMonitorRun } = require("../services/researchMonitorService");
+
+const AUGUST_22_PRESET = {
+  id: "august-22-nationwide-online-event",
+  name: "August 22 nationwide online event",
+  query: "People across the United States showing current interest in starting, buying, growing, or systemizing a business or building wealth through real estate before the August 22 online event.",
+  locations: ["United States"],
+  negativeKeywords: ["student assignment", "homework", "hypothetical", "job seeker", "hiring", "my course", "promo code", "video game"],
+  intentCategories: [
+    { name: "Career transition", phrases: ["leave my W-2", "quit my job", "replace my income", "become my own boss"] },
+    { name: "Business ownership", phrases: ["start a business", "buy a business", "first business", "entrepreneur community"] },
+    { name: "Growth and systems", phrases: ["scale my business", "need business systems", "stuck in my business", "looking for a business coach"] },
+    { name: "Real estate wealth", phrases: ["real estate investor", "multifamily investing", "grow my real estate portfolio", "start an investment company"] },
+  ],
+  intervalMinutes: 30,
+};
 
 const router = express.Router();
 
@@ -46,6 +63,8 @@ router.get("/research/monitors", async (req, res) => {
   return res.json({ success: true, monitors });
 });
 
+router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: [AUGUST_22_PRESET] }));
+
 router.post("/research/monitors", async (req, res) => {
   try {
     const query = String(req.body?.query || "").trim();
@@ -58,6 +77,7 @@ router.post("/research/monitors", async (req, res) => {
       name: String(req.body?.name || query).trim().slice(0, 160),
       query,
       keywords: (req.body?.keywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
+      intentCategories: (req.body?.intentCategories || []).slice(0, 12).map((category) => ({ name: String(category.name || "Intent").trim().slice(0, 80), phrases: (category.phrases || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 30) })),
       negativeKeywords: (req.body?.negativeKeywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
       locations: (req.body?.locations || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 25),
       sources: requestedSources.length ? requestedSources : ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"],
@@ -65,8 +85,9 @@ router.post("/research/monitors", async (req, res) => {
       intervalMinutes: Math.min(10080, Math.max(15, Number(req.body?.intervalMinutes) || 60)),
       maxResultsPerSource: Math.min(100, Math.max(5, Number(req.body?.maxResultsPerSource) || 25)),
       nextRunAt: new Date(),
+      runRequestedAt: new Date(),
+      sourceHealth: (requestedSources.length ? requestedSources : ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]).map((source) => ({ source, enabled: true, state: "never", nextScheduledAttempt: new Date() })),
     });
-    setImmediate(() => runResearchMonitor(monitor._id).catch(() => {}));
     return res.status(201).json({ success: true, monitor });
   } catch (error) {
     return res.status(400).json({ success: false, error: error.message || "Unable to create the monitor." });
@@ -74,7 +95,7 @@ router.post("/research/monitors", async (req, res) => {
 });
 
 router.patch("/research/monitors/:monitorId", async (req, res) => {
-  const allowed = ["name", "query", "keywords", "negativeKeywords", "locations", "sources", "feedUrls", "enabled", "intervalMinutes", "maxResultsPerSource"];
+  const allowed = ["name", "query", "keywords", "intentCategories", "negativeKeywords", "locations", "sources", "feedUrls", "enabled", "intervalMinutes", "maxResultsPerSource"];
   const update = Object.fromEntries(allowed.filter((key) => req.body?.[key] !== undefined).map((key) => [key, req.body[key]]));
   if (update.enabled === true) update.nextRunAt = new Date();
   const monitor = await ResearchMonitor.findOneAndUpdate({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId }, { $set: update }, { new: true, runValidators: true });
@@ -86,8 +107,26 @@ router.post("/research/monitors/:monitorId/run", async (req, res) => {
   const monitor = await ResearchMonitor.findOne({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId });
   if (!monitor) return res.status(404).json({ success: false, error: "Monitor not found." });
   if (monitor.lastRunStatus === "running") return res.status(409).json({ success: false, error: "This monitor is already running." });
-  setImmediate(() => runResearchMonitor(monitor._id).catch(() => {}));
-  return res.status(202).json({ success: true, monitor: { ...monitor.toObject(), lastRunStatus: "running" } });
+  const queued = await requestResearchMonitorRun(monitor._id);
+  return res.status(202).json({ success: true, monitor: { ...queued.toObject(), lastRunStatus: "queued" } });
+});
+
+router.get("/research/activity", async (req, res) => {
+  const filter = { workspaceId: req.auth.workspaceId };
+  if (req.query.monitorId) filter.monitorId = req.query.monitorId;
+  const activity = await MonitorActivity.find(filter).sort({ createdAt: -1 }).limit(Math.min(250, Number(req.query.limit) || 100)).lean();
+  return res.json({ success: true, activity });
+});
+
+router.get("/research/notifications", async (req, res) => {
+  const notifications = await InAppNotification.find({ workspaceId: req.auth.workspaceId }).sort({ createdAt: -1 }).limit(100).lean();
+  return res.json({ success: true, notifications, unread: notifications.filter((item) => !item.readAt).length });
+});
+
+router.patch("/research/notifications/:notificationId", async (req, res) => {
+  const notification = await InAppNotification.findOneAndUpdate({ _id: req.params.notificationId, workspaceId: req.auth.workspaceId }, { $set: { readAt: req.body?.read === false ? null : new Date() } }, { new: true });
+  if (!notification) return res.status(404).json({ success: false, error: "Notification not found." });
+  return res.json({ success: true, notification });
 });
 
 router.get("/research/signals", async (req, res) => {
@@ -104,6 +143,7 @@ router.patch("/research/signals/:signalId", async (req, res) => {
   if (!["new", "reviewing", "qualified", "dismissed"].includes(status)) return res.status(400).json({ success: false, error: "Choose a valid review status." });
   const signal = await IntentSignal.findOneAndUpdate({ _id: req.params.signalId, workspaceId: req.auth.workspaceId }, { $set: { status } }, { new: true });
   if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
+  if (status === "qualified") await InAppNotification.create({ workspaceId: req.auth.workspaceId, userId: req.auth.user?._id || null, monitorId: signal.monitorId, signalId: signal._id, type: "qualified_lead", title: "Qualified lead ready for review", message: `${signal.title || "A public lead"} was qualified. CRM import still requires individual approval.` });
   return res.json({ success: true, signal });
 });
 
@@ -113,6 +153,7 @@ router.post("/research/signals/:signalId/convert", async (req, res) => {
   const name = String(req.body?.name || signal.authorName || "").trim();
   if (!name) return res.status(400).json({ success: false, error: "Add the person's name before creating a CRM lead." });
   const organizationName = String(req.body?.company || signal.organizationName || signal.organizationDomain || "").trim();
+  if (organizationName && signal.identityResolution?.status !== "supported") return res.status(400).json({ success: false, error: "The company connection is not supported by public evidence. Add this lead without a company or review the source first." });
   let organization = null;
   if (organizationName) {
     const identity = signal.organizationDomain ? { workspaceId: req.auth.workspaceId, domain: signal.organizationDomain } : { workspaceId: req.auth.workspaceId, name: organizationName };
