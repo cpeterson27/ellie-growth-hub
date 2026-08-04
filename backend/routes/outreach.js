@@ -268,6 +268,13 @@ router.post("/generate", async (req,res)=>{
 
     }
 
+    if (campaign.campaignKind !== "program") {
+      const eventbriteUrl = String(campaign.registrationLinks?.eventbrite?.url || "").trim();
+      const meetupUrl = String(campaign.registrationLinks?.meetup?.url || "").trim();
+      const missing = [!eventbriteUrl && "Eventbrite", !meetupUrl && "Meetup"].filter(Boolean);
+      if (missing.length) return res.status(400).json({ error: `Add the ${missing.join(" and ")} link${missing.length === 1 ? "" : "s"} to this campaign before generating event emails. Every event draft must include both registration links.` });
+    }
+
     let generalTemplate = campaign.emailTemplate?.currentVersion
       ? await CampaignTemplateVersion.findOne({
         campaignId: campaign._id,

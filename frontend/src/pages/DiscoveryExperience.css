@@ -135,6 +135,28 @@
 .activity-help { color: var(--text-muted); font-size: .76rem; margin: .5rem 0 0; }
 .crm-review-explainer { background: #edf5f1; border-radius: 9px; color: #52645d; font-size: .78rem; line-height: 1.5; margin: 0 0 1rem; padding: .75rem .9rem; }
 .crm-review-explainer strong { color: #174c3e; }
+.intent-draft-modal { display: grid; gap: 1rem; min-width: min(720px,75vw); }
+.intent-draft-safety { background: #edf5f1; border-left: 4px solid #278261; border-radius: 8px; display: grid; gap: .2rem; padding: .75rem .9rem; }
+.intent-draft-safety strong { color: #174c3e; }
+.intent-draft-safety span { color: #52645d; font-size: .76rem; line-height: 1.4; }
+.intent-draft-modal label { display: grid; gap: .4rem; }
+.intent-draft-modal label > span,
+.intent-draft-basis > span { color: #5e6b66; font-size: .7rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.intent-draft-modal input,
+.intent-draft-modal select,
+.intent-draft-modal textarea { background: #fff; border: 1px solid #ccd7d2; border-radius: 9px; font: inherit; padding: .7rem .8rem; }
+.intent-draft-modal textarea { line-height: 1.55; min-height: 320px; resize: vertical; }
+.intent-draft-basis { background: #f7f5ef; border-radius: 9px; display: grid; gap: .25rem; padding: .8rem; }
+.intent-draft-basis p { color: var(--text-muted); font-size: .76rem; margin: 0; }
+.intent-draft-status { align-items: center; display: flex; justify-content: space-between; }
+.intent-draft-status > div { display: grid; gap: .2rem; }
+.intent-draft-status span { color: #8a671f; font-size: .68rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.intent-draft-status button { background: transparent; border: 0; color: #176655; cursor: pointer; font: inherit; font-size: .76rem; font-weight: 800; }
+.intent-draft-links { display: grid; gap: .65rem; grid-template-columns: 1fr 1fr; }
+.intent-draft-links a { background: #f7faf8; border: 1px solid #d9e4df; border-radius: 9px; display: grid; gap: .2rem; padding: .7rem; text-decoration: none; }
+.intent-draft-links span { color: #64716c; font-size: .68rem; text-transform: uppercase; }
+.intent-draft-links strong { color: #176655; font-size: .8rem; }
+.intent-draft-placeholder { background: #fff5df; border-radius: 8px; color: #735b28; font-size: .75rem; margin: 0; padding: .65rem .75rem; }
 .friendly-empty { background: #f7faf8; border: 1px dashed #cfdad5; border-radius: 12px; padding: 2rem; text-align: center; }
 .friendly-empty p { color: var(--text-muted); margin: .3rem auto 0; }
 
@@ -188,4 +210,6 @@
   .signal-priority { grid-template-columns: auto auto 1fr; }
   .signal-contact { border-left: 0; border-top: 1px solid #e5e2da; padding: .7rem 0 0; }
   .intent-signal-actions { flex-direction: column; grid-column: auto; }
+  .intent-draft-modal { min-width: 0; }
+  .intent-draft-links { grid-template-columns: 1fr; }
 }

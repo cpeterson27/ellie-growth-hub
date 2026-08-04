@@ -334,6 +334,15 @@ export const updateIntentSignal = (signalId, status) =>
 export const convertIntentSignal = (signalId, payload = {}) =>
   api.post(`/audience/research/signals/${signalId}/convert`, payload).then((res) => res.data);
 
+export const generateIntentEmailDraft = (signalId, campaignId) =>
+  api.post(`/audience/research/signals/${signalId}/email-drafts`, { campaignId }).then((res) => res.data);
+
+export const updateIntentEmailDraft = (signalId, draftId, payload) =>
+  api.patch(`/audience/research/signals/${signalId}/email-drafts/${draftId}`, payload).then((res) => res.data);
+
+export const transferIntentEmailDraft = (signalId, draftId) =>
+  api.post(`/audience/research/signals/${signalId}/email-drafts/${draftId}/transfer`).then((res) => res.data);
+
 export const fetchMarketResearchHistory = (limit = 30) =>
   api.get("/audience/research/history", { params: { limit } }).then((res) => res.data);
 

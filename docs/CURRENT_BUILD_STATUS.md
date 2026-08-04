@@ -15,6 +15,8 @@
 - Buyer-intent scoring now requires a specific first-person need, current business challenge, recommendation request, or concrete start/buy/scale/invest goal. Generic advice, free resources, creator feedback requests, and promotions are rejected; usernames and repeated keywords no longer inflate scores.
 - Live Lead actions use explicit outcomes: saving a possible lead changes review status only, while CRM creation remains a separate confirmed action. Source accounts are clickable public usernames and are explicitly not presented as verified real identities.
 - CRM import review now lives under People Research, where staged research imports originate. Source retry notices are grouped and translated into non-actionable informational messages, and the notification panel has a persistent close control.
+- Saved possible leads can generate editable, personalized event-email drafts directly from public evidence. Generation requires and preserves both the campaign's Eventbrite and Meetup links. Drafts remain unsent; transferring a reviewed draft into Outreach requires a researched CRM contact and verified email, and the transferred message still enters as pending review.
+- Public usernames cannot be used as CRM names. A real researched name is required before an intent signal becomes a contact.
 
 ## Product decisions
 

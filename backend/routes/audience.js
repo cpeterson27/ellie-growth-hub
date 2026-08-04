@@ -10,6 +10,9 @@ const IntentSignal = require("../models/IntentSignal");
 const ResearchMonitor = require("../models/ResearchMonitor");
 const MonitorActivity = require("../models/MonitorActivity");
 const InAppNotification = require("../models/InAppNotification");
+const IntentEmailDraft = require("../models/IntentEmailDraft");
+const Campaign = require("../models/Campaign");
+const Outreach = require("../models/Outreach");
 
 const {
   discoverAudienceSources,
@@ -20,6 +23,7 @@ const { compileMarketQuestion } = require("../services/marketResearchService");
 const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
 const { buyerIntentAssessment, requestResearchMonitorRun, scoreSignal } = require("../services/researchMonitorService");
+const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEmailDraftService");
 
 const AUGUST_22_PRESET = {
   id: "august-22-nationwide-online-event",
@@ -142,7 +146,11 @@ router.get("/research/signals", async (req, res) => {
   if (rejected.length) await Promise.all(rejected.map(({ signal, eligibility }) => IntentSignal.updateOne({ _id: signal._id }, { $set: { audienceEligible: false, audienceRejectionReason: eligibility.reason, status: "dismissed", classification: "irrelevant", classificationReason: eligibility.reason } })));
   const accepted = assessed.filter((item) => item.eligibility.eligible && (!item.ranking || item.ranking.score >= 45) && item.signal.audienceEligible !== false);
   if (accepted.length) await Promise.all(accepted.filter((item) => item.ranking && (item.signal.score !== item.ranking.score || JSON.stringify(item.signal.scoreReasons || []) !== JSON.stringify(item.ranking.reasons))).map(({ signal, ranking }) => IntentSignal.updateOne({ _id: signal._id }, { $set: { score: ranking.score, scoreReasons: ranking.reasons } })));
-  return res.json({ success: true, signals: accepted.map(({ signal, ranking }) => ranking ? { ...signal, score: ranking.score, scoreReasons: ranking.reasons } : signal), automaticallyRejected: rejected.length });
+  const acceptedSignals = accepted.map(({ signal, ranking }) => ranking ? { ...signal, score: ranking.score, scoreReasons: ranking.reasons } : signal);
+  const drafts = await IntentEmailDraft.find({ workspaceId: req.auth.workspaceId, signalId: { $in: acceptedSignals.map((signal) => signal._id) } }).sort({ updatedAt: -1 }).lean();
+  const draftsBySignal = new Map();
+  drafts.forEach((draft) => { const key = String(draft.signalId); draftsBySignal.set(key, [...(draftsBySignal.get(key) || []), draft]); });
+  return res.json({ success: true, signals: acceptedSignals.map((signal) => ({ ...signal, emailDrafts: draftsBySignal.get(String(signal._id)) || [] })), automaticallyRejected: rejected.length });
 });
 
 router.patch("/research/signals/:signalId", async (req, res) => {
@@ -159,6 +167,7 @@ router.post("/research/signals/:signalId/convert", async (req, res) => {
   if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
   const name = String(req.body?.name || signal.authorName || "").trim();
   if (!name) return res.status(400).json({ success: false, error: "Add the person's name before creating a CRM lead." });
+  if (/^(?:\/?u\/|@|https?:\/\/)/i.test(name)) return res.status(400).json({ success: false, error: "A public username is not a verified real name. Research and enter the person's real name before creating the CRM record." });
   const organizationName = String(req.body?.company || signal.organizationName || signal.organizationDomain || "").trim();
   if (organizationName && signal.identityResolution?.status !== "supported") return res.status(400).json({ success: false, error: "The company connection is not supported by public evidence. Add this lead without a company or review the source first." });
   let organization = null;
@@ -175,6 +184,64 @@ router.post("/research/signals/:signalId/convert", async (req, res) => {
   signal.status = "converted";
   await signal.save();
   return res.status(201).json({ success: true, contact, organization });
+});
+
+function campaignRegistrationLinks(campaign) {
+  return {
+    eventbriteUrl: String(campaign.registrationLinks?.eventbrite?.url || campaign.eventId?.integrations?.eventbrite?.url || "").trim(),
+    meetupUrl: String(campaign.registrationLinks?.meetup?.url || campaign.eventId?.integrations?.meetup?.url || "").trim(),
+  };
+}
+
+router.post("/research/signals/:signalId/email-drafts", async (req, res) => {
+  try {
+    const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
+    if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
+    if (!['qualified', 'converted'].includes(signal.status)) return res.status(400).json({ success: false, error: "Save this as a possible lead before creating an email draft." });
+    const campaign = await Campaign.findById(req.body?.campaignId).populate("eventId");
+    if (!campaign) return res.status(404).json({ success: false, error: "Choose a valid event campaign." });
+    const links = campaignRegistrationLinks(campaign);
+    const missing = [!links.eventbriteUrl && "Eventbrite", !links.meetupUrl && "Meetup"].filter(Boolean);
+    if (missing.length) return res.status(400).json({ success: false, error: `Add the ${missing.join(" and ")} link${missing.length === 1 ? "" : "s"} to this campaign before generating drafts. Every intent draft must include both registration links.` });
+    const generated = await generateIntentEmailDraft(signal.toObject(), campaign.toObject(), links);
+    const draft = await IntentEmailDraft.findOneAndUpdate(
+      { workspaceId: req.auth.workspaceId, signalId: signal._id, campaignId: campaign._id },
+      { $set: { ...generated, ...links, body: ensureLinks(generated.body, links.eventbriteUrl, links.meetupUrl), status: "draft", reviewedAt: null, outreachId: null } },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+    return res.status(201).json({ success: true, draft });
+  } catch (error) { return res.status(400).json({ success: false, error: error.message || "Unable to generate the personalized draft." }); }
+});
+
+router.patch("/research/signals/:signalId/email-drafts/:draftId", async (req, res) => {
+  const existing = await IntentEmailDraft.findOne({ _id: req.params.draftId, signalId: req.params.signalId, workspaceId: req.auth.workspaceId });
+  if (!existing) return res.status(404).json({ success: false, error: "Email draft not found." });
+  if (existing.status === "transferred") return res.status(409).json({ success: false, error: "This draft is already in Outreach." });
+  if (req.body?.subject !== undefined) existing.subject = String(req.body.subject).trim().slice(0, 300);
+  if (req.body?.body !== undefined) existing.body = ensureLinks(String(req.body.body), existing.eventbriteUrl, existing.meetupUrl);
+  if (!existing.subject || !existing.body) return res.status(400).json({ success: false, error: "The subject and email body are required." });
+  if (req.body?.status === "reviewed") { existing.status = "reviewed"; existing.reviewedAt = new Date(); }
+  else existing.status = "draft";
+  await existing.save();
+  return res.json({ success: true, draft: existing });
+});
+
+router.post("/research/signals/:signalId/email-drafts/:draftId/transfer", async (req, res) => {
+  const draft = await IntentEmailDraft.findOne({ _id: req.params.draftId, signalId: req.params.signalId, workspaceId: req.auth.workspaceId });
+  if (!draft) return res.status(404).json({ success: false, error: "Email draft not found." });
+  if (draft.status !== "reviewed") return res.status(400).json({ success: false, error: "Review and save the draft before moving it to Outreach." });
+  const contact = await Contact.findOne({ sourceProvider: "intent_monitor", providerContactId: String(req.params.signalId) });
+  if (!contact) return res.status(400).json({ success: false, error: "Add this person to the CRM and complete identity research before moving the draft to Outreach." });
+  if (!contact.email || contact.emailStatus !== "verified") return res.status(400).json({ success: false, error: "A verified email is required before a draft can enter Outreach. Published or guessed emails are not sufficient." });
+  await Contact.updateOne({ _id: contact._id }, { $addToSet: { campaignIds: draft.campaignId } });
+  const escapedBody = String(draft.body).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+  const outreach = await Outreach.findOneAndUpdate(
+    { campaignId: draft.campaignId, contactEmail: contact.email.toLowerCase().trim() },
+    { $set: { campaignId: draft.campaignId, contactId: contact._id, organization: contact.company || contact.name || "Individual lead", contactName: contact.name || contact.firstName || "", contactEmail: contact.email.toLowerCase().trim(), contactRole: contact.title || "", reason: "Evidence-backed public buyer-intent signal", subject: draft.subject, emailDraft: draft.body, htmlBody: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${escapedBody}</div>`, eventLink: draft.eventbriteUrl, status: "pending", errorMessage: "" } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+  draft.status = "transferred"; draft.outreachId = outreach._id; await draft.save();
+  return res.status(201).json({ success: true, draft, outreach, message: "Draft moved to Outreach as pending review. Nothing was sent." });
 });
 
 router.post("/research/plan", async (req, res) => {

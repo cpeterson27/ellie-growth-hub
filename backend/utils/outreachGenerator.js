@@ -99,7 +99,7 @@ function generateOutreachDraft(contact, campaign) {
   const eventLink =
     campaign.registrationLinks?.eventbrite?.url ||
     campaign.content?.callToActionUrl ||
-    "https://www.eventbrite.com/e/deal-to-close-multifamily-bootcamp-tickets-1994515277887?aff=ebdssbdestsearch";
+    "";
 
   const meetupLink =
     campaign.registrationLinks?.meetup?.url || "";

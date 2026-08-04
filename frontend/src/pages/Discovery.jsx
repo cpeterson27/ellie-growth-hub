@@ -29,6 +29,9 @@ import {
   updateResearchMonitor,
   updateIntentSignal,
   convertIntentSignal,
+  generateIntentEmailDraft,
+  updateIntentEmailDraft,
+  transferIntentEmailDraft,
   updateContact,
 } from "../services/api.js";
 import "./Discovery.css";
@@ -145,6 +148,10 @@ export default function Discovery() {
   const [qualitySaving, setQualitySaving] = useState(false);
   const [qualityDraft, setQualityDraft] = useState({ query: "", keywords: "", negativeKeywords: "" });
   const [peopleSearchPrompt, setPeopleSearchPrompt] = useState("Find 20 owners, founders, real estate investors, or business decision-makers in the United States who are likely able to purchase a ticket for the August 22 online event. Exclude minors, students, job seekers, and people without evidence of a real business or investment role.");
+  const [draftSignal, setDraftSignal] = useState(null);
+  const [draftCampaignId, setDraftCampaignId] = useState("");
+  const [draftEditor, setDraftEditor] = useState(null);
+  const [draftBusy, setDraftBusy] = useState(false);
   const [selectedSources, setSelectedSources] = useState(["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]);
   const [monitorDraft, setMonitorDraft] = useState({
     name: "Nationwide event buyer intent",
@@ -308,7 +315,7 @@ export default function Discovery() {
   };
 
   const addSignalToCrm = async (signal) => {
-    let name = signal.authorName || "";
+    let name = /^(?:\/?u\/|@|https?:\/\/)/i.test(String(signal.authorName || "").trim()) ? "" : signal.authorName || "";
     if (!name) name = window.prompt("Enter this person's name before adding the lead to the CRM:", "") || "";
     if (!name.trim()) return;
     try {
@@ -319,6 +326,49 @@ export default function Discovery() {
       await loadProspects();
     } catch (error) { setNotice(error.response?.data?.error || "Unable to add this signal to the CRM."); }
     finally { setSignalBusyId(""); }
+  };
+
+  const openEmailDraft = (signal) => {
+    const existing = signal.emailDrafts?.[0] || null;
+    const eligibleCampaigns = campaigns.filter((campaign) => campaign.campaignKind !== "program");
+    setDraftSignal(signal);
+    setDraftEditor(existing ? { ...existing } : null);
+    setDraftCampaignId(String(existing?.campaignId || eligibleCampaigns[0]?._id || ""));
+  };
+
+  const generateEmailDraft = async () => {
+    if (!draftSignal?._id || !draftCampaignId) return;
+    try {
+      setDraftBusy(true);
+      const response = await generateIntentEmailDraft(draftSignal._id, draftCampaignId);
+      setDraftEditor(response.draft);
+      setNotice("Personalized draft created with both Eventbrite and Meetup links. Nothing was sent.");
+    } catch (error) { setNotice(error.response?.data?.error || "Unable to create the email draft."); }
+    finally { setDraftBusy(false); }
+  };
+
+  const saveReviewedEmailDraft = async () => {
+    if (!draftSignal?._id || !draftEditor?._id) return;
+    try {
+      setDraftBusy(true);
+      const response = await updateIntentEmailDraft(draftSignal._id, draftEditor._id, { subject: draftEditor.subject, body: draftEditor.body, status: "reviewed" });
+      setDraftEditor(response.draft);
+      setNotice("Draft saved as reviewed. It is still unsent and has not entered Outreach.");
+      await loadAutomaticResearch();
+    } catch (error) { setNotice(error.response?.data?.error || "Unable to save the reviewed draft."); }
+    finally { setDraftBusy(false); }
+  };
+
+  const moveDraftToOutreach = async () => {
+    if (!draftSignal?._id || !draftEditor?._id) return;
+    try {
+      setDraftBusy(true);
+      const response = await transferIntentEmailDraft(draftSignal._id, draftEditor._id);
+      setNotice(response.message || "Draft moved to Outreach. Nothing was sent.");
+      setDraftSignal(null);
+      navigate(`/outreach?campaignId=${draftEditor.campaignId}`);
+    } catch (error) { setNotice(error.response?.data?.error || "Unable to move this draft to Outreach."); }
+    finally { setDraftBusy(false); }
   };
 
   useEffect(() => {
@@ -563,7 +613,7 @@ export default function Discovery() {
         <div className="signal-priority"><span>Priority</span><strong>{signal.score >= 75 ? "High" : signal.score >= 55 ? "Medium" : "Review"}</strong><small>{signal.score}/100 match</small></div>
         <div className="intent-signal-main"><div><span>{signal.source.replaceAll("_", " ")}</span><small>{signal.publishedAt ? new Date(signal.publishedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "New"}</small></div><h3>{displayText(signal.title) || "Public buyer-intent signal"}</h3><p>{displayText(signal.excerpt) || "Open the original source to review the context."}</p><div className="signal-why"><strong>Why it scored {signal.score}/100</strong><span>{(signal.scoreReasons || []).slice(0, 3).join(" · ") || "A specific current need matched your audience rules."}</span></div><a href={signal.sourceUrl} target="_blank" rel="noreferrer">View original public post ↗</a></div>
         <aside className="signal-contact"><span>Source account</span>{account.url ? <a href={account.url} target="_blank" rel="noreferrer">{account.label} ↗</a> : <strong>{account.label}</strong>}<small>Public username from the post—not a verified real name. Open it only to review public context.</small>{signal.organizationName || signal.organizationDomain ? <><span>Organization</span><strong>{signal.identityResolution?.status === "supported" ? (signal.organizationName || signal.organizationDomain) : "Not established"}</strong></> : null}{signal.publishedEmails?.length ? <div className="published-email-note">Published email found · still unverified</div> : null}</aside>
-        <div className="intent-signal-actions">{signal.status === "converted" ? <Button size="sm" disabled>Added to CRM</Button> : signal.status === "qualified" ? <Button size="sm" disabled={signalBusyId === signal._id} onClick={() => addSignalToCrm(signal)}>Research and add to CRM</Button> : <Button size="sm" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>Save as possible lead</Button>}<small>{signal.status === "qualified" ? "Creates a Needs Research CRM record after confirmation." : "Moves this to Saved possible leads. Nothing else happens."}</small><Button size="sm" variant="outline" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => reviewSignal(signal, "dismissed")}>Not a buyer</Button></div>
+        <div className="intent-signal-actions">{["qualified", "converted"].includes(signal.status) ? <><Button size="sm" onClick={() => openEmailDraft(signal)}>{signal.emailDrafts?.length ? "Review email draft" : "Create personalized draft"}</Button>{signal.status === "converted" ? <Button size="sm" variant="outline" disabled>Added to CRM</Button> : <Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => addSignalToCrm(signal)}>Research and add to CRM</Button>}<small>Drafts always include Eventbrite and Meetup. Nothing sends automatically.</small></> : <><Button size="sm" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>Save as possible lead</Button><small>Moves this to Saved possible leads. Nothing else happens.</small></>}<Button size="sm" variant="outline" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => reviewSignal(signal, "dismissed")}>Not a buyer</Button></div>
       </article>; })}</div> : <div className="friendly-empty"><strong>{leadView === "new" ? "You’re caught up" : "No leads in this view"}</strong><p>{leadView === "new" ? "Growth Operator will place the next plausible adult buyer here after the automatic filters run." : "Change the view above or wait for the next monitoring check."}</p></div>}
     </DashboardCard></> : null}
 
@@ -639,6 +689,13 @@ export default function Discovery() {
       <p className="crm-review-explainer"><strong>When to use this:</strong> People appear here only after a People Research import has been confirmed and staged for final CRM approval. Approve moves one person into Contacts. Delete removes that staged person. Neither action sends outreach.</p>
       {filtered.length ? <div className="discovery-review-list">{filtered.map((prospect) => <article key={prospect._id}><div><strong>{prospect.name || "Unnamed prospect"}</strong><span>{[prospect.title, prospect.company].filter(Boolean).join(" · ") || "Company details needed"}</span><small>{prospect.email || "No email"} · {prospect.emailStatus || "unverified"}</small></div><div><Button size="sm" onClick={() => approve(prospect)}>Approve into Contacts</Button><Button size="sm" variant="outline" onClick={() => setDeleteTarget(prospect)}>Remove</Button></div></article>)}</div> : <div className="friendly-empty"><strong>No staged people need CRM approval</strong><p>Run People Research first, review its evidence, then confirm an import. Those people will appear here for the final decision.</p></div>}
     </DashboardCard> : null}
+
+    <Modal isOpen={Boolean(draftSignal)} onClose={() => !draftBusy && setDraftSignal(null)} title="Personalized email draft" footer={<>{draftEditor?.status === "transferred" ? <><Button variant="outline" onClick={() => setDraftSignal(null)}>Close</Button><Button onClick={() => navigate(`/outreach?campaignId=${draftEditor.campaignId}`)}>Open in Outreach</Button></> : draftEditor ? <><Button variant="outline" disabled={draftBusy} onClick={() => setDraftSignal(null)}>Close</Button><Button variant="outline" loading={draftBusy} onClick={saveReviewedEmailDraft}>Save reviewed draft</Button>{draftEditor.status === "reviewed" ? <Button loading={draftBusy} onClick={moveDraftToOutreach}>Move to Outreach</Button> : null}</> : <><Button variant="outline" disabled={draftBusy} onClick={() => setDraftSignal(null)}>Cancel</Button><Button loading={draftBusy} disabled={!draftCampaignId} onClick={generateEmailDraft}>Generate unsent draft</Button></>}</>}>
+      <div className="intent-draft-modal">
+        <div className="intent-draft-safety"><strong>Draft only—nothing sends from this window.</strong><span>Every draft must contain both registration links. Moving it to Outreach later requires a CRM contact with a verified email.</span></div>
+        {!draftEditor ? <><label><span>Event campaign</span><select value={draftCampaignId} onChange={(event) => setDraftCampaignId(event.target.value)}><option value="">Choose a campaign</option>{campaigns.filter((campaign) => campaign.campaignKind !== "program").map((campaign) => { const hasEventbrite = Boolean(campaign.registrationLinks?.eventbrite?.url); const hasMeetup = Boolean(campaign.registrationLinks?.meetup?.url); return <option key={campaign._id} value={campaign._id}>{campaign.name}{hasEventbrite && hasMeetup ? "" : " · add both registration links first"}</option>; })}</select></label><div className="intent-draft-basis"><span>Personalization source</span><strong>{displayText(draftSignal?.title)}</strong><p>Growth Operator will use only this public evidence and will not assume the username is a verified real name.</p></div></> : <><header className="intent-draft-status"><div><span>{draftEditor.status === "reviewed" ? "Reviewed and unsent" : draftEditor.status === "transferred" ? "Pending in Outreach" : "Generated draft—review required"}</span><strong>{draftEditor.generationMethod === "openai" ? "AI-assisted personalization" : "Rules-based personalization"}</strong></div>{draftEditor.status !== "transferred" ? <button type="button" onClick={() => setDraftEditor(null)}>Choose another campaign</button> : null}</header><div className="intent-draft-links"><a href={draftEditor.eventbriteUrl} target="_blank" rel="noreferrer"><span>Eventbrite</span><strong>Included in draft ↗</strong></a><a href={draftEditor.meetupUrl} target="_blank" rel="noreferrer"><span>Meetup</span><strong>Included in draft ↗</strong></a></div><label><span>Subject</span><input disabled={draftEditor.status === "transferred"} value={draftEditor.subject || ""} onChange={(event) => setDraftEditor((current) => ({ ...current, subject: event.target.value, status: "draft" }))} /></label><label><span>Email body</span><textarea disabled={draftEditor.status === "transferred"} value={draftEditor.body || ""} onChange={(event) => setDraftEditor((current) => ({ ...current, body: event.target.value, status: "draft" }))} /></label><p className="intent-draft-placeholder"><strong>{"{{firstName}}"}</strong> stays as a placeholder until the person is researched in the CRM. A published or guessed email cannot move into Outreach.</p></>}
+      </div>
+    </Modal>
 
     <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete this prospect?" footer={<><Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button onClick={remove}>Delete permanently</Button></>}><p>This removes {deleteTarget?.name || "this prospect"} from Growth Operator. This cannot be undone.</p></Modal>
   </div>;
