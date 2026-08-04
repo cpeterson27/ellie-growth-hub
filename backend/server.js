@@ -100,15 +100,13 @@ connectDatabase(mongoUri)
       const recordedName = String(contact.name || "").trim();
       if (!/(?:reddit\.com\/user\/|^\/?u\/|https?:\/\/)/i.test(recordedName)) continue;
       const evidenceNote = `Original public account value: ${recordedName}`;
-      contact.name = "Identity research needed";
-      contact.firstName = "";
-      contact.lastName = "";
-      contact.stage = "Needs Research";
-      contact.researchStatus = "needs_research";
-      if (!String(contact.notes || "").includes(evidenceNote)) {
-        contact.notes = [contact.notes, evidenceNote].filter(Boolean).join("\n");
-      }
-      await contact.save();
+      const notes = String(contact.notes || "").includes(evidenceNote)
+        ? contact.notes
+        : [contact.notes, evidenceNote].filter(Boolean).join("\n");
+      await Contact.updateOne(
+        { _id: contact._id },
+        { $set: { name: "Identity research needed", firstName: "", lastName: "", stage: "Needs Research", researchStatus: "needs_research", notes } },
+      );
       repairedIntentContacts += 1;
     }
     if (repairedIntentContacts) {
