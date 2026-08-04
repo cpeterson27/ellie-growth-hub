@@ -6,6 +6,8 @@ const Audience = require("../models/Audience");
 const DiscoveryRun = require("../models/DiscoveryRun");
 const MarketResearchJob = require("../models/MarketResearchJob");
 const PeopleResearchPreview = require("../models/PeopleResearchPreview");
+const IntentSignal = require("../models/IntentSignal");
+const ResearchMonitor = require("../models/ResearchMonitor");
 
 const {
   discoverAudienceSources,
@@ -15,11 +17,116 @@ const { previewOrganizationImport, importOrganizations } = require("../services/
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
+const { runResearchMonitor } = require("../services/researchMonitorService");
 
 const router = express.Router();
 
 router.get("/research/sources", (_req, res) => {
-  return res.json({ success: true, sources: [sourceStatus()] });
+  return res.json({
+    success: true,
+    sources: [sourceStatus()],
+    automaticSources: [
+      { id: "bing_web", name: "Open web (Bing RSS)", accountRequired: false },
+      { id: "bing_news", name: "Bing News RSS", accountRequired: false },
+      { id: "gdelt", name: "Worldwide news (GDELT)", accountRequired: false },
+      { id: "sec_form_d", name: "SEC EDGAR Form D filings", accountRequired: false },
+      { id: "bluesky", name: "Public Bluesky posts", accountRequired: false },
+      { id: "hacker_news", name: "Hacker News discussions", accountRequired: false },
+      { id: "stack_exchange", name: "Stack Exchange questions", accountRequired: false },
+      { id: "reddit_rss", name: "Public Reddit search feeds", accountRequired: false, availability: "best_effort" },
+      { id: "duckduckgo", name: "Open-web discovery (DuckDuckGo)", accountRequired: false, availability: "best_effort" },
+      { id: "rss", name: "Public RSS and Atom feeds", accountRequired: false },
+      { id: "discourse", name: "Public Discourse communities", accountRequired: false },
+    ],
+  });
+});
+
+router.get("/research/monitors", async (req, res) => {
+  const monitors = await ResearchMonitor.find({ workspaceId: req.auth.workspaceId }).sort({ createdAt: -1 }).lean();
+  return res.json({ success: true, monitors });
+});
+
+router.post("/research/monitors", async (req, res) => {
+  try {
+    const query = String(req.body?.query || "").trim();
+    if (query.length < 5) return res.status(400).json({ success: false, error: "Describe the intent or audience to monitor." });
+    const allowedSources = new Set(["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
+    const requestedSources = Array.isArray(req.body?.sources) ? req.body.sources.filter((source) => allowedSources.has(source)) : [];
+    const monitor = await ResearchMonitor.create({
+      workspaceId: req.auth.workspaceId,
+      userId: req.auth.user?._id || null,
+      name: String(req.body?.name || query).trim().slice(0, 160),
+      query,
+      keywords: (req.body?.keywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
+      negativeKeywords: (req.body?.negativeKeywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
+      locations: (req.body?.locations || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 25),
+      sources: requestedSources.length ? requestedSources : ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"],
+      feedUrls: (req.body?.feedUrls || []).map(String).filter((url) => /^https:\/\//i.test(url)).slice(0, 30),
+      intervalMinutes: Math.min(10080, Math.max(15, Number(req.body?.intervalMinutes) || 60)),
+      maxResultsPerSource: Math.min(100, Math.max(5, Number(req.body?.maxResultsPerSource) || 25)),
+      nextRunAt: new Date(),
+    });
+    setImmediate(() => runResearchMonitor(monitor._id).catch(() => {}));
+    return res.status(201).json({ success: true, monitor });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to create the monitor." });
+  }
+});
+
+router.patch("/research/monitors/:monitorId", async (req, res) => {
+  const allowed = ["name", "query", "keywords", "negativeKeywords", "locations", "sources", "feedUrls", "enabled", "intervalMinutes", "maxResultsPerSource"];
+  const update = Object.fromEntries(allowed.filter((key) => req.body?.[key] !== undefined).map((key) => [key, req.body[key]]));
+  if (update.enabled === true) update.nextRunAt = new Date();
+  const monitor = await ResearchMonitor.findOneAndUpdate({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId }, { $set: update }, { new: true, runValidators: true });
+  if (!monitor) return res.status(404).json({ success: false, error: "Monitor not found." });
+  return res.json({ success: true, monitor });
+});
+
+router.post("/research/monitors/:monitorId/run", async (req, res) => {
+  const monitor = await ResearchMonitor.findOne({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId });
+  if (!monitor) return res.status(404).json({ success: false, error: "Monitor not found." });
+  if (monitor.lastRunStatus === "running") return res.status(409).json({ success: false, error: "This monitor is already running." });
+  setImmediate(() => runResearchMonitor(monitor._id).catch(() => {}));
+  return res.status(202).json({ success: true, monitor: { ...monitor.toObject(), lastRunStatus: "running" } });
+});
+
+router.get("/research/signals", async (req, res) => {
+  const limit = Math.min(250, Math.max(1, Number(req.query.limit) || 100));
+  const filter = { workspaceId: req.auth.workspaceId };
+  if (req.query.monitorId) filter.monitorId = req.query.monitorId;
+  if (req.query.status) filter.status = req.query.status;
+  const signals = await IntentSignal.find(filter).sort({ score: -1, publishedAt: -1, discoveredAt: -1 }).limit(limit).lean();
+  return res.json({ success: true, signals });
+});
+
+router.patch("/research/signals/:signalId", async (req, res) => {
+  const status = String(req.body?.status || "");
+  if (!["new", "reviewing", "qualified", "dismissed"].includes(status)) return res.status(400).json({ success: false, error: "Choose a valid review status." });
+  const signal = await IntentSignal.findOneAndUpdate({ _id: req.params.signalId, workspaceId: req.auth.workspaceId }, { $set: { status } }, { new: true });
+  if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
+  return res.json({ success: true, signal });
+});
+
+router.post("/research/signals/:signalId/convert", async (req, res) => {
+  const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
+  if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
+  const name = String(req.body?.name || signal.authorName || "").trim();
+  if (!name) return res.status(400).json({ success: false, error: "Add the person's name before creating a CRM lead." });
+  const organizationName = String(req.body?.company || signal.organizationName || signal.organizationDomain || "").trim();
+  let organization = null;
+  if (organizationName) {
+    const identity = signal.organizationDomain ? { workspaceId: req.auth.workspaceId, domain: signal.organizationDomain } : { workspaceId: req.auth.workspaceId, name: organizationName };
+    organization = await Organization.findOneAndUpdate(identity, { $set: { workspaceId: req.auth.workspaceId, name: organizationName, domain: signal.organizationDomain || null, source: "public_web", website: signal.organizationDomain ? `https://${signal.organizationDomain}` : "", lastResearchVerifiedAt: new Date() }, $addToSet: { researchEvidence: { sourceType: signal.source, sourceUrl: signal.sourceUrl, field: "intent_signal", observedValue: signal.title, observedAt: new Date() } } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+  }
+  const parts = name.split(/\s+/);
+  const contact = await Contact.findOneAndUpdate(
+    { sourceProvider: "intent_monitor", providerContactId: String(signal._id) },
+    { $set: { name, firstName: parts[0] || "", lastName: parts.slice(1).join(" "), company: organizationName, organizationId: organization?._id || null, sourceProvider: "intent_monitor", providerContactId: String(signal._id), providerRecordId: signal.sourceId, sources: ["public_web", signal.source], status: "active", type: "lead", stage: "Needs Research", researchStatus: "needs_research", qualifyContact: true, tags: ["intent-signal", signal.source], website: signal.sourceUrl, notes: `Public intent signal: ${signal.title}\nSource: ${signal.sourceUrl}` } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+  signal.status = "converted";
+  await signal.save();
+  return res.status(201).json({ success: true, contact, organization });
 });
 
 router.post("/research/plan", async (req, res) => {

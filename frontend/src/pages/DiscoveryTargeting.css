@@ -86,6 +86,55 @@
   gap: 12px;
 }
 
+.intent-monitor-intro { color: #5f6f69; margin: 0 0 18px; max-width: 900px; }
+.intent-monitor-builder { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 14px; }
+.intent-monitor-builder label { display: grid; gap: 7px; }
+.intent-monitor-builder label > span { color: #354740; font-size: 13px; font-weight: 700; }
+.intent-monitor-builder input,
+.intent-monitor-builder textarea,
+.intent-monitor-builder select { background: #fff; border: 1px solid #cbd7d2; border-radius: 10px; color: #19352c; font: inherit; padding: 11px 12px; }
+.intent-monitor-builder textarea { min-height: 82px; resize: vertical; }
+.intent-monitor-builder .span-2 { grid-column: 1 / -1; }
+.intent-source-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.intent-source-chips span { background: #edf8f4; border: 1px solid #cce8dd; border-radius: 999px; color: #17684f; font-size: 12px; font-weight: 700; padding: 7px 10px; }
+.intent-monitor-list { display: grid; gap: 12px; margin-top: 20px; }
+.intent-monitor-list article { align-items: center; background: #f8fbfa; border: 1px solid #d9e4df; border-radius: 14px; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) 180px auto; padding: 16px; }
+.intent-monitor-list article > div:first-child strong,
+.intent-monitor-list article > div:first-child p,
+.intent-monitor-list article > div:first-child small { display: block; }
+.intent-monitor-list article p { color: #63726d; margin: 6px 0; }
+.intent-monitor-list article small { color: #73817c; }
+.intent-monitor-state { color: #267557; display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; margin-bottom: 5px; text-transform: uppercase; }
+.intent-monitor-state.is-failed { color: #ae3f3f; }
+.intent-monitor-state.is-running { color: #a56b12; }
+.intent-monitor-totals strong,
+.intent-monitor-totals span,
+.intent-monitor-totals small { display: block; }
+.intent-monitor-totals strong { font-size: 25px; }
+.intent-monitor-actions { display: flex; gap: 8px; }
+.intent-signal-list { display: grid; gap: 12px; }
+.intent-signal-list article { align-items: start; border: 1px solid #d8e2de; border-left: 4px solid #29a078; border-radius: 13px; display: grid; gap: 15px; grid-template-columns: 72px minmax(0, 1fr) 190px auto; padding: 15px; }
+.intent-signal-list article.is-dismissed { filter: grayscale(.7); opacity: .55; }
+.intent-signal-list article.is-converted { border-left-color: #5c6fc7; }
+.intent-signal-score { background: #edf8f4; border-radius: 10px; padding: 10px 5px; text-align: center; }
+.intent-signal-score strong,
+.intent-signal-score span { display: block; }
+.intent-signal-score strong { color: #17684f; font-size: 25px; }
+.intent-signal-score span { color: #63726d; font-size: 10px; text-transform: uppercase; }
+.intent-signal-main > div { display: flex; gap: 10px; justify-content: space-between; }
+.intent-signal-main > div span { color: #17684f; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.intent-signal-main > div small,
+.intent-signal-main > small { color: #75827d; }
+.intent-signal-main > strong { display: block; margin-top: 6px; }
+.intent-signal-main p { color: #53655e; display: -webkit-box; margin: 7px 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.intent-signal-main a { color: #17684f; display: inline-block; font-size: 13px; font-weight: 700; margin-top: 8px; }
+.intent-signal-person strong,
+.intent-signal-person span,
+.intent-signal-person small { display: block; }
+.intent-signal-person span,
+.intent-signal-person small { color: #6a7772; margin-top: 5px; }
+.intent-signal-actions { display: grid; gap: 7px; }
+
 .research-history-item {
   align-items: center;
   background: #fff;
@@ -359,6 +408,12 @@
   text-transform: capitalize;
 }
 @media (max-width: 760px) {
+  .intent-monitor-builder { grid-template-columns: 1fr; }
+  .intent-monitor-builder .span-2 { grid-column: auto; }
+  .intent-monitor-list article,
+  .intent-signal-list article { grid-template-columns: 1fr; }
+  .intent-monitor-actions,
+  .intent-signal-actions { display: flex; flex-wrap: wrap; }
   .people-preview-batch > header,
   .people-preview-person {
     grid-template-columns: 1fr;

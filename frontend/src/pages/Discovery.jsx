@@ -5,6 +5,7 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
 import {
   createAudienceDefinition,
+  createResearchMonitor,
   createMarketResearchPlan,
   deleteContact,
   discoverAudienceOrganizations,
@@ -15,9 +16,15 @@ import {
   fetchMarketResearchHistory,
   fetchPeopleResearchPreviews,
   fetchMarketResearchSources,
+  fetchResearchMonitors,
+  fetchIntentSignals,
   fetchMarketResearchJob,
   saveDiscoveryTemplates,
   startExternalMarketResearch,
+  runResearchMonitor,
+  updateResearchMonitor,
+  updateIntentSignal,
+  convertIntentSignal,
   updateContact,
 } from "../services/api.js";
 import "./Discovery.css";
@@ -97,6 +104,19 @@ export default function Discovery() {
   const [peoplePreviews, setPeoplePreviews] = useState([]);
   const [peoplePreviewsLoading, setPeoplePreviewsLoading] = useState(false);
   const [openPeoplePreviewId, setOpenPeoplePreviewId] = useState("");
+  const [monitors, setMonitors] = useState([]);
+  const [intentSignals, setIntentSignals] = useState([]);
+  const [monitorSaving, setMonitorSaving] = useState(false);
+  const [monitorRunningId, setMonitorRunningId] = useState("");
+  const [signalBusyId, setSignalBusyId] = useState("");
+  const [monitorDraft, setMonitorDraft] = useState({
+    name: "Nationwide event buyer intent",
+    query: "People in the United States discussing leaving a W-2 job, starting or buying a business, building wealth through real estate, scaling a company, needing business systems, coaching, or an entrepreneurial community",
+    keywords: "leave my W-2, quit my job, start a business, buy a business, real estate investor, multifamily, build wealth, business systems, entrepreneur, business coach, scale my business",
+    negativeKeywords: "student assignment, fictional, video game",
+    feedUrls: "",
+    intervalMinutes: 60,
+  });
 
   useEffect(() => {
     const question = String(searchParams.get("question") || "").trim();
@@ -132,6 +152,16 @@ export default function Discovery() {
     }
   };
 
+  const loadAutomaticResearch = async () => {
+    try {
+      const [monitorResponse, signalResponse] = await Promise.all([fetchResearchMonitors(), fetchIntentSignals({ limit: 150 })]);
+      setMonitors(monitorResponse.monitors || []);
+      setIntentSignals(signalResponse.signals || []);
+    } catch {
+      setNotice("Unable to load automatic intent monitoring.");
+    }
+  };
+
   useEffect(() => {
     loadProspects().catch(() => setNotice("Unable to load prospects."));
     fetchCampaigns().then((items) => setCampaigns(Array.isArray(items) ? items : [])).catch(() => {});
@@ -139,12 +169,70 @@ export default function Discovery() {
     fetchMarketResearchSources().then((data) => setResearchSource(data.sources?.[0] || null)).catch(() => {});
     loadResearchHistory();
     loadPeoplePreviews();
+    loadAutomaticResearch();
     const refreshHistory = window.setInterval(() => {
       loadResearchHistory();
       loadPeoplePreviews();
+      loadAutomaticResearch();
     }, 15000);
     return () => window.clearInterval(refreshHistory);
   }, []);
+
+  const createMonitor = async () => {
+    try {
+      setMonitorSaving(true);
+      await createResearchMonitor({
+        ...monitorDraft,
+        keywords: splitValues(monitorDraft.keywords),
+        negativeKeywords: splitValues(monitorDraft.negativeKeywords),
+        locations: ["United States"],
+        feedUrls: splitValues(monitorDraft.feedUrls),
+        sources: ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"],
+        maxResultsPerSource: 35,
+      });
+      setNotice("Nationwide monitoring started. Jarvis will keep checking public sources in the background.");
+      await loadAutomaticResearch();
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Unable to start automatic monitoring.");
+    } finally { setMonitorSaving(false); }
+  };
+
+  const runMonitorNow = async (monitorId) => {
+    try {
+      setMonitorRunningId(monitorId);
+      await runResearchMonitor(monitorId);
+      setNotice("Monitoring run started. Results will appear here automatically.");
+      window.setTimeout(loadAutomaticResearch, 5000);
+    } catch (error) { setNotice(error.response?.data?.error || "Unable to run this monitor."); }
+    finally { setMonitorRunningId(""); }
+  };
+
+  const toggleMonitor = async (monitor) => {
+    await updateResearchMonitor(monitor._id, { enabled: !monitor.enabled });
+    await loadAutomaticResearch();
+  };
+
+  const reviewSignal = async (signal, status) => {
+    try {
+      setSignalBusyId(signal._id);
+      await updateIntentSignal(signal._id, status);
+      await loadAutomaticResearch();
+    } finally { setSignalBusyId(""); }
+  };
+
+  const addSignalToCrm = async (signal) => {
+    let name = signal.authorName || "";
+    if (!name) name = window.prompt("Enter this person's name before adding the lead to the CRM:", "") || "";
+    if (!name.trim()) return;
+    try {
+      setSignalBusyId(signal._id);
+      await convertIntentSignal(signal._id, { name, company: signal.organizationName || signal.organizationDomain || "" });
+      setNotice(`${name} was added to the CRM as a needs-research lead. No outreach was sent.`);
+      await loadAutomaticResearch();
+      await loadProspects();
+    } catch (error) { setNotice(error.response?.data?.error || "Unable to add this signal to the CRM."); }
+    finally { setSignalBusyId(""); }
+  };
 
   useEffect(() => {
     if (window.location.hash !== "#people-research-previews") return;
@@ -349,6 +437,35 @@ export default function Discovery() {
         <p>{marketPlan.summary}</p>
         <div><article><strong>Ranking</strong><span>{(marketPlan.rankingDimensions || []).join(" · ")}</span></article><article><strong>Needs attention</strong><span>{[...(marketPlan.assumptions || []), ...(marketPlan.unresolved || [])].join(" ") || "No unresolved criteria."}</span></article></div>
       </section> : null}
+    </DashboardCard>
+
+    <DashboardCard title="Automatic nationwide intent monitoring" action={<Button variant="outline" onClick={loadAutomaticResearch}>Refresh</Button>}>
+      <p className="intent-monitor-intro">Jarvis checks public conversations, news, forums, feeds, and open-web results on the backend. Chrome does not need to stay open. Matches are evidence-backed and stay in review until you choose what to do.</p>
+      <div className="intent-monitor-builder">
+        <label><span>Monitor name</span><input value={monitorDraft.name} onChange={(event) => setMonitorDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+        <label className="span-2"><span>Who or what should Jarvis listen for?</span><textarea value={monitorDraft.query} onChange={(event) => setMonitorDraft((current) => ({ ...current, query: event.target.value }))} /></label>
+        <label className="span-2"><span>Intent phrases and keywords</span><textarea value={monitorDraft.keywords} onChange={(event) => setMonitorDraft((current) => ({ ...current, keywords: event.target.value }))} /></label>
+        <label><span>Ignore these terms</span><input value={monitorDraft.negativeKeywords} onChange={(event) => setMonitorDraft((current) => ({ ...current, negativeKeywords: event.target.value }))} /></label>
+        <label><span>Check every</span><select value={monitorDraft.intervalMinutes} onChange={(event) => setMonitorDraft((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}><option value={15}>15 minutes</option><option value={30}>30 minutes</option><option value={60}>1 hour</option><option value={360}>6 hours</option><option value={1440}>Daily</option></select></label>
+        <label className="span-2"><span>Additional public RSS, Atom, or Discourse feed URLs (optional)</span><textarea value={monitorDraft.feedUrls} onChange={(event) => setMonitorDraft((current) => ({ ...current, feedUrls: event.target.value }))} placeholder="One public feed URL per line. Jarvis checks these automatically too." /></label>
+      </div>
+      <div className="intent-source-chips"><span>Bing open web</span><span>Bing News</span><span>GDELT news</span><span>SEC Form D filings</span><span>Bluesky</span><span>Hacker News</span><span>Stack Exchange</span><span>Reddit public feeds</span><span>DuckDuckGo discovery</span><span>Public RSS/Discourse feeds</span></div>
+      <Button loading={monitorSaving} disabled={!monitorDraft.query.trim()} onClick={createMonitor}>Start automatic monitoring</Button>
+      {monitors.length ? <div className="intent-monitor-list">{monitors.map((monitor) => <article key={monitor._id}>
+        <div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? monitor.lastRunStatus : "paused"}</span><strong>{monitor.name}</strong><p>{monitor.query}</p><small>{(monitor.sources || []).map((source) => source.replaceAll("_", " ")).join(" · ")}</small></div>
+        <div className="intent-monitor-totals"><strong>{monitor.totals?.signalsFound || 0}</strong><span>signals found</span><small>{monitor.lastRunMessage || "Waiting for first run"}</small></div>
+        <div className="intent-monitor-actions"><Button size="sm" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Run now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button></div>
+      </article>)}</div> : null}
+    </DashboardCard>
+
+    <DashboardCard title="Live intent review" action={<span className="label-pill">{intentSignals.filter((signal) => signal.status === "new").length} new</span>}>
+      <p className="intent-monitor-intro">These are public signals, not automatically approved contacts. Review the evidence, qualify useful matches, dismiss noise, or add one person at a time to the CRM.</p>
+      {intentSignals.length ? <div className="intent-signal-list">{intentSignals.map((signal) => <article key={signal._id} className={`is-${signal.status}`}>
+        <div className="intent-signal-score"><strong>{signal.score}</strong><span>intent score</span></div>
+        <div className="intent-signal-main"><div><span>{signal.source.replaceAll("_", " ")}</span><small>{signal.publishedAt ? new Date(signal.publishedAt).toLocaleString() : "Recently discovered"}</small></div><strong>{signal.title || "Public intent signal"}</strong><p>{signal.excerpt || "Open the source to review the public context."}</p><small>{(signal.scoreReasons || []).join(" · ")}</small><a href={signal.sourceUrl} target="_blank" rel="noreferrer">Open public evidence</a></div>
+        <div className="intent-signal-person"><strong>{signal.authorName || signal.people?.[0]?.name || "Person needs identification"}</strong><span>{signal.organizationName || signal.organizationDomain || "Organization needs research"}</span>{signal.people?.length ? <small>{signal.people.length} public team member{signal.people.length === 1 ? "" : "s"} found</small> : null}{signal.publishedEmails?.length ? <small>{signal.publishedEmails.length} published email{signal.publishedEmails.length === 1 ? "" : "s"} · unverified</small> : null}<small>{signal.status.replaceAll("_", " ")}</small></div>
+        <div className="intent-signal-actions"><Button size="sm" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => addSignalToCrm(signal)}>{signal.status === "converted" ? "In CRM" : "Add to CRM"}</Button><Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>Qualify</Button><Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "dismissed")}>Dismiss</Button></div>
+      </article>)}</div> : <div className="table-state table-state--empty">Start a monitor above. New public intent signals will appear here automatically after the first source run.</div>}
     </DashboardCard>
 
     <DashboardCard title="Saved research and prospect lists" action={<Button variant="outline" loading={historyLoading} onClick={loadResearchHistory}>Refresh</Button>}>

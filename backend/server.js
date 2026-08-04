@@ -32,6 +32,7 @@ const mcpRouter = require("./routes/mcp");
 const oauthRouter = require("./routes/oauth");
 const gptActionsRouter = require("./routes/gptActions");
 const { requireAuth } = require("./middleware/auth");
+const { startResearchMonitorRunner } = require("./services/researchMonitorService");
 
 const app = express();
 
@@ -138,6 +139,7 @@ connectDatabase(mongoUri)
 
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
+      startResearchMonitorRunner();
     });
 
     server.on("error", (error) => {

@@ -301,6 +301,27 @@ export const fetchMarketResearchResults = (audienceId) =>
 export const fetchMarketResearchSources = () =>
   api.get("/audience/research/sources").then((res) => res.data);
 
+export const fetchResearchMonitors = () =>
+  api.get("/audience/research/monitors").then((res) => res.data);
+
+export const createResearchMonitor = (payload) =>
+  api.post("/audience/research/monitors", payload).then((res) => res.data);
+
+export const updateResearchMonitor = (monitorId, payload) =>
+  api.patch(`/audience/research/monitors/${monitorId}`, payload).then((res) => res.data);
+
+export const runResearchMonitor = (monitorId) =>
+  api.post(`/audience/research/monitors/${monitorId}/run`).then((res) => res.data);
+
+export const fetchIntentSignals = (params = {}) =>
+  api.get("/audience/research/signals", { params }).then((res) => res.data);
+
+export const updateIntentSignal = (signalId, status) =>
+  api.patch(`/audience/research/signals/${signalId}`, { status }).then((res) => res.data);
+
+export const convertIntentSignal = (signalId, payload = {}) =>
+  api.post(`/audience/research/signals/${signalId}/convert`, payload).then((res) => res.data);
+
 export const fetchMarketResearchHistory = (limit = 30) =>
   api.get("/audience/research/history", { params: { limit } }).then((res) => res.data);
 
