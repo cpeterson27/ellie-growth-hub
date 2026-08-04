@@ -90,6 +90,18 @@ function fullContactName(contact = {}) {
     .join(" ");
 }
 
+function isIntentContact(contact = {}) {
+  return contact.sourceProvider === "intent_monitor";
+}
+
+function contactDisplayName(contact = {}) {
+  const name = String(contact.name || "").trim();
+  if (isIntentContact(contact) && /(?:reddit\.com\/user\/|^\/?u\/|https?:\/\/)/i.test(name)) {
+    return "Identity research needed";
+  }
+  return name || "Identity research needed";
+}
+
 function isUnsubscribed(contact = {}) {
   return (
     contact.status === "unsubscribed" ||
@@ -3454,19 +3466,19 @@ export default function Contacts() {
       <Modal
         isOpen={Boolean(detailContact)}
         onClose={() => setDetailContact(null)}
-        title={detailContact?.name || "Contact"}
+        title={detailContact ? contactDisplayName(detailContact) : "Contact"}
       >
         {detailContact ? (
           <div className="contact-detail">
             <div className="contact-detail__summary">
               <div>
                 <span>
-                  {(detailContact.name || "?").slice(0, 1).toUpperCase()}
+                  {contactDisplayName(detailContact).slice(0, 1).toUpperCase()}
                 </span>
                 <p>
-                  <strong>{detailContact.name}</strong>
+                  <strong>{contactDisplayName(detailContact)}</strong>
                   <small>
-                    {detailContact.title || "Contact"}
+                    {isIntentContact(detailContact) ? "Public intent lead · research not finished" : detailContact.title || "Contact"}
                     {detailContact.company
                       ? ` at ${detailContact.company}`
                       : ""}
@@ -3487,6 +3499,34 @@ export default function Contacts() {
                 Edit contact
               </Button>
             </div>
+            {isIntentContact(detailContact) ? (
+              <section className="intent-contact-action-center">
+                <header>
+                  <span>Deal to Close follow-up</span>
+                  <h3>This is a saved public signal—not a complete person yet</h3>
+                  <p>Growth Operator kept the original post as evidence, but it will not treat a Reddit username as a real name or invent an email. Complete these steps in order.</p>
+                </header>
+                <ol>
+                  <li className="is-done"><b>1</b><div><strong>Buyer intent reviewed</strong><span>You already said this signal may be worth following up.</span></div></li>
+                  <li><b>2</b><div><strong>Research the real identity</strong><span>Jarvis looks for a name, company, role, and published business contact using supporting public sources.</span></div></li>
+                  <li><b>3</b><div><strong>Review the generated email</strong><span>The Deal to Close draft includes both Eventbrite and Meetup links and remains unsent.</span></div></li>
+                  <li><b>4</b><div><strong>Verify the contact method</strong><span>Only a verified email can move the reviewed draft into Outreach. You still approve every step.</span></div></li>
+                </ol>
+                <div className="intent-contact-action-center__actions">
+                  <Button onClick={() => {
+                    const prompt = `Research this prospective Deal to Close Bootcamp attendee using public evidence: ${detailContact.website || detailContact.notes || "saved public intent signal"}. Find the real adult person's name, business or company, role, and a publicly listed business email only when a source directly supports each connection. Do not guess identity or mark an email verified. Return evidence for my review.`;
+                    setDetailContact(null);
+                    navigate(`/jarvis?prompt=${encodeURIComponent(prompt)}`);
+                  }}>Research identity with Jarvis</Button>
+                  <Button variant="outline" onClick={() => {
+                    setDetailContact(null);
+                    navigate(`/discovery?tab=leads&signalId=${encodeURIComponent(detailContact.providerContactId || "")}`);
+                  }}>Open intent lead & email</Button>
+                  {detailContact.website ? <a href={detailContact.website} target="_blank" rel="noreferrer">Open original public evidence ↗</a> : null}
+                </div>
+                <p className="intent-contact-action-center__safety"><strong>No outreach has been sent.</strong> Missing fields are intentional until reliable public evidence is found.</p>
+              </section>
+            ) : null}
             {isUnsubscribed(detailContact) ? (
               <section className="contact-unsubscribe-alert" role="alert">
                 <span>Do not email</span>
@@ -3504,7 +3544,7 @@ export default function Contacts() {
               const rows = fields.map(([field, label]) => [
                 field,
                 label,
-                detailValue(detailContact[field]),
+                field === "name" ? contactDisplayName(detailContact) : detailValue(detailContact[field]),
               ]);
               return (
                 <section className="contact-detail__group" key={group}>

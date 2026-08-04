@@ -91,6 +91,30 @@ connectDatabase(mongoUri)
       );
     }
 
+    // Older intent conversions sometimes stored a Reddit username and URL as a
+    // person's name. Keep the source evidence, but do not present that account
+    // as a verified identity in the CRM.
+    const legacyIntentContacts = await Contact.find({ sourceProvider: "intent_monitor" });
+    let repairedIntentContacts = 0;
+    for (const contact of legacyIntentContacts) {
+      const recordedName = String(contact.name || "").trim();
+      if (!/(?:reddit\.com\/user\/|^\/?u\/|https?:\/\/)/i.test(recordedName)) continue;
+      const evidenceNote = `Original public account value: ${recordedName}`;
+      contact.name = "Identity research needed";
+      contact.firstName = "";
+      contact.lastName = "";
+      contact.stage = "Needs Research";
+      contact.researchStatus = "needs_research";
+      if (!String(contact.notes || "").includes(evidenceNote)) {
+        contact.notes = [contact.notes, evidenceNote].filter(Boolean).join("\n");
+      }
+      await contact.save();
+      repairedIntentContacts += 1;
+    }
+    if (repairedIntentContacts) {
+      console.log(`Repaired ${repairedIntentContacts} legacy intent contact name(s).`);
+    }
+
     app.use("/api/auth", authRouter);
     app.use("/", oauthRouter);
     app.use("/", gptActionsRouter);

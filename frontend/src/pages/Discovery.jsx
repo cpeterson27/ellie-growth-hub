@@ -137,7 +137,7 @@ export default function Discovery() {
   const [monitorSaving, setMonitorSaving] = useState(false);
   const [monitorRunningId, setMonitorRunningId] = useState("");
   const [signalBusyId, setSignalBusyId] = useState("");
-  const [activeTab, setActiveTab] = useState("company");
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "company");
   const [monitorPresets, setMonitorPresets] = useState([]);
   const [monitorActivity, setMonitorActivity] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -166,6 +166,8 @@ export default function Discovery() {
   useEffect(() => {
     const question = String(searchParams.get("question") || "").trim();
     if (question) setMarketQuestion(question);
+    const tab = String(searchParams.get("tab") || "").trim();
+    if (["company", "monitoring", "leads", "people", "saved"].includes(tab)) setActiveTab(tab);
   }, [searchParams]);
 
   useEffect(() => {
@@ -209,6 +211,12 @@ export default function Discovery() {
       const [monitorResponse, signalResponse, activityResponse, notificationResponse] = await Promise.all([fetchResearchMonitors(), fetchIntentSignals({ limit: 150 }), fetchResearchActivity({ limit: 100 }), fetchResearchNotifications()]);
       setMonitors(monitorResponse.monitors || []);
       setIntentSignals(signalResponse.signals || []);
+      const focusedSignalId = String(searchParams.get("signalId") || "");
+      if (focusedSignalId) {
+        const focusedSignal = (signalResponse.signals || []).find((item) => String(item._id) === focusedSignalId);
+        setActiveTab("leads");
+        setLeadView(focusedSignal?.status === "qualified" ? "qualified" : "all");
+      }
       setMonitorActivity(activityResponse.activity || []);
       setNotifications(notificationResponse.notifications || []);
     } catch {
@@ -309,8 +317,12 @@ export default function Discovery() {
     try {
       setSignalBusyId(signal._id);
       await updateIntentSignal(signal._id, status);
-      setNotice(status === "qualified" ? "Saved as a possible lead. Nothing was added to the CRM and no outreach was sent. Open “Saved possible leads” when you are ready to research or add it." : "Removed from your active review queue as not a fit.");
+      setNotice(status === "qualified" ? "Saved as a possible lead. Next, review the personalized Deal to Close email draft. Nothing was sent or added to the CRM." : "Removed from your active review queue as not a fit.");
       await loadAutomaticResearch();
+      if (status === "qualified") {
+        setLeadView("qualified");
+        openEmailDraft({ ...signal, status: "qualified" });
+      }
     } finally { setSignalBusyId(""); }
   };
 
@@ -334,6 +346,12 @@ export default function Discovery() {
     setDraftSignal(signal);
     setDraftEditor(existing ? { ...existing } : null);
     setDraftCampaignId(String(existing?.campaignId || eligibleCampaigns[0]?._id || ""));
+  };
+
+  const researchSignalIdentity = (signal) => {
+    const account = publicAccount(signal);
+    const prompt = `Research this prospective Deal to Close Bootcamp attendee using public evidence: ${account.label} from ${signal.sourceUrl}. Find the real adult person's name, business or company, role, and a publicly listed business email only when a source directly supports each connection. Do not guess, infer identity from a username, or mark an email verified. Return the evidence for my review before adding anything to the CRM.`;
+    navigate(`/jarvis?prompt=${encodeURIComponent(prompt)}`);
   };
 
   const generateEmailDraft = async () => {
@@ -613,7 +631,7 @@ export default function Discovery() {
         <div className="signal-priority"><span>Priority</span><strong>{signal.score >= 75 ? "High" : signal.score >= 55 ? "Medium" : "Review"}</strong><small>{signal.score}/100 match</small></div>
         <div className="intent-signal-main"><div><span>{signal.source.replaceAll("_", " ")}</span><small>{signal.publishedAt ? new Date(signal.publishedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "New"}</small></div><h3>{displayText(signal.title) || "Public buyer-intent signal"}</h3><p>{displayText(signal.excerpt) || "Open the original source to review the context."}</p><div className="signal-why"><strong>Why it scored {signal.score}/100</strong><span>{(signal.scoreReasons || []).slice(0, 3).join(" · ") || "A specific current need matched your audience rules."}</span></div><a href={signal.sourceUrl} target="_blank" rel="noreferrer">View original public post ↗</a></div>
         <aside className="signal-contact"><span>Source account</span>{account.url ? <a href={account.url} target="_blank" rel="noreferrer">{account.label} ↗</a> : <strong>{account.label}</strong>}<small>Public username from the post—not a verified real name. Open it only to review public context.</small>{signal.organizationName || signal.organizationDomain ? <><span>Organization</span><strong>{signal.identityResolution?.status === "supported" ? (signal.organizationName || signal.organizationDomain) : "Not established"}</strong></> : null}{signal.publishedEmails?.length ? <div className="published-email-note">Published email found · still unverified</div> : null}</aside>
-        <div className="intent-signal-actions">{["qualified", "converted"].includes(signal.status) ? <><Button size="sm" onClick={() => openEmailDraft(signal)}>{signal.emailDrafts?.length ? "Review email draft" : "Create personalized draft"}</Button>{signal.status === "converted" ? <Button size="sm" variant="outline" disabled>Added to CRM</Button> : <Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => addSignalToCrm(signal)}>Research and add to CRM</Button>}<small>Drafts always include Eventbrite and Meetup. Nothing sends automatically.</small></> : <><Button size="sm" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>Save as possible lead</Button><small>Moves this to Saved possible leads. Nothing else happens.</small></>}<Button size="sm" variant="outline" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => reviewSignal(signal, "dismissed")}>Not a buyer</Button></div>
+        <div className="intent-signal-actions">{["qualified", "converted"].includes(signal.status) ? <><div className="intent-next-step"><span>Next step</span><strong>{!signal.emailDrafts?.length ? "Create the Deal to Close email" : !signal.crmContact ? "Find the real person and contact method" : signal.crmContact.emailStatus !== "verified" ? "Verify a contact email" : "Review and move the draft to Outreach"}</strong><small>Nothing is sent automatically.</small></div><div className="intent-action-row"><Button size="sm" onClick={() => openEmailDraft(signal)}>{signal.emailDrafts?.length ? "Review generated email" : "Generate Deal to Close email"}</Button><Button size="sm" variant="outline" onClick={() => researchSignalIdentity(signal)}>Research identity & email</Button>{signal.status === "converted" ? <Button size="sm" variant="outline" onClick={() => navigate(`/contacts?tab=attention&search=${encodeURIComponent(signal.crmContact?.name || "Identity research needed")}`)}>Open contact next steps</Button> : <Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => addSignalToCrm(signal)}>Add researched person to CRM</Button>}</div><ol className="intent-progress"><li className="is-done">Intent approved</li><li className={signal.emailDrafts?.length ? "is-done" : ""}>Email drafted</li><li className={signal.crmContact ? "is-done" : ""}>Identity added</li><li className={signal.crmContact?.emailStatus === "verified" ? "is-done" : ""}>Email verified</li><li className={signal.emailDrafts?.some((draft) => draft.status === "transferred") ? "is-done" : ""}>Ready in Outreach</li></ol><small>Every draft includes Eventbrite and Meetup. You review it before Outreach, and Outreach still does not send automatically.</small></> : <><Button size="sm" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>Yes—prepare follow-up</Button><small>Saves the lead and opens a personalized unsent email draft as the next step.</small></>}<Button size="sm" variant="outline" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => reviewSignal(signal, "dismissed")}>Not a buyer</Button></div>
       </article>; })}</div> : <div className="friendly-empty"><strong>{leadView === "new" ? "You’re caught up" : "No leads in this view"}</strong><p>{leadView === "new" ? "Growth Operator will place the next plausible adult buyer here after the automatic filters run." : "Change the view above or wait for the next monitoring check."}</p></div>}
     </DashboardCard></> : null}
 

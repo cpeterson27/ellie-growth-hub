@@ -16,6 +16,8 @@ Monitoring uses database-backed worker leases. A deployment restart safely relea
 
 Every signal remains an individual review decision. Growth Operator does not infer a username's company affiliation without supporting public evidence, bulk-import leads, send outreach, or call a published email verified.
 
+When a user approves a Live Lead, Growth Operator immediately presents an editable, unsent Deal to Close email draft containing both Eventbrite and Meetup registration links. The lead then follows a visible identity-research, CRM, verified-email, and Outreach checklist. Intent-created contacts open into that guided action center rather than a generic incomplete-contact record.
+
 ## What the product does
 
 Ellie AI organizes the work surrounding an event:

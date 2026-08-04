@@ -17,6 +17,9 @@
 - CRM import review now lives under People Research, where staged research imports originate. Source retry notices are grouped and translated into non-actionable informational messages, and the notification panel has a persistent close control.
 - Saved possible leads can generate editable, personalized event-email drafts directly from public evidence. Generation requires and preserves both the campaign's Eventbrite and Meetup links. Drafts remain unsent; transferring a reviewed draft into Outreach requires a researched CRM contact and verified email, and the transferred message still enters as pending review.
 - Public usernames cannot be used as CRM names. A real researched name is required before an intent signal becomes a contact.
+- Approving an intent lead now opens the unsent Deal to Close draft as the immediate next action. Each saved lead shows a five-step progress path: intent approved, email drafted, identity added, email verified, and ready in Outreach.
+- Intent-created CRM records use a guided action center instead of treating missing fields as a generic data-quality form. It links back to the original evidence and generated draft, starts evidence-bounded Jarvis identity research, and explains that no outreach has been sent.
+- Legacy intent contacts that stored a Reddit username or URL as a person's name are safely relabeled as “Identity research needed”; the original account value is retained in notes as evidence.
 
 ## Product decisions
 

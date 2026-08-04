@@ -150,7 +150,16 @@ router.get("/research/signals", async (req, res) => {
   const drafts = await IntentEmailDraft.find({ workspaceId: req.auth.workspaceId, signalId: { $in: acceptedSignals.map((signal) => signal._id) } }).sort({ updatedAt: -1 }).lean();
   const draftsBySignal = new Map();
   drafts.forEach((draft) => { const key = String(draft.signalId); draftsBySignal.set(key, [...(draftsBySignal.get(key) || []), draft]); });
-  return res.json({ success: true, signals: acceptedSignals.map((signal) => ({ ...signal, emailDrafts: draftsBySignal.get(String(signal._id)) || [] })), automaticallyRejected: rejected.length });
+  const contacts = await Contact.find({
+    sourceProvider: "intent_monitor",
+    providerContactId: { $in: acceptedSignals.map((signal) => String(signal._id)) },
+  }).select("name email emailStatus company title researchStatus stage providerContactId website").lean();
+  const contactsBySignal = new Map(contacts.map((contact) => [String(contact.providerContactId), contact]));
+  return res.json({ success: true, signals: acceptedSignals.map((signal) => ({
+    ...signal,
+    emailDrafts: draftsBySignal.get(String(signal._id)) || [],
+    crmContact: contactsBySignal.get(String(signal._id)) || null,
+  })), automaticallyRejected: rejected.length });
 });
 
 router.patch("/research/signals/:signalId", async (req, res) => {
