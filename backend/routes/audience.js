@@ -19,7 +19,7 @@ const { previewOrganizationImport, importOrganizations } = require("../services/
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
-const { audienceEligibility, requestResearchMonitorRun } = require("../services/researchMonitorService");
+const { buyerIntentAssessment, requestResearchMonitorRun, scoreSignal } = require("../services/researchMonitorService");
 
 const AUGUST_22_PRESET = {
   id: "august-22-nationwide-online-event",
@@ -135,9 +135,14 @@ router.get("/research/signals", async (req, res) => {
   if (req.query.monitorId) filter.monitorId = req.query.monitorId;
   if (req.query.status) filter.status = req.query.status;
   const signals = await IntentSignal.find(filter).sort({ score: -1, publishedAt: -1, discoveredAt: -1 }).limit(limit).lean();
-  const rejected = signals.map((signal) => ({ signal, eligibility: audienceEligibility(signal) })).filter((item) => !item.eligibility.eligible);
+  const monitorIds = [...new Set(signals.map((signal) => String(signal.monitorId || "")).filter(Boolean))];
+  const monitorMap = new Map((await ResearchMonitor.find({ _id: { $in: monitorIds } }).lean()).map((monitor) => [String(monitor._id), monitor]));
+  const assessed = signals.map((signal) => ({ signal, eligibility: buyerIntentAssessment(signal), ranking: monitorMap.has(String(signal.monitorId)) ? scoreSignal(signal, monitorMap.get(String(signal.monitorId))) : null }));
+  const rejected = assessed.filter((item) => !item.eligibility.eligible || (item.ranking && item.ranking.score < 45));
   if (rejected.length) await Promise.all(rejected.map(({ signal, eligibility }) => IntentSignal.updateOne({ _id: signal._id }, { $set: { audienceEligible: false, audienceRejectionReason: eligibility.reason, status: "dismissed", classification: "irrelevant", classificationReason: eligibility.reason } })));
-  return res.json({ success: true, signals: signals.filter((signal) => audienceEligibility(signal).eligible && signal.audienceEligible !== false), automaticallyRejected: rejected.length });
+  const accepted = assessed.filter((item) => item.eligibility.eligible && (!item.ranking || item.ranking.score >= 45) && item.signal.audienceEligible !== false);
+  if (accepted.length) await Promise.all(accepted.filter((item) => item.ranking && (item.signal.score !== item.ranking.score || JSON.stringify(item.signal.scoreReasons || []) !== JSON.stringify(item.ranking.reasons))).map(({ signal, ranking }) => IntentSignal.updateOne({ _id: signal._id }, { $set: { score: ranking.score, scoreReasons: ranking.reasons } })));
+  return res.json({ success: true, signals: accepted.map(({ signal, ranking }) => ranking ? { ...signal, score: ranking.score, scoreReasons: ranking.reasons } : signal), automaticallyRejected: rejected.length });
 });
 
 router.patch("/research/signals/:signalId", async (req, res) => {

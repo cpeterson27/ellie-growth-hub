@@ -1,5 +1,13 @@
 .discovery-page { gap: 1rem; }
 .discovery-page .dashboard-card { overflow: hidden; }
+.notification-overlay { align-items: flex-start; background: #10251e55; display: flex; inset: 0; justify-content: flex-end; padding: 1rem; position: fixed; z-index: 1000; }
+.notification-overlay .notification-panel { background: #fff; border: 1px solid #d8d1c3; border-radius: 16px; box-shadow: 0 18px 60px #10251e35; display: grid; grid-template-rows: auto minmax(0,1fr); height: min(720px,calc(100vh - 2rem)); max-height: none; overflow: hidden; padding: 0; position: static; width: min(440px,calc(100vw - 2rem)); }
+.notification-panel > header { background: #fff; border-bottom: 1px solid #e6e1d7; display: flex; justify-content: space-between; padding: 1rem; position: sticky; top: 0; z-index: 2; }
+.notification-panel > header > div { display: grid; gap: .15rem; }
+.notification-panel > header span { color: var(--text-muted); font-size: .72rem; }
+.notification-panel > header button { background: #173f35; border-radius: 8px; color: #fff; padding: .5rem .65rem; }
+.notification-list { overflow: auto; padding: .55rem; }
+.notification-list > button { margin: .3rem 0; padding: .8rem; width: 100%; }
 
 .monitoring-guide,
 .lead-review-hero {
@@ -74,7 +82,7 @@
 .source-health-grid > article.is-blocked,
 .source-health-grid > article.is-rate_limited { border-left-color: #bc694d; }
 .source-health-list { display: grid; margin-top: .8rem; }
-.source-health-list > div { align-items: center; border-top: 1px solid #e4e8e6; display: grid; gap: .6rem; grid-template-columns: 10px minmax(105px,.7fr) 90px 85px minmax(170px,1fr) minmax(130px,1fr) auto; min-width: 0; padding: .65rem .2rem; }
+.source-health-list > div { align-items: center; border-top: 1px solid #e4e8e6; display: grid; gap: .6rem; grid-template-columns: 10px minmax(105px,.7fr) 150px 85px minmax(170px,1fr) auto; min-width: 0; padding: .65rem .2rem; }
 .source-health-list strong { font-size: .78rem; overflow-wrap: anywhere; text-transform: capitalize; }
 .source-health-list span,
 .source-health-list small { color: #69756f; font-size: .7rem; overflow-wrap: anywhere; }
@@ -119,9 +127,14 @@
 .signal-contact { border-left: 1px solid #e5e2da; display: grid; gap: .2rem; min-width: 0; padding-left: 1rem; }
 .signal-contact > span { color: #7a817e; font-size: .64rem; font-weight: 850; letter-spacing: .06em; margin-top: .35rem; text-transform: uppercase; }
 .signal-contact > strong { font-size: .84rem; overflow-wrap: anywhere; }
+.signal-contact > a { color: #176655; font-size: .86rem; font-weight: 850; overflow-wrap: anywhere; }
 .signal-contact > small { color: var(--text-muted); font-size: .72rem; line-height: 1.4; }
 .published-email-note { background: #fff3d9; border-radius: 7px; color: #76551d; font-size: .7rem; margin-top: .5rem; padding: .5rem; }
 .intent-signal-actions { align-self: stretch; display: flex; flex-direction: column; gap: .45rem; justify-content: center; }
+.intent-signal-actions > small { color: var(--text-muted); font-size: .68rem; line-height: 1.4; }
+.activity-help { color: var(--text-muted); font-size: .76rem; margin: .5rem 0 0; }
+.crm-review-explainer { background: #edf5f1; border-radius: 9px; color: #52645d; font-size: .78rem; line-height: 1.5; margin: 0 0 1rem; padding: .75rem .9rem; }
+.crm-review-explainer strong { color: #174c3e; }
 .friendly-empty { background: #f7faf8; border: 1px dashed #cfdad5; border-radius: 12px; padding: 2rem; text-align: center; }
 .friendly-empty p { color: var(--text-muted); margin: .3rem auto 0; }
 

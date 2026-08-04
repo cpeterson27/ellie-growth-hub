@@ -21,11 +21,14 @@ function scoreSignal(signal, monitor) {
   const negative = (monitor.negativeKeywords || []).map((value) => String(value).toLowerCase()).filter(Boolean);
   const matched = positive.filter((keyword) => content.includes(keyword));
   const excluded = negative.filter((keyword) => content.includes(keyword));
-  let score = 20 + Math.min(50, matched.length * 12);
-  const reasons = matched.map((keyword) => `Matched “${keyword}”`);
-  if (signal.authorName) { score += 5; reasons.push("Public author identity available"); }
-  if (signal.organizationDomain) { score += 10; reasons.push("Public organization domain available"); }
-  if (signal.publishedAt && Date.now() - new Date(signal.publishedAt).valueOf() < 7 * 86400000) { score += 10; reasons.push("Recent signal"); }
+  const buyer = buyerIntentAssessment(signal);
+  let score = buyer.eligible ? 40 : 0;
+  const reasons = buyer.reasons.slice();
+  if (buyer.eligible) score += Math.min(15, matched.length * 5);
+  if (/\b(?:urgent|as soon as possible|this month|right now|ready to|actively looking)\b/.test(content)) { score += 15; reasons.push("Shows current urgency"); }
+  if (/\b(?:my business|my company|our company|my portfolio|i own|founder|business owner)\b/.test(content)) { score += 15; reasons.push("Indicates an existing business or portfolio"); }
+  if (signal.organizationDomain && signal.identityResolution?.status === "supported") { score += 10; reasons.push("Organization connection has public support"); }
+  if (signal.publishedAt && Date.now() - new Date(signal.publishedAt).valueOf() < 7 * 86400000) { score += 5; reasons.push("Posted recently"); }
   if (excluded.length) { score = Math.max(0, score - 60); reasons.push(`Excluded terms: ${excluded.join(", ")}`); }
   return { score: Math.min(100, score), reasons, matched };
 }
@@ -34,7 +37,7 @@ function rulesClassify(signal) {
   const text = `${signal.title || ""} ${signal.excerpt || ""}`.toLowerCase();
   const patterns = [
     ["hypothetical_or_student", /assignment|homework|student|case study|hypothetical|for a class/],
-    ["promotion", /my course|our service|book a call|limited offer|use my code|subscribe|we help/],
+    ["promotion", /my course|our service|book a call|limited offer|use my code|subscribe|we help|free (?:guide|kit|webinar|download)|looking for feedback|i(?:'m| am) (?:building|launching|offering)|join (?:us|my)|sign up/],
     ["job_seeker", /looking for (a )?job|seeking employment|resume|hiring|open to work/],
     ["buyer_intent", /i need|looking for|recommend|how (do|can) i|ready to|want to|planning to|help me/],
   ];
@@ -53,6 +56,27 @@ function audienceEligibility(signal) {
   if (/\b(?:no money|broke|can't afford|cannot afford|zero budget|no budget)\b/.test(text)) return { eligible: false, reason: "The post explicitly indicates no current purchasing ability." };
   if (/\b(?:homework|assignment|school project|for (?:my|a) class|student survey|hypothetical)\b/.test(text)) return { eligible: false, reason: "Student or hypothetical research—not buyer intent." };
   return { eligible: true, reason: "" };
+}
+
+function buyerIntentAssessment(signal) {
+  const basic = audienceEligibility(signal);
+  if (!basic.eligible) return { ...basic, reasons: [basic.reason] };
+  const text = `${signal.title || ""} ${signal.excerpt || ""}`.toLowerCase();
+  const promotion = /\b(?:free (?:business )?(?:guide|kit|webinar|download|resource)|looking for feedback|feedback on (?:my|our)|i(?:'m| am) (?:building|launching|offering|creating)|my (?:course|program|service|newsletter)|we help|book a call|subscribe|sign up|join (?:us|my)|use my code|limited offer)\b/;
+  if (promotion.test(text)) return { eligible: false, reason: "Promotional or creator-feedback content—not a buyer request.", reasons: ["Appears to be promoting or testing an offer"] };
+  const informational = /\b(?:the best thing you could ever have|tips for (?:entrepreneurs|business owners)|entrepreneurs (?:should|must|need to)|here(?:'s| is) how|ultimate guide|top \d+|why every)\b/;
+  if (informational.test(text)) return { eligible: false, reason: "General advice or content—not a first-person buying need.", reasons: ["General informational content"] };
+  const intentPatterns = [
+    [/\b(?:i need|we need|need help|help me)\b/, "Explicitly asks for help"],
+    [/\b(?:i(?:'m| am)|we(?:'re| are)) (?:actively )?looking for (?:a |an )?(?:coach|mentor|consultant|program|community|system|solution|event|training|advice|help)\b/, "Actively looking for help or a solution"],
+    [/\b(?:how (?:do|can|should) i|what should i do)\b/, "Asks how to solve a current problem"],
+    [/\b(?:i want to|we want to|i(?:'m| am) ready to|we(?:'re| are) ready to|i plan to|planning to) (?:start|buy|scale|grow|leave|quit|invest|build|systemize)\b/, "States a current business or investment goal"],
+    [/\b(?:struggling (?:to|with)|stuck (?:in|with)|overwhelmed (?:by|with))\b/, "Describes a current business challenge"],
+    [/\b(?:can anyone recommend|recommendations? for|seeking (?:a |an )?(?:coach|mentor|consultant|program|community|system|solution))\b/, "Requests a recommendation"],
+  ];
+  const reasons = intentPatterns.filter(([pattern]) => pattern.test(text)).map(([, reason]) => reason);
+  if (!reasons.length) return { eligible: false, reason: "No clear first-person current need or buying request.", reasons: ["Keyword match without buyer behavior"] };
+  return { eligible: true, reason: "", reasons };
 }
 
 async function classifySignal(signal) {
@@ -112,10 +136,10 @@ async function runResearchMonitor(monitorId) {
     const websiteCandidates = [];
     for (const group of collected.groups) {
       for (const signal of group.signals) {
-        const ranking = scoreSignal(signal, monitor);
-        if (!ranking.matched.length || ranking.score < 30) { rejected += 1; continue; }
-        const eligibility = audienceEligibility(signal);
+        const eligibility = buyerIntentAssessment(signal);
         if (!eligibility.eligible) { rejected += 1; continue; }
+        const ranking = scoreSignal(signal, monitor);
+        if (!ranking.matched.length || ranking.score < 45) { rejected += 1; continue; }
         const classification = await classifySignal(signal);
         if (["hypothetical_or_student", "promotion", "job_seeker", "irrelevant"].includes(classification.classification)) { rejected += 1; continue; }
         const saved = await IntentSignal.findOneAndUpdate(
@@ -142,17 +166,17 @@ async function runResearchMonitor(monitorId) {
       } catch (_error) { await IntentSignal.updateOne({ _id: candidate.signalId }, { $set: { websiteResearchStatus: "failed" } }); }
     }
     await activity(monitor, runId, "websites_researched", `Researched ${websitesResearched} public websites.`, websitesResearched);
-    await activity(monitor, runId, "leads_prepared", `Prepared ${found} leads for individual review.`, found);
+    await activity(monitor, runId, "leads_prepared", `${found} buyer-intent signals passed the filters.`, found);
     for (const failure of collected.failures) {
       await activity(monitor, runId, "source_failure", `${failure.source} failed: ${failure.message}`, 1, failure);
-      await notify(monitor, "source_failure", "Monitoring source needs attention", `${failure.source}: ${failure.message}`);
     }
+    if (collected.failures.length) await notify(monitor, "source_failure", "Some sources are retrying automatically", `${collected.failures.length} optional source${collected.failures.length === 1 ? " was" : "s were"} unavailable. Monitoring still completed using the other sources.`);
     const nextRunAt = new Date(Date.now() + monitor.intervalMinutes * 60000);
     const priorHealth = new Map((monitor.sourceHealth || []).map((item) => [item.source, item.toObject ? item.toObject() : item]));
     for (const group of collected.groups) priorHealth.set(group.source, { source: group.source, enabled: true, lastSuccessfulCheck: new Date(), lastErrorAt: priorHealth.get(group.source)?.lastErrorAt || null, lastError: "", resultsCollected: (priorHealth.get(group.source)?.resultsCollected || 0) + group.signals.length, state: "healthy", nextScheduledAttempt: nextRunAt });
     for (const failure of collected.failures) priorHealth.set(failure.source, { source: failure.source, enabled: true, lastSuccessfulCheck: priorHealth.get(failure.source)?.lastSuccessfulCheck || null, lastErrorAt: new Date(), lastError: failure.message, resultsCollected: priorHealth.get(failure.source)?.resultsCollected || 0, state: failure.state, nextScheduledAttempt: nextRunAt });
     monitor.lastRunStatus = collected.failures.length ? "partial" : "completed";
-    monitor.lastRunMessage = `${found} leads prepared; ${rejected} weak matches rejected${collected.failures.length ? `; ${collected.failures.length} source failure(s)` : ""}.`;
+    monitor.lastRunMessage = `${found} buyer-intent signals passed the filters; ${rejected} weak matches rejected${collected.failures.length ? `; ${collected.failures.length} optional source retry(s)` : ""}.`;
     monitor.totals.runs += 1; monitor.totals.signalsFound += found; monitor.totals.signalsQualified += qualified;
     monitor.nextRunAt = nextRunAt; monitor.sourceHealth = [...priorHealth.values()]; monitor.leaseOwner = ""; monitor.leaseExpiresAt = null;
     await monitor.save();
@@ -190,4 +214,4 @@ function startResearchMonitorRunner() {
   return timer;
 }
 
-module.exports = { audienceEligibility, classifySignal, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, startResearchMonitorRunner, scoreSignal };
+module.exports = { audienceEligibility, buyerIntentAssessment, classifySignal, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, startResearchMonitorRunner, scoreSignal };
