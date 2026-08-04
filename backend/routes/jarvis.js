@@ -18,6 +18,7 @@ const { compileMarketQuestion } = require("../services/marketResearchService");
 const { ingestContacts } = require("../services/contactIngestionService");
 const { isJarvisWebResearchEnabled, normalizePublicPeople, researchAndStagePublicPeople } = require("../services/publicPeopleResearchService");
 const { applyContactFieldUpdate, availableContactFields, buildContactFieldUpdatePreview } = require("../services/contactFieldUpdateService");
+const { collectMonitorSignals } = require("../services/intentSourceService");
 
 const router = express.Router();
 const OPENAI_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"]);
@@ -44,6 +45,24 @@ function previewPeopleAsImportRows(preview, selectedIndexes) {
     evidenceUrl: person.evidenceUrl,
     evidenceSummary: person.evidenceSummary,
   })));
+}
+
+async function fallbackPublicAccountResearch(message) {
+  const username = String(message).match(/(?:reddit\.com\/user\/|\bu\/)([A-Za-z0-9_-]+)/i)?.[1];
+  if (!username) return null;
+  const collected = await collectMonitorSignals({
+    query: username,
+    keywords: [`"${username}"`],
+    locations: [],
+    sources: ["bing_web", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"],
+    maxResultsPerSource: 10,
+  });
+  const mentions = collected.groups.flatMap((group) => group.signals || [])
+    .filter((item) => item?.sourceUrl)
+    .filter((item, index, rows) => rows.findIndex((other) => other.sourceUrl === item.sourceUrl) === index)
+    .slice(0, 20)
+    .map((item) => ({ source: item.source, title: item.title || item.sourceUrl, excerpt: item.excerpt || "", url: item.sourceUrl, authorName: item.authorName || "" }));
+  return { username, mentions, sourceErrors: collected.errors || [] };
 }
 
 /**
@@ -103,12 +122,26 @@ router.post("/chat", async (req, res) => {
             },
           });
         } catch (error) {
+          const fallback = await fallbackPublicAccountResearch(message).catch(() => null);
+          if (fallback) {
+            const answer = fallback.mentions.length
+              ? `OpenAI identity research was unavailable, so I completed a no-credit public-source fallback search for u/${fallback.username}. I found ${fallback.mentions.length} public mention${fallback.mentions.length === 1 ? "" : "s"} to review below. These links may provide context or another public profile, but none is treated as the same real person without direct supporting evidence. No contact was added and no outreach was sent.`
+              : `I completed a no-credit public-source fallback search for u/${fallback.username}, but found no additional indexed account or business evidence. I cannot safely connect this username to a real person. The available contact option is the original Reddit account or post.`;
+            return res.json({ success: true, data: { answer, data: { researchQuestion: message, fallbackResearch: true, publicAccount: `u/${fallback.username}`, mentions: fallback.mentions, sourceErrors: fallback.sourceErrors }, actionsAvailable: [], activity: [{ status: "warning", label: "OpenAI research unavailable—used public-source fallback" }, { status: "complete", label: `Checked public web and social indexes for u/${fallback.username}` }, { status: "complete", label: `Returned ${fallback.mentions.length} evidence link${fallback.mentions.length === 1 ? "" : "s"} without inferring identity` }], memorySources: [] } });
+          }
           return res.status(503).json({
             success: false,
             error: error.message || "Jarvis could not complete public-web lead research.",
             data: { researchQuestion: message, plan },
           });
         }
+      }
+      const fallback = await fallbackPublicAccountResearch(message).catch(() => null);
+      if (fallback) {
+        const answer = fallback.mentions.length
+          ? `OpenAI research is not available, so I used Growth Operator's no-credit public-source search for u/${fallback.username}. I found ${fallback.mentions.length} public mention${fallback.mentions.length === 1 ? "" : "s"} below. Review the links for direct identity evidence; I did not assume that matching usernames belong to the same person.`
+          : `I checked no-credit public web and social indexes for u/${fallback.username}, but found no additional supported identity evidence. Use the original Reddit post or account if you choose to contact them.`;
+        return res.json({ success: true, data: { answer, data: { researchQuestion: message, fallbackResearch: true, publicAccount: `u/${fallback.username}`, mentions: fallback.mentions, sourceErrors: fallback.sourceErrors }, actionsAvailable: [], activity: [{ status: "complete", label: "Ran no-credit public web and social-index search" }, { status: "complete", label: `Returned ${fallback.mentions.length} reviewable evidence link${fallback.mentions.length === 1 ? "" : "s"}` }], memorySources: [] } });
       }
       return res.json({
         success: true,

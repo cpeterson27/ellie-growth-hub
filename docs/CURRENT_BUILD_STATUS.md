@@ -21,6 +21,8 @@
 - Intent-created CRM records use a guided action center instead of treating missing fields as a generic data-quality form. It links back to the original evidence and generated draft, starts evidence-bounded Jarvis identity research, and explains that no outreach has been sent.
 - Legacy intent contacts that stored a Reddit username or URL as a person's name are safely relabeled as “Identity research needed”; the original account value is retained in notes as evidence.
 - “Research identity with Jarvis” now opens a dedicated lead-research task and starts it automatically. The task keeps the original post attached, returns to the exact lead, and distinguishes a supported real name or published contact from the honest outcome that only a manual public-platform reply/message is available.
+- Jarvis identity tasks now show elapsed time, a normal 1–3 minute expectation, explicit completion/failure states, and an always-visible result transcript. Findings speak automatically; when OpenAI speech is unavailable or out of credits, Jarvis uses the device's built-in browser voice and automatically returns to the selected OpenAI voice when service is available again.
+- If paid OpenAI web research is unavailable, exact public-account searches fall back to Growth Operator's Bing, Reddit, Bluesky, Hacker News, Stack Exchange, and DuckDuckGo adapters. Matching links are presented as clues for manual evidence review and never treated as proof that two usernames belong to the same person.
 
 ## Product decisions
 

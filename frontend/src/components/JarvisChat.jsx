@@ -62,6 +62,15 @@ function JarvisResearchPreview({ message, approval, busy, onPrepare, onConfirm }
   </section>;
 }
 
+function JarvisPublicMentionPreview({ message }) {
+  const mentions = Array.isArray(message?.data?.mentions) ? message.data.mentions : [];
+  if (!message?.data?.fallbackResearch) return null;
+  return <section className="jarvis-mention-preview">
+    <header><span>No-credit fallback search</span><strong>{mentions.length} public evidence link{mentions.length === 1 ? "" : "s"}</strong><p>Matching usernames are clues only. Open a source and look for a direct statement connecting the account to a real name or business.</p></header>
+    {mentions.length ? <div>{mentions.map((mention, index) => <article key={`${mention.url}-${index}`}><span>{String(mention.source || "public web").replaceAll("_", " ")}</span><strong>{mention.title}</strong><p>{mention.excerpt || "Open this public result to review its context."}</p><a href={mention.url} target="_blank" rel="noreferrer">Review public source ↗</a></article>)}</div> : <p className="jarvis-mention-preview__empty">No additional public account or business evidence was found. Jarvis will not manufacture an identity; use the original Reddit post/account if you decide to make contact.</p>}
+  </section>;
+}
+
 // Speech synthesis handles plain prose much better than rendered Markdown.
 // Keep the visual response intact, but remove formatting and add natural pauses
 // before handing a reply to the browser voice.
@@ -122,6 +131,9 @@ export default function JarvisChat() {
   const [researchApprovals, setResearchApprovals] = useState({});
   const [researchActionId, setResearchActionId] = useState("");
   const autoPromptStartedRef = useRef(false);
+  const spokenResearchErrorRef = useRef("");
+  const [researchStartedAt, setResearchStartedAt] = useState(null);
+  const [researchElapsedSeconds, setResearchElapsedSeconds] = useState(0);
   const intentResearchTask = searchParams.get("task") === "intent-identity";
   const researchSourceUrl = String(searchParams.get("sourceUrl") || "");
   const researchLeadLabel = String(searchParams.get("leadLabel") || "Saved intent lead");
@@ -167,10 +179,25 @@ export default function JarvisChat() {
 
   const stopSpeaking = () => {
     audioRef.current?.pause();
+    window.speechSynthesis?.cancel();
     audioRef.current = null;
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
     audioUrlRef.current = "";
     setSpeakingId(null);
+  };
+
+  const speakWithBrowser = (text, id) => {
+    if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) return false;
+    const utterance = new window.SpeechSynthesisUtterance(prepareTextForSpeech(text));
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice = voices.find((voice) => /^en-US/i.test(voice.lang) && /Samantha|Alex|Google|Microsoft/i.test(voice.name)) || voices.find((voice) => /^en/i.test(voice.lang)) || null;
+    utterance.rate = profile?.voiceRate || 1;
+    utterance.onend = stopSpeaking;
+    utterance.onerror = () => { stopSpeaking(); setSpeechError("Browser voice playback was interrupted."); };
+    setSpeakingId(id);
+    window.speechSynthesis.speak(utterance);
+    setSpeechError("Using this device’s built-in Jarvis backup voice. OpenAI voice will return automatically when available.");
+    return true;
   };
 
   const speakText = async (text, id) => {
@@ -179,6 +206,7 @@ export default function JarvisChat() {
     setSpeechError("");
     stopSpeaking();
     setSpeakingId(id);
+    if (status?.openai?.voiceEnabled === false && speakWithBrowser(spokenText, id)) return;
     try {
       const blob = await synthesizeJarvisSpeech(spokenText, OPENAI_VOICE_NAMES.has(voiceName) ? voiceName : "marin");
       const url = URL.createObjectURL(blob);
@@ -191,7 +219,7 @@ export default function JarvisChat() {
       await audio.play();
     } catch (voiceError) {
       stopSpeaking();
-      setSpeechError(voiceError.response?.data?.error || "OpenAI voice needs an active API key and billing in the Render backend.");
+      if (!speakWithBrowser(spokenText, id)) setSpeechError(voiceError.response?.data?.error || "Neither OpenAI voice nor this browser’s backup voice is available.");
     }
   };
 
@@ -266,9 +294,27 @@ export default function JarvisChat() {
     const initialPrompt = String(searchParams.get("prompt") || "").trim();
     if (searchParams.get("autostart") !== "1" || !initialPrompt || autoPromptStartedRef.current) return;
     autoPromptStartedRef.current = true;
+    setResearchStartedAt(Date.now());
     setInput("");
     submitPrompt(initialPrompt);
   }, []);
+
+  const intentResearchResult = messages.find((message) => message.data?.researchQuestion);
+  const intentResearchState = loading ? "searching" : intentResearchResult ? "complete" : error ? "failed" : researchStartedAt ? "waiting" : "starting";
+
+  useEffect(() => {
+    if (!researchStartedAt || ["complete", "failed"].includes(intentResearchState)) return undefined;
+    const updateElapsed = () => setResearchElapsedSeconds(Math.max(0, Math.floor((Date.now() - researchStartedAt) / 1000)));
+    updateElapsed();
+    const timer = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(timer);
+  }, [researchStartedAt, intentResearchState]);
+
+  useEffect(() => {
+    if (!intentResearchTask || !error || !autoSpeak || spokenResearchErrorRef.current === error) return;
+    spokenResearchErrorRef.current = error;
+    speakWithBrowser(`Jarvis finished the search but could not establish a supported identity. No contact was added. You can use the original public post to reply or message the account manually.`, "research-error");
+  }, [error, intentResearchTask, autoSpeak]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -549,9 +595,9 @@ export default function JarvisChat() {
         <button type="submit" disabled={savingProfile}>{savingProfile ? "Saving…" : "Save Jarvis"}</button>
       </form> : null}
 
-      {intentResearchTask ? <section className="jarvis-intent-task" aria-live="polite">
-        <div><span>Identity research in progress</span><h2>{researchLeadLabel}</h2><p>{loading ? "Jarvis is searching public sources now. You do not need to type anything." : "Review the result below. A name or email appears only when public evidence supports it."}</p></div>
-        <ol><li className="is-done">Original post attached</li><li className={loading ? "is-active" : "is-done"}>Public identity search</li><li>Review evidence and contact option</li></ol>
+      {intentResearchTask ? <section className={`jarvis-intent-task is-${intentResearchState}`} aria-live="polite">
+        <div><span>{intentResearchState === "complete" ? "Identity research complete" : intentResearchState === "failed" ? "Search finished—no supported identity" : "Identity research in progress"}</span><h2>{researchLeadLabel}</h2><p>{intentResearchState === "searching" || intentResearchState === "waiting" ? `Jarvis is checking the exact username, original post, public web results, business pages, and publicly indexed social profiles. ${researchElapsedSeconds < 15 ? "Starting source checks…" : `Running for ${Math.floor(researchElapsedSeconds / 60)}:${String(researchElapsedSeconds % 60).padStart(2, "0")}. Most searches finish within 1–3 minutes.`}` : intentResearchState === "complete" ? "The result and supporting sources are shown directly below." : "Jarvis finished without enough evidence to connect this account to a real person. No identity or email was invented."}</p></div>
+        <ol><li className="is-done">Original post attached</li><li className={["searching", "waiting"].includes(intentResearchState) ? "is-active" : "is-done"}>Public identity search</li><li className={["complete", "failed"].includes(intentResearchState) ? "is-done" : ""}>Review evidence and contact option</li></ol>
         <div className="jarvis-intent-task__actions"><button type="button" onClick={() => navigate(researchReturnTo.startsWith("/") ? researchReturnTo : "/discovery?tab=leads")}>Back to this lead</button>{researchSourceUrl ? <a href={researchSourceUrl} target="_blank" rel="noreferrer">Open original post or account ↗</a> : null}</div>
         <p className="jarvis-intent-task__outcome"><strong>Possible result:</strong> Jarvis may find a supported name and published contact, or conclude that the Reddit account cannot be safely connected to a real person. In that case, the only responsible contact method is a manual public reply or platform message—never a guessed email.</p>
       </section> : null}
@@ -568,6 +614,7 @@ export default function JarvisChat() {
               {msg.type === "assistant" ? <div className="jarvis-response-tools"><button onClick={() => speakMessage(msg)} disabled={speakingId === msg.id}>{speakingId === msg.id ? "Speaking…" : "Speak"}</button></div> : null}
 
               <JarvisResearchPreview message={msg} approval={researchApprovals[String(msg.data?.previewId || "")]} busy={researchActionId === String(msg.data?.previewId || "")} onPrepare={prepareResearchImport} onConfirm={confirmResearchImport} />
+              <JarvisPublicMentionPreview message={msg} />
 
               {msg.activity?.length ? <div className="jarvis-activity"><p>Jarvis completed</p>{msg.activity.map((step, index) => <div key={`${msg.id}-${index}`}><span>{step.status === "warning" ? "!" : "✓"}</span>{step.label}</div>)}</div> : null}
               {msg.memorySources?.length ? <div className="jarvis-memory-sources"><strong>Vault notes consulted</strong>{msg.memorySources.map((source) => <span key={source}>{source}</span>)}</div> : null}
@@ -632,8 +679,8 @@ export default function JarvisChat() {
           {voiceInputSupported ? <button type="button" className="jarvis-mic-btn" onClick={startListening} disabled={loading || listening}>{listening ? "Listening…" : "Talk"}</button> : null}
         </div>
 
-        <div className="jarvis-voice-controls"><label className="jarvis-voice-picker">OpenAI voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{OPENAI_VOICES.map((voice) => <option key={voice.value} value={voice.value}>{voice.label}</option>)}</select></label><button type="button" className="jarvis-voice-test" onClick={testVoice} disabled={Boolean(speakingId)}>{speakingId ? "Speaking…" : "Test voice"}</button><label className="jarvis-auto-speak"><input type="checkbox" checked={autoSpeak} onChange={(event) => setAutoSpeak(event.target.checked)} /> Speak replies automatically</label></div>
-        <p className="jarvis-ai-voice-disclosure">Jarvis voice audio is AI-generated using OpenAI.</p>
+        <div className="jarvis-voice-controls"><label className="jarvis-voice-picker">Preferred OpenAI voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{OPENAI_VOICES.map((voice) => <option key={voice.value} value={voice.value}>{voice.label}</option>)}</select></label><button type="button" className="jarvis-voice-test" onClick={testVoice} disabled={Boolean(speakingId)}>{speakingId ? "Speaking…" : "Test voice"}</button><label className="jarvis-auto-speak"><input type="checkbox" checked={autoSpeak} onChange={(event) => setAutoSpeak(event.target.checked)} /> Speak findings automatically</label></div>
+        <p className="jarvis-ai-voice-disclosure">Voice automatically falls back to this device’s built-in speech when OpenAI voice has no credits or is unavailable.</p>
 
         {selectedCampaignId && (
           <div className="jarvis-test-email-group">
@@ -648,7 +695,7 @@ export default function JarvisChat() {
         )}
 
         <p className="jarvis-input-note">Press ⌘J while Growth Operator is open to start a voice turn. Talk records one request and sends it to Jarvis. Jarvis never sends outreach or changes records without a confirmed action.</p>
-        {speechError ? <div className="jarvis-error">{speechError}</div> : null}
+        {speechError ? <div className={speechError.startsWith("Using this device") ? "jarvis-voice-notice" : "jarvis-error"}>{speechError}</div> : null}
         {error && <div className="jarvis-error">{intentResearchTask ? `${error} No identity was added. Open the original public post above if you want to reply or message through that platform.` : error}</div>}
       </form>
     </div>
