@@ -29,6 +29,9 @@ import {
   bulkAssignContactsToCampaign,
   createEmailVerificationBatch,
   fetchEmailVerificationBatch,
+  fetchJarvisEditableContactFields,
+  prepareJarvisContactFieldUpdate,
+  confirmJarvisContactFieldUpdate,
 } from "../services/api.js";
 import { useInitiative } from "../context/InitiativeContext.jsx";
 
@@ -513,6 +516,12 @@ export default function Contacts() {
   const [bulkCampaignId, setBulkCampaignId] = useState("");
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkNotice, setBulkNotice] = useState("");
+  const [fieldUpdateOpen, setFieldUpdateOpen] = useState(false);
+  const [fieldUpdateFields, setFieldUpdateFields] = useState([]);
+  const [fieldUpdateDraft, setFieldUpdateDraft] = useState({ fieldKey: "", value: "" });
+  const [fieldUpdateApproval, setFieldUpdateApproval] = useState(null);
+  const [fieldUpdateSaving, setFieldUpdateSaving] = useState(false);
+  const [fieldUpdateError, setFieldUpdateError] = useState("");
   const [unsubscribedContacts, setUnsubscribedContacts] = useState([]);
   const [crmView, setCrmView] = useState("list");
   const [isCardCaptureOpen, setCardCaptureOpen] = useState(false);
@@ -550,6 +559,64 @@ export default function Contacts() {
     )
       ? selectedCampaignIds[0]
       : "";
+  const selectedFieldUpdateDefinition = fieldUpdateFields.find(
+    (field) => field.key === fieldUpdateDraft.fieldKey,
+  );
+
+  async function openFieldUpdate() {
+    try {
+      setFieldUpdateError("");
+      setFieldUpdateApproval(null);
+      setFieldUpdateDraft({ fieldKey: "", value: "" });
+      setFieldUpdateOpen(true);
+      const response = await fetchJarvisEditableContactFields();
+      setFieldUpdateFields(response.data || []);
+    } catch (err) {
+      setFieldUpdateError(err.response?.data?.error || "Unable to load editable CRM fields.");
+    }
+  }
+
+  async function prepareFieldUpdate() {
+    if (!fieldUpdateDraft.fieldKey) return setFieldUpdateError("Choose the field Jarvis should update.");
+    try {
+      setFieldUpdateSaving(true);
+      setFieldUpdateError("");
+      const response = await prepareJarvisContactFieldUpdate(
+        selectedContactIds,
+        fieldUpdateDraft.fieldKey,
+        fieldUpdateDraft.value,
+      );
+      setFieldUpdateApproval(response.data);
+    } catch (err) {
+      setFieldUpdateError(err.response?.data?.error || "Unable to prepare this field update.");
+    } finally {
+      setFieldUpdateSaving(false);
+    }
+  }
+
+  async function confirmFieldUpdate() {
+    if (!fieldUpdateApproval) return;
+    try {
+      setFieldUpdateSaving(true);
+      setFieldUpdateError("");
+      const response = await confirmJarvisContactFieldUpdate(
+        fieldUpdateApproval.approvalId,
+        fieldUpdateApproval.confirmationPhrase,
+      );
+      const result = response.data;
+      setBulkNotice(
+        `Jarvis updated ${result.updated} contact${result.updated === 1 ? "" : "s"} in ${result.field.label}.${result.conflicts ? ` ${result.conflicts} skipped because the record changed after preview.` : ""} An audit receipt was saved.`,
+      );
+      setFieldUpdateOpen(false);
+      setFieldUpdateApproval(null);
+      setSelectedContactIds([]);
+      await loadContacts();
+    } catch (err) {
+      setFieldUpdateError(err.response?.data?.error || "Unable to apply this field update.");
+    } finally {
+      setFieldUpdateSaving(false);
+    }
+  }
 
   function stopCardScanner() {
     if (cardFrameRef.current) {
@@ -1852,6 +1919,13 @@ export default function Contacts() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={openFieldUpdate}
+                >
+                  Update fields with Jarvis
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   loading={bulkSaving}
                   onClick={archiveSelectedContacts}
                 >
@@ -1876,6 +1950,35 @@ export default function Contacts() {
         {bulkNotice ? (
           <p className="contact-bulk-notice">{bulkNotice}</p>
         ) : null}
+        <Modal
+          isOpen={fieldUpdateOpen}
+          onClose={() => !fieldUpdateSaving && setFieldUpdateOpen(false)}
+          title="Update selected CRM fields with Jarvis"
+          footer={
+            <>
+              <Button variant="outline" disabled={fieldUpdateSaving} onClick={() => setFieldUpdateOpen(false)}>Cancel</Button>
+              {fieldUpdateApproval ? (
+                <Button loading={fieldUpdateSaving} onClick={confirmFieldUpdate}>Confirm exact update</Button>
+              ) : (
+                <Button loading={fieldUpdateSaving} disabled={!fieldUpdateDraft.fieldKey} onClick={prepareFieldUpdate}>Preview changes</Button>
+              )}
+            </>
+          }
+        >
+          <div className="jarvis-field-update">
+            <p><strong>{selectedContactIds.length} selected contact{selectedContactIds.length === 1 ? "" : "s"}.</strong> Jarvis changes one approved field at a time and never changes email consent, verification, suppression, or unsubscribe data here.</p>
+            {!fieldUpdateApproval ? <>
+              <label className="form-field"><span>Field to update</span><select className="select-input" value={fieldUpdateDraft.fieldKey} onChange={(event) => setFieldUpdateDraft({ fieldKey: event.target.value, value: "" })}><option value="">Choose a CRM field…</option>{fieldUpdateFields.map((field) => <option key={`${field.custom ? "custom" : "built-in"}-${field.key}`} value={field.key}>{field.label}{field.custom ? " · custom" : ""}</option>)}</select></label>
+              {selectedFieldUpdateDefinition?.type === "boolean" ? <label className="form-field"><span>New value</span><select className="select-input" value={fieldUpdateDraft.value} onChange={(event) => setFieldUpdateDraft({ ...fieldUpdateDraft, value: event.target.value })}><option value="">Choose yes or no…</option><option value="true">Yes</option><option value="false">No</option></select></label> : <label className="form-field"><span>New value</span><input className="select-input" type={selectedFieldUpdateDefinition?.type === "number" ? "number" : selectedFieldUpdateDefinition?.type === "date" ? "date" : "text"} value={fieldUpdateDraft.value} onChange={(event) => setFieldUpdateDraft({ ...fieldUpdateDraft, value: event.target.value })} placeholder={selectedFieldUpdateDefinition?.type === "list" ? "Separate multiple values with commas" : "Enter the approved value"} /></label>}
+              <small>Nothing changes when you preview. You will see the old and new values before confirming.</small>
+            </> : <section className="jarvis-field-update__preview">
+              <header><span>Approval preview</span><strong>{fieldUpdateApproval.preview.changedCount} record{fieldUpdateApproval.preview.changedCount === 1 ? "" : "s"} will change</strong><small>{fieldUpdateApproval.preview.unchangedCount || 0} already matched · {fieldUpdateApproval.preview.missingCount || 0} unavailable</small></header>
+              <div className="jarvis-field-update__changes">{(fieldUpdateApproval.preview.displayChanges || fieldUpdateApproval.preview.changes || []).map((change) => <article key={change.contactId}><strong>{change.contactName}</strong><span><del>{change.beforeDisplay}</del><b>→</b><ins>{change.afterDisplay}</ins></span></article>)}</div>
+              <div className="jarvis-field-update__confirmation"><span>Required confirmation</span><strong>{fieldUpdateApproval.confirmationPhrase}</strong><small>Expires at {new Date(fieldUpdateApproval.expiresAt).toLocaleTimeString()}. If a record changes before confirmation, Jarvis skips it instead of overwriting newer work.</small></div>
+            </section>}
+            {fieldUpdateError ? <p className="form-error">{fieldUpdateError}</p> : null}
+          </div>
+        </Modal>
         {!loading && contacts.length ? (
           <div className="crm-results-summary" id="contact-results">
             <span>

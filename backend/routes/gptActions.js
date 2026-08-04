@@ -10,6 +10,7 @@ const WorkspaceMembership = require("../models/WorkspaceMembership");
 const GrowthActionApproval = require("../models/GrowthActionApproval");
 const PeopleResearchPreview = require("../models/PeopleResearchPreview");
 const McpAuditLog = require("../models/McpAuditLog");
+const ContactFieldUpdateAudit = require("../models/ContactFieldUpdateAudit");
 const { requireMcpAuth } = require("../middleware/mcpAuth");
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
@@ -17,6 +18,7 @@ const { effectiveTemplate } = require("../services/campaignMasterTemplate");
 const { previewContactIngestion, ingestContacts } = require("../services/contactIngestionService");
 const { normalizePublicPeople, savePublicPeoplePreview } = require("../services/publicPeopleResearchService");
 const { sendEmail } = require("../services/email");
+const { applyContactFieldUpdate, availableContactFields, buildContactFieldUpdatePreview } = require("../services/contactFieldUpdateService");
 
 const router = express.Router();
 const serverUrl = (req) => String(process.env.PUBLIC_BACKEND_URL || process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
@@ -49,7 +51,7 @@ router.get("/gpt-actions/openapi.json", (req, res) => {
   const base = serverUrl(req);
   res.json({
     openapi: "3.1.0",
-    info: { title: "Growth Operator", version: "1.3.0", description: "Research leads and prepare guarded CRM operations. High-impact changes require a short-lived approval and an exact second confirmation." },
+    info: { title: "Growth Operator", version: "1.4.0", description: "Research leads and prepare guarded CRM operations. High-impact changes require a short-lived approval and an exact second confirmation." },
     servers: [{ url: base }],
     components: {
       securitySchemes: { GrowthOperatorToken: { type: "http", scheme: "bearer", bearerFormat: "Growth Operator connection token" } },
@@ -75,6 +77,10 @@ router.get("/gpt-actions/openapi.json", (req, res) => {
       "/gpt-actions/campaigns/send": { post: { operationId: "confirmCampaignSend", summary: "Send an approved campaign after exact confirmation", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ConfirmationRequest" } } } }, responses: { 200: { description: "Send receipt" } } } },
       "/gpt-actions/contacts/prepare-archive": { post: { operationId: "prepareContactArchive", summary: "Preview reversible contact archiving", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["contactIds"], properties: { contactIds: { type: "array", maxItems: 500, items: { type: "string" } } } } } } }, responses: { 200: { description: "Archive preview and confirmation" } } } },
       "/gpt-actions/contacts/archive": { post: { operationId: "confirmContactArchive", summary: "Archive contacts after exact confirmation", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ConfirmationRequest" } } } }, responses: { 200: { description: "Archive receipt" } } } },
+      "/gpt-actions/contacts/search": { get: { operationId: "searchCrmContacts", summary: "Find CRM contacts and their IDs before preparing a field update", parameters: [{ name: "query", in: "query", required: true, schema: { type: "string", minLength: 2, maxLength: 200 } }, { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 25 } }], responses: { 200: { description: "Matching CRM contacts" } } } },
+      "/gpt-actions/contacts/editable-fields": { get: { operationId: "listEditableContactFields", summary: "List fields that Growth Operator may safely update", responses: { 200: { description: "Editable built-in and custom CRM fields" } } } },
+      "/gpt-actions/contacts/prepare-field-update": { post: { operationId: "prepareContactFieldUpdate", summary: "Preview one field update across selected CRM contacts", description: "This does not change contacts. Show the complete preview and ask for the exact returned confirmation before applying.", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["contactIds", "fieldKey", "value"], properties: { contactIds: { type: "array", minItems: 1, maxItems: 500, items: { type: "string" } }, fieldKey: { type: "string", description: "A key returned by listEditableContactFields." }, value: { description: "The new value. Type must match the field definition." } } } } } }, responses: { 200: { description: "Before/after preview and short-lived confirmation" } } } },
+      "/gpt-actions/contacts/apply-field-update": { post: { operationId: "applyContactFieldUpdate", summary: "Apply a previously previewed contact field update", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ConfirmationRequest" } } } }, responses: { 200: { description: "Update and audit receipt" } } } },
       "/gpt-actions/linkedin/preview": { post: { operationId: "previewLinkedInConnections", summary: "Preview owner-provided LinkedIn connection rows", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["connections"], properties: { connections: { type: "array", maxItems: 500, items: { $ref: "#/components/schemas/ConnectionRow" } } } } } } }, responses: { 200: { description: "Deduplication preview" } } } },
       "/gpt-actions/linkedin/prepare-import": { post: { operationId: "prepareLinkedInImport", summary: "Prepare owner-provided LinkedIn rows for CRM review", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["connections"], properties: { connections: { type: "array", maxItems: 500, items: { $ref: "#/components/schemas/ConnectionRow" } } } } } } }, responses: { 200: { description: "Import confirmation" } } } },
       "/gpt-actions/linkedin/import": { post: { operationId: "confirmLinkedInImport", summary: "Import confirmed LinkedIn rows as unmarketable prospects", requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ConfirmationRequest" } } } }, responses: { 200: { description: "Import receipt" } } } },
@@ -92,7 +98,7 @@ router.get("/gpt-actions/privacy", (_req, res) => res.type("html").send("<!docty
 router.use("/gpt-actions", requireMcpAuth);
 router.get("/gpt-actions/status", (req, res) => {
   audit(req, "status", true);
-  res.json({ connected: true, workspaceScoped: true, capabilities: ["research planning", "ranked lead search", "prospect lists", "start research", "public-web decision-maker review and import", "template drafts with approval", "guarded campaign sends", "reversible contact archiving", "custom CRM fields", "owner-provided LinkedIn connection imports"], safeguards: ["source evidence required", "published emails remain unverified", "exact second confirmation", "15-minute approvals", "admin role checks", "suppression and consent enforcement", "audit logs"], unavailable: ["permanent deletion", "LinkedIn scraping or network access", "unconfirmed bulk sending", "guaranteed coverage of every US business"] });
+  res.json({ connected: true, workspaceScoped: true, capabilities: ["research planning", "ranked lead search", "prospect lists", "start research", "public-web decision-maker review and import", "confirmed contact field updates", "template drafts with approval", "guarded campaign sends", "reversible contact archiving", "custom CRM fields", "owner-provided LinkedIn connection imports"], safeguards: ["source evidence required", "published emails remain unverified", "exact second confirmation", "15-minute approvals", "admin role checks", "suppression and consent enforcement", "conflict detection", "audit logs"], unavailable: ["permanent deletion", "LinkedIn scraping or network access", "unconfirmed bulk sending", "unrestricted database access", "guaranteed coverage of every US business"] });
 });
 router.get("/gpt-actions/prospect-lists", requireScope("research:read"), async (req, res) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
@@ -237,6 +243,88 @@ router.post("/gpt-actions/contacts/archive", requireScope("crm:write"), requireO
     audit(req, "archive_contacts", true, result.modifiedCount);
     res.json({ archived: result.modifiedCount, permanentDeletion: false });
   } catch (error) { audit(req, "archive_contacts", false, error.message); res.status(400).json({ error: error.message }); }
+});
+
+router.get("/gpt-actions/contacts/search", requireScope("crm:read"), async (req, res) => {
+  try {
+    const query = String(req.query.query || "").trim().slice(0, 200);
+    if (query.length < 2) return res.status(400).json({ error: "Enter at least two characters to search CRM contacts." });
+    const safe = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const contacts = await Contact.find({
+      status: { $ne: "archived" },
+      $or: ["name", "email", "company", "title"].map((field) => ({ [field]: { $regex: safe, $options: "i" } })),
+    }).select("name firstName lastName email company title industry city state country stage seniority tags additionalFields").sort({ updatedAt: -1 }).limit(limit).lean();
+    audit(req, "search_crm_contacts", true, contacts.length);
+    return res.json({ contacts, count: contacts.length });
+  } catch (error) {
+    audit(req, "search_crm_contacts", false, error.message);
+    return res.status(400).json({ error: error.message || "Unable to search CRM contacts." });
+  }
+});
+
+router.get("/gpt-actions/contacts/editable-fields", requireScope("crm:read"), async (req, res) => {
+  try {
+    const fields = await availableContactFields();
+    audit(req, "list_editable_contact_fields", true, fields.length);
+    return res.json({ fields });
+  } catch (error) {
+    audit(req, "list_editable_contact_fields", false, error.message);
+    return res.status(400).json({ error: error.message || "Unable to list editable CRM fields." });
+  }
+});
+
+router.post("/gpt-actions/contacts/prepare-field-update", requireScope("crm:write"), requireOperator, async (req, res) => {
+  try {
+    const preview = await buildContactFieldUpdatePreview({
+      contactIds: req.body?.contactIds,
+      fieldKey: req.body?.fieldKey,
+      value: req.body?.value,
+    });
+    if (!preview.changedCount) return res.status(400).json({ error: "The selected contacts already have that value." });
+    const phrase = `UPDATE ${preview.changedCount} CONTACT${preview.changedCount === 1 ? "" : "S"}: ${preview.field.label.toUpperCase()}`;
+    const payload = {
+      fieldKey: preview.field.key,
+      value: preview.value,
+      changes: preview.changes.filter((item) => item.changed).map(({ contactId, before }) => ({ contactId, before })),
+    };
+    const summary = {
+      fieldKey: preview.field.key,
+      fieldLabel: preview.field.label,
+      selectedCount: preview.selectedCount,
+      changedCount: preview.changedCount,
+      unchangedCount: preview.unchangedCount,
+      missingCount: preview.missingCount,
+      changes: preview.displayChanges,
+    };
+    const item = await approval(req, "update_contact_field", payload, summary, phrase);
+    audit(req, "prepare_contact_field_update", true, `${preview.field.key}:${preview.changedCount}`);
+    return res.json({ approvalId: item._id, expiresAt: item.expiresAt, confirmationPhrase: phrase, preview: summary, warning: "Only this field will change. Records changed after the preview will be skipped." });
+  } catch (error) {
+    audit(req, "prepare_contact_field_update", false, error.message);
+    return res.status(400).json({ error: error.message || "Unable to prepare this contact update." });
+  }
+});
+
+router.post("/gpt-actions/contacts/apply-field-update", requireScope("crm:write"), requireOperator, async (req, res) => {
+  try {
+    const item = await consumeApproval(req, "update_contact_field");
+    const result = await applyContactFieldUpdate(item.payload);
+    if (result.changes.length) {
+      await ContactFieldUpdateAudit.insertMany(result.changes.map((change) => ({
+        workspaceId: req.mcpAuth.workspaceId,
+        userId: req.mcpAuth.userId,
+        approvalId: item._id,
+        source: "gpt_action",
+        ...change,
+      })));
+    }
+    audit(req, "apply_contact_field_update", true, `${result.field.key}:${result.updated}`);
+    return res.json({ updated: result.updated, unchanged: result.unchanged, conflicts: result.conflicts, missing: result.missing, field: { key: result.field.key, label: result.field.label }, auditRecorded: result.changes.length });
+  } catch (error) {
+    audit(req, "apply_contact_field_update", false, error.message);
+    return res.status(400).json({ error: error.message || "Unable to apply this contact update." });
+  }
 });
 
 router.post("/gpt-actions/linkedin/preview", requireScope("crm:read"), async (req, res) => {

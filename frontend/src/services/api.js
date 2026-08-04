@@ -453,6 +453,15 @@ export const confirmJarvisResearchImport = (previewId, approvalId, confirmation)
     .post(`/jarvis/research-previews/${previewId}/confirm-import`, { approvalId, confirmation })
     .then((res) => res.data);
 
+export const fetchJarvisEditableContactFields = () =>
+  api.get("/jarvis/contact-field-updates/fields").then((res) => res.data);
+
+export const prepareJarvisContactFieldUpdate = (contactIds, fieldKey, value) =>
+  api.post("/jarvis/contact-field-updates/prepare", { contactIds, fieldKey, value }).then((res) => res.data);
+
+export const confirmJarvisContactFieldUpdate = (approvalId, confirmation) =>
+  api.post("/jarvis/contact-field-updates/confirm", { approvalId, confirmation }).then((res) => res.data);
+
 export const synthesizeJarvisSpeech = (text, voice) =>
   api
     .post("/jarvis/voice/speech", { text, voice }, { responseType: "blob" })

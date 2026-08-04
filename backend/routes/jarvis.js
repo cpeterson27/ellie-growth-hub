@@ -8,6 +8,7 @@ const OpenAI = require("openai");
 const Contact = require("../models/Contact");
 const GrowthActionApproval = require("../models/GrowthActionApproval");
 const PeopleResearchPreview = require("../models/PeopleResearchPreview");
+const ContactFieldUpdateAudit = require("../models/ContactFieldUpdateAudit");
 const jarvisService = require("../services/jarvisService");
 const llmService = require("../services/llmService");
 const jarvisMemoryService = require("../services/jarvisMemoryService");
@@ -16,6 +17,7 @@ const developmentRequestService = require("../services/developmentRequestService
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { ingestContacts } = require("../services/contactIngestionService");
 const { isJarvisWebResearchEnabled, normalizePublicPeople, researchAndStagePublicPeople } = require("../services/publicPeopleResearchService");
+const { applyContactFieldUpdate, availableContactFields, buildContactFieldUpdatePreview } = require("../services/contactFieldUpdateService");
 
 const router = express.Router();
 const OPENAI_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"]);
@@ -245,6 +247,103 @@ router.post("/research-previews/:previewId/confirm-import", async (req, res) => 
     });
   } catch (error) {
     return res.status(400).json({ success: false, error: error.message || "Unable to import this research preview." });
+  }
+});
+
+router.get("/contact-field-updates/fields", async (_req, res) => {
+  try {
+    return res.json({ success: true, data: await availableContactFields() });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to load editable CRM fields." });
+  }
+});
+
+router.post("/contact-field-updates/prepare", async (req, res) => {
+  if (!requireJarvisOperator(req, res)) return;
+  try {
+    const preview = await buildContactFieldUpdatePreview({
+      contactIds: req.body?.contactIds,
+      fieldKey: req.body?.fieldKey,
+      value: req.body?.value,
+    });
+    if (!preview.changedCount) return res.status(400).json({ success: false, error: "The selected contacts already have that value." });
+    const phrase = `UPDATE ${preview.changedCount} CONTACT${preview.changedCount === 1 ? "" : "S"}: ${preview.field.label.toUpperCase()}`;
+    const approval = await GrowthActionApproval.create({
+      workspaceId: req.auth.workspaceId,
+      userId: req.auth.user._id,
+      action: "update_contact_field",
+      payload: {
+        fieldKey: preview.field.key,
+        value: preview.value,
+        changes: preview.changes.filter((item) => item.changed).map(({ contactId, before }) => ({ contactId, before })),
+      },
+      summary: {
+        fieldKey: preview.field.key,
+        fieldLabel: preview.field.label,
+        selectedCount: preview.selectedCount,
+        changedCount: preview.changedCount,
+        unchangedCount: preview.unchangedCount,
+        missingCount: preview.missingCount,
+        displayChanges: preview.displayChanges,
+      },
+      confirmationPhrase: phrase,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+    return res.json({
+      success: true,
+      data: {
+        approvalId: approval._id,
+        confirmationPhrase: phrase,
+        expiresAt: approval.expiresAt,
+        preview: approval.summary,
+        warning: "Only the displayed field will change. Records changed after this preview will be skipped as conflicts.",
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to prepare this CRM update." });
+  }
+});
+
+router.post("/contact-field-updates/confirm", async (req, res) => {
+  if (!requireJarvisOperator(req, res)) return;
+  try {
+    const approval = await GrowthActionApproval.findOne({
+      _id: req.body?.approvalId,
+      workspaceId: req.auth.workspaceId,
+      userId: req.auth.user._id,
+      action: "update_contact_field",
+      usedAt: null,
+      expiresAt: { $gt: new Date() },
+    });
+    if (!approval) return res.status(400).json({ success: false, error: "This approval is missing, expired, already used, or belongs to another workspace." });
+    if (String(req.body?.confirmation || "") !== approval.confirmationPhrase) {
+      return res.status(400).json({ success: false, error: `Confirmation must exactly match: ${approval.confirmationPhrase}` });
+    }
+    const result = await applyContactFieldUpdate(approval.payload);
+    if (result.changes.length) {
+      await ContactFieldUpdateAudit.insertMany(result.changes.map((change) => ({
+        workspaceId: req.auth.workspaceId,
+        userId: req.auth.user._id,
+        approvalId: approval._id,
+        source: "jarvis",
+        ...change,
+      })));
+    }
+    approval.usedAt = new Date();
+    await approval.save();
+    return res.json({
+      success: true,
+      data: {
+        updated: result.updated,
+        unchanged: result.unchanged,
+        conflicts: result.conflicts,
+        missing: result.missing,
+        field: { key: result.field.key, label: result.field.label },
+        auditRecorded: result.changes.length,
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to apply this CRM update." });
   }
 });
 
