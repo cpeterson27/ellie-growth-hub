@@ -187,6 +187,14 @@ async function searchBingNews(monitor, limit) {
   });
 }
 
+async function searchGoogleWeb(monitor, limit) {
+  const key = String(process.env.GOOGLE_SEARCH_API_KEY || "").trim();
+  const cx = String(process.env.GOOGLE_SEARCH_ENGINE_ID || "").trim();
+  if (!key || !cx) throw new Error("Google Programmable Search is not configured.");
+  const response = await axios.get("https://customsearch.googleapis.com/customsearch/v1", { params: { key, cx, q: booleanQueryFor(monitor), num: Math.min(10, limit) }, timeout: REQUEST_TIMEOUT, maxContentLength: 4 * 1024 * 1024 });
+  return (response.data?.items || []).map((item) => normalizeSignal("google_web", { sourceId: item.cacheId || item.link, sourceUrl: item.link, title: item.title, excerpt: item.snippet, organizationDomain: item.displayLink, evidenceLabel: "Google public web result" })).filter(Boolean);
+}
+
 async function searchSecFormD(monitor, limit) {
   const url = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=D&company=&dateb=&owner=include&start=0&count=100&output=atom";
   const signals = await fetchFeed(url, "sec_form_d", "SEC EDGAR Form D filing", 100);
@@ -227,6 +235,7 @@ async function searchDuckDuckGo(monitor, limit) {
 }
 
 const ADAPTERS = {
+  google_web: searchGoogleWeb,
   bing_web: searchBingWeb,
   bing_news: searchBingNews,
   gdelt: searchGdelt,

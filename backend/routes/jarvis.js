@@ -54,7 +54,7 @@ async function fallbackPublicAccountResearch(message) {
     query: username,
     keywords: [`"${username}"`],
     locations: [],
-    sources: ["bing_web", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"],
+    sources: [...(process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID ? ["google_web"] : []), "bing_web", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"],
     maxResultsPerSource: 10,
   });
   const mentions = collected.groups.flatMap((group) => group.signals || [])
