@@ -3514,9 +3514,11 @@ export default function Contacts() {
                 </ol>
                 <div className="intent-contact-action-center__actions">
                   <Button onClick={() => {
-                    const prompt = `Research this prospective Deal to Close Bootcamp attendee using public evidence: ${detailContact.website || detailContact.notes || "saved public intent signal"}. Find the real adult person's name, business or company, role, and a publicly listed business email only when a source directly supports each connection. Do not guess identity or mark an email verified. Return evidence for my review.`;
+                    const sourceUrl = detailContact.website || "";
+                    const prompt = `Research 1 prospect for the Deal to Close Bootcamp. Start with this exact public account and post: ${sourceUrl || detailContact.notes || "saved public intent signal"}. Determine whether public evidence supports the real adult person's name, business or company, and role. Find a visibly published business email or official public contact page only when evidence supports the same identity. Do not guess, infer identity from the username, or mark an email verified. If identity cannot be established, say so clearly and recommend only the public platform contact options.`;
+                    const params = new URLSearchParams({ prompt, autostart: "1", task: "intent-identity", sourceUrl, leadLabel: "Saved Deal to Close lead", returnTo: `/discovery?tab=leads&signalId=${detailContact.providerContactId || ""}` });
                     setDetailContact(null);
-                    navigate(`/jarvis?prompt=${encodeURIComponent(prompt)}`);
+                    navigate(`/jarvis?${params.toString()}`);
                   }}>Research identity with Jarvis</Button>
                   <Button variant="outline" onClick={() => {
                     setDetailContact(null);

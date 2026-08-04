@@ -350,8 +350,9 @@ export default function Discovery() {
 
   const researchSignalIdentity = (signal) => {
     const account = publicAccount(signal);
-    const prompt = `Research this prospective Deal to Close Bootcamp attendee using public evidence: ${account.label} from ${signal.sourceUrl}. Find the real adult person's name, business or company, role, and a publicly listed business email only when a source directly supports each connection. Do not guess, infer identity from a username, or mark an email verified. Return the evidence for my review before adding anything to the CRM.`;
-    navigate(`/jarvis?prompt=${encodeURIComponent(prompt)}`);
+    const prompt = `Research 1 prospect for the Deal to Close Bootcamp. Start with this exact public account ${account.label} and post: ${signal.sourceUrl}. Determine whether public evidence supports the real adult person's name, business or company, and role. Find a visibly published business email or official public contact page only when evidence supports the same identity. Do not guess, infer identity from the username, or mark an email verified. If identity cannot be established, say so clearly and recommend only the public platform contact options.`;
+    const params = new URLSearchParams({ prompt, autostart: "1", task: "intent-identity", sourceUrl: signal.sourceUrl || account.url || "", leadLabel: account.label, returnTo: `/discovery?tab=leads&signalId=${signal._id}` });
+    navigate(`/jarvis?${params.toString()}`);
   };
 
   const generateEmailDraft = async () => {

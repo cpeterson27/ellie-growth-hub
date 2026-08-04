@@ -121,6 +121,11 @@ export default function JarvisChat() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [researchApprovals, setResearchApprovals] = useState({});
   const [researchActionId, setResearchActionId] = useState("");
+  const autoPromptStartedRef = useRef(false);
+  const intentResearchTask = searchParams.get("task") === "intent-identity";
+  const researchSourceUrl = String(searchParams.get("sourceUrl") || "");
+  const researchLeadLabel = String(searchParams.get("leadLabel") || "Saved intent lead");
+  const researchReturnTo = String(searchParams.get("returnTo") || "/discovery?tab=leads");
 
   useEffect(() => {
     getStatus().then(setStatus);
@@ -137,6 +142,7 @@ export default function JarvisChat() {
   }, []);
 
   useEffect(() => {
+    if (intentResearchTask) return;
     fetchPeopleResearchPreviews(1).then((response) => {
       const preview = response?.previews?.[0];
       if (!preview?.people?.length) return;
@@ -148,7 +154,7 @@ export default function JarvisChat() {
         data: { previewId: preview._id, previewStatus: preview.status, preview: preview.summary, people: preview.people },
       }]);
     }).catch(() => {});
-  }, []);
+  }, [intentResearchTask]);
 
   const scrollToBottom = () => {
     const messagePanel = messagesEndRef.current?.parentElement;
@@ -255,6 +261,14 @@ export default function JarvisChat() {
       setNextId(nextId + 2);
     }
   };
+
+  useEffect(() => {
+    const initialPrompt = String(searchParams.get("prompt") || "").trim();
+    if (searchParams.get("autostart") !== "1" || !initialPrompt || autoPromptStartedRef.current) return;
+    autoPromptStartedRef.current = true;
+    setInput("");
+    submitPrompt(initialPrompt);
+  }, []);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -479,7 +493,7 @@ export default function JarvisChat() {
   const visualLabel = { idle: "Systems ready", listening: "Listening", thinking: "Analyzing workspace", speaking: "Responding" }[visualState];
 
   return (
-    <div ref={containerRef} className={`jarvis-chat-container jarvis-chat-container--${profile?.theme || "executive"} ${isFullscreen ? "jarvis-chat-container--fullscreen" : ""}`}>
+    <div ref={containerRef} className={`jarvis-chat-container jarvis-chat-container--${profile?.theme || "executive"} ${intentResearchTask ? "jarvis-chat-container--intent-task" : ""} ${isFullscreen ? "jarvis-chat-container--fullscreen" : ""}`}>
       <div className={`jarvis-header jarvis-header--${visualState}`}>
         <div className="jarvis-circuit-field" aria-hidden="true">
           <svg viewBox="0 0 1200 360" preserveAspectRatio="none">
@@ -534,6 +548,13 @@ export default function JarvisChat() {
         <label>OpenAI voice<select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{OPENAI_VOICES.map((voice) => <option key={voice.value} value={voice.value}>{voice.label}</option>)}</select></label>
         <button type="submit" disabled={savingProfile}>{savingProfile ? "Saving…" : "Save Jarvis"}</button>
       </form> : null}
+
+      {intentResearchTask ? <section className="jarvis-intent-task" aria-live="polite">
+        <div><span>Identity research in progress</span><h2>{researchLeadLabel}</h2><p>{loading ? "Jarvis is searching public sources now. You do not need to type anything." : "Review the result below. A name or email appears only when public evidence supports it."}</p></div>
+        <ol><li className="is-done">Original post attached</li><li className={loading ? "is-active" : "is-done"}>Public identity search</li><li>Review evidence and contact option</li></ol>
+        <div className="jarvis-intent-task__actions"><button type="button" onClick={() => navigate(researchReturnTo.startsWith("/") ? researchReturnTo : "/discovery?tab=leads")}>Back to this lead</button>{researchSourceUrl ? <a href={researchSourceUrl} target="_blank" rel="noreferrer">Open original post or account ↗</a> : null}</div>
+        <p className="jarvis-intent-task__outcome"><strong>Possible result:</strong> Jarvis may find a supported name and published contact, or conclude that the Reddit account cannot be safely connected to a real person. In that case, the only responsible contact method is a manual public reply or platform message—never a guessed email.</p>
+      </section> : null}
 
       <div className="jarvis-messages">
         {messages.map((msg) => (
@@ -628,7 +649,7 @@ export default function JarvisChat() {
 
         <p className="jarvis-input-note">Press ⌘J while Growth Operator is open to start a voice turn. Talk records one request and sends it to Jarvis. Jarvis never sends outreach or changes records without a confirmed action.</p>
         {speechError ? <div className="jarvis-error">{speechError}</div> : null}
-        {error && <div className="jarvis-error">{error}</div>}
+        {error && <div className="jarvis-error">{intentResearchTask ? `${error} No identity was added. Open the original public post above if you want to reply or message through that platform.` : error}</div>}
       </form>
     </div>
   );
