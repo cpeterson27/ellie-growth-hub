@@ -99,14 +99,13 @@ const prepareTextForSpeech = (text = "") =>
 export default function JarvisChat() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const intentResearchTask = searchParams.get("task") === "intent-identity";
   const containerRef = useRef(null);
-  const [messages, setMessages] = useState([
-    {
+  const [messages, setMessages] = useState(intentResearchTask ? [] : [{
       id: 1,
       type: "assistant",
       text: "Hello! I'm Jarvis, your AI assistant for marketing insights and campaign management. Ask me anything about your organizations, contacts, campaigns, or growth opportunities.",
-    },
-  ]);
+    }]);
   const [input, setInput] = useState(() => String(searchParams.get("prompt") || ""));
   const [nextId, setNextId] = useState(2);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
@@ -134,7 +133,6 @@ export default function JarvisChat() {
   const spokenResearchErrorRef = useRef("");
   const [researchStartedAt, setResearchStartedAt] = useState(null);
   const [researchElapsedSeconds, setResearchElapsedSeconds] = useState(0);
-  const intentResearchTask = searchParams.get("task") === "intent-identity";
   const researchSourceUrl = String(searchParams.get("sourceUrl") || "");
   const researchLeadLabel = String(searchParams.get("leadLabel") || "Saved intent lead");
   const researchReturnTo = String(searchParams.get("returnTo") || "/discovery?tab=leads");
@@ -585,7 +583,7 @@ export default function JarvisChat() {
         </div>
       </div>
 
-      {profileOpen && profile ? <form className="jarvis-persona-panel" onSubmit={saveProfile}>
+      {profileOpen && profile ? <form className="jarvis-persona-panel" onSubmit={saveProfile}><header><strong>Personalize Jarvis</strong><button type="button" onClick={() => setProfileOpen(false)}>Close ×</button></header>
         <label>Name<input value={profile.name} maxLength="40" onChange={(event) => setProfile({ ...profile, name: event.target.value })} /></label>
         <label>Greeting<input value={profile.greeting} maxLength="240" onChange={(event) => setProfile({ ...profile, greeting: event.target.value })} /></label>
         <label>Visual style<select value={profile.theme} onChange={(event) => setProfile({ ...profile, theme: event.target.value })}><option value="executive">Executive</option><option value="midnight">Midnight</option><option value="copper">Copper</option></select></label>
@@ -606,7 +604,7 @@ export default function JarvisChat() {
       </section> : null}
 
       <div className="jarvis-messages">
-        {messages.map((msg) => (
+        {messages.filter((msg) => !intentResearchTask || msg.type === "user" || msg.type === "error" || msg.data?.researchQuestion).map((msg) => (
           <div
             key={msg.id}
             className={`jarvis-message jarvis-message--${msg.type}`}
@@ -622,7 +620,7 @@ export default function JarvisChat() {
               {msg.activity?.length ? <div className="jarvis-activity"><p>Jarvis completed</p>{msg.activity.map((step, index) => <div key={`${msg.id}-${index}`}><span>{step.status === "warning" ? "!" : "✓"}</span>{step.label}</div>)}</div> : null}
               {msg.memorySources?.length ? <div className="jarvis-memory-sources"><strong>Vault notes consulted</strong>{msg.memorySources.map((source) => <span key={source}>{source}</span>)}</div> : null}
 
-              {msg.actions && msg.actions.length > 0 && (
+              {!intentResearchTask && msg.actions && msg.actions.length > 0 && (
                 <div className="jarvis-actions">
                   <p className="jarvis-actions-label">Available Actions:</p>
                   <div className="jarvis-actions-list">
@@ -640,7 +638,7 @@ export default function JarvisChat() {
                 </div>
               )}
 
-              {msg.type === "assistant" && !msg.savedAs && !msg.data?.people?.length ? (
+              {!intentResearchTask && msg.type === "assistant" && !msg.savedAs && !msg.data?.people?.length ? (
                 <div className="jarvis-draft-actions">
                   <button disabled={savingDraftId === msg.id} onClick={() => saveJarvisDraft(msg, "email_template")}>Save as email template</button>
                   <button disabled={savingDraftId === msg.id} onClick={() => saveJarvisDraft(msg, "social")}>Save as social draft</button>

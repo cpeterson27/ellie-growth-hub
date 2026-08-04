@@ -6,6 +6,7 @@
 .notification-panel > header > div { display: grid; gap: .15rem; }
 .notification-panel > header span { color: var(--text-muted); font-size: .72rem; }
 .notification-panel > header button { background: #173f35; border-radius: 8px; color: #fff; padding: .5rem .65rem; }
+.notification-panel__controls{display:flex;gap:.4rem}.notification-panel__controls button:first-child{background:#fff;color:#8b3529;border:1px solid #d8aaa2}
 .notification-list { overflow: auto; padding: .55rem; }
 .notification-list > button { margin: .3rem 0; padding: .8rem; width: 100%; }
 

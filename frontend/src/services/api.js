@@ -316,6 +316,9 @@ export const fetchResearchNotifications = () =>
 export const updateResearchNotification = (notificationId, read = true) =>
   api.patch(`/audience/research/notifications/${notificationId}`, { read }).then((res) => res.data);
 
+export const clearResearchNotifications = () =>
+  api.delete("/audience/research/notifications").then((res) => res.data);
+
 export const createResearchMonitor = (payload) =>
   api.post("/audience/research/monitors", payload).then((res) => res.data);
 

@@ -20,6 +20,7 @@ import {
   fetchResearchMonitorPresets,
   fetchResearchActivity,
   fetchResearchNotifications,
+  clearResearchNotifications,
   updateResearchNotification,
   fetchIntentSignals,
   fetchMarketResearchJob,
@@ -294,6 +295,24 @@ export default function Discovery() {
   const markNotificationRead = async (notification) => {
     await updateResearchNotification(notification._id, true);
     setNotifications((items) => items.map((item) => item._id === notification._id ? { ...item, readAt: new Date().toISOString() } : item));
+  };
+
+  const openNotification = async (notification) => {
+    await markNotificationRead(notification);
+    setShowNotifications(false);
+    if (["high_score", "published_email", "qualified_lead"].includes(notification.type)) {
+      setActiveTab("leads");
+      setLeadView(notification.type === "qualified_lead" ? "qualified" : "all");
+    } else {
+      setActiveTab("monitoring");
+    }
+  };
+
+  const clearNotifications = async () => {
+    await clearResearchNotifications();
+    setNotifications([]);
+    setShowNotifications(false);
+    setNotice("Notifications cleared. Monitoring and leads were not changed.");
   };
 
   const visibleSignals = intentSignals.filter((signal) => leadView === "all" ? signal.status !== "dismissed" : signal.status === leadView);
@@ -580,7 +599,7 @@ export default function Discovery() {
       <button className="notification-button" type="button" onClick={() => setShowNotifications((value) => !value)} aria-expanded={showNotifications}>Notifications <span>{notifications.filter((item) => !item.readAt).length}</span></button>
     </header>
 
-    {showNotifications ? <div className="notification-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowNotifications(false); }}><section className="notification-panel" role="dialog" aria-modal="true" aria-label="Monitoring notifications"><header><div><strong>Notifications</strong><span>{notifications.filter((item) => !item.readAt).length} unread</span></div><button type="button" onClick={() => setShowNotifications(false)} aria-label="Close notifications">Close ×</button></header><div className="notification-list">{notifications.length ? notifications.slice(0, 20).map((item) => <button type="button" key={item._id} className={item.readAt ? "is-read" : ""} onClick={() => markNotificationRead(item)}><strong>{item.type === "source_failure" ? "Some sources are retrying" : item.title}</strong><span>{item.type === "source_failure" ? "Growth Operator completed with other sources. No action is required unless all sources stop working." : item.message}</span><small>{new Date(item.createdAt).toLocaleString()}</small></button>) : <p>No notifications yet.</p>}</div></section></div> : null}
+    {showNotifications ? <div className="notification-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowNotifications(false); }}><section className="notification-panel" role="dialog" aria-modal="true" aria-label="Monitoring notifications"><header><div><strong>Notifications</strong><span>{notifications.filter((item) => !item.readAt).length} unread · select one to open its destination</span></div><div className="notification-panel__controls">{notifications.length ? <button type="button" onClick={clearNotifications}>Clear all</button> : null}<button type="button" onClick={() => setShowNotifications(false)} aria-label="Close notifications">Close ×</button></div></header><div className="notification-list">{notifications.length ? notifications.slice(0, 20).map((item) => <button type="button" key={item._id} className={item.readAt ? "is-read" : ""} onClick={() => openNotification(item)}><strong>{item.type === "source_failure" ? "Some sources are retrying" : item.title}</strong><span>{item.type === "source_failure" ? "Other sources still completed. Select this to open monitoring details." : item.message}</span><small>{new Date(item.createdAt).toLocaleString()} · Open { ["high_score", "published_email", "qualified_lead"].includes(item.type) ? "Live Leads" : "Intent Monitoring"}</small></button>) : <p>No notifications yet.</p>}</div></section></div> : null}
 
     <nav className="discovery-tabs" aria-label="Organization discovery workspaces">{[["company", "Company Discovery"], ["monitoring", "Intent Monitoring"], ["leads", "Live Leads"], ["people", "People Research"], ["saved", "Saved Searches"]].map(([id, label]) => <button key={id} type="button" className={activeTab === id ? "is-active" : ""} onClick={() => setActiveTab(id)}>{label}{id === "leads" && intentSignals.filter((item) => item.status === "new").length ? <span>{intentSignals.filter((item) => item.status === "new").length}</span> : null}</button>)}</nav>
 
@@ -615,11 +634,11 @@ export default function Discovery() {
       <div className="monitor-setup-actions"><Button loading={monitorSaving} disabled={!monitorDraft.query.trim()} onClick={createMonitor}>Start this monitor</Button><small>You can pause it at any time. No outreach is ever sent.</small></div></section> : null}
       {monitors.length ? <div className="intent-monitor-list">{monitors.map((monitor) => { const failures = (monitor.sourceHealth || []).filter((health) => ["failed", "blocked", "rate_limited"].includes(health.state)); return <article key={monitor._id}>
         <header className="monitor-card-header"><div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? "Monitoring is on" : "Monitoring paused"}</span><strong>{monitor.name}</strong></div><div className="intent-monitor-actions"><Button size="sm" onClick={() => openQualityEditor(monitor)}>Improve lead quality</Button><Button size="sm" variant="outline" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Check now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button></div></header>
-        <div className="monitor-card-summary"><div><strong>{monitor.totals?.signalsFound || 0}</strong><span>historical matches across all runs</span></div><div><strong>{monitor.nextRunAt ? new Date(monitor.nextRunAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</strong><span>next automatic check</span></div><div><strong>{failures.length}</strong><span>sources needing attention</span></div></div>
-        <div className="monitor-count-explainer"><strong>Why this is not your Live Leads count</strong><span>The historical total includes repeat discoveries and signals later rejected or dismissed. Live Leads shows only the current, deduplicated review queue.</span><button type="button" onClick={() => setActiveTab("leads")}>Open Live Leads</button></div>
+        <div className="monitor-card-summary"><div><strong>{monitor.totals?.signalsFound || 0}</strong><span>raw public matches processed—not leads</span></div><div><strong>{monitor.nextRunAt ? new Date(monitor.nextRunAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</strong><span>next automatic check</span></div><div><strong>{failures.length}</strong><span>optional sources retrying</span></div></div>
+        <div className="monitor-count-explainer"><strong>Where are the actual leads?</strong><span>This raw total includes duplicates, rejected posts, and the same item seen again. Only deduplicated adult-buyer candidates appear in Live Leads. There is nothing to review inside the raw total itself.</span><button type="button" onClick={() => setActiveTab("leads")}>Review actual Live Leads</button></div>
         <p className="monitor-last-result">Latest check: {friendlyMonitorMessage(monitor.lastRunMessage) || "Waiting for the first check."}</p>
         {qualityEditingId === String(monitor._id) ? <section className="quality-editor"><header><div><span>Improve future results</span><h3>Teach Growth Operator what a good lead looks like</h3></div><button type="button" onClick={() => setQualityEditingId("")}>Close</button></header><div><label><span>Who is a good buyer?</span><textarea value={qualityDraft.query} onChange={(event) => setQualityDraft((current) => ({ ...current, query: event.target.value }))} /><small>Describe an adult with the role, business situation, and reason they could benefit from the event.</small></label><label><span>Language that signals buying interest</span><textarea value={qualityDraft.keywords} onChange={(event) => setQualityDraft((current) => ({ ...current, keywords: event.target.value }))} /><small>Use specific phrases such as “looking for a business coach” or “need systems to scale.”</small></label><label><span>Always reject</span><textarea value={qualityDraft.negativeKeywords} onChange={(event) => setQualityDraft((current) => ({ ...current, negativeKeywords: event.target.value }))} /><small>Minors, schoolwork, no-budget posts, promotions, and job seekers are also blocked automatically.</small></label></div><footer><Button loading={qualitySaving} onClick={() => saveLeadQuality(monitor)}>Save and check again</Button><span>This changes future monitoring. It does not contact anyone.</span></footer></section> : null}
-        <details className="monitor-details"><summary>Advanced: source health</summary><p>These sources work independently. A temporary limit does not stop the monitor; Growth Operator keeps the successful results and retries automatically.</p><div className="source-health-list">{(monitor.sourceHealth || []).map((health) => <div key={health.source} className={`is-${health.state}`}><span className="source-health-dot"></span><strong>{health.source.replaceAll("_", " ")}</strong><span>{friendlySourceState(health.state)}</span><small>{health.resultsCollected || 0} collected</small><small>{health.lastSuccessfulCheck ? `Checked ${new Date(health.lastSuccessfulCheck).toLocaleString()}` : "Will retry automatically"}</small><button type="button" onClick={() => toggleExistingSource(monitor, health.source)}>{(monitor.sources || []).includes(health.source) ? "Disable" : "Enable"}</button></div>)}</div></details>
+        <details className="monitor-details"><summary>Advanced: source health</summary><p>These are raw posts and pages checked—not qualified leads. Large numbers, such as Stack Exchange, mostly become rejected noise. Temporary limits are retried automatically and do not stop successful sources.</p><div className="source-health-list">{(monitor.sourceHealth || []).map((health) => <div key={health.source} className={`is-${health.state}`}><span className="source-health-dot"></span><strong>{health.source.replaceAll("_", " ")}</strong><span>{friendlySourceState(health.state)}</span><small>{health.resultsCollected || 0} raw items checked (not leads)</small><small>{health.lastSuccessfulCheck ? `Checked ${new Date(health.lastSuccessfulCheck).toLocaleString()}` : "Will retry automatically"}</small><button type="button" onClick={() => toggleExistingSource(monitor, health.source)}>{(monitor.sources || []).includes(health.source) ? "Disable" : "Enable"}</button></div>)}</div></details>
       </article>; })}</div> : <div className="friendly-empty"><strong>No monitors yet</strong><p>Create one above and Growth Operator will start listening automatically.</p></div>}
     </DashboardCard>
 

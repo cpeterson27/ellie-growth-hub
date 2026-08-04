@@ -133,6 +133,11 @@ router.patch("/research/notifications/:notificationId", async (req, res) => {
   return res.json({ success: true, notification });
 });
 
+router.delete("/research/notifications", async (req, res) => {
+  const result = await InAppNotification.deleteMany({ workspaceId: req.auth.workspaceId });
+  return res.json({ success: true, deleted: result.deletedCount || 0 });
+});
+
 router.get("/research/signals", async (req, res) => {
   const limit = Math.min(250, Math.max(1, Number(req.query.limit) || 100));
   const filter = { workspaceId: req.auth.workspaceId };

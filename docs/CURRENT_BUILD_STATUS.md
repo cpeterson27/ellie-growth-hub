@@ -24,6 +24,9 @@
 - Jarvis identity tasks now show elapsed time, a normal 1–3 minute expectation, explicit completion/failure states, and an always-visible result transcript. Findings speak automatically; when OpenAI speech is unavailable or out of credits, Jarvis uses the device's built-in browser voice and automatically returns to the selected OpenAI voice when service is available again.
 - If paid OpenAI web research is unavailable, exact public-account searches fall back to Growth Operator's Bing, Reddit, Bluesky, Hacker News, Stack Exchange, and DuckDuckGo adapters. Matching links are presented as clues for manual evidence review and never treated as proof that two usernames belong to the same person.
 - Singular requests such as “research 1 prospect/contact” are now routed into identity research instead of the generic workspace-summary chat. The identity screen uses an honest indeterminate activity bar (not a fabricated percentage), names the current search/validation stage, explains that interim zero counts are not results, and offers a restart after four minutes rather than waiting indefinitely.
+- Identity tasks suppress unrelated organization summaries, generic campaign actions, and content-save buttons. Their responsive layout stacks below 1,100px so the transcript and results remain visible without fullscreen; Personalize opens as an explicit editable panel with a close control.
+- Monitor totals and per-source counts are labeled as raw processed items—not leads. Live Leads remains the only deduplicated human-review queue. Notifications now open the relevant Leads or Monitoring destination and can be permanently cleared without changing monitoring or lead data.
+- Evidence-backed OpenAI and no-credit fallback research summaries are recorded through the existing opt-in Jarvis memory bridge when it is connected. Raw scraped pages and unsupported identity guesses are not written as facts.
 
 ## Product decisions
 
