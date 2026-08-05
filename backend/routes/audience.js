@@ -22,7 +22,7 @@ const { previewOrganizationImport, importOrganizations } = require("../services/
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
-const { buyerIntentAssessment, requestResearchMonitorRun, scoreSignal } = require("../services/researchMonitorService");
+const { buyerIntentAssessment, requestResearchMonitorRun, runResearchMonitor, scoreSignal } = require("../services/researchMonitorService");
 const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEmailDraftService");
 
 const AUGUST_22_PRESET = {
@@ -93,6 +93,11 @@ router.post("/research/monitors", async (req, res) => {
       runRequestedAt: new Date(),
       sourceHealth: (requestedSources.length ? requestedSources : ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]).map((source) => ({ source, enabled: true, state: "never", nextScheduledAttempt: new Date() })),
     });
+    // A new monitor always performs its first check immediately. The selected
+    // interval controls subsequent checks, not the initial one.
+    setImmediate(() => runResearchMonitor(monitor._id).catch((error) => {
+      console.error("Immediate first monitor run failed:", error.message || error);
+    }));
     return res.status(201).json({ success: true, monitor });
   } catch (error) {
     return res.status(400).json({ success: false, error: error.message || "Unable to create the monitor." });
