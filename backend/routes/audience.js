@@ -41,7 +41,7 @@ const AUGUST_22_PRESET = {
 };
 
 const router = express.Router();
-const RECOMMENDED_MONITOR_SOURCES = ["google_web", "bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
+const RECOMMENDED_MONITOR_SOURCES = ["bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
 
 router.get("/research/sources", (_req, res) => {
   return res.json({

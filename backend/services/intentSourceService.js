@@ -170,8 +170,20 @@ async function searchRedditRss(monitor, limit) {
 }
 
 async function searchBingWeb(monitor, limit) {
-  const url = `https://www.bing.com/search?q=${encodeURIComponent(booleanQueryFor(monitor))}&format=rss`;
-  const signals = await fetchFeed(url, "bing_web", "Bing public web result feed", limit);
+  const baseQuery = booleanQueryFor(monitor);
+  const queries = [
+    `(site:facebook.com/groups OR site:linkedin.com/groups OR site:x.com OR site:twitter.com OR site:instagram.com OR site:threads.net) (${baseQuery})`,
+    `(site:youtube.com OR site:biggerpockets.com OR site:meetup.com OR site:eventbrite.com) (${baseQuery})`,
+    `(site:discord.com OR site:discord.gg OR inurl:forum OR "real estate investors association" OR "local REIA") (${baseQuery})`,
+    baseQuery,
+  ];
+  const responses = await Promise.allSettled(queries.map((query) => {
+    const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&format=rss`;
+    return fetchFeed(url, "bing_web", "Bing public web and community result", limit);
+  }));
+  const successful = responses.filter((response) => response.status === "fulfilled");
+  if (!successful.length) throw responses[0]?.reason || new Error("Bing returned no usable search responses.");
+  const signals = [...new Map(successful.flatMap((response) => response.value).map((signal) => [signal.sourceUrl, signal])).values()].slice(0, limit);
   return signals.map((signal) => {
     try { return { ...signal, organizationDomain: new URL(signal.sourceUrl).hostname.replace(/^www\./, "") }; }
     catch (_error) { return signal; }
@@ -285,7 +297,7 @@ const ADAPTERS = {
 
 async function collectMonitorSignals(monitor) {
   const limit = Math.min(100, Math.max(5, Number(monitor.maxResultsPerSource) || 25));
-  const selected = monitor.sources?.length ? monitor.sources : ["google_web", "bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
+  const selected = monitor.sources?.length ? monitor.sources : ["bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
   const work = selected.filter((source) => ADAPTERS[source]).map(async (source) => ({ source, signals: await ADAPTERS[source](monitor, limit) }));
   if ((monitor.feedUrls || []).length) work.push(searchConfiguredFeeds(monitor, limit).then((signals) => ({ source: "feeds", signals })));
   const settled = await Promise.allSettled(work);
