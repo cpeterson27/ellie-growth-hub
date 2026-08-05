@@ -21,6 +21,13 @@ function scoreSignal(signal, monitor) {
   const negative = (monitor.negativeKeywords || []).map((value) => String(value).toLowerCase()).filter(Boolean);
   const matched = positive.filter((keyword) => {
     if (content.includes(keyword)) return true;
+    const concepts = [
+      [/multifamily|real estate invest/, /\b(?:apartment|apartments|rental propert|investment propert|units?|landlord|portfolio|cap rate)\b/],
+      [/raise capital|financ/, /\b(?:capital|funding|funds|loan|lender|hard money|financing)\b/],
+      [/start|buy.*business|entrepreneur/, /\b(?:business owner|founder|entrepreneur|acquisition|buy a business|start a business)\b/],
+      [/scale|business systems?/, /\b(?:scale|systems?|operations|process|growth|overwhelmed|stuck)\b/],
+    ];
+    if (concepts.some(([keywordPattern, contentPattern]) => keywordPattern.test(keyword) && contentPattern.test(content))) return true;
     const words = keyword.split(/\s+/).filter((word) => word.length > 3);
     return words.length > 1 && words.filter((word) => content.includes(word)).length >= Math.ceil(words.length / 2);
   });
