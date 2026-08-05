@@ -195,7 +195,8 @@ async function runResearchMonitor(monitorId) {
       } catch (_error) { await IntentSignal.updateOne({ _id: candidate.signalId }, { $set: { websiteResearchStatus: "failed" } }); }
     }
     await activity(monitor, runId, "websites_researched", `Researched ${websitesResearched} public websites.`, websitesResearched);
-    await activity(monitor, runId, "leads_prepared", `${found} buyer-intent signals passed the filters.`, found);
+    const resultLabel = isCommunityPartnerMonitor(monitor) ? "community partner leads" : "buyer-intent signals";
+    await activity(monitor, runId, "leads_prepared", `${found} ${resultLabel} passed the filters.`, found);
     for (const failure of collected.failures) {
       await activity(monitor, runId, "source_failure", `${failure.source} failed: ${failure.message}`, 1, failure);
     }
@@ -205,7 +206,7 @@ async function runResearchMonitor(monitorId) {
     for (const group of collected.groups) priorHealth.set(group.source, { source: group.source, enabled: true, lastSuccessfulCheck: new Date(), lastErrorAt: priorHealth.get(group.source)?.lastErrorAt || null, lastError: "", resultsCollected: (priorHealth.get(group.source)?.resultsCollected || 0) + group.signals.length, state: "healthy", nextScheduledAttempt: nextRunAt });
     for (const failure of collected.failures) priorHealth.set(failure.source, { source: failure.source, enabled: true, lastSuccessfulCheck: priorHealth.get(failure.source)?.lastSuccessfulCheck || null, lastErrorAt: new Date(), lastError: failure.message, resultsCollected: priorHealth.get(failure.source)?.resultsCollected || 0, state: failure.state, nextScheduledAttempt: nextRunAt });
     monitor.lastRunStatus = collected.failures.length ? "partial" : "completed";
-    monitor.lastRunMessage = `${found} buyer-intent signals passed the filters; ${rejected} weak matches rejected${collected.failures.length ? `; ${collected.failures.length} optional source retry(s)` : ""}.`;
+    monitor.lastRunMessage = `${found} ${resultLabel} passed the filters; ${rejected} weak matches rejected${collected.failures.length ? `; ${collected.failures.length} optional source retry(s)` : ""}.`;
     const activeSignalFilter = { workspaceId: monitor.workspaceId, monitorId: monitor._id, audienceEligible: { $ne: false }, status: { $ne: "dismissed" } };
     const [activeSignalCount, activeQualifiedCount] = await Promise.all([
       IntentSignal.countDocuments(activeSignalFilter),
