@@ -96,4 +96,4 @@ async function researchPublicWebsite(startUrl) {
   return { status: "completed", emails, people, evidence: pages.map((page) => ({ label: "Public company website", url: page.url, observedAt: new Date() })) };
 }
 
-module.exports = { pageLinks, plainText, researchPublicWebsite, safeUrl };
+module.exports = { fetchPublicPage, pageLinks, plainText, researchPublicWebsite, safeUrl };

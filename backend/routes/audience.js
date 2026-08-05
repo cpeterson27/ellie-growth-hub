@@ -37,6 +37,7 @@ const AUGUST_22_PRESET = {
     { name: "Growth and systems", phrases: ["scale my business", "need business systems", "stuck in my business", "looking for a business coach"] },
     { name: "Real estate wealth", phrases: ["real estate investor", "multifamily investing", "grow my real estate portfolio", "start an investment company"] },
   ],
+  feedUrls: ["https://www.biggerpockets.com/forums"],
   intervalMinutes: 30,
 };
 

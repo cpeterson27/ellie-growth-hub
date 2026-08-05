@@ -1,6 +1,6 @@
 const axios = require("axios");
 const crypto = require("node:crypto");
-const { safeUrl } = require("./publicWebsiteResearchService");
+const { fetchPublicPage, plainText, safeUrl } = require("./publicWebsiteResearchService");
 
 const USER_AGENT = "GrowthOperatorResearchBot/1.0 (+https://ellie-ai-backend.onrender.com/gpt-actions/privacy; support@elliescoaching.com)";
 const REQUEST_TIMEOUT = 20000;
@@ -254,10 +254,111 @@ async function searchSecFormD(monitor, limit) {
   return filtered.slice(0, limit);
 }
 
+const DISCUSSION_PATH = /\/(?:topics?|threads?|discussions?|posts?)\//i;
+const COMMUNITY_PATH = /\/(?:forums?|community|groups?)(?:\/|$)/i;
+
+function htmlMeta(html, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = [
+    new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']*)["']`, "i"),
+    new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${escaped}["']`, "i"),
+  ];
+  return decodeEntities(patterns.map((pattern) => html.match(pattern)?.[1]).find(Boolean) || "");
+}
+
+function publicPageLinks(html, baseUrl) {
+  const base = new URL(baseUrl);
+  return [...String(html || "").matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map((match) => {
+    try {
+      const url = new URL(decodeEntities(match[1]), base);
+      if (!/^https?:$/.test(url.protocol) || url.hostname !== base.hostname) return null;
+      url.hash = "";
+      return { url: url.toString(), label: decodeEntities(clean(match[2])) };
+    } catch (_error) { return null; }
+  }).filter(Boolean);
+}
+
+function relevanceScore(link, monitor) {
+  const text = `${link.label} ${link.url}`.toLowerCase();
+  const needles = termsFor(monitor, 12).flatMap((term) => term.toLowerCase().split(/\s+/)).filter((term) => term.length > 3);
+  return needles.reduce((score, term) => score + (text.includes(term) ? 2 : 0), 0) + (DISCUSSION_PATH.test(link.url) ? 20 : 0);
+}
+
+function structuredDiscussion(html) {
+  for (const match of String(html || "").matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      const queue = Array.isArray(parsed) ? [...parsed] : [parsed];
+      while (queue.length) {
+        const item = queue.shift();
+        if (!item || typeof item !== "object") continue;
+        if (Array.isArray(item)) { queue.push(...item); continue; }
+        const main = item.mainEntity && typeof item.mainEntity === "object" ? item.mainEntity : item;
+        const types = [main["@type"], item["@type"]].flat().filter(Boolean);
+        if (types.some((type) => ["DiscussionForumPosting", "Question", "QAPage"].includes(type)) && (main.articleBody || main.text || main.headline || main.name)) {
+          return {
+            title: main.headline || main.name || "",
+            excerpt: main.articleBody || main.text || "",
+            authorName: main.author?.name || item.author?.name || "",
+            authorUrl: main.author?.url || item.author?.url || "",
+            publishedAt: main.datePublished || main.dateCreated || item.datePublished || "",
+          };
+        }
+        for (const value of Object.values(item)) if (value && typeof value === "object") queue.push(value);
+      }
+    } catch (_error) {}
+  }
+  return null;
+}
+
+async function crawlConfiguredSite(startUrl, monitor, limit) {
+  let first;
+  try { first = await fetchPublicPage(startUrl); }
+  catch (error) {
+    if (/not an HTML page/i.test(error.message || "")) return fetchFeed(startUrl, "configured_feed", "User-added public feed", limit);
+    throw error;
+  }
+  if (first.blocked) throw new Error("The site blocks public crawling in robots.txt.");
+  if (/^\s*<\?xml|<rss\b|<feed\b/i.test(first.html)) return extractXmlItems(first.html).slice(0, limit).map((item) => normalizeSignal("configured_feed", {
+    sourceId: item.id || item.link, sourceUrl: item.link, title: item.title, excerpt: item.description,
+    authorName: item.author, publishedAt: item.publishedAt, evidenceLabel: "User-added public feed",
+  })).filter(Boolean);
+
+  const links = publicPageLinks(first.html, first.url);
+  let discussions = links.filter((link) => DISCUSSION_PATH.test(new URL(link.url).pathname));
+  if (!discussions.length) {
+    const hubs = [...new Map(links.filter((link) => COMMUNITY_PATH.test(new URL(link.url).pathname)).sort((a, b) => relevanceScore(b, monitor) - relevanceScore(a, monitor)).map((link) => [link.url, link])).values()].slice(0, 6);
+    const hubPages = await Promise.allSettled(hubs.map((hub) => fetchPublicPage(hub.url)));
+    discussions = hubPages.flatMap((result) => result.status === "fulfilled" && !result.value.blocked ? publicPageLinks(result.value.html, result.value.url) : []).filter((link) => DISCUSSION_PATH.test(new URL(link.url).pathname));
+  }
+  const targets = [...new Map(discussions.sort((a, b) => relevanceScore(b, monitor) - relevanceScore(a, monitor)).map((link) => [link.url, link])).values()].slice(0, Math.min(limit, 20));
+  const pages = await Promise.allSettled(targets.map((target) => fetchPublicPage(target.url)));
+  const host = new URL(first.url).hostname.replace(/^www\./, "");
+  return pages.flatMap((result, index) => {
+    const target = targets[index];
+    if (result.status !== "fulfilled" || result.value.blocked) return [];
+    const html = result.value.html;
+    const discussion = structuredDiscussion(html);
+    const title = discussion?.title || htmlMeta(html, "og:title") || decodeEntities(clean(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1])) || target.label;
+    const excerpt = discussion?.excerpt || htmlMeta(html, "og:description") || htmlMeta(html, "description") || plainText(html).slice(0, 6000);
+    return [normalizeSignal("configured_site", {
+      sourceId: result.value.url, sourceUrl: result.value.url, title, excerpt,
+      authorName: discussion?.authorName || htmlMeta(html, "author"), authorUrl: discussion?.authorUrl || "",
+      organizationDomain: host, publishedAt: discussion?.publishedAt || htmlMeta(html, "article:published_time") || htmlMeta(html, "datePublished"),
+      evidenceLabel: "User-added public community page", raw: { seedUrl: startUrl },
+    })].filter(Boolean);
+  });
+}
+
 async function searchConfiguredFeeds(monitor, limit) {
   const urls = (monitor.feedUrls || []).filter(Boolean).slice(0, 30);
-  const groups = await Promise.allSettled(urls.map((url) => fetchFeed(url, url.includes("discourse") ? "discourse" : "rss", "Public RSS or Atom feed", limit)));
-  return groups.flatMap((group) => group.status === "fulfilled" ? group.value : []);
+  const groups = [];
+  for (let index = 0; index < urls.length; index += 3) {
+    groups.push(...await Promise.allSettled(urls.slice(index, index + 3).map((url) => crawlConfiguredSite(url, monitor, limit))));
+  }
+  const signals = groups.flatMap((group) => group.status === "fulfilled" ? group.value : []);
+  if (!signals.length && groups.some((group) => group.status === "rejected")) throw groups.find((group) => group.status === "rejected").reason;
+  return [...new Map(signals.map((signal) => [signal.sourceUrl, signal])).values()].slice(0, limit * Math.max(1, urls.length));
 }
 
 function unwrapDuckDuckGoUrl(rawUrl) {
@@ -315,4 +416,4 @@ async function collectMonitorSignals(monitor) {
   };
 }
 
-module.exports = { booleanQueryFor, collectMonitorSignals, extractXmlItems, normalizeSignal, queryFor, termsFor };
+module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, extractXmlItems, normalizeSignal, queryFor, termsFor };

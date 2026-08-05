@@ -19,7 +19,11 @@ function scoreSignal(signal, monitor) {
   const categoryPhrases = (monitor.intentCategories || []).flatMap((category) => category.phrases || []);
   const positive = [...(monitor.keywords || []), ...categoryPhrases, ...(monitor.locations || [])].map((value) => String(value).toLowerCase()).filter(Boolean);
   const negative = (monitor.negativeKeywords || []).map((value) => String(value).toLowerCase()).filter(Boolean);
-  const matched = positive.filter((keyword) => content.includes(keyword));
+  const matched = positive.filter((keyword) => {
+    if (content.includes(keyword)) return true;
+    const words = keyword.split(/\s+/).filter((word) => word.length > 3);
+    return words.length > 1 && words.filter((word) => content.includes(word)).length >= Math.ceil(words.length / 2);
+  });
   const excluded = negative.filter((keyword) => content.includes(keyword));
   const buyer = buyerIntentAssessment(signal);
   let score = buyer.eligible ? 40 : 0;
@@ -71,6 +75,7 @@ function buyerIntentAssessment(signal) {
     [/\b(?:i(?:'m| am)|we(?:'re| are)) (?:actively )?looking for (?:a |an )?(?:coach|mentor|consultant|program|community|system|solution|event|training|advice|help)\b/, "Actively looking for help or a solution"],
     [/\b(?:how (?:do|can|should) i|what should i do)\b/, "Asks how to solve a current problem"],
     [/\b(?:i want to|we want to|i(?:'m| am) ready to|we(?:'re| are) ready to|i plan to|planning to) (?:start|buy|scale|grow|leave|quit|invest|build|systemize)\b/, "States a current business or investment goal"],
+    [/\b(?:i(?:'m| am)|we(?:'re| are)) (?:thinking about|considering|trying to|looking to|exploring)\b|\bthinking about (?:my|our|the) next move\b/, "Actively considering a next business or investment move"],
     [/\b(?:struggling (?:to|with)|stuck (?:in|with)|overwhelmed (?:by|with))\b/, "Describes a current business challenge"],
     [/\b(?:can anyone recommend|recommendations? for|seeking (?:a |an )?(?:coach|mentor|consultant|program|community|system|solution))\b/, "Requests a recommendation"],
   ];
