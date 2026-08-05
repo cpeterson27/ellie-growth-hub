@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, updateCampaignRegistrationLinks, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchContacts, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, updateCampaignRegistrationLinks, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -25,6 +25,8 @@ export default function CampaignWorkspace() {
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [emailPreview, setEmailPreview] = useState(null);
+  const [previewContacts, setPreviewContacts] = useState([]);
+  const [previewContactId, setPreviewContactId] = useState("");
   const [templateAudience, setTemplateAudience] = useState("general");
   const [activeSection, setActiveSection] = useState("email");
 
@@ -34,6 +36,15 @@ export default function CampaignWorkspace() {
       .then(setCampaign)
       .catch((err) => setError(err.response?.data?.error || "Unable to load campaign."))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchContacts({ campaignId: id, limit: 500 }).then((response) => {
+      const contacts = response.data || [];
+      setPreviewContacts(contacts);
+      setPreviewContactId((current) => current || String(contacts[0]?._id || ""));
+    }).catch(() => setPreviewContacts([]));
   }, [id]);
 
   useEffect(() => {
@@ -153,6 +164,7 @@ export default function CampaignWorkspace() {
         meetupEnabled: campaign.registrationLinks?.meetup?.enabled === true,
         meetupUrl: campaign.registrationLinks?.meetup?.url || "",
         meetupLabel: campaign.registrationLinks?.meetup?.label || "View on Meetup",
+        previewContactId,
       }));
     } catch (err) {
       setError(err.response?.data?.error || "Unable to prepare the email preview.");
@@ -227,10 +239,11 @@ export default function CampaignWorkspace() {
                 <label><span>Meetup button link</span><input type="url" value={campaign.registrationLinks?.meetup?.url || ""} onChange={(event) => updateMeetupButton("url", event.target.value)} placeholder="https://www.meetup.com/..." /></label>
               </> : null}
             </div>
-            <p className="campaign-template-help">Use {"{{firstName}}"}, {"{{campaignName}}"}, {"{{programName}}"}, and {"{{eventLink}}"} for personalization.</p>
+            <p className="campaign-template-help">Use {"{{firstName}}"}, {"{{company}}"}, {"{{campaignName}}"}, {"{{programName}}"}, and {"{{eventLink}}"} for personalization.</p>
+            <label><span>Preview as an assigned contact</span><select value={previewContactId} onChange={(event) => setPreviewContactId(event.target.value)}><option value="">Example contact and company</option>{previewContacts.map((contact) => <option key={contact._id} value={contact._id}>{contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed contact"}{contact.company ? ` · ${contact.company}` : " · company missing"}</option>)}</select><small>The preview uses this contact’s saved first name and company. It does not send an email.</small></label>
             <div className="campaign-auto-footer"><strong>Added automatically to every sent email</strong><span>Your business name and postal address from Settings</span><span className="campaign-unsubscribe-preview">Unsubscribe from campaign emails</span></div>
             <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={previewTemplate}>Preview complete email</Button><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
-            {emailPreview ? <div className="campaign-email-preview"><div><strong>Subject:</strong> {emailPreview.subject}<button type="button" onClick={() => setEmailPreview(null)}>Close preview</button></div><iframe title="Complete campaign email preview" srcDoc={emailPreview.html} sandbox="allow-popups allow-popups-to-escape-sandbox" /></div> : null}
+            {emailPreview ? <div className="campaign-email-preview"><div><strong>Previewing:</strong> {emailPreview.previewRecipient?.name} · {emailPreview.previewRecipient?.company || "company missing"}<br/><strong>Subject:</strong> {emailPreview.subject}<button type="button" onClick={() => setEmailPreview(null)}>Close preview</button></div><iframe title="Complete campaign email preview" srcDoc={emailPreview.html} sandbox="allow-popups allow-popups-to-escape-sandbox" /></div> : null}
             {templateVersions.length ? <small>{templateVersions.length} immutable approved version{templateVersions.length === 1 ? "" : "s"} saved.</small> : null}
           </div> : <p>Loading the master template…</p>}
         </DashboardCard> : null}

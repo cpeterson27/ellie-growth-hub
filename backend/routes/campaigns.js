@@ -1,5 +1,6 @@
 const express = require("express");
 const Campaign = require("../models/Campaign");
+const Contact = require("../models/Contact");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 const Event = require("../models/Event");
 const Outreach = require("../models/Outreach");
@@ -190,10 +191,18 @@ router.post("/:id/email-template/preview", async (req, res) => {
       },
     };
   }
-  const draft = generateOutreachDraft(
-    { firstName: "Cassandra", lastName: "", name: "Cassandra", email: "preview@example.com", sources: ["preview"] },
-    previewCampaign,
-  );
+  const requestedContactId = String(req.body?.previewContactId || "");
+  const previewContact = /^[a-f0-9]{24}$/i.test(requestedContactId)
+    ? await Contact.findOne({ _id: requestedContactId, campaignIds: campaign._id }).lean()
+    : null;
+  const draft = generateOutreachDraft(previewContact || {
+    firstName: "Preview",
+    lastName: "Contact",
+    name: "Preview Contact",
+    company: "Example Multifamily Community",
+    email: "preview@example.com",
+    sources: ["preview"],
+  }, previewCampaign);
   const workspace = await WorkspaceConfig.findOne({ key: "primary" }).lean();
   const businessName = workspace?.legalBusinessName || workspace?.workspaceName || "Ellie's Coaching";
   const postalAddress = workspace?.postalAddress || "Business postal address from Settings";
@@ -203,7 +212,15 @@ router.post("/:id/email-template/preview", async (req, res) => {
     ? draft.htmlBody.replace("</body>", `${footerHtml}</body>`)
     : `${draft.htmlBody}${footerHtml}`;
 
-  return res.json({ subject: draft.subject, html });
+  return res.json({
+    subject: draft.subject,
+    html,
+    previewRecipient: previewContact ? {
+      id: previewContact._id,
+      name: previewContact.name || [previewContact.firstName, previewContact.lastName].filter(Boolean).join(" "),
+      company: previewContact.companyNameForEmails || previewContact.company || "",
+    } : { name: "Preview Contact", company: "Example Multifamily Community" },
+  });
 });
 
 router.put("/:id/email-template", requireRole("owner", "admin", "member"), async (req, res) => {

@@ -111,6 +111,7 @@ router.get("/", async (req, res) => {
       researchStatus,
       qualifyContact,
       emailStatus,
+      campaignId,
     } = req.query;
 
     const query = status ? { status } : { status: { $ne: "archived" } };
@@ -125,6 +126,7 @@ router.get("/", async (req, res) => {
     if (researchStatus) query.researchStatus = researchStatus;
     if (qualifyContact !== undefined) query.qualifyContact = String(qualifyContact) === "true";
     if (emailStatus) query.emailStatus = emailStatus;
+    if (campaignId && mongoose.Types.ObjectId.isValid(campaignId)) query.campaignIds = campaignId;
 
     const total = await Contact.countDocuments(query);
     const contacts = await Contact.find(query)
