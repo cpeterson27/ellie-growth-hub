@@ -285,7 +285,7 @@ const ADAPTERS = {
 
 async function collectMonitorSignals(monitor) {
   const limit = Math.min(100, Math.max(5, Number(monitor.maxResultsPerSource) || 25));
-  const selected = monitor.sources?.length ? monitor.sources : ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"];
+  const selected = monitor.sources?.length ? monitor.sources : ["google_web", "bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
   const work = selected.filter((source) => ADAPTERS[source]).map(async (source) => ({ source, signals: await ADAPTERS[source](monitor, limit) }));
   if ((monitor.feedUrls || []).length) work.push(searchConfiguredFeeds(monitor, limit).then((signals) => ({ source: "feeds", signals })));
   const settled = await Promise.allSettled(work);

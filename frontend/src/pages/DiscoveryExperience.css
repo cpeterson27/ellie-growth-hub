@@ -63,6 +63,8 @@
 .monitor-run-progress p { color: #47645b; margin: 0; }
 .monitor-run-progress small { color: #6c7e78; }
 @keyframes monitor-spin { to { transform: rotate(360deg); } }
+.intent-source-chips button.is-optional { border-style: dashed; color: #806236; }
+.intent-source-chips button.is-optional.is-on { background: #fff5df; border-color: #c59b48; color: #725218; }
 .monitor-card-summary > div { display: grid; gap: .15rem; padding: 1rem; }
 .monitor-card-summary > div + div { border-left: 1px solid #e7e4dc; }
 .monitor-card-summary strong { color: #173f35; font-size: 1.55rem; }

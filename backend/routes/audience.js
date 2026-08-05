@@ -41,6 +41,7 @@ const AUGUST_22_PRESET = {
 };
 
 const router = express.Router();
+const RECOMMENDED_MONITOR_SOURCES = ["google_web", "bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
 
 router.get("/research/sources", (_req, res) => {
   return res.json({
@@ -85,13 +86,13 @@ router.post("/research/monitors", async (req, res) => {
       intentCategories: (req.body?.intentCategories || []).slice(0, 12).map((category) => ({ name: String(category.name || "Intent").trim().slice(0, 80), phrases: (category.phrases || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 30) })),
       negativeKeywords: (req.body?.negativeKeywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
       locations: (req.body?.locations || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 25),
-      sources: requestedSources.length ? requestedSources : ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"],
+      sources: requestedSources.length ? requestedSources : RECOMMENDED_MONITOR_SOURCES,
       feedUrls: (req.body?.feedUrls || []).map(String).filter((url) => /^https:\/\//i.test(url)).slice(0, 30),
       intervalMinutes: Math.min(10080, Math.max(15, Number(req.body?.intervalMinutes) || 60)),
       maxResultsPerSource: Math.min(100, Math.max(5, Number(req.body?.maxResultsPerSource) || 25)),
       nextRunAt: new Date(),
       runRequestedAt: new Date(),
-      sourceHealth: (requestedSources.length ? requestedSources : ["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]).map((source) => ({ source, enabled: true, state: "never", nextScheduledAttempt: new Date() })),
+      sourceHealth: (requestedSources.length ? requestedSources : RECOMMENDED_MONITOR_SOURCES).map((source) => ({ source, enabled: true, state: "never", nextScheduledAttempt: new Date() })),
     });
     // A new monitor always performs its first check immediately. The selected
     // interval controls subsequent checks, not the initial one.
