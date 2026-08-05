@@ -29,6 +29,7 @@ function booleanQueryFor(monitor, max = 6) {
 }
 
 function isCommunityPartnerMonitor(monitor) {
+  if (monitor.monitorType) return monitor.monitorType === "community_partner";
   return /community leaders?|organizers?|group admins?|group owners?|meetup hosts?|association (?:directors?|presidents?)|podcast hosts?|newsletter publishers?/i.test(`${monitor.query || ""} ${(monitor.keywords || []).join(" ")}`);
 }
 
@@ -224,10 +225,12 @@ async function searchMeetupPublic(monitor, limit) {
     const title = htmlMeta(html, "og:title").replace(/\s*\|\s*Meetup\s*$/i, "") || targets[index].label;
     const excerpt = htmlMeta(html, "og:description") || htmlMeta(html, "description");
     if (!/real estate|multifamily|apartment|landlord|property invest|REIA/i.test(`${title} ${excerpt}`)) return [];
+    const memberCount = Number(html.match(/"memberships(?:\([^)]*\))?":\{"__typename":"MembershipConnection","totalCount":(\d+)/)?.[1] || 0);
+    const recentActivity = /"status":"UPCOMING"|"dateTime":"2026-/i.test(html);
     return [normalizeSignal("meetup_public", {
       sourceId: result.value.url, sourceUrl: result.value.url, title, excerpt,
       organizationName: title, organizationDomain: "meetup.com", evidenceLabel: "Public Meetup real-estate group",
-      raw: { discoveryMethod: "public_meetup_topic_directory" },
+      raw: { discoveryMethod: "public_meetup_topic_directory", memberCount, recentActivity },
     })].filter(Boolean);
   }).slice(0, limit);
 }
@@ -403,6 +406,16 @@ async function searchConfiguredFeeds(monitor, limit) {
   return [...new Map(signals.map((signal) => [signal.sourceUrl, signal])).values()].slice(0, limit * Math.max(1, urls.length));
 }
 
+async function searchCommunityDirectories(monitor, limit) {
+  const directories = [
+    "https://nationalreia.org/find-a-reia/",
+    "https://reiclub.com/real-estate-clubs/",
+    "https://dscrdirect.net/meetups",
+  ];
+  const results = await Promise.allSettled(directories.map((url) => crawlConfiguredSite(url, monitor, Math.min(10, limit))));
+  return [...new Map(results.flatMap((result) => result.status === "fulfilled" ? result.value : []).map((signal) => [signal.sourceUrl, { ...signal, source: "community_directory" }])).values()].slice(0, limit);
+}
+
 function unwrapDuckDuckGoUrl(rawUrl) {
   try {
     const url = new URL(decodeEntities(rawUrl), "https://html.duckduckgo.com");
@@ -430,6 +443,7 @@ const ADAPTERS = {
   bing_web: searchBingWeb,
   bing_news: searchBingNews,
   meetup_public: searchMeetupPublic,
+  community_directories: searchCommunityDirectories,
   gdelt: searchGdelt,
   sec_form_d: searchSecFormD,
   bluesky: searchBluesky,
@@ -443,6 +457,7 @@ async function collectMonitorSignals(monitor) {
   const limit = Math.min(100, Math.max(5, Number(monitor.maxResultsPerSource) || 25));
   const selected = monitor.sources?.length ? [...monitor.sources] : ["bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
   if (isCommunityPartnerMonitor(monitor) && !selected.includes("meetup_public")) selected.push("meetup_public");
+  if (isCommunityPartnerMonitor(monitor) && !selected.includes("community_directories")) selected.push("community_directories");
   const work = selected.filter((source) => ADAPTERS[source]).map(async (source) => ({ source, signals: await ADAPTERS[source](monitor, limit) }));
   if ((monitor.feedUrls || []).length) work.push(searchConfiguredFeeds(monitor, limit).then((signals) => ({ source: "feeds", signals })));
   const settled = await Promise.allSettled(work);

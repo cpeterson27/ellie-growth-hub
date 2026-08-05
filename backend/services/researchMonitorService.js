@@ -33,6 +33,18 @@ function scoreSignal(signal, monitor) {
   });
   const excluded = negative.filter((keyword) => content.includes(keyword));
   const buyer = signalEligibility(signal, monitor);
+  if (isCommunityPartnerMonitor(monitor)) {
+    let partnerScore = buyer.eligible ? 35 : 0;
+    const partnerReasons = buyer.reasons.slice();
+    if (buyer.eligible && ["meetup_public", "configured_community", "community_directory"].includes(signal.source)) { partnerScore += 20; partnerReasons.push("Verified through a direct public community source"); }
+    if (buyer.eligible && matched.length) { partnerScore += Math.min(15, matched.length * 3); partnerReasons.push(`Matched ${Math.min(matched.length, 5)} targeting rule${matched.length === 1 ? "" : "s"}`); }
+    if (/association|REIA|organizer|president|director|founder|host|admin|club|network|meetup/i.test(content)) { partnerScore += 15; partnerReasons.push("Shows community or leadership evidence"); }
+    if (Number(signal.raw?.memberCount) >= 500) { partnerScore += 10; partnerReasons.push(`${Number(signal.raw.memberCount).toLocaleString()} public members`); }
+    if (signal.raw?.recentActivity) { partnerScore += 10; partnerReasons.push("Shows recent or upcoming activity"); }
+    if (signal.organizationName) { partnerScore += 5; partnerReasons.push("Community organization name identified"); }
+    if (excluded.length) { partnerScore = Math.max(0, partnerScore - 60); partnerReasons.push(`Excluded terms: ${excluded.join(", ")}`); }
+    return { score: Math.min(100, partnerScore), reasons: partnerReasons, matched };
+  }
   let score = buyer.eligible ? 40 : 0;
   const reasons = buyer.reasons.slice();
   if (buyer.eligible) score += Math.min(15, matched.length * 5);

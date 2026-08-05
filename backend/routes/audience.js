@@ -27,6 +27,7 @@ const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEma
 
 const AUGUST_22_PRESET = {
   id: "august-22-nationwide-online-event",
+  monitorType: "buyer_intent",
   name: "August 22 nationwide online event",
   query: "People across the United States showing current interest in starting, buying, growing, or systemizing a business or building wealth through real estate before the August 22 online event.",
   locations: ["United States"],
@@ -41,8 +42,23 @@ const AUGUST_22_PRESET = {
   intervalMinutes: 30,
 };
 
+const COMMUNITY_PARTNER_PRESET = {
+  id: "real-estate-community-partners",
+  monitorType: "community_partner",
+  name: "Real Estate Community Partners - USA",
+  query: "Find U.S. organizers, founders, presidents, directors, group administrators, Meetup hosts, podcast hosts, newsletter publishers, and association leaders who operate active communities for multifamily investors, apartment owners, landlords, real estate entrepreneurs, syndicators, and commercial real estate professionals.",
+  locations: ["United States"],
+  negativeKeywords: ["student", "homework", "job seeker", "inactive", "unrelated", "crypto", "forex"],
+  intentCategories: [
+    { name: "Community leadership", phrases: ["REIA president", "meetup organizer", "community manager", "group administrator", "association director"] },
+    { name: "Relevant audiences", phrases: ["multifamily investors", "apartment owners", "landlord association", "real estate investing club", "syndication community"] },
+  ],
+  feedUrls: ["https://www.biggerpockets.com/forums", "https://www.creonline.com/forums/"],
+  intervalMinutes: 60,
+};
+
 const router = express.Router();
-const RECOMMENDED_MONITOR_SOURCES = ["meetup_public", "bing_web", "reddit_rss"];
+const RECOMMENDED_MONITOR_SOURCES = ["meetup_public", "community_directories", "bing_web", "reddit_rss"];
 
 router.get("/research/sources", (_req, res) => {
   return res.json({
@@ -53,6 +69,7 @@ router.get("/research/sources", (_req, res) => {
       { id: "bing_web", name: "Open web (Bing RSS)", accountRequired: false },
       { id: "bing_news", name: "Bing News RSS", accountRequired: false },
       { id: "meetup_public", name: "Public Meetup real-estate groups", accountRequired: false },
+      { id: "community_directories", name: "Public REIA and real-estate club directories", accountRequired: false },
       { id: "gdelt", name: "Worldwide news (GDELT)", accountRequired: false },
       { id: "sec_form_d", name: "SEC EDGAR Form D filings", accountRequired: false },
       { id: "bluesky", name: "Public Bluesky posts", accountRequired: false },
@@ -71,18 +88,19 @@ router.get("/research/monitors", async (req, res) => {
   return res.json({ success: true, monitors });
 });
 
-router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: [AUGUST_22_PRESET] }));
+router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: [AUGUST_22_PRESET, COMMUNITY_PARTNER_PRESET] }));
 
 router.post("/research/monitors", async (req, res) => {
   try {
     const query = String(req.body?.query || "").trim();
     if (query.length < 5) return res.status(400).json({ success: false, error: "Describe the intent or audience to monitor." });
-    const allowedSources = new Set(["google_web", "bing_web", "bing_news", "meetup_public", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
+    const allowedSources = new Set(["google_web", "bing_web", "bing_news", "meetup_public", "community_directories", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
     const requestedSources = Array.isArray(req.body?.sources) ? req.body.sources.filter((source) => allowedSources.has(source)) : [];
     const monitor = await ResearchMonitor.create({
       workspaceId: req.auth.workspaceId,
       userId: req.auth.user?._id || null,
       name: String(req.body?.name || query).trim().slice(0, 160),
+      monitorType: req.body?.monitorType === "community_partner" ? "community_partner" : "buyer_intent",
       query,
       keywords: (req.body?.keywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
       intentCategories: (req.body?.intentCategories || []).slice(0, 12).map((category) => ({ name: String(category.name || "Intent").trim().slice(0, 80), phrases: (category.phrases || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 30) })),
@@ -108,7 +126,7 @@ router.post("/research/monitors", async (req, res) => {
 });
 
 router.patch("/research/monitors/:monitorId", async (req, res) => {
-  const allowed = ["name", "query", "keywords", "intentCategories", "negativeKeywords", "locations", "sources", "feedUrls", "enabled", "intervalMinutes", "maxResultsPerSource"];
+  const allowed = ["name", "monitorType", "query", "keywords", "intentCategories", "negativeKeywords", "locations", "sources", "feedUrls", "enabled", "intervalMinutes", "maxResultsPerSource"];
   const update = Object.fromEntries(allowed.filter((key) => req.body?.[key] !== undefined).map((key) => [key, req.body[key]]));
   if (update.enabled === true) update.nextRunAt = new Date();
   const monitor = await ResearchMonitor.findOneAndUpdate({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId }, { $set: update }, { new: true, runValidators: true });
