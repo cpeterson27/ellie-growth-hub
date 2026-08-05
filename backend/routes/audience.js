@@ -47,6 +47,7 @@ router.get("/research/sources", (_req, res) => {
     success: true,
     sources: [sourceStatus()],
     automaticSources: [
+      { id: "google_web", name: "Google Programmable Search (entire public web)", accountRequired: true, configured: Boolean(process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) },
       { id: "bing_web", name: "Open web (Bing RSS)", accountRequired: false },
       { id: "bing_news", name: "Bing News RSS", accountRequired: false },
       { id: "gdelt", name: "Worldwide news (GDELT)", accountRequired: false },
@@ -73,7 +74,7 @@ router.post("/research/monitors", async (req, res) => {
   try {
     const query = String(req.body?.query || "").trim();
     if (query.length < 5) return res.status(400).json({ success: false, error: "Describe the intent or audience to monitor." });
-    const allowedSources = new Set(["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
+    const allowedSources = new Set(["google_web", "bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
     const requestedSources = Array.isArray(req.body?.sources) ? req.body.sources.filter((source) => allowedSources.has(source)) : [];
     const monitor = await ResearchMonitor.create({
       workspaceId: req.auth.workspaceId,
@@ -105,6 +106,16 @@ router.patch("/research/monitors/:monitorId", async (req, res) => {
   const monitor = await ResearchMonitor.findOneAndUpdate({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId }, { $set: update }, { new: true, runValidators: true });
   if (!monitor) return res.status(404).json({ success: false, error: "Monitor not found." });
   return res.json({ success: true, monitor });
+});
+
+router.delete("/research/monitors/:monitorId", async (req, res) => {
+  const monitor = await ResearchMonitor.findOneAndDelete({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId });
+  if (!monitor) return res.status(404).json({ success: false, error: "Monitor not found." });
+  await Promise.all([
+    MonitorActivity.deleteMany({ workspaceId: req.auth.workspaceId, monitorId: monitor._id }),
+    InAppNotification.deleteMany({ workspaceId: req.auth.workspaceId, monitorId: monitor._id }),
+  ]);
+  return res.json({ success: true, deleted: String(monitor._id) });
 });
 
 router.post("/research/monitors/:monitorId/run", async (req, res) => {

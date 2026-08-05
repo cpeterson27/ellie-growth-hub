@@ -54,10 +54,20 @@ function searchableText(contact = {}) {
 
 function matchReasons(contact, audiences = []) {
   const haystack = searchableText(contact);
+  const title = String(contact.title || "").toLowerCase();
   const reasons = [];
   for (const audience of audiences) {
-    const terms = AUDIENCE_TERMS[String(audience).toLowerCase()] || [String(audience).toLowerCase()];
+    const label = String(audience).toLowerCase().trim();
+    const catalogEntry = Object.entries(AUDIENCE_TERMS).find(([key]) => label === key || label.includes(key) || key.includes(label));
+    const meaningfulLabel = label
+      .replace(/\b(?:email|emails|outreach|outreaches|template|templates|audience|contacts?)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const titleWords = meaningfulLabel.split(/[^a-z0-9]+/).filter((word) => word.length >= 4);
+    const titleMatch = title && titleWords.length && titleWords.every((word) => title.includes(word) || title.includes(word.replace(/s$/, "")));
+    const terms = catalogEntry?.[1] || [meaningfulLabel || label];
     const hits = terms.filter((term) => haystack.includes(term));
+    if (titleMatch && !hits.includes(meaningfulLabel)) hits.unshift(meaningfulLabel);
     if (hits.length) reasons.push({ audience, terms: hits.slice(0, 4) });
   }
   return reasons;

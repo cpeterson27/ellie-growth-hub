@@ -498,6 +498,16 @@ class ContactService {
 
   async updateContact(id, updates) {
 
+    if (updates.employeeCount !== undefined) {
+      const rawEmployeeCount = String(updates.employeeCount ?? "").trim();
+      if (!rawEmployeeCount) updates.employeeCount = null;
+      else {
+        const values = rawEmployeeCount.match(/\d[\d,]*/g)?.map((value) => Number(value.replaceAll(",", ""))).filter(Number.isFinite) || [];
+        if (!values.length) throw new Error("Company size must be a number or a range such as 1–10.");
+        updates.employeeCount = Math.max(...values);
+      }
+    }
+
 
     const contact =
       await Contact.findById(id);

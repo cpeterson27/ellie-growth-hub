@@ -150,6 +150,9 @@ const contactSchema = new mongoose.Schema(
       ref: "Campaign",
       index: true,
     }],
+    // Optional per-campaign audience-template selection. When absent or set to
+    // "auto", outreach generation continues to route from the contact's title.
+    campaignTemplateOverrides: { type: mongoose.Schema.Types.Mixed, default: {} },
 
 
     // -------------------------------------------------------------------------

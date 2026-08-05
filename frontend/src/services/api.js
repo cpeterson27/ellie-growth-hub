@@ -325,6 +325,9 @@ export const createResearchMonitor = (payload) =>
 export const updateResearchMonitor = (monitorId, payload) =>
   api.patch(`/audience/research/monitors/${monitorId}`, payload).then((res) => res.data);
 
+export const deleteResearchMonitor = (monitorId) =>
+  api.delete(`/audience/research/monitors/${monitorId}`).then((res) => res.data);
+
 export const runResearchMonitor = (monitorId) =>
   api.post(`/audience/research/monitors/${monitorId}/run`).then((res) => res.data);
 

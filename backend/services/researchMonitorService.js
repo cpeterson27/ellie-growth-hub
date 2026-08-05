@@ -149,7 +149,7 @@ async function runResearchMonitor(monitorId) {
         );
         found += 1;
         if (ranking.score >= 60) qualified += 1;
-        if (["bing_web", "duckduckgo"].includes(signal.source) && signal.organizationDomain && ranking.score >= 55) websiteCandidates.push({ signalId: saved._id, domain: signal.organizationDomain });
+        if (["google_web", "bing_web", "duckduckgo"].includes(signal.source) && signal.organizationDomain && ranking.score >= 55) websiteCandidates.push({ signalId: saved._id, domain: signal.organizationDomain });
         if (ranking.score >= 75) await notify(monitor, "high_scoring_lead", "High-scoring lead found", `${saved.title || "A public signal"} scored ${ranking.score}.`, saved._id);
       }
     }

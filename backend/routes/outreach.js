@@ -392,7 +392,7 @@ router.post("/generate", async (req,res)=>{
 
       const normalizedProfiles = (cleanedContact.audienceProfiles || [])
         .map((profile) => String(profile).toLowerCase().trim());
-      const routedTemplate = audienceTemplates
+      const automaticTemplate = audienceTemplates
         .map((candidate) => {
           const reasons = matchReasons(cleanedContact, [candidate.label]);
           const exactProfile = normalizedProfiles.includes(String(candidate.label).toLowerCase().trim());
@@ -403,9 +403,15 @@ router.post("/generate", async (req,res)=>{
         })
         .filter((candidate) => candidate.score > 0)
         .sort((left, right) => right.score - left.score)[0];
+      const overrideKey = String(cleanedContact.campaignTemplateOverrides?.[String(campaign._id)] || "auto");
+      const routedTemplate = overrideKey === "general"
+        ? null
+        : overrideKey !== "auto"
+          ? audienceTemplates.find((candidate) => candidate.key === overrideKey) || automaticTemplate
+          : automaticTemplate;
       const recipientTemplate = routedTemplate?.template || generalTemplate;
-      const recipientAudienceKey = routedTemplate?.key || "general";
-      const recipientAudienceLabel = routedTemplate?.label || "All Deal to Close contacts";
+      const recipientAudienceKey = overrideKey === "general" ? "general" : routedTemplate?.key || "general";
+      const recipientAudienceLabel = overrideKey === "general" ? "Main campaign template" : routedTemplate?.label || "Main campaign template";
       campaign.content = {
         subject: recipientTemplate.subject,
         body: recipientTemplate.body,

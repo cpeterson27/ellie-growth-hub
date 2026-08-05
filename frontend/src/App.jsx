@@ -1,31 +1,35 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
 
-import Dashboard from "./pages/Dashboard.jsx";
-import Events from "./pages/Events.jsx";
-import Campaigns from "./pages/Campaigns.jsx";
-import CampaignWorkspace from "./pages/CampaignWorkspace.jsx";
-import Outreach from "./pages/Outreach.jsx";
-import Partners from "./pages/Partners.jsx";
-import Marketing from "./pages/Marketing.jsx";
-import Content from "./pages/Content.jsx";
-import Contacts from "./pages/Contacts.jsx";
-import Analytics from "./pages/Analytics.jsx";
-import Settings from "./pages/Settings.jsx";
-import Jarvis from "./pages/Jarvis.jsx";
-import Integrations from "./pages/Integrations.jsx";
-import EventbriteIntegration from "./pages/EventbriteIntegration.jsx";
-import Discovery from "./pages/Discovery.jsx";
-import DevelopmentRequests from "./pages/DevelopmentRequests.jsx";
-import CrmSetup from "./pages/CrmSetup.jsx";
-import GmailIntegration from "./pages/GmailIntegration.jsx";
 import { InitiativeProvider } from "./context/InitiativeContext.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
-import Login from "./pages/Login.jsx";
-import Landing from "./pages/Landing.jsx";
-import CampaignLaunch from "./pages/CampaignLaunch.jsx";
-import OAuthConsent from "./pages/OAuthConsent.jsx";
+
+const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
+const Events = lazy(() => import("./pages/Events.jsx"));
+const Campaigns = lazy(() => import("./pages/Campaigns.jsx"));
+const CampaignLaunch = lazy(() => import("./pages/CampaignLaunch.jsx"));
+const CampaignWorkspace = lazy(() => import("./pages/CampaignWorkspace.jsx"));
+const Outreach = lazy(() => import("./pages/Outreach.jsx"));
+const Partners = lazy(() => import("./pages/Partners.jsx"));
+const Marketing = lazy(() => import("./pages/Marketing.jsx"));
+const Content = lazy(() => import("./pages/Content.jsx"));
+const Contacts = lazy(() => import("./pages/Contacts.jsx"));
+const Analytics = lazy(() => import("./pages/Analytics.jsx"));
+const Settings = lazy(() => import("./pages/Settings.jsx"));
+const Jarvis = lazy(() => import("./pages/Jarvis.jsx"));
+const Integrations = lazy(() => import("./pages/Integrations.jsx"));
+const EventbriteIntegration = lazy(() => import("./pages/EventbriteIntegration.jsx"));
+const Discovery = lazy(() => import("./pages/Discovery.jsx"));
+const DevelopmentRequests = lazy(() => import("./pages/DevelopmentRequests.jsx"));
+const CrmSetup = lazy(() => import("./pages/CrmSetup.jsx"));
+const GmailIntegration = lazy(() => import("./pages/GmailIntegration.jsx"));
+const Login = lazy(() => import("./pages/Login.jsx"));
+const Landing = lazy(() => import("./pages/Landing.jsx"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent.jsx"));
+
+const PageLoading = () => <div className="auth-loading">Opening Growth Operator…</div>;
 
 function ProtectedApp() {
   const { loading, session } = useAuth();
@@ -69,12 +73,14 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/oauth/consent" element={<OAuthConsent />} />
-          <Route path="*" element={<ProtectedApp />} />
-        </Routes>
+        <Suspense fallback={<PageLoading />}>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/oauth/consent" element={<OAuthConsent />} />
+            <Route path="*" element={<ProtectedApp />} />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   );

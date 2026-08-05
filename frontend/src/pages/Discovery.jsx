@@ -6,6 +6,7 @@ import Modal from "../components/Modal.jsx";
 import {
   createAudienceDefinition,
   createResearchMonitor,
+  deleteResearchMonitor,
   createMarketResearchPlan,
   deleteContact,
   discoverAudienceOrganizations,
@@ -156,7 +157,7 @@ export default function Discovery() {
   const [socialSignal, setSocialSignal] = useState(null);
   const [socialCampaignId, setSocialCampaignId] = useState("");
   const [socialDraft, setSocialDraft] = useState(null);
-  const [selectedSources, setSelectedSources] = useState(["bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]);
+  const [selectedSources, setSelectedSources] = useState(["google_web", "bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "reddit_rss", "duckduckgo"]);
   const [monitorDraft, setMonitorDraft] = useState({
     name: "Nationwide event buyer intent",
     query: "People in the United States discussing leaving a W-2 job, starting or buying a business, building wealth through real estate, scaling a company, needing business systems, coaching, or an entrepreneurial community",
@@ -333,6 +334,18 @@ export default function Discovery() {
   const toggleMonitor = async (monitor) => {
     await updateResearchMonitor(monitor._id, { enabled: !monitor.enabled });
     await loadAutomaticResearch();
+  };
+
+  const removeMonitor = async (monitor) => {
+    if (!window.confirm(`Delete “${monitor.name}”? Saved leads will remain, but this monitor and its activity log will be removed.`)) return;
+    try {
+      setMonitorRunningId(monitor._id);
+      await deleteResearchMonitor(monitor._id);
+      setNotice(`Deleted monitor “${monitor.name}”. Saved CRM contacts and leads were not deleted.`);
+      await loadAutomaticResearch();
+    } catch (error) {
+      setNotice(error.response?.data?.error || "Unable to delete this monitor.");
+    } finally { setMonitorRunningId(""); }
   };
 
   const reviewSignal = async (signal, status) => {
@@ -644,7 +657,7 @@ export default function Discovery() {
       </section> : null}
     </DashboardCard></> : null}
 
-    {activeTab === "monitoring" ? <><section className="monitoring-guide"><div><span>Runs automatically</span><h2>Growth Operator listens for likely adult buyers</h2><p>It scans public sources, removes minors and low-value noise, and sends plausible opportunities to Live Leads. Nothing is contacted or added to your CRM automatically.</p></div><ol><li><strong>1</strong><span><b>Listen</b>Checks public conversations while your browser is closed.</span></li><li><strong>2</strong><span><b>Filter</b>Rejects minors, students, promotions, job seekers, and no-budget posts.</span></li><li><strong>3</strong><span><b>You decide</b>Review evidence and approve one lead at a time.</span></li></ol></section>
+    {activeTab === "monitoring" ? <><section className="monitoring-guide"><div><span>Runs automatically</span><h2>Growth Operator monitors public buyer-intent signals</h2><p>It searches the open web and selected public sources, filters low-quality results, and sends credible opportunities to Live Leads. Nothing is contacted or added to your CRM automatically.</p></div><ol><li><strong>1</strong><span><b>Search</b>Checks public web results and conversations while your browser is closed.</span></li><li><strong>2</strong><span><b>Qualify</b>Filters promotions, schoolwork, job seekers, and results without a current need.</span></li><li><strong>3</strong><span><b>You decide</b>Review evidence and approve one lead at a time.</span></li></ol></section>
 
     <DashboardCard title="Your active monitors" action={<div className="monitor-header-actions"><Button variant="outline" onClick={loadAutomaticResearch}>Refresh</Button><Button onClick={() => setShowMonitorSetup((value) => !value)}>{showMonitorSetup ? "Close setup" : "Create a monitor"}</Button></div>}>
       {showMonitorSetup ? <section className="monitor-setup-panel"><header><span>New monitor</span><h3>Choose what Growth Operator should listen for</h3><p>Start with the August 22 preset, then edit any language you want.</p></header>{monitorPresets.map((preset) => <button className="monitor-preset" type="button" key={preset.id} onClick={() => applyMonitorPreset(preset)}><span>Recommended starting point</span><strong>{preset.name}</strong><small>Nationwide adult buyer intent for your online event</small></button>)}<div className="intent-monitor-builder">
@@ -658,7 +671,7 @@ export default function Discovery() {
       </div>
       <div className="monitor-setup-actions"><Button loading={monitorSaving} disabled={!monitorDraft.query.trim()} onClick={createMonitor}>Start this monitor</Button><small>You can pause it at any time. No outreach is ever sent.</small></div></section> : null}
       {monitors.length ? <div className="intent-monitor-list">{monitors.map((monitor) => { const failures = (monitor.sourceHealth || []).filter((health) => ["failed", "blocked", "rate_limited"].includes(health.state)); return <article key={monitor._id}>
-        <header className="monitor-card-header"><div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? "Monitoring is on" : "Monitoring paused"}</span><strong>{monitor.name}</strong></div><div className="intent-monitor-actions"><Button size="sm" onClick={() => openQualityEditor(monitor)}>Improve lead quality</Button><Button size="sm" variant="outline" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Check now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button></div></header>
+        <header className="monitor-card-header"><div><span className={`intent-monitor-state is-${monitor.lastRunStatus}`}>{monitor.enabled ? "Monitoring is on" : "Monitoring paused"}</span><strong>{monitor.name}</strong></div><div className="intent-monitor-actions"><Button size="sm" onClick={() => openQualityEditor(monitor)}>Improve lead quality</Button><Button size="sm" variant="outline" loading={monitorRunningId === monitor._id} disabled={!monitor.enabled || monitor.lastRunStatus === "running"} onClick={() => runMonitorNow(monitor._id)}>Check now</Button><Button size="sm" variant="outline" onClick={() => toggleMonitor(monitor)}>{monitor.enabled ? "Pause" : "Resume"}</Button><Button size="sm" variant="outline" disabled={monitorRunningId === monitor._id} onClick={() => removeMonitor(monitor)}>Delete</Button></div></header>
         <div className="monitor-card-summary"><div><strong>{monitor.totals?.signalsFound || 0}</strong><span>raw public matches processed—not leads</span></div><div><strong>{monitor.nextRunAt ? new Date(monitor.nextRunAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "—"}</strong><span>next automatic check</span></div><div><strong>{failures.length}</strong><span>optional sources retrying</span></div></div>
         <div className="monitor-count-explainer"><strong>Where are the actual leads?</strong><span>This raw total includes duplicates, rejected posts, and the same item seen again. Only deduplicated adult-buyer candidates appear in Live Leads. There is nothing to review inside the raw total itself.</span><button type="button" onClick={() => setActiveTab("leads")}>Review actual Live Leads</button></div>
         <p className="monitor-last-result">Latest check: {friendlyMonitorMessage(monitor.lastRunMessage) || "Waiting for the first check."}</p>

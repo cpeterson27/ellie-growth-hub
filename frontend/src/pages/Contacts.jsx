@@ -5,7 +5,6 @@ import { FiMoreHorizontal } from "react-icons/fi";
 import "./Contacts.css";
 import "./ContactVerification.css";
 import "./ContactDashboard.css";
-import { BrowserQRCodeReader } from "@zxing/browser";
 
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
@@ -688,6 +687,7 @@ export default function Contacts() {
         "Point the camera at the contact’s digital business-card QR code.",
       );
 
+      const { BrowserQRCodeReader } = await import("@zxing/browser");
       const codeReader = new BrowserQRCodeReader();
 
       const controls = await codeReader.decodeFromConstraints(
@@ -724,6 +724,7 @@ export default function Contacts() {
     const imageUrl = URL.createObjectURL(file);
     try {
       setCardStatus("Reading QR code from the image…");
+      const { BrowserQRCodeReader } = await import("@zxing/browser");
       const codeReader = new BrowserQRCodeReader();
       const result = await codeReader.decodeFromImageUrl(imageUrl);
       await acceptCardPayload(result.getText());
@@ -1742,42 +1743,11 @@ export default function Contacts() {
         ) : null}
         {contactOverview ? (
           <p className="contact-guidance">
-            <strong>How this CRM works:</strong> Campaign assignment and data
-            quality are separate. A contact can already be assigned or contacted
-            and still appear in <strong>Data quality review</strong> if an email
-            is unsafe or their profile is incomplete. Discovery is only for
-            finding new prospects you do not already have.
+            <strong>To leave Data quality review:</strong> a contact needs a name,
+            a verified email, and at least one audience clue—job title, company,
+            industry, seniority, audience/interests, keyword, or list. Campaign
+            assignment is separate, so an assigned contact can still need review.
           </p>
-        ) : null}
-        {unsubscribedContacts.length ? (
-          <section className="crm-unsubscribe-notice" role="status">
-            <div className="crm-unsubscribe-notice__icon" aria-hidden="true">
-              !
-            </div>
-            <div>
-              <span>Email preference notification</span>
-              <strong>
-                {unsubscribedContacts.length} contact
-                {unsubscribedContacts.length === 1 ? " has" : "s have"}{" "}
-                unsubscribed
-              </strong>
-              <p>
-                Latest: {unsubscribedContacts[0]?.name || "Contact"} ·{" "}
-                {unsubscribeDate(unsubscribedContacts[0])}. Growth Operator blocks campaign
-                email to every unsubscribed contact.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setContactTab("unsubscribed");
-                setCurrentPage(1);
-              }}
-            >
-              Review unsubscribes
-            </Button>
-          </section>
         ) : null}
         <div className="crm-toolbar">
           <label>
@@ -3920,6 +3890,33 @@ export default function Contacts() {
                       </select>
                     </label>
                   </div>
+                  {editingContact.campaignIds?.[0] ? (() => {
+                    const selectedCampaign = campaigns.find((campaign) => String(campaign._id) === String(editingContact.campaignIds[0]));
+                    const campaignKey = String(editingContact.campaignIds[0]);
+                    const availableTemplates = Object.entries(selectedCampaign?.emailAudienceTemplates || {}).filter(([, template]) => template?.status === "approved");
+                    return <div className="contact-decision-step">
+                      <span className="contact-decision-step__number">4</span>
+                      <label className="form-field">
+                        <span>Email template for this contact</span>
+                        <select
+                          className="select-input"
+                          value={String(editingContact.campaignTemplateOverrides?.[campaignKey] || "auto")}
+                          onChange={(event) => setEditingContact({
+                            ...editingContact,
+                            campaignTemplateOverrides: {
+                              ...(editingContact.campaignTemplateOverrides || {}),
+                              [campaignKey]: event.target.value,
+                            },
+                          })}
+                        >
+                          <option value="auto">Automatic—match from job title</option>
+                          <option value="general">Main campaign template</option>
+                          {availableTemplates.map(([key, template]) => <option key={key} value={key}>{template.audienceLabel || key}</option>)}
+                        </select>
+                        <small>No job title automatically falls back to the main campaign template.</small>
+                      </label>
+                    </div>;
+                  })() : null}
                   {!editingContact.email ? (
                     <p className="contact-decision-warning">
                       Add an email address to continue.
