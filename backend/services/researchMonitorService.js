@@ -189,7 +189,12 @@ async function runResearchMonitor(monitorId) {
     for (const failure of collected.failures) priorHealth.set(failure.source, { source: failure.source, enabled: true, lastSuccessfulCheck: priorHealth.get(failure.source)?.lastSuccessfulCheck || null, lastErrorAt: new Date(), lastError: failure.message, resultsCollected: priorHealth.get(failure.source)?.resultsCollected || 0, state: failure.state, nextScheduledAttempt: nextRunAt });
     monitor.lastRunStatus = collected.failures.length ? "partial" : "completed";
     monitor.lastRunMessage = `${found} buyer-intent signals passed the filters; ${rejected} weak matches rejected${collected.failures.length ? `; ${collected.failures.length} optional source retry(s)` : ""}.`;
-    monitor.totals.runs += 1; monitor.totals.signalsFound += found; monitor.totals.signalsQualified += qualified;
+    const activeSignalFilter = { workspaceId: monitor.workspaceId, monitorId: monitor._id, audienceEligible: { $ne: false }, status: { $ne: "dismissed" } };
+    const [activeSignalCount, activeQualifiedCount] = await Promise.all([
+      IntentSignal.countDocuments(activeSignalFilter),
+      IntentSignal.countDocuments({ ...activeSignalFilter, score: { $gte: 60 } }),
+    ]);
+    monitor.totals.runs += 1; monitor.totals.signalsFound = activeSignalCount; monitor.totals.signalsQualified = activeQualifiedCount;
     monitor.nextRunAt = nextRunAt; monitor.sourceHealth = [...priorHealth.values()]; monitor.leaseOwner = ""; monitor.leaseExpiresAt = null;
     await monitor.save();
     await activity(monitor, runId, "run_completed", monitor.lastRunMessage, found);
