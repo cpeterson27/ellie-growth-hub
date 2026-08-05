@@ -210,12 +210,16 @@ async function searchGoogleWeb(monitor, limit) {
       searchType: "public_forums_and_reia",
     },
   ];
-  const responses = await Promise.all(queries.map(({ query }) => axios.get("https://customsearch.googleapis.com/customsearch/v1", {
+  const responses = await Promise.allSettled(queries.map(({ query }) => axios.get("https://customsearch.googleapis.com/customsearch/v1", {
     params: { key, cx, q: query, num: Math.min(10, limit) },
     timeout: REQUEST_TIMEOUT,
     maxContentLength: 4 * 1024 * 1024,
   })));
-  const results = responses.flatMap((response, index) => (response.data?.items || []).map((item) => ({ item, label: queries[index].label })));
+  const successful = responses.filter((response) => response.status === "fulfilled");
+  if (!successful.length) throw responses[0]?.reason || new Error("Google returned no usable search responses.");
+  const results = responses.flatMap((response, index) => response.status === "fulfilled"
+    ? (response.value.data?.items || []).map((item) => ({ item, label: queries[index].label }))
+    : []);
   return [...new Map(results.map(({ item, label }) => [item.link, normalizeSignal("google_web", {
     sourceId: item.cacheId || item.link,
     sourceUrl: item.link,
@@ -292,8 +296,9 @@ async function collectMonitorSignals(monitor) {
     errors: failures.map(({ item, source }) => `${source}: ${item.reason?.response?.status || item.reason?.message || "source failed"}`),
     failures: failures.map(({ item, source }) => {
       const status = item.reason?.response?.status;
-      const message = String(status || item.reason?.message || "Source failed");
-      return { source, message, state: status === 429 ? "rate_limited" : /challenge|blocked|forbidden|403/i.test(message) ? "blocked" : "failed" };
+      const providerMessage = item.reason?.response?.data?.error?.message || item.reason?.response?.data?.message;
+      const message = String(providerMessage || item.reason?.message || status || "Source failed");
+      return { source, message, state: status === 429 ? "rate_limited" : status === 401 || status === 403 || /challenge|blocked|forbidden|403/i.test(message) ? "blocked" : "failed" };
     }),
   };
 }

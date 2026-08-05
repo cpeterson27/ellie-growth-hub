@@ -57,6 +57,12 @@
 .intent-monitor-state { color: #267557; margin: 0; }
 .intent-monitor-state.is-running { color: #267557; }
 .monitor-card-summary { border-bottom: 1px solid #e7e4dc; border-top: 1px solid #e7e4dc; display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 1rem; }
+.monitor-run-progress { align-items: center; background: #edf7f3; border: 1px solid #b9d9cd; display: flex; gap: 1rem; margin-top: 1rem; padding: 1.2rem; }
+.monitor-run-progress__spinner { animation: monitor-spin .9s linear infinite; border: 4px solid #bddbd0; border-radius: 50%; border-top-color: #176b59; flex: 0 0 30px; height: 30px; width: 30px; }
+.monitor-run-progress div { display: grid; gap: .2rem; }
+.monitor-run-progress p { color: #47645b; margin: 0; }
+.monitor-run-progress small { color: #6c7e78; }
+@keyframes monitor-spin { to { transform: rotate(360deg); } }
 .monitor-card-summary > div { display: grid; gap: .15rem; padding: 1rem; }
 .monitor-card-summary > div + div { border-left: 1px solid #e7e4dc; }
 .monitor-card-summary strong { color: #173f35; font-size: 1.55rem; }
