@@ -22,7 +22,7 @@ const { previewOrganizationImport, importOrganizations } = require("../services/
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
-const { buyerIntentAssessment, requestResearchMonitorRun, runResearchMonitor, scoreSignal } = require("../services/researchMonitorService");
+const { requestResearchMonitorRun, runResearchMonitor, scoreSignal, signalEligibility } = require("../services/researchMonitorService");
 const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEmailDraftService");
 
 const AUGUST_22_PRESET = {
@@ -42,7 +42,7 @@ const AUGUST_22_PRESET = {
 };
 
 const router = express.Router();
-const RECOMMENDED_MONITOR_SOURCES = ["bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
+const RECOMMENDED_MONITOR_SOURCES = ["meetup_public", "bing_web", "reddit_rss"];
 
 router.get("/research/sources", (_req, res) => {
   return res.json({
@@ -52,6 +52,7 @@ router.get("/research/sources", (_req, res) => {
       { id: "google_web", name: "Google Programmable Search (entire public web)", accountRequired: true, configured: Boolean(process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) },
       { id: "bing_web", name: "Open web (Bing RSS)", accountRequired: false },
       { id: "bing_news", name: "Bing News RSS", accountRequired: false },
+      { id: "meetup_public", name: "Public Meetup real-estate groups", accountRequired: false },
       { id: "gdelt", name: "Worldwide news (GDELT)", accountRequired: false },
       { id: "sec_form_d", name: "SEC EDGAR Form D filings", accountRequired: false },
       { id: "bluesky", name: "Public Bluesky posts", accountRequired: false },
@@ -76,7 +77,7 @@ router.post("/research/monitors", async (req, res) => {
   try {
     const query = String(req.body?.query || "").trim();
     if (query.length < 5) return res.status(400).json({ success: false, error: "Describe the intent or audience to monitor." });
-    const allowedSources = new Set(["google_web", "bing_web", "bing_news", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
+    const allowedSources = new Set(["google_web", "bing_web", "bing_news", "meetup_public", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
     const requestedSources = Array.isArray(req.body?.sources) ? req.body.sources.filter((source) => allowedSources.has(source)) : [];
     const monitor = await ResearchMonitor.create({
       workspaceId: req.auth.workspaceId,
@@ -164,7 +165,7 @@ router.get("/research/signals", async (req, res) => {
   const signals = await IntentSignal.find(filter).sort({ score: -1, publishedAt: -1, discoveredAt: -1 }).limit(limit).lean();
   const monitorIds = [...new Set(signals.map((signal) => String(signal.monitorId || "")).filter(Boolean))];
   const monitorMap = new Map((await ResearchMonitor.find({ _id: { $in: monitorIds } }).lean()).map((monitor) => [String(monitor._id), monitor]));
-  const assessed = signals.map((signal) => ({ signal, eligibility: buyerIntentAssessment(signal), ranking: monitorMap.has(String(signal.monitorId)) ? scoreSignal(signal, monitorMap.get(String(signal.monitorId))) : null }));
+  const assessed = signals.map((signal) => { const monitor = monitorMap.get(String(signal.monitorId)); return { signal, eligibility: signalEligibility(signal, monitor), ranking: monitor ? scoreSignal(signal, monitor) : null }; });
   const rejected = assessed.filter((item) => !item.eligibility.eligible || (item.ranking && item.ranking.score < 45));
   if (rejected.length) await Promise.all(rejected.map(({ signal, eligibility }) => IntentSignal.updateOne({ _id: signal._id }, { $set: { audienceEligible: false, audienceRejectionReason: eligibility.reason, status: "dismissed", classification: "irrelevant", classificationReason: eligibility.reason } })));
   const accepted = assessed.filter((item) => item.eligibility.eligible && (!item.ranking || item.ranking.score >= 45) && item.signal.audienceEligible !== false);

@@ -28,6 +28,10 @@ function booleanQueryFor(monitor, max = 6) {
   return termsFor(monitor, max).map((term) => /\s/.test(term) ? `"${term.replace(/"/g, "")}"` : term).join(" OR ");
 }
 
+function isCommunityPartnerMonitor(monitor) {
+  return /community leaders?|organizers?|group admins?|group owners?|meetup hosts?|association (?:directors?|presidents?)|podcast hosts?|newsletter publishers?/i.test(`${monitor.query || ""} ${(monitor.keywords || []).join(" ")}`);
+}
+
 function normalizeSignal(source, item = {}) {
   const sourceUrl = String(item.sourceUrl || "").trim();
   if (!sourceUrl) return null;
@@ -199,6 +203,35 @@ async function searchBingNews(monitor, limit) {
   });
 }
 
+async function searchMeetupPublic(monitor, limit) {
+  const directoryUrls = [
+    "https://www.meetup.com/topics/real-estate-investing/us/",
+    "https://www.meetup.com/topics/real-estate-investors/us/",
+    "https://www.meetup.com/topics/apartment-owners/us/",
+    "https://www.meetup.com/topics/real-estate-networking/us/",
+  ];
+  const reserved = new Set(["about", "apps", "blog", "cities", "find", "home", "login", "lp", "meetup-pro", "register", "sitemap", "start", "topics"]);
+  const directories = await Promise.allSettled(directoryUrls.map((url) => fetchPublicPage(url)));
+  const groupLinks = directories.flatMap((result) => result.status === "fulfilled" && !result.value.blocked ? publicPageLinks(result.value.html, result.value.url) : []).filter((link) => {
+    const parts = new URL(link.url).pathname.split("/").filter(Boolean);
+    return parts.length === 1 && !reserved.has(parts[0].toLowerCase());
+  });
+  const targets = [...new Map(groupLinks.map((link) => [link.url.split("?")[0], { ...link, url: link.url.split("?")[0] }])).values()].slice(0, Math.min(40, Math.max(limit, 20)));
+  const pages = await Promise.allSettled(targets.map((target) => fetchPublicPage(target.url)));
+  return pages.flatMap((result, index) => {
+    if (result.status !== "fulfilled" || result.value.blocked) return [];
+    const html = result.value.html;
+    const title = htmlMeta(html, "og:title").replace(/\s*\|\s*Meetup\s*$/i, "") || targets[index].label;
+    const excerpt = htmlMeta(html, "og:description") || htmlMeta(html, "description");
+    if (!/real estate|multifamily|apartment|landlord|property invest|REIA/i.test(`${title} ${excerpt}`)) return [];
+    return [normalizeSignal("meetup_public", {
+      sourceId: result.value.url, sourceUrl: result.value.url, title, excerpt,
+      organizationName: title, organizationDomain: "meetup.com", evidenceLabel: "Public Meetup real-estate group",
+      raw: { discoveryMethod: "public_meetup_topic_directory" },
+    })].filter(Boolean);
+  }).slice(0, limit);
+}
+
 async function searchGoogleWeb(monitor, limit) {
   const key = String(process.env.GOOGLE_SEARCH_API_KEY || "").trim();
   const cx = String(process.env.GOOGLE_SEARCH_ENGINE_ID || "").trim();
@@ -334,7 +367,7 @@ async function crawlConfiguredSite(startUrl, monitor, limit) {
   const targets = [...new Map(discussions.sort((a, b) => relevanceScore(b, monitor) - relevanceScore(a, monitor)).map((link) => [link.url, link])).values()].slice(0, Math.min(limit, 20));
   const pages = await Promise.allSettled(targets.map((target) => fetchPublicPage(target.url)));
   const host = new URL(first.url).hostname.replace(/^www\./, "");
-  return pages.flatMap((result, index) => {
+  const signals = pages.flatMap((result, index) => {
     const target = targets[index];
     if (result.status !== "fulfilled" || result.value.blocked) return [];
     const html = result.value.html;
@@ -348,6 +381,15 @@ async function crawlConfiguredSite(startUrl, monitor, limit) {
       evidenceLabel: "User-added public community page", raw: { seedUrl: startUrl },
     })].filter(Boolean);
   });
+  if (isCommunityPartnerMonitor(monitor)) {
+    const title = htmlMeta(first.html, "og:title") || decodeEntities(clean(first.html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1])) || host;
+    const excerpt = htmlMeta(first.html, "og:description") || htmlMeta(first.html, "description") || `Public community supplied by the user: ${host}`;
+    signals.unshift(normalizeSignal("configured_community", {
+      sourceId: first.url, sourceUrl: first.url, title, excerpt, organizationName: title,
+      organizationDomain: host, evidenceLabel: "User-added public community homepage", raw: { seedUrl: startUrl },
+    }));
+  }
+  return [...new Map(signals.filter(Boolean).map((signal) => [signal.sourceUrl, signal])).values()].slice(0, limit);
 }
 
 async function searchConfiguredFeeds(monitor, limit) {
@@ -387,6 +429,7 @@ const ADAPTERS = {
   google_web: searchGoogleWeb,
   bing_web: searchBingWeb,
   bing_news: searchBingNews,
+  meetup_public: searchMeetupPublic,
   gdelt: searchGdelt,
   sec_form_d: searchSecFormD,
   bluesky: searchBluesky,
@@ -398,7 +441,8 @@ const ADAPTERS = {
 
 async function collectMonitorSignals(monitor) {
   const limit = Math.min(100, Math.max(5, Number(monitor.maxResultsPerSource) || 25));
-  const selected = monitor.sources?.length ? monitor.sources : ["bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
+  const selected = monitor.sources?.length ? [...monitor.sources] : ["bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
+  if (isCommunityPartnerMonitor(monitor) && !selected.includes("meetup_public")) selected.push("meetup_public");
   const work = selected.filter((source) => ADAPTERS[source]).map(async (source) => ({ source, signals: await ADAPTERS[source](monitor, limit) }));
   if ((monitor.feedUrls || []).length) work.push(searchConfiguredFeeds(monitor, limit).then((signals) => ({ source: "feeds", signals })));
   const settled = await Promise.allSettled(work);
@@ -416,4 +460,4 @@ async function collectMonitorSignals(monitor) {
   };
 }
 
-module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, extractXmlItems, normalizeSignal, queryFor, termsFor };
+module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, extractXmlItems, isCommunityPartnerMonitor, normalizeSignal, queryFor, searchMeetupPublic, termsFor };

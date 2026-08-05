@@ -5,7 +5,7 @@ const IntentSignal = require("../models/IntentSignal");
 const ResearchMonitor = require("../models/ResearchMonitor");
 const MonitorActivity = require("../models/MonitorActivity");
 const InAppNotification = require("../models/InAppNotification");
-const { collectMonitorSignals } = require("./intentSourceService");
+const { collectMonitorSignals, isCommunityPartnerMonitor } = require("./intentSourceService");
 const { researchPublicWebsite } = require("./publicWebsiteResearchService");
 
 const RUNNER_INTERVAL_MS = Math.max(15000, Number(process.env.RESEARCH_WORKER_POLL_MS) || 60000);
@@ -32,7 +32,7 @@ function scoreSignal(signal, monitor) {
     return words.length > 1 && words.filter((word) => content.includes(word)).length >= Math.ceil(words.length / 2);
   });
   const excluded = negative.filter((keyword) => content.includes(keyword));
-  const buyer = buyerIntentAssessment(signal);
+  const buyer = signalEligibility(signal, monitor);
   let score = buyer.eligible ? 40 : 0;
   const reasons = buyer.reasons.slice();
   if (buyer.eligible) score += Math.min(15, matched.length * 5);
@@ -42,6 +42,21 @@ function scoreSignal(signal, monitor) {
   if (signal.publishedAt && Date.now() - new Date(signal.publishedAt).valueOf() < 7 * 86400000) { score += 5; reasons.push("Posted recently"); }
   if (excluded.length) { score = Math.max(0, score - 60); reasons.push(`Excluded terms: ${excluded.join(", ")}`); }
   return { score: Math.min(100, score), reasons, matched };
+}
+
+function communityPartnerAssessment(signal, monitor) {
+  const text = `${signal.title || ""} ${signal.excerpt || ""} ${signal.organizationName || ""}`.toLowerCase();
+  const negative = (monitor.negativeKeywords || []).map((value) => String(value).toLowerCase()).filter(Boolean);
+  const excluded = negative.find((keyword) => text.includes(keyword));
+  if (excluded) return { eligible: false, reason: `Excluded term: ${excluded}`, reasons: [`Excluded term: ${excluded}`] };
+  const realEstate = /real estate|multifamily|apartment|landlord|rental propert|syndication|commercial propert|REIA|wealth building/i.test(text);
+  const community = /community|association|meetup|group|club|network|forum|mastermind|podcast|newsletter|organizer|founder|president|director|host|admin|conference/i.test(text);
+  if (!realEstate || !community) return { eligible: false, reason: "No clear active real-estate community or leadership evidence.", reasons: ["Missing real-estate community evidence"] };
+  return { eligible: true, reason: "", reasons: ["Public evidence identifies a relevant real-estate community or leader"] };
+}
+
+function signalEligibility(signal, monitor) {
+  return isCommunityPartnerMonitor(monitor || {}) ? communityPartnerAssessment(signal, monitor || {}) : buyerIntentAssessment(signal);
 }
 
 function rulesClassify(signal) {
@@ -148,11 +163,13 @@ async function runResearchMonitor(monitorId) {
     const websiteCandidates = [];
     for (const group of collected.groups) {
       for (const signal of group.signals) {
-        const eligibility = buyerIntentAssessment(signal);
+        const eligibility = signalEligibility(signal, monitor);
         if (!eligibility.eligible) { rejected += 1; continue; }
         const ranking = scoreSignal(signal, monitor);
         if (!ranking.matched.length || ranking.score < 45) { rejected += 1; continue; }
-        const classification = await classifySignal(signal);
+        const classification = isCommunityPartnerMonitor(monitor)
+          ? { classification: "uncertain", method: "rules", reason: "Matched public community-partner evidence." }
+          : await classifySignal(signal);
         if (["hypothetical_or_student", "promotion", "job_seeker", "irrelevant"].includes(classification.classification)) { rejected += 1; continue; }
         const saved = await IntentSignal.findOneAndUpdate(
           { workspaceId: monitor.workspaceId, source: signal.source, sourceId: signal.sourceId },
@@ -231,4 +248,4 @@ function startResearchMonitorRunner() {
   return timer;
 }
 
-module.exports = { audienceEligibility, buyerIntentAssessment, classifySignal, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, startResearchMonitorRunner, scoreSignal };
+module.exports = { audienceEligibility, buyerIntentAssessment, classifySignal, communityPartnerAssessment, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, signalEligibility, startResearchMonitorRunner, scoreSignal };
