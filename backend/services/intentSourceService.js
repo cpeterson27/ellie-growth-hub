@@ -191,8 +191,27 @@ async function searchGoogleWeb(monitor, limit) {
   const key = String(process.env.GOOGLE_SEARCH_API_KEY || "").trim();
   const cx = String(process.env.GOOGLE_SEARCH_ENGINE_ID || "").trim();
   if (!key || !cx) throw new Error("Google Programmable Search is not configured.");
-  const response = await axios.get("https://customsearch.googleapis.com/customsearch/v1", { params: { key, cx, q: booleanQueryFor(monitor), num: Math.min(10, limit) }, timeout: REQUEST_TIMEOUT, maxContentLength: 4 * 1024 * 1024 });
-  return (response.data?.items || []).map((item) => normalizeSignal("google_web", { sourceId: item.cacheId || item.link, sourceUrl: item.link, title: item.title, excerpt: item.snippet, organizationDomain: item.displayLink, evidenceLabel: "Google public web result" })).filter(Boolean);
+  const baseQuery = booleanQueryFor(monitor);
+  const queries = [
+    { query: baseQuery, label: "Google public web result" },
+    { query: `site:facebook.com/groups (${baseQuery})`, label: "Google-indexed public Facebook group result" },
+    { query: `site:linkedin.com/groups (${baseQuery})`, label: "Google-indexed public LinkedIn group result" },
+  ];
+  const responses = await Promise.all(queries.map(({ query }) => axios.get("https://customsearch.googleapis.com/customsearch/v1", {
+    params: { key, cx, q: query, num: Math.min(10, limit) },
+    timeout: REQUEST_TIMEOUT,
+    maxContentLength: 4 * 1024 * 1024,
+  })));
+  const results = responses.flatMap((response, index) => (response.data?.items || []).map((item) => ({ item, label: queries[index].label })));
+  return [...new Map(results.map(({ item, label }) => [item.link, normalizeSignal("google_web", {
+    sourceId: item.cacheId || item.link,
+    sourceUrl: item.link,
+    title: item.title,
+    excerpt: item.snippet,
+    organizationDomain: item.displayLink,
+    evidenceLabel: label,
+    raw: { googleSearchType: label.includes("Facebook") ? "facebook_group" : label.includes("LinkedIn") ? "linkedin_group" : "open_web" },
+  })])).values()].filter(Boolean).slice(0, limit);
 }
 
 async function searchSecFormD(monitor, limit) {
