@@ -44,6 +44,10 @@
 .monitor-details summary,
 .activity-drawer summary { color: #185443; cursor: pointer; font-weight: 800; }
 .advanced-monitor-options label { margin-top: .8rem; }
+.public-community-sources { background: #eef7f3; border-left: 3px solid #267557; display: grid; gap: .3rem; margin-top: .8rem; padding: .75rem .85rem; }
+.public-community-sources strong { color: #174c3d; font-size: .78rem; }
+.public-community-sources span { color: #405f56; font-size: .74rem; line-height: 1.5; }
+.public-community-sources small { color: var(--text-muted); font-size: .68rem; line-height: 1.45; }
 
 .intent-monitor-list { margin-top: 0; }
 .intent-monitor-list > article { align-items: stretch; background: #fff; border: 1px solid #d9e4df; border-radius: 16px; display: block; padding: 1.15rem; }

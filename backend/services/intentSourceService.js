@@ -194,8 +194,21 @@ async function searchGoogleWeb(monitor, limit) {
   const baseQuery = booleanQueryFor(monitor);
   const queries = [
     { query: baseQuery, label: "Google public web result" },
-    { query: `site:facebook.com/groups (${baseQuery})`, label: "Google-indexed public Facebook group result" },
-    { query: `site:linkedin.com/groups (${baseQuery})`, label: "Google-indexed public LinkedIn group result" },
+    {
+      query: `(site:facebook.com/groups OR site:linkedin.com/groups OR site:x.com OR site:twitter.com OR site:instagram.com OR site:threads.net) (${baseQuery})`,
+      label: "Google-indexed public social community result",
+      searchType: "public_social",
+    },
+    {
+      query: `(site:youtube.com OR site:biggerpockets.com OR site:meetup.com OR site:eventbrite.com) (${baseQuery})`,
+      label: "Google-indexed public video, real-estate, or event community result",
+      searchType: "public_events_and_forums",
+    },
+    {
+      query: `(site:discord.com OR site:discord.gg OR inurl:forum OR "real estate investors association" OR "local REIA") (${baseQuery})`,
+      label: "Google-indexed public forum, Discord, or local REIA result",
+      searchType: "public_forums_and_reia",
+    },
   ];
   const responses = await Promise.all(queries.map(({ query }) => axios.get("https://customsearch.googleapis.com/customsearch/v1", {
     params: { key, cx, q: query, num: Math.min(10, limit) },
@@ -210,7 +223,7 @@ async function searchGoogleWeb(monitor, limit) {
     excerpt: item.snippet,
     organizationDomain: item.displayLink,
     evidenceLabel: label,
-    raw: { googleSearchType: label.includes("Facebook") ? "facebook_group" : label.includes("LinkedIn") ? "linkedin_group" : "open_web" },
+    raw: { googleSearchType: queries.find((query) => query.label === label)?.searchType || "open_web" },
   })])).values()].filter(Boolean).slice(0, limit);
 }
 

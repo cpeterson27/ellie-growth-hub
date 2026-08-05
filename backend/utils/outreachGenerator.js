@@ -56,10 +56,14 @@ function emailButton(url, label, backgroundColor) {
 }
 
 function fillTemplate(value = "", variables = {}) {
-  return Object.entries(variables).reduce(
+  const filled = Object.entries(variables).reduce(
     (output, [key, replacement]) => output.replaceAll(`{{${key}}}`, String(replacement || "")),
     String(value || ""),
   );
+  const company = String(variables.company || variables.communityName || "");
+  return filled
+    .replace(/\[(?:community|company|organization)\s+name\]/gi, company)
+    .replace(/\{\{(?:community|company|organization)\s*name\}\}/gi, company);
 }
 
 function textToHtml(value = "") {
@@ -158,6 +162,10 @@ Ellie's Coaching
     campaignName,
     programName: campaign.programName || campaignName,
     eventLink,
+    company: cleanName(contact.companyNameForEmails || contact.company || "your community"),
+    companyName: cleanName(contact.companyNameForEmails || contact.company || "your community"),
+    communityName: cleanName(contact.companyNameForEmails || contact.company || "your community"),
+    organizationName: cleanName(contact.companyNameForEmails || contact.company || "your community"),
   };
   const savedSubject = String(campaign.content?.subject || "").trim();
   const savedBody = String(campaign.content?.body || "").trim();
