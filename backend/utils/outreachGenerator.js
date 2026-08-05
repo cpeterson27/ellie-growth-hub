@@ -62,8 +62,8 @@ function fillTemplate(value = "", variables = {}) {
   );
   const company = String(variables.company || variables.communityName || "");
   return filled
-    .replace(/\[(?:community|company|organization)\s+name\]/gi, company)
-    .replace(/\{\{(?:community|company|organization)\s*name\}\}/gi, company);
+    .replace(/\[(?:community|company|organization)(?:\s+name)?\]/gi, company)
+    .replace(/\{\{(?:community|company|organization)(?:\s*name)?\}\}/gi, company);
 }
 
 function textToHtml(value = "") {
@@ -165,7 +165,9 @@ Ellie's Coaching
     company: cleanName(contact.companyNameForEmails || contact.company || "your community"),
     companyName: cleanName(contact.companyNameForEmails || contact.company || "your community"),
     communityName: cleanName(contact.companyNameForEmails || contact.company || "your community"),
+    community: cleanName(contact.companyNameForEmails || contact.company || "your community"),
     organizationName: cleanName(contact.companyNameForEmails || contact.company || "your community"),
+    organization: cleanName(contact.companyNameForEmails || contact.company || "your community"),
   };
   const savedSubject = String(campaign.content?.subject || "").trim();
   const savedBody = String(campaign.content?.body || "").trim();
