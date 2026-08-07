@@ -29,10 +29,26 @@ async function extractBusinessCard(imageDataUrl) {
     }],
   });
   const parsed = JSON.parse(response.choices?.[0]?.message?.content || "{}");
-  return Object.fromEntries([
-    "firstName", "lastName", "email", "phone", "company", "title",
-    "linkedin", "website", "city", "state", "country", "notes",
-  ].map((field) => [field, clean(parsed[field])]));
+  const aliases = {
+    firstName: ["firstName", "first_name", "givenName"],
+    lastName: ["lastName", "last_name", "familyName", "surname"],
+    email: ["email", "emailAddress"], phone: ["phone", "phoneNumber", "telephone"],
+    company: ["company", "companyName", "organization"],
+    title: ["title", "jobTitle", "position"],
+    linkedin: ["linkedin", "linkedIn", "linkedinUrl", "linkedInUrl"],
+    website: ["website", "websiteUrl", "url"], city: ["city"], state: ["state", "region"],
+    country: ["country"], notes: ["notes", "other"],
+  };
+  const contact = Object.fromEntries(Object.entries(aliases).map(([field, keys]) => [
+    field,
+    clean(keys.map((key) => parsed[key]).find((value) => clean(value))),
+  ]));
+  if (!contact.firstName && !contact.lastName && clean(parsed.name)) {
+    const parts = clean(parsed.name).split(/\s+/);
+    contact.firstName = parts.shift() || "";
+    contact.lastName = parts.join(" ");
+  }
+  return contact;
 }
 
 module.exports = { extractBusinessCard };

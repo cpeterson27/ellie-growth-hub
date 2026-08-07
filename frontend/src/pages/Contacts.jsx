@@ -725,28 +725,31 @@ export default function Contacts() {
     if (!file) return;
     const imageUrl = URL.createObjectURL(file);
     try {
-      setCardStatus("Reading the card image…");
-      const { BrowserQRCodeReader } = await import("@zxing/browser");
-      const codeReader = new BrowserQRCodeReader();
-      const result = await codeReader.decodeFromImageUrl(imageUrl);
-      await acceptCardPayload(result.getText());
-    } catch {
-      try {
-        setCardStatus("No QR code found. Reading the printed card details…");
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        const response = await extractBusinessCard(dataUrl);
-        const nextDraft = { ...manualContactDefaults, ...(response.data || {}) };
-        setCardDraft(nextDraft);
-        setCardStatus("Card details captured. Review every field before saving.");
-        await reviewCardDraft(nextDraft);
-      } catch (error) {
-        setCardStatus(error.response?.data?.message || "The card could not be read. Try a sharper photo with the entire card visible.");
-      }
+      setCardStatus("Reading the QR code and all printed card details…");
+      const dataUrlPromise = new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const qrPromise = import("@zxing/browser")
+        .then(({ BrowserQRCodeReader }) => new BrowserQRCodeReader().decodeFromImageUrl(imageUrl))
+        .then((result) => result.getText())
+        .catch(() => "");
+      const [dataUrl, qrPayload] = await Promise.all([dataUrlPromise, qrPromise]);
+      const response = await extractBusinessCard(dataUrl);
+      const printed = response.data || {};
+      const qrFields = qrPayload ? parseBusinessCardPayload(qrPayload) : {};
+      const nextDraft = { ...manualContactDefaults, ...printed };
+      Object.entries(qrFields).forEach(([key, value]) => {
+        if (value) nextDraft[key] = value;
+      });
+      setCardRaw(qrPayload || "");
+      setCardDraft(nextDraft);
+      setCardStatus("QR and printed details captured. Review every field before saving.");
+      await reviewCardDraft(nextDraft);
+    } catch (error) {
+      setCardStatus(error.response?.data?.message || "The card could not be read. Try a sharper photo with the entire card visible.");
     } finally {
       URL.revokeObjectURL(imageUrl);
     }
