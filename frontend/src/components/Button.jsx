@@ -8,6 +8,7 @@ export default function Button({
   disabled = false,
   loading = false,
   onClick,
+  className = '',
   ...props
 }) {
   return (
@@ -17,6 +18,7 @@ export default function Button({
         'btn',
         `btn--${variant}`,
         `btn--${size}`,
+        className,
         loading ? 'btn--loading' : '',
       ]
         .filter(Boolean)

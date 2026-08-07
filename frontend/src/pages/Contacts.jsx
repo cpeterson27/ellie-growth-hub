@@ -2498,6 +2498,7 @@ export default function Contacts() {
         isOpen={isCardCaptureOpen}
         onClose={closeCardCapture}
         title="Scan a business card"
+        className="business-card-modal"
         footer={
           <>
             <Button
@@ -2546,14 +2547,14 @@ export default function Contacts() {
             <div
               className={cardScanning ? "business-card-live is-active" : "business-card-live"}
             >
-              <strong>Scan live QR</strong>
-              <small>Use the rear camera on a phone when available.</small>
+              <strong>Scan digital card QR</strong>
+              <small>Point the rear camera at a Blinq or other digital-card QR code.</small>
               <Button
-                variant="outline"
-                size="sm"
+                size="lg"
+                className="business-card-start-button"
                 onClick={cardScanning ? stopCardScanner : startCardScanner}
               >
-                {cardScanning ? "Stop camera" : "Start camera"}
+                {cardScanning ? "Stop camera" : "Open camera and scan"}
               </Button>
               <video
                 className={

@@ -1,5 +1,5 @@
 const OpenAI = require("openai");
-const { fetchPublicPage, plainText } = require("./publicWebsiteResearchService");
+const { fetchPublicPage } = require("./publicWebsiteResearchService");
 
 function client() {
   const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
@@ -33,15 +33,6 @@ function normalizeContact(parsed = {}) {
   return contact;
 }
 
-async function extractJsonFromText(text, instruction) {
-  const response = await client().chat.completions.create({
-    model: process.env.BUSINESS_CARD_OPENAI_MODEL || process.env.JARVIS_OPENAI_MODEL || "gpt-4.1-mini",
-    response_format: { type: "json_object" },
-    messages: [{ role: "user", content: `${instruction}\n\n${String(text || "").slice(0, 120000)}` }],
-  });
-  return normalizeContact(JSON.parse(response.choices?.[0]?.message?.content || "{}"));
-}
-
 async function extractBusinessCard(imageDataUrl) {
   const image = String(imageDataUrl || "");
   if (!/^data:image\/(?:png|jpeg|jpg|webp);base64,/i.test(image)) {
@@ -71,13 +62,38 @@ async function extractDigitalBusinessCard(rawUrl) {
   if (!/(^|\.)blinq\.me$/i.test(url.hostname)) throw new Error("Only public Blinq card links are supported by this resolver.");
   const page = await fetchPublicPage(url.toString());
   if (page.blocked) throw new Error("Blinq did not allow this public card to be read.");
-  const visibleText = plainText(page.html);
-  const contact = await extractJsonFromText(
-    `${visibleText}\n\nEMBEDDED PAGE DATA:\n${page.html}`,
-    "Extract the contact details from this public Blinq digital business-card page and its embedded application data. Return JSON with only these string fields: firstName, lastName, email, phone, company, title, linkedin, website, city, state, country, notes. Use the card owner's details, not Blinq company/support details. Do not guess missing fields. Do not use the Blinq card URL as website unless it is explicitly listed as the owner's website.",
-  );
+  const contact = parseBlinqHtml(page.html);
   contact.notes = [contact.notes, `Digital business card: ${page.url}`].filter(Boolean).join("\n");
   return contact;
 }
 
-module.exports = { extractBusinessCard, extractDigitalBusinessCard, normalizeContact };
+function parseBlinqHtml(html) {
+  const decoded = String(html || "")
+    .replace(/\\u([0-9a-f]{4})/gi, (_match, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/\\"/g, '"');
+  const stringField = (key) => {
+    const match = decoded.match(new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "i"));
+    if (!match || match[1] === "$undefined") return "";
+    return clean(match[1].replace(/\\n/g, " ").replace(/\\"/g, '"').replace(/\\\\/g, "\\"));
+  };
+  const arrayValue = (key) => {
+    const start = decoded.search(new RegExp(`"${key}"\\s*:\\s*\\[`, "i"));
+    if (start < 0) return "";
+    return decoded.slice(start, start + 5000).match(/"value"\s*:\s*"((?:\\.|[^"\\])*)"/i)?.[1] || "";
+  };
+  const cardStart = decoded.indexOf('"card":{');
+  const cardData = cardStart >= 0 ? decoded.slice(cardStart, cardStart + 30000) : decoded;
+  const urlsStart = cardData.search(/"urls"\s*:\s*\[/i);
+  const urlsData = urlsStart >= 0 ? cardData.slice(urlsStart, urlsStart + 8000) : "";
+  const urls = [...urlsData.matchAll(/https?:\/\/[^"\\\s]+/gi)].map((match) => match[0]);
+  const linkedin = urls.find((value) => /linkedin\.com/i.test(value)) || "";
+  const website = urls.find((value) => !/linkedin\.com|blinq\.me|googleapis\.com/i.test(value)) || "";
+  return normalizeContact({
+    firstName: stringField("firstName"), lastName: stringField("lastName"),
+    email: clean(arrayValue("emails")), phone: clean(arrayValue("phoneNumbers")),
+    company: stringField("orgName"), title: stringField("jobTitle"), linkedin, website,
+    city: stringField("city"), state: stringField("state"), country: stringField("country"),
+  });
+}
+
+module.exports = { extractBusinessCard, extractDigitalBusinessCard, normalizeContact, parseBlinqHtml };
