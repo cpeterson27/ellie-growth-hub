@@ -235,7 +235,7 @@ export default function CampaignWorkspace() {
         {activeSection === "email" ? <DashboardCard title="Campaign master email">
           {emailTemplate ? <div className="campaign-template-editor">
             <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Saved version ${emailTemplate.currentVersion}` : "Editing master template"}</strong></div>
-            <label><span>Template for target audience</span><select value={templateAudience} onChange={(event) => setTemplateAudience(event.target.value)}><option value="general">All Deal to Close contacts</option>{(campaign.audience || []).map((audience, index) => <option value={`audience-${index}`} key={`${audience}-${index}`}>{audience}</option>)}</select></label>
+            <label><span>Template for target audience</span><select value={templateAudience} onChange={(event) => setTemplateAudience(event.target.value)}><option value="general">Main template · fallback for unmatched contacts</option>{(campaign.audience || []).map((audience, index) => <option value={`audience-${index}`} key={`${audience}-${index}`}>{audience}</option>)}</select><small>When outreach is generated, Growth Operator compares each contact’s title and saved audience data with these approved audience labels. The strongest match receives that audience template; otherwise the main template is used. You can override the choice on an individual contact.</small></label>
             <div className="campaign-flyer-editor">
               <span>Email flyer</span>
               {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.name} flyer`} /> : null}

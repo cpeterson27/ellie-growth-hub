@@ -3944,11 +3944,11 @@ export default function Contacts() {
                             },
                           })}
                         >
-                          <option value="auto">Automatic—match from job title</option>
+                          <option value="auto">Automatic—match from title and audience data</option>
                           <option value="general">Main campaign template</option>
                           {availableTemplates.map(([key, template]) => <option key={key} value={key}>{template.audienceLabel || key}</option>)}
                         </select>
-                        <small>No job title automatically falls back to the main campaign template.</small>
+                        <small>Automatic routing checks title, industry, company, audience profiles, tags, keywords, lists, seniority, and notes. If nothing matches, the main campaign template is used.</small>
                       </label>
                     </div>;
                   })() : null}
