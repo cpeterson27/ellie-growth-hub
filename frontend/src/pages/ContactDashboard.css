@@ -370,6 +370,43 @@
   height: 1px;
   opacity: 0;
 }
+.crm-file-drop--primary {
+  align-items: center;
+  background: linear-gradient(145deg, #f9fdfb, #edf7f3);
+  border-color: #6f9f90;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 210px;
+  padding: 28px;
+  text-align: center;
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.crm-file-drop--primary:hover,
+.crm-file-drop--primary:focus-within {
+  background: #f5fcf8;
+  border-color: #176b59;
+  box-shadow: 0 0 0 5px rgba(23,107,89,.09);
+}
+.crm-file-drop__icon {
+  align-items: center;
+  background: #176b59;
+  border-radius: 50%;
+  color: #fff !important;
+  display: flex;
+  font-size: 1.35rem;
+  height: 54px;
+  justify-content: center;
+  margin-bottom: 7px;
+  width: 54px;
+}
+.crm-file-drop--primary strong { color: #173f37; font-size: 1.05rem; }
+.crm-file-drop--primary > span:not(.crm-file-drop__icon) { color: #536b64; margin-top: 3px; }
+.crm-file-drop--primary small { color: #74857f; font-size: .7rem; margin-top: 8px; }
+@media (max-width: 720px) {
+  .crm-file-drop--primary { min-height: 180px; padding: 22px; }
+}
 .crm-file-drop span,
 .crm-paste-option {
   color: var(--text-muted);

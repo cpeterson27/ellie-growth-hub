@@ -1616,19 +1616,25 @@ export default function Contacts() {
           >
             Customize fields
           </Button>
+          <Button
+            variant="secondary"
+            className="crm-import-primary"
+            onClick={openCsvImport}
+          >
+            Import contacts
+          </Button>
           <div className="crm-menu-wrap">
             <Button
               variant="outline"
               onClick={() => setImportMenuOpen((open) => !open)}
             >
-              Import ▾
+              More options ▾
             </Button>
             {importMenuOpen ? (
               <div className="crm-menu crm-import-menu">
                 <button onClick={openPreparationWorkspace}>
                   Prepare lead list / CSV
                 </button>
-                <button onClick={openCsvImport}>Import completed CSV</button>
                 <button
                   onClick={() => {
                     navigate("/discovery");
@@ -2985,7 +2991,7 @@ export default function Contacts() {
               Upload a CSV exported from a spreadsheet or another CRM.
               Growth Operator recognizes common people columns automatically.
             </p>
-            <label className="crm-file-drop">
+            <label className="crm-file-drop crm-file-drop--primary">
               <input
                 type="file"
                 accept=".csv,.txt,text/csv,text/plain"
@@ -3003,8 +3009,10 @@ export default function Contacts() {
                   }
                 }}
               />
-              <strong>Choose a CSV file</strong>
-              <span>or drag a file here</span>
+              <span className="crm-file-drop__icon" aria-hidden="true">⇧</span>
+              <strong>Drop your contact CSV here</strong>
+              <span>or tap to choose a file</span>
+              <small>CSV and text exports are supported</small>
             </label>
           </div>
         ) : (
