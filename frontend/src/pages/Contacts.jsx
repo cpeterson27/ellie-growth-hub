@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Papa from "papaparse";
-import { FiMoreHorizontal } from "react-icons/fi";
+import { FiColumns, FiList, FiMoreHorizontal } from "react-icons/fi";
 import "./Contacts.css";
 import "./ContactVerification.css";
 import "./ContactDashboard.css";
@@ -537,7 +537,7 @@ export default function Contacts() {
   const [fieldUpdateSaving, setFieldUpdateSaving] = useState(false);
   const [fieldUpdateError, setFieldUpdateError] = useState("");
   const [unsubscribedContacts, setUnsubscribedContacts] = useState([]);
-  const [crmView, setCrmView] = useState("list");
+  const [crmView, setCrmView] = useState(() => localStorage.getItem("growth-operator-crm-view") || "pipeline");
   const [isCardCaptureOpen, setCardCaptureOpen] = useState(false);
   const [cardDraft, setCardDraft] = useState(manualContactDefaults);
   const [cardRaw, setCardRaw] = useState("");
@@ -825,6 +825,11 @@ export default function Contacts() {
         err.response?.data?.message || "Unable to update the lifecycle stage.",
       );
     }
+  }
+
+  function changeCrmView(view) {
+    setCrmView(view);
+    localStorage.setItem("growth-operator-crm-view", view);
   }
 
   useEffect(
@@ -1829,6 +1834,16 @@ export default function Contacts() {
             assignment is separate, so an assigned contact can still need review.
           </p>
         ) : null}
+        <section className="crm-view-mode" aria-label="Choose contact workspace">
+          <button className={crmView === "pipeline" ? "active" : ""} type="button" onClick={() => changeCrmView("pipeline")}>
+            <FiColumns aria-hidden="true" />
+            <span><strong>Pipeline board</strong><small>Drag contacts between lifecycle stages</small></span>
+          </button>
+          <button className={crmView === "list" ? "active" : ""} type="button" onClick={() => changeCrmView("list")}>
+            <FiList aria-hidden="true" />
+            <span><strong>Relationship list</strong><small>Search, review, select, and update records</small></span>
+          </button>
+        </section>
         <div className="crm-toolbar">
           <label>
             Campaign{" "}
@@ -1861,20 +1876,6 @@ export default function Contacts() {
               Clear filters
             </Button>
           ) : null}
-          <div className="crm-view-switch" aria-label="CRM view">
-            <button
-              className={crmView === "list" ? "active" : ""}
-              onClick={() => setCrmView("list")}
-            >
-              Relationship list
-            </button>
-            <button
-              className={crmView === "pipeline" ? "active" : ""}
-              onClick={() => setCrmView("pipeline")}
-            >
-              Lifecycle pipeline
-            </button>
-          </div>
         </div>
         <div className="crm-tabs crm-tabs--simple">
           {[
@@ -2125,6 +2126,7 @@ export default function Contacts() {
                           }
                           onClick={() => setDetailContact(contact)}
                         >
+                          <span className="crm-pipeline__drag" aria-hidden="true">⋮⋮</span>
                           <strong>{contact.name}</strong>
                           <span>{contact.title || "Role missing"}</span>
                           <small>{contact.company || "Company missing"}</small>
@@ -2142,6 +2144,12 @@ export default function Contacts() {
                                 : "Unassigned"}
                             </span>
                           </footer>
+                          <label className="crm-pipeline__mobile-stage" onClick={(event) => event.stopPropagation()}>
+                            <span>Move to stage</span>
+                            <select value={crmStage(contact)} onChange={(event) => moveContactStage(contact._id, event.target.value)}>
+                              {CRM_PIPELINE_STAGES.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                          </label>
                         </article>
                       ))
                     ) : (
