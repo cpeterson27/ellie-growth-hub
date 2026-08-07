@@ -404,6 +404,7 @@ export const archiveContact = (contactId) => api.post(`/contacts/${contactId}/ar
 export const deleteContact = (contactId, confirmCascade = false) => api.delete(`/contacts/${contactId}`, { data: { confirmCascade } }).then((res) => res.data);
 export const updateContact = (contactId, data) => api.patch(`/contacts/${contactId}`, data).then((res) => res.data);
 export const extractBusinessCard = (image) => api.post("/contacts/business-card/extract", { image }).then((res) => res.data);
+export const resolveDigitalBusinessCard = (url) => api.post("/contacts/business-card/resolve", { url }).then((res) => res.data);
 export const bulkAssignContactsToCampaign = (contactIds, campaignId) =>
   api.patch("/contacts/bulk/assign-campaign", { contactIds, campaignId }).then((res) => res.data);
 export const bulkConfirmAndAssignContacts = (contactIds, campaignId) =>

@@ -26,6 +26,7 @@ import {
   deleteContact,
   updateContact,
   extractBusinessCard,
+  resolveDigitalBusinessCard,
   bulkAssignContactsToCampaign,
   bulkConfirmAndAssignContacts,
   createEmailVerificationBatch,
@@ -669,15 +670,30 @@ export default function Contacts() {
   }
 
   async function acceptCardPayload(payload) {
-
     const parsed = parseBusinessCardPayload(payload);
-
+    let resolved = {};
+    const url = String(payload || "").match(/https?:\/\/[^\s]+/i)?.[0] || "";
+    if (url) {
+      try {
+        const parsedUrl = new URL(url);
+        if (/(^|\.)blinq\.me$/i.test(parsedUrl.hostname)) {
+          setCardStatus("Opening the Blinq card and retrieving all shared contact details…");
+          const response = await resolveDigitalBusinessCard(url);
+          resolved = response.data || {};
+        }
+      } catch (error) {
+        console.error("Unable to resolve digital business card", error);
+      }
+    }
     const nextDraft = { ...manualContactDefaults, ...parsed };
+    Object.entries(resolved).forEach(([key, value]) => {
+      if (value) nextDraft[key] = value;
+    });
     setCardRaw(payload);
     setCardDraft(nextDraft);
     setCardStatus(
       fullContactName(nextDraft)
-        ? "Card read successfully. Review the information before saving."
+        ? "Digital card details retrieved. Review the information before saving."
         : "The QR code was read, but the card did not include a name. Complete the missing fields below.",
     );
     await reviewCardDraft(nextDraft);
