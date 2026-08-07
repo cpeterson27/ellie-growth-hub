@@ -75,7 +75,7 @@ const publicAccount = (signal) => {
   return { label: label || "Account not available", url: /^https:\/\//i.test(signal?.authorUrl || "") ? signal.authorUrl : "" };
 };
 
-const friendlySourceState = (state) => ({ healthy: "Working", rate_limited: "Temporarily limited", blocked: "Temporarily unavailable", failed: "Retrying automatically", never: "Waiting for first check" }[state] || "Checking");
+const friendlySourceState = (state) => ({ healthy: "Results found", empty: "No indexed pages found", rate_limited: "Temporarily limited", blocked: "Temporarily unavailable", failed: "Retrying automatically", never: "Waiting for first check" }[state] || "Checking");
 const sourceAction = (health) => {
   const error = String(health?.lastError || "");
   if (health?.source === "google_web") {
@@ -85,6 +85,7 @@ const sourceAction = (health) => {
     if (/quota|daily limit|rate limit|429/i.test(error)) return "Google’s search quota is temporarily exhausted. Other web sources are still running.";
     if (/access not configured|has not been used|disabled/i.test(error)) return "Enable the Custom Search JSON API in the same Google Cloud project as this API key.";
   }
+  if (health?.state === "empty") return "The source completed, but the public search index returned no matching pages. Add known public group URLs for direct checking.";
   return error || (health?.state === "never" ? "This source has not finished its first check yet." : "This source will be retried on the next scheduled run.");
 };
 const monitorSourceEnabled = (monitor, source) => source === "feeds" ? Boolean((monitor.feedUrls || []).length) : (monitor.sources || []).includes(source);

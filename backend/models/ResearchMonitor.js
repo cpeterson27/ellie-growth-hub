@@ -32,7 +32,7 @@ const researchMonitorSchema = new mongoose.Schema({
     lastErrorAt: { type: Date, default: null },
     lastError: { type: String, default: "" },
     resultsCollected: { type: Number, default: 0 },
-    state: { type: String, enum: ["healthy", "rate_limited", "blocked", "failed", "never"], default: "never" },
+    state: { type: String, enum: ["healthy", "empty", "rate_limited", "blocked", "failed", "never"], default: "never" },
     nextScheduledAttempt: { type: Date, default: null },
   }],
   totals: {

@@ -25,6 +25,7 @@ import {
   archiveContact,
   deleteContact,
   updateContact,
+  extractBusinessCard,
   bulkAssignContactsToCampaign,
   bulkConfirmAndAssignContacts,
   createEmailVerificationBatch,
@@ -724,15 +725,28 @@ export default function Contacts() {
     if (!file) return;
     const imageUrl = URL.createObjectURL(file);
     try {
-      setCardStatus("Reading QR code from the image…");
+      setCardStatus("Reading the card image…");
       const { BrowserQRCodeReader } = await import("@zxing/browser");
       const codeReader = new BrowserQRCodeReader();
       const result = await codeReader.decodeFromImageUrl(imageUrl);
       await acceptCardPayload(result.getText());
     } catch {
-      setCardStatus(
-        "No QR code was found in that image. Try a clearer screenshot or paste the digital-card link.",
-      );
+      try {
+        setCardStatus("No QR code found. Reading the printed card details…");
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const response = await extractBusinessCard(dataUrl);
+        const nextDraft = { ...manualContactDefaults, ...(response.data || {}) };
+        setCardDraft(nextDraft);
+        setCardStatus("Card details captured. Review every field before saving.");
+        await reviewCardDraft(nextDraft);
+      } catch (error) {
+        setCardStatus(error.response?.data?.message || "The card could not be read. Try a sharper photo with the entire card visible.");
+      }
     } finally {
       URL.revokeObjectURL(imageUrl);
     }
@@ -2450,7 +2464,7 @@ export default function Contacts() {
       <Modal
         isOpen={isCardCaptureOpen}
         onClose={closeCardCapture}
-        title="Capture a digital business card"
+        title="Scan a business card"
         footer={
           <>
             <Button
@@ -2477,39 +2491,22 @@ export default function Contacts() {
             <span>Networking intake</span>
             <h3>Scan once. Review once. Keep the relationship connected.</h3>
             <p>
-              Growth Operator reads a digital-card QR code or copied contact details,
-              checks for an existing CRM record, and then creates or updates one
-              contact.
+              Photograph a printed card, scan a digital-card QR code, or paste
+              copied details. Review the result before it enters the CRM.
             </p>
           </section>
           <ol className="business-card-steps">
             <li>
-              <strong>Stay signed into Growth Operator</strong>
-              <span>
-                Only your team needs an Growth Operator login. The person sharing the card
-                does not.
-              </span>
+              <strong>Take a clear photo</strong>
+              <span>Keep the entire card inside the frame with good lighting.</span>
             </li>
             <li>
-              <strong>Scan or paste the card</strong>
-              <span>
-                Growth Operator keeps you on this screen instead of silently saving or
-                launching a link.
-              </span>
+              <strong>Review the details</strong>
+              <span>Correct anything unclear before saving.</span>
             </li>
             <li>
-              <strong>Review the match</strong>
-              <span>
-                Confirm the details and see whether this updates an existing
-                contact or creates a new one.
-              </span>
-            </li>
-            <li>
-              <strong>Choose Add to CRM</strong>
-              <span>
-                Nothing enters the CRM until you approve it with the final
-                button.
-              </span>
+              <strong>Add to CRM</strong>
+              <span>Duplicate checking runs before the final save.</span>
             </li>
           </ol>
           <div className="business-card-capture__methods">
@@ -2538,10 +2535,8 @@ export default function Contacts() {
               />
             </div>
             <label>
-              <strong>Use a QR screenshot</strong>
-              <small>
-                Choose a saved screenshot containing the card’s QR code.
-              </small>
+              <strong>Photograph or upload a card</strong>
+              <small>Reads printed details and QR codes.</small>
               <span className="business-card-upload-button">
                 Choose screenshot
               </span>
@@ -2549,6 +2544,7 @@ export default function Contacts() {
                 className="business-card-file"
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
+                capture="environment"
                 onChange={(event) => readCardImage(event.target.files?.[0])}
               />
             </label>

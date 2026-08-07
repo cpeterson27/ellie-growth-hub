@@ -15,8 +15,18 @@ const Campaign = require("../models/Campaign");
 const Outreach = require("../models/Outreach");
 const { applyResearchClassification } = require("../services/contactResearchService");
 const { assessEmail } = require("../services/emailRiskService");
+const { extractBusinessCard } = require("../services/businessCardExtractionService");
 
 const router = express.Router();
+
+router.post("/business-card/extract", async (req, res) => {
+  try {
+    const contact = await extractBusinessCard(req.body?.image);
+    return res.json({ success: true, data: contact });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || "Unable to read the business card image" });
+  }
+});
 
 router.post("/email-risk/check", async (req, res) => {
   try {

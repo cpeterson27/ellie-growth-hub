@@ -199,15 +199,28 @@ async function searchIndexedSocialGroups(monitor, platform, limit) {
   const config = platform === "linkedin"
     ? { host: "linkedin.com", path: "groups", source: "linkedin_public", label: "Bing-indexed public LinkedIn group" }
     : { host: "facebook.com", path: "groups", source: "facebook_public", label: "Bing-indexed public Facebook group" };
-  const query = `site:${config.host}/${config.path} (${booleanQueryFor(monitor)})`;
-  const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&format=rss`;
-  const results = await fetchFeed(url, config.source, config.label, limit);
-  return results.filter((signal) => {
+  const terms = booleanQueryFor(monitor);
+  const queries = [
+    `site:${config.host} inurl:${config.path} (${terms})`,
+    `site:www.${config.host} inurl:${config.path} (${terms})`,
+    `site:${config.host} "group" (${terms})`,
+  ];
+  const responses = await Promise.allSettled(queries.map((query) => fetchFeed(
+    `https://www.bing.com/search?q=${encodeURIComponent(query)}&format=rss`,
+    config.source,
+    config.label,
+    limit,
+  )));
+  const successful = responses.filter((response) => response.status === "fulfilled");
+  if (!successful.length) throw responses[0]?.reason || new Error(`Bing returned no usable ${platform} search responses.`);
+  const results = successful.flatMap((response) => response.value);
+  return [...new Map(results.filter((signal) => {
     try {
       const parsed = new URL(signal.sourceUrl);
-      return parsed.hostname.toLowerCase().endsWith(config.host) && parsed.pathname.toLowerCase().includes(`/${config.path}`);
+      const hostMatches = parsed.hostname.toLowerCase() === config.host || parsed.hostname.toLowerCase().endsWith(`.${config.host}`);
+      return hostMatches && (parsed.pathname.toLowerCase().includes(`/${config.path}`) || /\bgroup\b/i.test(`${signal.title} ${signal.excerpt}`));
     } catch (_error) { return false; }
-  });
+  }).map((signal) => [signal.sourceUrl, signal])).values()].slice(0, limit);
 }
 
 const searchLinkedInPublic = (monitor, limit) => searchIndexedSocialGroups(monitor, "linkedin", limit);
