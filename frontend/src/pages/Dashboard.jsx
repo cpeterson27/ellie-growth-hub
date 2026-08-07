@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiCalendar, FiCamera, FiChevronLeft, FiChevronRight, FiDollarSign, FiMail, FiTrendingUp, FiUsers } from "react-icons/fi";
+import { FiCalendar, FiChevronLeft, FiChevronRight, FiDollarSign, FiMail, FiTrendingUp, FiUsers } from "react-icons/fi";
 import StatCard from "../components/StatCard.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Button from "../components/Button.jsx";
@@ -49,7 +49,7 @@ export default function Dashboard() {
   }, [selected?._id]);
 
   if (loading) return <div className="page-dashboard"><p>Loading dashboard…</p></div>;
-  if (!events.length) return <div className="page-dashboard"><div className="page-header"><div><h1 className="page-title">Business dashboard</h1><p className="page-subtitle">Create or import your first event to begin tracking performance.</p></div><div className="dashboard-header-actions"><Button onClick={() => navigate("/contacts?scan=business-card")}><FiCamera /> Scan card</Button><Button variant="outline" onClick={() => navigate("/events")}>Open Events</Button></div></div></div>;
+  if (!events.length) return <div className="page-dashboard"><div className="page-header"><div><h1 className="page-title">Business dashboard</h1><p className="page-subtitle">Create or import your first event to begin tracking performance.</p></div><Button variant="outline" onClick={() => navigate("/events")}>Open Events</Button></div></div>;
 
   const selectedTickets = Number(selected?.ticketsSold || 0);
   const selectedGoal = Number(selected?.ticketGoal || 0);
@@ -132,7 +132,7 @@ export default function Dashboard() {
   return <div className="page-dashboard dashboard-portfolio">
     <div className="page-header">
       <div><p className="page-eyebrow">Event command center</p><h1 className="page-title">Event dashboard</h1><p className="page-subtitle">Choose one event and see everything that matters in one place.</p></div>
-      <div className="dashboard-header-actions"><Button className="dashboard-scan-action" onClick={() => navigate("/contacts?scan=business-card")}><FiCamera /> Scan card</Button><Button variant="outline" onClick={() => navigate("/analytics")}>Analytics</Button><Button variant="outline" onClick={() => navigate("/events")}>Events</Button></div>
+      <div className="dashboard-header-actions"><Button variant="outline" onClick={() => navigate("/analytics")}>Analytics</Button><Button variant="outline" onClick={() => navigate("/events")}>Events</Button></div>
     </div>
 
     <section className="dashboard-event-picker" aria-label="Choose an event to view">

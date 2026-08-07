@@ -23,6 +23,7 @@
 }
 
 .navbar__context { min-width: 0; }
+.navbar__mobile-brand{display:none;min-width:0}.navbar__mobile-brand strong,.navbar__mobile-brand span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.navbar__mobile-brand strong{color:#163e35;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase}.navbar__mobile-brand span{color:#68746f;font-size:.68rem;font-weight:700}
 .initiative-switcher{background:#f0eee8;border:1px solid #d5d0c4;border-radius:3px;display:grid;margin-left:auto;min-width:260px;padding:7px 34px 7px 12px;position:relative}.initiative-switcher:before{background:#b79a58;content:"";height:calc(100% + 2px);left:-1px;position:absolute;top:-1px;width:3px}.initiative-switcher>span{color:#8a8c84;font-size:.56rem;font-weight:850;letter-spacing:.11em;text-transform:uppercase}.initiative-switcher select{appearance:none;background:transparent;border:0!important;color:#183f38;cursor:pointer;font:inherit;font-family:Georgia,"Times New Roman",serif;font-size:.86rem;font-weight:600;min-height:23px;padding:0;max-width:300px}.initiative-switcher>i{background:#b79447;border-radius:50%;height:6px;position:absolute;right:14px;top:25px;width:6px}.initiative-switcher>i.is-offer{background:#496b8a}
 
 .navbar__menu {
@@ -82,7 +83,7 @@
   flex:0 0 auto;
 }
 
-.navbar__search,.navbar__jarvis,.navbar__logout {
+.navbar__scan,.navbar__search,.navbar__jarvis {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -92,26 +93,29 @@
   cursor: pointer;
   transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
+.navbar__scan{background:#1f5c50;border:1px solid #1f5c50;color:#fff;gap:.45rem;padding:0 .8rem;font:inherit;font-size:.78rem;font-weight:800}
 .navbar__search { gap: .55rem; min-width: 180px; padding: 0 .55rem 0 .75rem; border: 1px solid rgba(32,61,53,.14); background: rgba(255,255,255,.82); color: #52605c; box-shadow: 0 6px 20px rgba(18,38,33,.05); }
 .navbar__search span { flex: 1; text-align: left; font-size: .82rem; font-weight: 620; }
 .navbar__search kbd { padding: .22rem .42rem; border: 1px solid rgba(32,61,53,.12); border-radius: 6px; color: #74807c; background: #f4f5f2; font: inherit; font-size: .68rem; }
 .navbar__jarvis { position: relative; gap: .5rem; padding: 0 .9rem; overflow: hidden; border: 1px solid #244d43; color: #effff9; background:#173b32; box-shadow:none; font-size: .8rem; font-weight: 780; }
 .navbar__jarvis i { width: 6px; height: 6px; border-radius: 50%; background: #68e7bd; box-shadow: 0 0 12px #68e7bd; animation: navbar-status 2s ease-in-out infinite; }
-.navbar__logout{background:transparent;border:1px solid rgba(32,61,53,.14);color:#65716d;width:38px}.navbar__search:hover,.navbar__jarvis:hover,.navbar__logout:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(18,38,33,.12); }
+.navbar__search:hover,.navbar__jarvis:hover,.navbar__scan:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(18,38,33,.12); }
 @keyframes navbar-status { 50% { opacity: .35; transform: scale(.75); } }
 
 @media (max-width: 900px) {
   .navbar {
-    min-height: 76px;
-    padding: .8rem 1rem;
+    display:grid;
+    grid-template-columns:46px minmax(0,1fr) auto;
+    gap:.75rem;
+    min-height:72px;
+    padding:calc(env(safe-area-inset-top) + .55rem) .8rem .55rem;
   }
 
   .navbar__menu {
     display: inline-flex;
   }
 
-  .navbar__search { min-width: 44px; width: 44px; padding: 0; }
-  .navbar__search span,.navbar__search kbd { display: none; }
+  .navbar__left{display:contents}.navbar__context{display:none}.navbar__mobile-brand{display:grid;gap:2px}.navbar__actions{display:contents}.navbar__scan{border-radius:10px;height:48px;padding:0 .85rem}.navbar__search,.navbar__jarvis{display:none}
   .initiative-switcher{display:none}
 }
 
@@ -124,10 +128,7 @@
   .navbar__menu-label { display: none; }
 }
 
-@media (max-width: 560px) {
-  .navbar__title { max-width: 43vw; }
-  .navbar__jarvis span { display: none; }
-}
+@media (max-width: 390px){.navbar__scan span{display:none}.navbar__scan{width:48px;padding:0}}
 
 /* Editorial command bar: intentionally asymmetric, restrained, and branded. */
 .navbar{min-height:88px;padding:.85rem 1.65rem;background:linear-gradient(100deg,rgba(252,251,247,.98),rgba(245,242,233,.96))}
@@ -137,3 +138,4 @@
 .navbar__menu:hover{transform:translateY(-1px) rotate(4deg);box-shadow:0 12px 28px rgba(15,55,46,.22)}
 .navbar__jarvis{border-radius:999px;background:linear-gradient(120deg,#173b32,#0e2923);box-shadow:0 8px 24px rgba(14,40,34,.14)}
 .navbar__new-program{align-items:center;background:#fff;border:1px solid #d8d0bf;color:#173f36;cursor:pointer;display:inline-flex;font:inherit;font-size:.76rem;font-weight:800;gap:.35rem;height:44px;padding:0 .75rem}.navbar__new-program:hover{border-color:#b9954b}@media(max-width:1180px){.navbar__new-program span{display:none}.navbar__new-program{justify-content:center;padding:0;width:44px}}@media(max-width:900px){.navbar__new-program{display:none}}
+@media(max-width:900px){.navbar{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:.75rem;min-height:72px;padding:calc(env(safe-area-inset-top) + .55rem) .8rem .55rem}.navbar__left,.navbar__actions{display:contents}.navbar__context,.initiative-switcher,.navbar__new-program,.navbar__search,.navbar__jarvis{display:none}.navbar__mobile-brand{display:grid;gap:2px}.navbar__scan{border-radius:10px;height:48px;padding:0 .85rem}}

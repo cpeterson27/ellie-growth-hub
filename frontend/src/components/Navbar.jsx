@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FiSearch, FiMenu, FiCpu, FiLogOut, FiPlus } from "react-icons/fi";
+import { FiSearch, FiMenu, FiCpu, FiCamera, FiPlus } from "react-icons/fi";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import { useInitiative } from "../context/InitiativeContext.jsx";
 import { fetchWorkspaceConfig } from "../services/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
 import "./Navbar.css";
 
 export default function Navbar({ onMenuClick }) {
   const navigate = useNavigate();
-  const { logout, session } = useAuth();
   const location = useLocation();
   const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
   const { campaigns, selected, selectedId, setSelectedId } = useInitiative();
@@ -60,6 +58,7 @@ export default function Navbar({ onMenuClick }) {
           <p className="navbar__eyebrow"><span>{workspaceName}</span><i />{pageMeta[0]}</p>
           <h1 className="navbar__title">{pageMeta[1]}</h1>
         </div>
+        <div className="navbar__mobile-brand"><strong>Growth Operator</strong><span>{pageMeta[0]}</span></div>
         <label className="initiative-switcher">
           <span>Current campaign</span>
           <select value={selectedId} onChange={(event) => changeInitiative(event.target.value)}>
@@ -77,14 +76,14 @@ export default function Navbar({ onMenuClick }) {
       </div>
 
       <div className="navbar__actions">
+        <button className="navbar__scan" type="button" onClick={() => navigate("/contacts?scan=business-card")}>
+          <FiCamera /><span>Scan card</span>
+        </button>
         <button className="navbar__search" type="button" aria-label="Search contacts" onClick={() => navigate("/contacts")}>
           <FiSearch /><span>Search workspace</span><kbd>⌘ K</kbd>
         </button>
         <button className="navbar__jarvis" type="button" onClick={() => navigate("/jarvis")}>
           <FiCpu /><span>Jarvis</span><i />
-        </button>
-        <button className="navbar__logout" type="button" onClick={async () => { await logout(); window.location.assign("/"); }} title={`Sign out ${session?.user?.email || ""}`} aria-label="Sign out">
-          <FiLogOut />
         </button>
       </div>
     </header>

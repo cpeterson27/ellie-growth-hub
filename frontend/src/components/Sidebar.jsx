@@ -12,7 +12,9 @@ import {
   FiLink,
   FiCpu,
   FiCheckCircle,
+  FiLogOut,
 } from "react-icons/fi";
+import { useAuth } from "../context/AuthContext.jsx";
 import "./Sidebar.css";
 
 const navItems = [
@@ -34,6 +36,7 @@ const navItems = [
 ];
 
 export default function Sidebar({ isOpen, isCollapsed, onClose }) {
+  const { logout, session } = useAuth();
   return (
     <aside className={`${isOpen ? "sidebar sidebar--open" : "sidebar"} ${isCollapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebar__brand">
@@ -59,6 +62,9 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
         ))}
       </nav>
       <div className="sidebar__footer">
+        <button className="sidebar__logout" type="button" onClick={async () => { await logout(); window.location.assign("/"); }} title={`Sign out ${session?.user?.email || ""}`}>
+          <FiLogOut /><span>Sign out</span>
+        </button>
         <p>Private growth operating system.</p>
       </div>
     </aside>
