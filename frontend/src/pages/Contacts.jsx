@@ -549,6 +549,16 @@ export default function Contacts() {
   const cardStreamRef = useRef(null);
   const cardFrameRef = useRef(null);
   const pageSize = 15;
+
+  useEffect(() => {
+    if (searchParams.get("scan") !== "business-card") return;
+    setCardDraft(manualContactDefaults);
+    setCardRaw("");
+    setCardStatus("");
+    setCardDuplicate(null);
+    setCardCampaignId(campaignId || "");
+    setCardCaptureOpen(true);
+  }, []);
   const importCampaignTargetId = String(
     importSummary?.campaignId ||
       campaigns.find(
@@ -672,6 +682,7 @@ export default function Contacts() {
   async function acceptCardPayload(payload) {
     const parsed = parseBusinessCardPayload(payload);
     let resolved = {};
+    let resolveError = "";
     const url = String(payload || "").match(/https?:\/\/[^\s]+/i)?.[0] || "";
     if (url) {
       try {
@@ -683,6 +694,7 @@ export default function Contacts() {
         }
       } catch (error) {
         console.error("Unable to resolve digital business card", error);
+        resolveError = error.response?.data?.message || error.message || "Blinq did not return the card details.";
       }
     }
     const nextDraft = { ...manualContactDefaults, ...parsed };
@@ -692,7 +704,9 @@ export default function Contacts() {
     setCardRaw(payload);
     setCardDraft(nextDraft);
     setCardStatus(
-      fullContactName(nextDraft)
+      resolveError
+        ? `The Blinq QR code was read, but its contact details could not be retrieved: ${resolveError}`
+        : fullContactName(nextDraft)
         ? "Digital card details retrieved. Review the information before saving."
         : "The QR code was read, but the card did not include a name. Complete the missing fields below.",
     );
