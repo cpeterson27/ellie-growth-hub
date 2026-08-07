@@ -210,8 +210,8 @@ export const syncGmailOutreachReplies = () =>
 export const fetchContactEmailHistory = (email) =>
   api.get("/gmail/contact-history", { params: { email } }).then((res) => res.data);
 
-export const fetchOutreachEmailHistory = () =>
-  api.get("/gmail/outreach-history").then((res) => res.data);
+export const fetchOutreachEmailHistory = (page = 1, limit = 50) =>
+  api.get("/gmail/outreach-history", { params: { page, limit } }).then((res) => res.data);
 
 export const syncEventbriteEvent = (eventId) =>
   api.post(`/eventbrite/events/${eventId}/sync`).then((res) => res.data);
@@ -405,6 +405,13 @@ export const deleteContact = (contactId, confirmCascade = false) => api.delete(`
 export const updateContact = (contactId, data) => api.patch(`/contacts/${contactId}`, data).then((res) => res.data);
 export const bulkAssignContactsToCampaign = (contactIds, campaignId) =>
   api.patch("/contacts/bulk/assign-campaign", { contactIds, campaignId }).then((res) => res.data);
+export const bulkConfirmAndAssignContacts = (contactIds, campaignId) =>
+  api.patch("/contacts/bulk/confirm-and-assign", {
+    contactIds,
+    campaignId,
+    emailAttested: true,
+    fitAttested: true,
+  }).then((res) => res.data);
 
 export const fetchPartners = () => api.get("/partners").then((res) => res.data);
 export const createPartner = (data) => api.post("/partners", data).then((res) => res.data);

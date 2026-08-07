@@ -195,6 +195,24 @@ async function searchBingWeb(monitor, limit) {
   });
 }
 
+async function searchIndexedSocialGroups(monitor, platform, limit) {
+  const config = platform === "linkedin"
+    ? { host: "linkedin.com", path: "groups", source: "linkedin_public", label: "Bing-indexed public LinkedIn group" }
+    : { host: "facebook.com", path: "groups", source: "facebook_public", label: "Bing-indexed public Facebook group" };
+  const query = `site:${config.host}/${config.path} (${booleanQueryFor(monitor)})`;
+  const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&format=rss`;
+  const results = await fetchFeed(url, config.source, config.label, limit);
+  return results.filter((signal) => {
+    try {
+      const parsed = new URL(signal.sourceUrl);
+      return parsed.hostname.toLowerCase().endsWith(config.host) && parsed.pathname.toLowerCase().includes(`/${config.path}`);
+    } catch (_error) { return false; }
+  });
+}
+
+const searchLinkedInPublic = (monitor, limit) => searchIndexedSocialGroups(monitor, "linkedin", limit);
+const searchFacebookPublic = (monitor, limit) => searchIndexedSocialGroups(monitor, "facebook", limit);
+
 async function searchBingNews(monitor, limit) {
   const url = `https://www.bing.com/news/search?q=${encodeURIComponent(booleanQueryFor(monitor))}&format=rss`;
   const signals = await fetchFeed(url, "bing_news", "Bing public news result feed", limit);
@@ -348,6 +366,31 @@ function structuredDiscussion(html) {
 }
 
 async function crawlConfiguredSite(startUrl, monitor, limit) {
+  const configuredUrl = new URL(startUrl);
+  const socialPlatform = /(^|\.)linkedin\.com$/i.test(configuredUrl.hostname)
+    ? "linkedin"
+    : /(^|\.)facebook\.com$/i.test(configuredUrl.hostname)
+      ? "facebook"
+      : "";
+  if (socialPlatform) {
+    const slug = decodeURIComponent(configuredUrl.pathname.split("/").filter(Boolean).pop() || socialPlatform)
+      .replace(/[-_]+/g, " ")
+      .trim();
+    const source = `${socialPlatform}_public`;
+    const platformLabel = socialPlatform === "linkedin" ? "LinkedIn" : "Facebook";
+    const seed = normalizeSignal("configured_community", {
+      sourceId: configuredUrl.toString(),
+      sourceUrl: configuredUrl.toString(),
+      title: slug || `${platformLabel} public community`,
+      excerpt: `User-added ${platformLabel} public group or page. Public indexed details are used; login-only posts are not accessed.`,
+      organizationName: slug || `${platformLabel} community`,
+      organizationDomain: configuredUrl.hostname.replace(/^www\./, ""),
+      evidenceLabel: `User-added public ${platformLabel} community URL`,
+      raw: { seedUrl: startUrl, accessMode: "public_web_index" },
+    });
+    const indexed = await searchIndexedSocialGroups(monitor, socialPlatform, limit).catch(() => []);
+    return [seed, ...indexed.map((signal) => ({ ...signal, source }))].filter(Boolean).slice(0, limit);
+  }
   let first;
   try { first = await fetchPublicPage(startUrl); }
   catch (error) {
@@ -442,6 +485,8 @@ const ADAPTERS = {
   google_web: searchGoogleWeb,
   bing_web: searchBingWeb,
   bing_news: searchBingNews,
+  linkedin_public: searchLinkedInPublic,
+  facebook_public: searchFacebookPublic,
   meetup_public: searchMeetupPublic,
   community_directories: searchCommunityDirectories,
   gdelt: searchGdelt,
@@ -458,6 +503,8 @@ async function collectMonitorSignals(monitor) {
   const selected = monitor.sources?.length ? [...monitor.sources] : ["bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
   if (isCommunityPartnerMonitor(monitor) && !selected.includes("meetup_public")) selected.push("meetup_public");
   if (isCommunityPartnerMonitor(monitor) && !selected.includes("community_directories")) selected.push("community_directories");
+  if (isCommunityPartnerMonitor(monitor) && !selected.includes("linkedin_public")) selected.push("linkedin_public");
+  if (isCommunityPartnerMonitor(monitor) && !selected.includes("facebook_public")) selected.push("facebook_public");
   const work = selected.filter((source) => ADAPTERS[source]).map(async (source) => ({ source, signals: await ADAPTERS[source](monitor, limit) }));
   if ((monitor.feedUrls || []).length) work.push(searchConfiguredFeeds(monitor, limit).then((signals) => ({ source: "feeds", signals })));
   const settled = await Promise.allSettled(work);

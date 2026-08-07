@@ -58,7 +58,7 @@ const COMMUNITY_PARTNER_PRESET = {
 };
 
 const router = express.Router();
-const RECOMMENDED_MONITOR_SOURCES = ["meetup_public", "community_directories", "bing_web", "reddit_rss"];
+const RECOMMENDED_MONITOR_SOURCES = ["linkedin_public", "facebook_public", "meetup_public", "community_directories", "bing_web", "reddit_rss"];
 
 router.get("/research/sources", (_req, res) => {
   return res.json({
@@ -68,6 +68,8 @@ router.get("/research/sources", (_req, res) => {
       { id: "google_web", name: "Google Programmable Search (entire public web)", accountRequired: true, configured: Boolean(process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) },
       { id: "bing_web", name: "Open web (Bing RSS)", accountRequired: false },
       { id: "bing_news", name: "Bing News RSS", accountRequired: false },
+      { id: "linkedin_public", name: "Public LinkedIn groups indexed on the web", accountRequired: false, availability: "public_index_only" },
+      { id: "facebook_public", name: "Public Facebook groups indexed on the web", accountRequired: false, availability: "public_index_only" },
       { id: "meetup_public", name: "Public Meetup real-estate groups", accountRequired: false },
       { id: "community_directories", name: "Public REIA and real-estate club directories", accountRequired: false },
       { id: "gdelt", name: "Worldwide news (GDELT)", accountRequired: false },
@@ -94,7 +96,7 @@ router.post("/research/monitors", async (req, res) => {
   try {
     const query = String(req.body?.query || "").trim();
     if (query.length < 5) return res.status(400).json({ success: false, error: "Describe the intent or audience to monitor." });
-    const allowedSources = new Set(["google_web", "bing_web", "bing_news", "meetup_public", "community_directories", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
+    const allowedSources = new Set(["google_web", "bing_web", "bing_news", "linkedin_public", "facebook_public", "meetup_public", "community_directories", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
     const requestedSources = Array.isArray(req.body?.sources) ? req.body.sources.filter((source) => allowedSources.has(source)) : [];
     const monitor = await ResearchMonitor.create({
       workspaceId: req.auth.workspaceId,

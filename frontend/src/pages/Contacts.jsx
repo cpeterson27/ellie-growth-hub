@@ -26,6 +26,7 @@ import {
   deleteContact,
   updateContact,
   bulkAssignContactsToCampaign,
+  bulkConfirmAndAssignContacts,
   createEmailVerificationBatch,
   fetchEmailVerificationBatch,
   fetchJarvisEditableContactFields,
@@ -962,6 +963,30 @@ export default function Contacts() {
     }
   }
 
+  async function confirmAndAssignSelectedContacts() {
+    if (!selectedContactIds.length)
+      return setError("Select at least one contact.");
+    if (!bulkCampaignId) return setError("Choose the campaign or event first.");
+    if (!window.confirm(
+      `Apply both confirmations to all ${selectedContactIds.length} selected contacts?\n\n• I know every email address is correct\n• Every person is a good fit for this campaign`,
+    )) return;
+    try {
+      setBulkSaving(true);
+      setError("");
+      setBulkNotice("");
+      const response = await bulkConfirmAndAssignContacts(selectedContactIds, bulkCampaignId);
+      setBulkNotice(
+        `${response.data?.confirmedAndAssigned || 0} selected contacts were confirmed and assigned to ${response.data?.campaignName || "the campaign"}.${response.data?.skipped ? ` ${response.data.skipped} suppressed, archived, or incomplete contacts were skipped.` : ""} No emails were sent yet.`,
+      );
+      setSelectedContactIds([]);
+      await loadContacts();
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to confirm and assign selected contacts");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   function exportSelectedContacts() {
     if (!selectedContacts.length) return;
     const fields = [
@@ -1372,10 +1397,12 @@ export default function Contacts() {
       },
     ]),
   );
-  const sourceVerificationResults = {
-    ...skippedVerificationResults,
-    ...importedVerificationResults,
-  };
+  // Source verification is only evidence for rows that actually contain a
+  // recognized status. Do not silently treat blank statuses as an intentional
+  // verification skip just because another row in the same CSV is verified.
+  // Leaving those rows pending forces the user to choose a fresh Emailable
+  // check or explicitly select "Skip email verification" for the whole file.
+  const sourceVerificationResults = importedVerificationResults;
   const hasImportedVerification =
     Object.keys(importedVerificationResults).length > 0;
   const effectiveVerificationResults =
@@ -1890,6 +1917,14 @@ export default function Contacts() {
                   onClick={assignSelectedContacts}
                 >
                   Add to campaign
+                </Button>
+                <Button
+                  variant="outline"
+                  loading={bulkSaving}
+                  disabled={!bulkCampaignId}
+                  onClick={confirmAndAssignSelectedContacts}
+                >
+                  Confirm emails + fit for all
                 </Button>
                 <Button
                   variant="outline"

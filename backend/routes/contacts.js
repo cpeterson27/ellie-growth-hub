@@ -392,6 +392,57 @@ router.patch("/bulk/assign-campaign", async (req, res) => {
   }
 });
 
+router.patch("/bulk/confirm-and-assign", async (req, res) => {
+  try {
+    const contactIds = [...new Set(Array.isArray(req.body?.contactIds) ? req.body.contactIds : [])];
+    const { campaignId, emailAttested, fitAttested } = req.body || {};
+    if (!contactIds.length || contactIds.length > 500) {
+      return res.status(400).json({ success: false, message: "Select between 1 and 500 contacts" });
+    }
+    if (emailAttested !== true || fitAttested !== true) {
+      return res.status(400).json({ success: false, message: "Confirm both the email addresses and campaign fit for the selected group" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(campaignId) || contactIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ success: false, message: "Invalid contact or campaign ID" });
+    }
+    const campaign = await Campaign.findById(campaignId).select("_id name");
+    if (!campaign) return res.status(404).json({ success: false, message: "Campaign not found" });
+
+    const contacts = await Contact.find({
+      _id: { $in: contactIds },
+      status: { $nin: ["archived", "invalid", "unsubscribed"] },
+      email: { $type: "string", $ne: "" },
+    });
+    const confirmedAt = new Date();
+    let updated = 0;
+    for (const contact of contacts) {
+      contact.emailStatus = "verified";
+      contact.primaryEmailVerificationSource = "owner_confirmation";
+      contact.emailConfidence = "personally_confirmed";
+      contact.primaryEmailLastVerifiedAt = confirmedAt;
+      contact.qualifyContact = true;
+      if (!contact.campaignIds.some((id) => String(id) === String(campaign._id))) {
+        contact.campaignIds.push(campaign._id);
+      }
+      applyResearchClassification(contact);
+      await contact.save();
+      updated += 1;
+    }
+    return res.json({
+      success: true,
+      data: {
+        confirmedAndAssigned: updated,
+        skipped: contactIds.length - updated,
+        campaignId: campaign._id,
+        campaignName: campaign.name,
+      },
+      message: `${updated} contact${updated === 1 ? "" : "s"} owner-confirmed and assigned to ${campaign.name}`,
+    });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message || "Unable to confirm and assign selected contacts" });
+  }
+});
+
 /**
  * GET /api/contacts/:id
  * Get single contact

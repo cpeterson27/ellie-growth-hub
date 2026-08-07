@@ -163,8 +163,28 @@ router.get("/:id/email-template", async (req, res) => {
   const audienceTemplate = audienceKey === "general" ? null : campaign.emailAudienceTemplates?.[audienceKey];
   const versions = await CampaignTemplateVersion.find({ campaignId: campaign._id })
     .sort({ version: -1 })
-    .select("version subject topic approvedAt approvedByUserId");
-  return res.json({ template: audienceTemplate || effectiveTemplate(campaign), versions });
+    .select("version subject body callToAction callToActionUrl topic approvedAt approvedByUserId createdAt")
+    .lean();
+  const usage = await Outreach.aggregate([
+    { $match: { campaignId: campaign._id, status: { $in: ["sent", "replied"] } } },
+    { $group: { _id: "$templateVersion", sentCount: { $sum: 1 }, firstSentAt: { $min: "$sentAt" }, lastSentAt: { $max: "$sentAt" }, audienceLabels: { $addToSet: "$templateAudienceLabel" } } },
+  ]);
+  const usageByVersion = new Map(usage.map((item) => [Number(item._id || 0), item]));
+  const audienceEntries = Object.entries(campaign.emailAudienceTemplates || {});
+  const versionHistory = versions.map((version) => {
+    const audience = audienceEntries.find(([, template]) => Number(template?.currentVersion) === Number(version.version));
+    const isGeneral = Number(campaign.emailTemplate?.currentVersion) === Number(version.version);
+    const used = usageByVersion.get(Number(version.version));
+    return {
+      ...version,
+      audienceKey: isGeneral ? "general" : audience?.[0] || "historical",
+      audienceLabel: isGeneral ? "Main campaign template" : audience?.[1]?.audienceLabel || used?.audienceLabels?.filter(Boolean)?.[0] || "Historical campaign template",
+      sentCount: used?.sentCount || 0,
+      firstSentAt: used?.firstSentAt || null,
+      lastSentAt: used?.lastSentAt || null,
+    };
+  });
+  return res.json({ template: audienceTemplate || effectiveTemplate(campaign), versions: versionHistory });
 });
 
 router.post("/:id/email-template/preview", async (req, res) => {

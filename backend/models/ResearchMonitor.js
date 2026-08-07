@@ -13,7 +13,7 @@ const researchMonitorSchema = new mongoose.Schema({
   }],
   negativeKeywords: [{ type: String, trim: true }],
   locations: [{ type: String, trim: true }],
-  sources: [{ type: String, enum: ["google_web", "bing_web", "bing_news", "meetup_public", "community_directories", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"] }],
+  sources: [{ type: String, enum: ["google_web", "bing_web", "bing_news", "linkedin_public", "facebook_public", "meetup_public", "community_directories", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"] }],
   feedUrls: [{ type: String, trim: true }],
   enabled: { type: Boolean, default: true, index: true },
   intervalMinutes: { type: Number, default: 60, min: 15, max: 10080 },

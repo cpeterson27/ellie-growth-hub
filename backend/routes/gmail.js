@@ -167,20 +167,27 @@ router.get("/contact-history", async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-router.get("/outreach-history", async (_req, res) => {
+router.get("/outreach-history", async (req, res) => {
   try {
-    const outreach = await Outreach.find({ status: { $in: ["sent", "replied"] } })
+    const page = Math.max(1, Number.parseInt(req.query?.page, 10) || 1);
+    const limit = Math.min(100, Math.max(10, Number.parseInt(req.query?.limit, 10) || 50));
+    const filter = { status: { $in: ["sent", "replied"] } };
+    const total = await Outreach.countDocuments(filter);
+    const outreach = await Outreach.find(filter)
       .populate("campaignId", "name")
       .sort({ sentAt: -1 })
-      .limit(100)
+      .skip((page - 1) * limit)
+      .limit(limit)
       .lean();
     res.json({
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
       outreach: outreach.map((item) => ({
         id: item._id,
         contactName: item.contactName,
         contactEmail: item.contactEmail,
         campaignName: item.campaignId?.name || "Campaign outreach",
         subject: item.subject,
+        body: item.emailDraft,
         status: item.status,
         sentAt: item.sentAt,
         repliedAt: item.repliedAt,

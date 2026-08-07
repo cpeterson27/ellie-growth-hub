@@ -23,6 +23,7 @@ export default function CampaignWorkspace() {
   const [imageUpload, setImageUpload] = useState({ configured: false, loaded: false });
   const [emailTemplate, setEmailTemplate] = useState(null);
   const [templateVersions, setTemplateVersions] = useState([]);
+  const [templateHistoryOpen, setTemplateHistoryOpen] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [emailPreview, setEmailPreview] = useState(null);
   const [previewContacts, setPreviewContacts] = useState([]);
@@ -111,6 +112,19 @@ export default function CampaignWorkspace() {
   };
 
   const updateTemplateField = (field, value) => setEmailTemplate((current) => ({ ...current, [field]: value, status: "draft" }));
+  const loadHistoricalTemplate = (version) => {
+    setEmailTemplate({
+      subject: version.subject || "",
+      body: version.body || "",
+      callToAction: version.callToAction || "",
+      callToActionUrl: version.callToActionUrl || "",
+      topic: version.topic || emailTemplate?.topic || "event_invitations",
+      status: "draft",
+      currentVersion: emailTemplate?.currentVersion || 0,
+    });
+    setTemplateHistoryOpen(false);
+    setEmailPreview(null);
+  };
   const updateMeetupButton = (field, value) => setCampaign((current) => ({
     ...current,
     registrationLinks: {
@@ -244,7 +258,19 @@ export default function CampaignWorkspace() {
             <div className="campaign-auto-footer"><strong>Added automatically to every sent email</strong><span>Your business name and postal address from Settings</span><span className="campaign-unsubscribe-preview">Unsubscribe from campaign emails</span></div>
             <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={previewTemplate}>Preview complete email</Button><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
             {emailPreview ? <div className="campaign-email-preview"><div><strong>Previewing:</strong> {emailPreview.previewRecipient?.name} · {emailPreview.previewRecipient?.company || "company missing"}<br/><strong>Subject:</strong> {emailPreview.subject}<button type="button" onClick={() => setEmailPreview(null)}>Close preview</button></div><iframe title="Complete campaign email preview" srcDoc={emailPreview.html} sandbox="allow-popups allow-popups-to-escape-sandbox" /></div> : null}
-            {templateVersions.length ? <small>{templateVersions.length} immutable approved version{templateVersions.length === 1 ? "" : "s"} saved.</small> : null}
+            {templateVersions.length ? <section className="campaign-template-history">
+              <button type="button" className="campaign-template-history__toggle" onClick={() => setTemplateHistoryOpen((open) => !open)}>
+                <span><strong>Template history</strong><small>{templateVersions.length} saved version{templateVersions.length === 1 ? "" : "s"} · sent copies are preserved</small></span>
+                <b>{templateHistoryOpen ? "Hide" : "View all"}</b>
+              </button>
+              {templateHistoryOpen ? <div className="campaign-template-history__list">{templateVersions.map((version) => <article key={version.version}>
+                <header><span>Version {version.version}</span><small>{version.approvedAt ? new Date(version.approvedAt).toLocaleString() : "Approval date unavailable"}</small></header>
+                <strong>{version.subject}</strong>
+                <small>{version.audienceLabel || "Historical campaign template"}{version.sentCount ? ` · used for ${version.sentCount} sent email${version.sentCount === 1 ? "" : "s"}` : " · never sent"}</small>
+                <pre>{version.body}</pre>
+                <footer><Button variant="outline" size="sm" onClick={() => loadHistoricalTemplate(version)}>Use as new draft</Button>{version.lastSentAt ? <small>Last sent {new Date(version.lastSentAt).toLocaleString()}</small> : null}</footer>
+              </article>)}</div> : null}
+            </section> : null}
           </div> : <p>Loading the master template…</p>}
         </DashboardCard> : null}
 
