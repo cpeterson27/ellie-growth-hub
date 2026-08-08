@@ -11,6 +11,7 @@ const ContentBrief = require("../models/ContentBrief");
 const { assignCampaignMatches, getCampaignMatches } = require("../services/campaignAudienceService");
 const { effectiveTemplate } = require("../services/campaignMasterTemplate");
 const { requireRole } = require("../middleware/auth");
+const { defaultResearchAudienceTemplate } = require("../services/researchAudienceTemplates");
 
 const router = express.Router();
 
@@ -160,7 +161,7 @@ router.get("/:id/email-template", async (req, res) => {
   const campaign = await Campaign.findById(req.params.id);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
   const audienceKey = String(req.query?.audienceKey || "general");
-  const audienceTemplate = audienceKey === "general" ? null : campaign.emailAudienceTemplates?.[audienceKey];
+  const audienceTemplate = audienceKey === "general" ? null : campaign.emailAudienceTemplates?.[audienceKey] || defaultResearchAudienceTemplate(audienceKey, campaign);
   const versions = await CampaignTemplateVersion.find({ campaignId: campaign._id })
     .sort({ version: -1 })
     .select("version subject body callToAction callToActionUrl topic approvedAt approvedByUserId createdAt")

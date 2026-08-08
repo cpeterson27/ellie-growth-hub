@@ -24,6 +24,7 @@ const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
 const { requestResearchMonitorRun, runResearchMonitor, scoreSignal, signalEligibility } = require("../services/researchMonitorService");
 const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEmailDraftService");
+const { researchAudienceForSignal } = require("../services/researchAudienceTemplates");
 
 const AUGUST_22_PRESET = {
   id: "august-22-nationwide-online-event",
@@ -268,10 +269,13 @@ router.post("/research/signals/:signalId/email-drafts", async (req, res) => {
     if (!['qualified', 'converted'].includes(signal.status)) return res.status(400).json({ success: false, error: "Save this as a possible lead before creating an email draft." });
     const campaign = await Campaign.findById(req.body?.campaignId).populate("eventId");
     if (!campaign) return res.status(404).json({ success: false, error: "Choose a valid event campaign." });
+    const monitor = await ResearchMonitor.findById(signal.monitorId).lean();
+    const templateSelection = researchAudienceForSignal(signal, monitor);
+    templateSelection.template = campaign.emailAudienceTemplates?.[templateSelection.key] || null;
     const links = campaignRegistrationLinks(campaign);
     const missing = [!links.eventbriteUrl && "Eventbrite", !links.meetupUrl && "Meetup"].filter(Boolean);
     if (missing.length) return res.status(400).json({ success: false, error: `Add the ${missing.join(" and ")} link${missing.length === 1 ? "" : "s"} to this campaign before generating drafts. Every intent draft must include both registration links.` });
-    const generated = await generateIntentEmailDraft(signal.toObject(), campaign.toObject(), links);
+    const generated = generateIntentEmailDraft(signal.toObject(), campaign.toObject(), links, templateSelection);
     const draft = await IntentEmailDraft.findOneAndUpdate(
       { workspaceId: req.auth.workspaceId, signalId: signal._id, campaignId: campaign._id },
       { $set: { ...generated, ...links, body: ensureLinks(generated.body, links.eventbriteUrl, links.meetupUrl), status: "draft", reviewedAt: null, outreachId: null } },
@@ -298,6 +302,7 @@ router.post("/research/signals/:signalId/email-drafts/:draftId/transfer", async 
   const draft = await IntentEmailDraft.findOne({ _id: req.params.draftId, signalId: req.params.signalId, workspaceId: req.auth.workspaceId });
   if (!draft) return res.status(404).json({ success: false, error: "Email draft not found." });
   if (draft.status !== "reviewed") return res.status(400).json({ success: false, error: "Review and save the draft before moving it to Outreach." });
+  if (!draft.templateAudienceKey || !draft.templateAudienceLabel || !draft.templateVersion) return res.status(400).json({ success: false, error: "This draft predates approved template tracking. Generate it again from Live Leads before moving it to Outreach." });
   const contact = await Contact.findOne({ sourceProvider: "intent_monitor", providerContactId: String(req.params.signalId) });
   if (!contact) return res.status(400).json({ success: false, error: "Add this person to the CRM and complete identity research before moving the draft to Outreach." });
   if (!contact.email || contact.emailStatus !== "verified") return res.status(400).json({ success: false, error: "A verified email is required before a draft can enter Outreach. Published or guessed emails are not sufficient." });
@@ -305,7 +310,7 @@ router.post("/research/signals/:signalId/email-drafts/:draftId/transfer", async 
   const escapedBody = String(draft.body).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
   const outreach = await Outreach.findOneAndUpdate(
     { campaignId: draft.campaignId, contactEmail: contact.email.toLowerCase().trim() },
-    { $set: { campaignId: draft.campaignId, contactId: contact._id, organization: contact.company || contact.name || "Individual lead", contactName: contact.name || contact.firstName || "", contactEmail: contact.email.toLowerCase().trim(), contactRole: contact.title || "", reason: "Evidence-backed public buyer-intent signal", subject: draft.subject, emailDraft: draft.body, htmlBody: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${escapedBody}</div>`, eventLink: draft.eventbriteUrl, status: "pending", errorMessage: "" } },
+    { $set: { campaignId: draft.campaignId, contactId: contact._id, organization: contact.company || contact.name || "Individual lead", contactName: contact.name || contact.firstName || "", contactEmail: contact.email.toLowerCase().trim(), contactRole: contact.title || "", reason: "Evidence-backed public prospect", subject: draft.subject, emailDraft: draft.body, htmlBody: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${escapedBody}</div>`, eventLink: draft.eventbriteUrl, templateVersion: draft.templateVersion, templateAudienceKey: draft.templateAudienceKey, templateAudienceLabel: draft.templateAudienceLabel, status: "pending", errorMessage: "" } },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
   draft.status = "transferred"; draft.outreachId = outreach._id; await draft.save();
