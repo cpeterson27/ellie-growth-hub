@@ -173,6 +173,7 @@ export default function Discovery() {
   const [draftCampaignId, setDraftCampaignId] = useState("");
   const [draftEditor, setDraftEditor] = useState(null);
   const [draftBusy, setDraftBusy] = useState(false);
+  const [draftError, setDraftError] = useState("");
   const [socialSignal, setSocialSignal] = useState(null);
   const [socialCampaignId, setSocialCampaignId] = useState("");
   const [socialDraft, setSocialDraft] = useState(null);
@@ -413,6 +414,7 @@ export default function Discovery() {
     const existing = signal.emailDrafts?.[0] || null;
     const eligibleCampaigns = campaigns.filter((campaign) => campaign.campaignKind !== "program");
     setDraftSignal(signal);
+    setDraftError("");
     setDraftEditor(existing ? { ...existing } : null);
     setDraftCampaignId(String(existing?.campaignId || eligibleCampaigns[0]?._id || ""));
   };
@@ -450,10 +452,11 @@ export default function Discovery() {
     if (!draftSignal?._id || !draftCampaignId) return;
     try {
       setDraftBusy(true);
+      setDraftError("");
       const response = await generateIntentEmailDraft(draftSignal._id, draftCampaignId);
       setDraftEditor(response.draft);
       setNotice("Personalized draft created with both Eventbrite and Meetup links. Nothing was sent.");
-    } catch (error) { setNotice(error.response?.data?.error || "Unable to create the email draft."); }
+    } catch (error) { const message = error.response?.data?.error || "Unable to create the email draft."; setDraftError(message); setNotice(message); }
     finally { setDraftBusy(false); }
   };
 
@@ -461,11 +464,12 @@ export default function Discovery() {
     if (!draftSignal?._id || !draftEditor?._id) return;
     try {
       setDraftBusy(true);
+      setDraftError("");
       const response = await updateIntentEmailDraft(draftSignal._id, draftEditor._id, { subject: draftEditor.subject, body: draftEditor.body, status: "reviewed" });
       setDraftEditor(response.draft);
       setNotice("Draft saved as reviewed. It is still unsent and has not entered Outreach.");
       await loadAutomaticResearch();
-    } catch (error) { setNotice(error.response?.data?.error || "Unable to save the reviewed draft."); }
+    } catch (error) { const message = error.response?.data?.error || "Unable to save the reviewed draft."; setDraftError(message); setNotice(message); }
     finally { setDraftBusy(false); }
   };
 
@@ -473,11 +477,12 @@ export default function Discovery() {
     if (!draftSignal?._id || !draftEditor?._id) return;
     try {
       setDraftBusy(true);
+      setDraftError("");
       const response = await transferIntentEmailDraft(draftSignal._id, draftEditor._id);
       setNotice(response.message || "Draft moved to Outreach. Nothing was sent.");
       setDraftSignal(null);
       navigate(`/outreach?campaignId=${draftEditor.campaignId}`);
-    } catch (error) { setNotice(error.response?.data?.error || "Unable to move this draft to Outreach."); }
+    } catch (error) { const message = error.response?.data?.error || "Unable to move this draft to Outreach."; setDraftError(message); setNotice(message); }
     finally { setDraftBusy(false); }
   };
 
@@ -805,7 +810,8 @@ export default function Discovery() {
     <Modal isOpen={Boolean(draftSignal)} onClose={() => !draftBusy && setDraftSignal(null)} title="Personalized email draft" footer={<>{draftEditor?.status === "transferred" ? <><Button variant="outline" onClick={() => setDraftSignal(null)}>Close</Button><Button onClick={() => navigate(`/outreach?campaignId=${draftEditor.campaignId}`)}>Open in Outreach</Button></> : draftEditor ? <><Button variant="outline" disabled={draftBusy} onClick={() => setDraftSignal(null)}>Close</Button><Button variant="outline" loading={draftBusy} onClick={saveReviewedEmailDraft}>Save reviewed draft</Button>{draftEditor.status === "reviewed" ? <Button loading={draftBusy} onClick={moveDraftToOutreach}>Move to Outreach</Button> : null}</> : <><Button variant="outline" disabled={draftBusy} onClick={() => setDraftSignal(null)}>Cancel</Button><Button loading={draftBusy} disabled={!draftCampaignId} onClick={generateEmailDraft}>Generate unsent draft</Button></>}</>}>
       <div className="intent-draft-modal">
         <div className="intent-draft-safety"><strong>Draft only—nothing sends from this window.</strong><span>Every draft must contain both registration links. Moving it to Outreach later requires a CRM contact with a verified email.</span></div>
-        {!draftEditor ? <><label><span>Event campaign</span><select value={draftCampaignId} onChange={(event) => setDraftCampaignId(event.target.value)}><option value="">Choose a campaign</option>{campaigns.filter((campaign) => campaign.campaignKind !== "program").map((campaign) => { const hasEventbrite = Boolean(campaign.registrationLinks?.eventbrite?.url); const hasMeetup = Boolean(campaign.registrationLinks?.meetup?.url); return <option key={campaign._id} value={campaign._id}>{campaign.name}{hasEventbrite && hasMeetup ? "" : " · add both registration links first"}</option>; })}</select><small>Growth Operator will select the required named audience template from this campaign. That template must be approved first.</small></label><div className="intent-draft-basis"><span>Personalization source</span><strong>{displayText(draftSignal?.title)}</strong><p>The approved template controls the message. Public evidence only determines which audience template applies; it is not turned into unapproved email copy.</p></div></> : <><header className="intent-draft-status"><div><span>{draftEditor.status === "reviewed" ? "Reviewed and unsent" : draftEditor.status === "transferred" ? "Pending in Outreach" : "Generated draft—review required"}</span><strong>{draftEditor.templateAudienceLabel ? `${draftEditor.templateAudienceLabel} · version ${draftEditor.templateVersion}` : "Old untracked draft · regenerate before Outreach"}</strong></div>{draftEditor.status !== "transferred" ? <button type="button" onClick={() => setDraftEditor(null)}>Choose another campaign</button> : null}</header><div className="intent-draft-links"><a href={draftEditor.eventbriteUrl} target="_blank" rel="noreferrer"><span>Eventbrite</span><strong>Included in draft ↗</strong></a><a href={draftEditor.meetupUrl} target="_blank" rel="noreferrer"><span>Meetup</span><strong>Included in draft ↗</strong></a></div><label><span>Subject</span><input disabled={draftEditor.status === "transferred"} value={draftEditor.subject || ""} onChange={(event) => setDraftEditor((current) => ({ ...current, subject: event.target.value, status: "draft" }))} /></label><label><span>Email body</span><textarea disabled={draftEditor.status === "transferred"} value={draftEditor.body || ""} onChange={(event) => setDraftEditor((current) => ({ ...current, body: event.target.value, status: "draft" }))} /></label><p className="intent-draft-placeholder"><strong>{"{{firstName}}"}</strong> stays as a placeholder until the person is researched in the CRM. A published or guessed email cannot move into Outreach.</p></>}
+        {!draftEditor ? <><label><span>Event campaign</span><select value={draftCampaignId} onChange={(event) => setDraftCampaignId(event.target.value)}><option value="">Choose a campaign</option>{campaigns.filter((campaign) => campaign.campaignKind !== "program").map((campaign) => { const hasEventbrite = Boolean(campaign.registrationLinks?.eventbrite?.url); const hasMeetup = Boolean(campaign.registrationLinks?.meetup?.url); return <option key={campaign._id} value={campaign._id}>{campaign.name}{hasEventbrite && hasMeetup ? "" : " · add both registration links first"}</option>; })}</select><small>Growth Operator will select the required named audience template from this campaign. That template must be approved first.</small></label><div className="intent-draft-basis"><span>Personalization source</span><strong>{displayText(draftSignal?.title)}</strong><p>The approved template controls the message. Public evidence only determines which audience template applies; it is not turned into unapproved email copy.</p></div></> : <><header className="intent-draft-status"><div><span>{draftEditor.status === "reviewed" ? "Reviewed and unsent" : draftEditor.status === "transferred" ? "Pending in Outreach" : "Generated draft—review required"}</span><strong>{draftEditor.templateAudienceLabel ? `${draftEditor.templateAudienceLabel} · version ${draftEditor.templateVersion}` : "Old untracked draft · regenerate before Outreach"}</strong></div>{draftEditor.status !== "transferred" ? <button type="button" onClick={() => { setDraftEditor(null); setDraftError(""); }}>Choose another campaign</button> : null}</header><div className="intent-draft-links"><a href={draftEditor.eventbriteUrl} target="_blank" rel="noreferrer"><span>Eventbrite</span><strong>Included in draft ↗</strong></a><a href={draftEditor.meetupUrl} target="_blank" rel="noreferrer"><span>Meetup</span><strong>Included in draft ↗</strong></a></div><label><span>Subject</span><input disabled={draftEditor.status === "transferred"} value={draftEditor.subject || ""} onChange={(event) => setDraftEditor((current) => ({ ...current, subject: event.target.value, status: "draft" }))} /></label><label><span>Email body</span><textarea disabled={draftEditor.status === "transferred"} value={draftEditor.body || ""} onChange={(event) => setDraftEditor((current) => ({ ...current, body: event.target.value, status: "draft" }))} /></label><p className="intent-draft-placeholder"><strong>{"{{firstName}}"}</strong> stays as a placeholder until the person is researched in the CRM. A published or guessed email cannot move into Outreach.</p></>}
+        {draftError ? <div className="intent-draft-error" role="alert"><strong>Action required</strong><span>{draftError}</span></div> : null}
       </div>
     </Modal>
 

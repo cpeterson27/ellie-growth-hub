@@ -302,15 +302,22 @@ router.post("/research/signals/:signalId/email-drafts/:draftId/transfer", async 
   const draft = await IntentEmailDraft.findOne({ _id: req.params.draftId, signalId: req.params.signalId, workspaceId: req.auth.workspaceId });
   if (!draft) return res.status(404).json({ success: false, error: "Email draft not found." });
   if (draft.status !== "reviewed") return res.status(400).json({ success: false, error: "Review and save the draft before moving it to Outreach." });
-  if (!draft.templateAudienceKey || !draft.templateAudienceLabel || !draft.templateVersion) return res.status(400).json({ success: false, error: "This draft predates approved template tracking. Generate it again from Live Leads before moving it to Outreach." });
+  if (!draft.templateAudienceKey || !draft.templateAudienceLabel || !draft.templateVersion) return res.status(400).json({ success: false, error: "This is an older untracked draft. Click Choose another campaign, select the campaign again, and generate a new draft from its approved template." });
   const contact = await Contact.findOne({ sourceProvider: "intent_monitor", providerContactId: String(req.params.signalId) });
-  if (!contact) return res.status(400).json({ success: false, error: "Add this person to the CRM and complete identity research before moving the draft to Outreach." });
-  if (!contact.email || contact.emailStatus !== "verified") return res.status(400).json({ success: false, error: "A verified email is required before a draft can enter Outreach. Published or guessed emails are not sufficient." });
+  if (!contact) return res.status(400).json({ success: false, error: "This person is not linked to a CRM contact yet. Close this window, click Add researched person to CRM, complete the contact, then reopen this draft." });
+  if (!contact.email) return res.status(400).json({ success: false, error: "This CRM contact has no email address. Open Contact next steps, add the email, save the contact, then try again." });
+  if (contact.emailStatus !== "verified") return res.status(400).json({ success: false, error: "This email has not been confirmed. Open Contact next steps and check ‘I know this email address is correct’ only if you personally confirmed it, save the contact, then try again." });
   await Contact.updateOne({ _id: contact._id }, { $addToSet: { campaignIds: draft.campaignId } });
-  const escapedBody = String(draft.body).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+  const firstName = String(contact.firstName || contact.name || "there").trim().split(/\s+/)[0];
+  const replaceContactFields = (value) => String(value || "")
+    .replaceAll("{{firstName}}", firstName)
+    .replaceAll("{{company}}", String(contact.company || contact.name || "your organization").trim());
+  const personalizedSubject = replaceContactFields(draft.subject);
+  const personalizedBody = replaceContactFields(draft.body);
+  const escapedBody = personalizedBody.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
   const outreach = await Outreach.findOneAndUpdate(
     { campaignId: draft.campaignId, contactEmail: contact.email.toLowerCase().trim() },
-    { $set: { campaignId: draft.campaignId, contactId: contact._id, organization: contact.company || contact.name || "Individual lead", contactName: contact.name || contact.firstName || "", contactEmail: contact.email.toLowerCase().trim(), contactRole: contact.title || "", reason: "Evidence-backed public prospect", subject: draft.subject, emailDraft: draft.body, htmlBody: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${escapedBody}</div>`, eventLink: draft.eventbriteUrl, templateVersion: draft.templateVersion, templateAudienceKey: draft.templateAudienceKey, templateAudienceLabel: draft.templateAudienceLabel, status: "pending", errorMessage: "" } },
+    { $set: { campaignId: draft.campaignId, contactId: contact._id, organization: contact.company || contact.name || "Individual lead", contactName: contact.name || contact.firstName || "", contactEmail: contact.email.toLowerCase().trim(), contactRole: contact.title || "", reason: "Evidence-backed public prospect", subject: personalizedSubject, emailDraft: personalizedBody, htmlBody: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">${escapedBody}</div>`, eventLink: draft.eventbriteUrl, templateVersion: draft.templateVersion, templateAudienceKey: draft.templateAudienceKey, templateAudienceLabel: draft.templateAudienceLabel, status: "pending", errorMessage: "" } },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
   draft.status = "transferred"; draft.outreachId = outreach._id; await draft.save();

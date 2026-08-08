@@ -170,6 +170,9 @@
 .intent-draft-links span { color: #64716c; font-size: .68rem; text-transform: uppercase; }
 .intent-draft-links strong { color: #176655; font-size: .8rem; }
 .intent-draft-placeholder { background: #fff5df; border-radius: 8px; color: #735b28; font-size: .75rem; margin: 0; padding: .65rem .75rem; }
+.intent-draft-error { background: #fff0ed; border: 1px solid #e4aaa0; border-left: 5px solid #b84737; color: #782d24; display: grid; gap: .3rem; padding: .85rem 1rem; }
+.intent-draft-error strong { font-size: .86rem; }
+.intent-draft-error span { font-size: .8rem; line-height: 1.5; }
 .friendly-empty { background: #f7faf8; border: 1px dashed #cfdad5; border-radius: 12px; padding: 2rem; text-align: center; }
 .friendly-empty p { color: var(--text-muted); margin: .3rem auto 0; }
 
