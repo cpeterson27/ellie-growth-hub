@@ -421,6 +421,8 @@ export const bulkConfirmAndAssignContacts = (contactIds, campaignId) =>
 export const fetchPartners = () => api.get("/partners").then((res) => res.data);
 export const createPartner = (data) => api.post("/partners", data).then((res) => res.data);
 export const updatePartner = (partnerId, data) => api.patch(`/partners/${partnerId}`, data).then((res) => res.data);
+export const createEventbriteAffiliateLink = (data) => api.post("/partners/eventbrite-links", data).then((res) => res.data);
+export const syncEventbriteAffiliate = (partnerId) => api.post(`/partners/eventbrite-links/${partnerId}/sync`).then((res) => res.data);
 
 export const fetchContentBriefs = (type) => api.get("/content", { params: type ? { type } : {} }).then((res) => res.data);
 export const createContentBrief = (data) => api.post("/content", data).then((res) => res.data);

@@ -1,6 +1,7 @@
 const axios = require("axios");
 const Event = require("../models/Event");
 const EventbriteSyncHistory = require("../models/EventbriteSyncHistory");
+const Partner = require("../models/Partner");
 const { accessToken } = require("./eventbriteOAuthService");
 const { retrieveCompleteListing } = require("./eventbriteListingService");
 
@@ -31,6 +32,20 @@ async function requestAll(token, path, collectionKey) {
     page += 1;
   } while (page <= 100);
   return { items, objectCount };
+}
+
+function affiliateStatsForAttendees(attendees = []) {
+  const stats = new Map();
+  attendees.filter((attendee) => !attendee.cancelled && !attendee.refunded && attendee.affiliate).forEach((attendee) => {
+    const rawAffiliate = typeof attendee.affiliate === "object" ? (attendee.affiliate.name || attendee.affiliate.id || "") : attendee.affiliate;
+    const code = String(rawAffiliate || "").trim().toLowerCase();
+    if (!code) return;
+    const current = stats.get(code) || { tickets: 0, revenue: 0 };
+    current.tickets += Math.max(1, Number(attendee.quantity) || 1);
+    current.revenue += money(attendee.costs?.gross?.major_value);
+    stats.set(code, current);
+  });
+  return stats;
 }
 
 async function syncEvent(localEventId) {
@@ -110,6 +125,14 @@ async function syncEvent(localEventId) {
     };
     await localEvent.save();
 
+    const affiliateStats = affiliateStatsForAttendees(attendees);
+    const partners = await Partner.find({ eventbriteEventId: String(eventId), trackingProvider: "eventbrite" });
+    await Promise.all(partners.map((partner) => {
+      const stats = affiliateStats.get(String(partner.referralCode || "").toLowerCase()) || { tickets: 0, revenue: 0 };
+      const currency = localEvent.eventbriteLogistics.currency || "USD";
+      return Partner.updateOne({ _id: partner._id }, { $set: { ticketsSold: stats.tickets, referrals: stats.tickets, grossRevenue: stats.revenue, revenue: new Intl.NumberFormat("en-US", { style: "currency", currency }).format(stats.revenue), currency, lastSyncedAt: new Date(), lastSyncStatus: "success", lastSyncError: "" } });
+    }));
+
     const endedAt = new Date();
     await EventbriteSyncHistory.create({
       syncId: `event-${localEvent._id}-${Date.now()}`,
@@ -146,4 +169,4 @@ async function syncEvent(localEventId) {
   }
 }
 
-module.exports = { syncEvent };
+module.exports = { affiliateStatsForAttendees, syncEvent };
