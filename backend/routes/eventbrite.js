@@ -223,7 +223,9 @@ router.get("/webhook/status", async (req, res) => {
     const connection = await IntegrationConnection.findOne({ provider: "eventbrite" }).lean();
     const webhook = connection?.metadata?.webhook || {};
     res.json({
-      configured: Boolean(webhookToken()),
+      configured: Boolean(webhookToken() && webhook.providerWebhookId),
+      receiverReady: Boolean(webhookToken()),
+      providerWebhookId: webhook.providerWebhookId || "",
       lastReceivedAt: webhook.lastReceivedAt || null,
       lastStatus: webhook.lastStatus || "",
       lastAction: webhook.lastAction || "",

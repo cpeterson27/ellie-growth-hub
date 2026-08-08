@@ -1,6 +1,7 @@
 const express = require("express");
 const Partner = require("../models/Partner");
 const Event = require("../models/Event");
+const AffiliateSale = require("../models/AffiliateSale");
 const { syncEvent } = require("../services/eventbriteLogisticsService");
 const router = express.Router();
 
@@ -16,6 +17,13 @@ function eventbriteAffiliateUrl(rawUrl, code) {
 }
 
 router.get("/", async (_req, res) => { try { res.json(await Partner.find().sort({ createdAt: -1 })); } catch { res.status(500).json({ message: "Unable to load partners" }); } });
+router.get("/eventbrite-sales", async (req, res) => {
+  try {
+    const partners = await Partner.find({ $or: [{ workspaceId: req.auth.workspaceId }, { workspaceId: null }] }).select("_id").lean();
+    const sales = await AffiliateSale.find({ partnerId: { $in: partners.map((partner) => partner._id) } }).populate("partnerId", "name commissionRate").sort({ purchasedAt: -1, createdAt: -1 }).limit(Math.min(100, Number(req.query.limit) || 25)).lean();
+    return res.json(sales);
+  } catch (_error) { return res.status(500).json({ message: "Unable to load affiliate sales." }); }
+});
 router.post("/eventbrite-links", async (req, res) => {
   try {
     const event = await Event.findById(req.body?.localEventId);
@@ -31,6 +39,8 @@ router.post("/eventbrite-links", async (req, res) => {
     if (duplicate) return res.status(409).json({ message: "That affiliate code is already being used for this event." });
     const referralLink = eventbriteAffiliateUrl(eventUrl, referralCode);
     const partner = await Partner.create({
+      workspaceId: req.auth.workspaceId,
+      userId: req.auth.user?._id || null,
       name,
       company: String(req.body?.company || "").trim(),
       email: String(req.body?.email || "").trim(),

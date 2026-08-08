@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 
 const partnerSchema = new mongoose.Schema({
+  workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", default: null, index: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   name: { type: String, required: true },
   company: { type: String, default: "" },
   email: { type: String, default: "", lowercase: true },
@@ -21,6 +23,7 @@ const partnerSchema = new mongoose.Schema({
   grossRevenue: { type: Number, default: 0 },
   currency: { type: String, default: "USD" },
   lastSyncedAt: { type: Date, default: null },
+  lastSaleAt: { type: Date, default: null },
   lastSyncStatus: { type: String, enum: ["", "success", "failed"], default: "" },
   lastSyncError: { type: String, default: "" },
   createdAt: { type: Date, default: Date.now },

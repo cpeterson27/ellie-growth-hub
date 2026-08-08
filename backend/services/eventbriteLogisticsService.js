@@ -2,6 +2,7 @@ const axios = require("axios");
 const Event = require("../models/Event");
 const EventbriteSyncHistory = require("../models/EventbriteSyncHistory");
 const Partner = require("../models/Partner");
+const AffiliateSale = require("../models/AffiliateSale");
 const { accessToken } = require("./eventbriteOAuthService");
 const { retrieveCompleteListing } = require("./eventbriteListingService");
 
@@ -127,10 +128,21 @@ async function syncEvent(localEventId) {
 
     const affiliateStats = affiliateStatsForAttendees(attendees);
     const partners = await Partner.find({ eventbriteEventId: String(eventId), trackingProvider: "eventbrite" });
-    await Promise.all(partners.map((partner) => {
+    await Promise.all(partners.map(async (partner) => {
+      const code = String(partner.referralCode || "").toLowerCase();
+      const matchingAttendees = attendees.filter((attendee) => {
+        const raw = typeof attendee.affiliate === "object" ? (attendee.affiliate.name || attendee.affiliate.id || "") : attendee.affiliate;
+        return String(raw || "").trim().toLowerCase() === code;
+      });
+      await Promise.all(matchingAttendees.filter((attendee) => attendee.id).map((attendee) => AffiliateSale.findOneAndUpdate(
+        { partnerId: partner._id, eventbriteAttendeeId: String(attendee.id) },
+        { $set: { workspaceId: partner.workspaceId || null, partnerId: partner._id, localEventId: localEvent._id, eventbriteEventId: String(eventId), eventbriteAttendeeId: String(attendee.id), eventbriteOrderId: String(attendee.order_id || ""), affiliateCode: partner.referralCode, buyerName: String(attendee.profile?.name || [attendee.profile?.first_name, attendee.profile?.last_name].filter(Boolean).join(" ") || ""), buyerEmail: String(attendee.profile?.email || ""), ticketClassName: String(attendee.ticket_class_name || ""), quantity: Math.max(1, Number(attendee.quantity) || 1), grossRevenue: money(attendee.costs?.gross?.major_value), currency: attendee.costs?.gross?.currency || localEvent.eventbriteLogistics.currency || "USD", status: attendee.refunded ? "refunded" : attendee.cancelled ? "cancelled" : "active", purchasedAt: attendee.created ? new Date(attendee.created) : null, lastSyncedAt: new Date() } },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      )));
       const stats = affiliateStats.get(String(partner.referralCode || "").toLowerCase()) || { tickets: 0, revenue: 0 };
       const currency = localEvent.eventbriteLogistics.currency || "USD";
-      return Partner.updateOne({ _id: partner._id }, { $set: { ticketsSold: stats.tickets, referrals: stats.tickets, grossRevenue: stats.revenue, revenue: new Intl.NumberFormat("en-US", { style: "currency", currency }).format(stats.revenue), currency, lastSyncedAt: new Date(), lastSyncStatus: "success", lastSyncError: "" } });
+      const latestSale = matchingAttendees.filter((attendee) => !attendee.cancelled && !attendee.refunded && attendee.created).sort((a, b) => new Date(b.created) - new Date(a.created))[0];
+      return Partner.updateOne({ _id: partner._id }, { $set: { ticketsSold: stats.tickets, referrals: stats.tickets, grossRevenue: stats.revenue, revenue: new Intl.NumberFormat("en-US", { style: "currency", currency }).format(stats.revenue), currency, lastSyncedAt: new Date(), lastSaleAt: latestSale?.created ? new Date(latestSale.created) : null, lastSyncStatus: "success", lastSyncError: "" } });
     }));
 
     const endedAt = new Date();
