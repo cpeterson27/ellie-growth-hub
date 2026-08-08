@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
@@ -16,8 +16,8 @@ export default function Partners() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
-  const [syncingId, setSyncingId] = useState("");
   const [verification, setVerification] = useState({});
+  const automaticChecks = useRef(new Set());
   const [sales, setSales] = useState([]);
   const [webhookStatus, setWebhookStatus] = useState(null);
   const [automationBusy, setAutomationBusy] = useState(false);
@@ -39,9 +39,9 @@ export default function Partners() {
     } catch { setError("Unable to load affiliate links."); }
   };
   useEffect(() => {
-    load();
+    const initialLoad = window.setTimeout(load, 0);
     const timer = window.setInterval(load, 30000);
-    return () => window.clearInterval(timer);
+    return () => { window.clearTimeout(initialLoad); window.clearInterval(timer); };
   }, []);
 
   const openNew = () => {
@@ -68,6 +68,7 @@ export default function Partners() {
         try { const status = await configureEventbriteWebhook(); setWebhookStatus(status); automatic = Boolean(status.configured); } catch { /* Manual verification remains available. */ }
         setSuccess(`Affiliate link created for ${created.name}${copied ? " and copied to your clipboard" : ". Use Copy affiliate link on the partner card"}. ${automatic ? "Automatic Eventbrite sale updates are on." : "Automatic updates still need setup; use Turn on automatic updates below."}`);
       }
+      if (form._id) automaticChecks.current.delete(form._id);
       setForm(null);
       await load();
     } catch (err) { setError(err.response?.data?.message || "Unable to save the affiliate link."); }
@@ -76,19 +77,6 @@ export default function Partners() {
   const copyLink = async (partner) => {
     try { await navigator.clipboard.writeText(partner.referralLink); setSuccess(`${partner.name}’s affiliate link was copied.`); }
     catch { setError("Your browser blocked copying. Open Edit and copy the link manually."); }
-  };
-  const verifyPartner = async (partner) => {
-    try {
-      setSyncingId(partner._id); setError(""); setSuccess("");
-      const result = await verifyEventbriteAffiliate(partner._id);
-      setVerification((current) => ({ ...current, [partner._id]: result }));
-      await load();
-      setSuccess(`${partner.name}: ${result.message}${webhookStatus?.configured ? " Automatic purchase updates are on." : " Automatic purchase updates still need setup."}`);
-    } catch (err) {
-      if (err.response?.data?.checks) setVerification((current) => ({ ...current, [partner._id]: err.response.data }));
-      setError(err.response?.data?.message || "Unable to verify Eventbrite affiliate tracking.");
-    }
-    finally { setSyncingId(""); }
   };
   const openLinkExisting = (partner) => {
     setError(""); setSuccess("");
@@ -112,6 +100,20 @@ export default function Partners() {
     } finally { setAutomationBusy(false); }
   };
 
+  useEffect(() => {
+    partners.forEach((partner) => {
+      if (partner.trackingProvider !== "eventbrite" || !partner.referralLink || automaticChecks.current.has(partner._id)) return;
+      automaticChecks.current.add(partner._id);
+      setVerification((current) => ({ ...current, [partner._id]: { checking: true } }));
+      verifyEventbriteAffiliate(partner._id)
+        .then((result) => {
+          setVerification((current) => ({ ...current, [partner._id]: result }));
+          if (result.partner) setPartners((current) => current.map((item) => item._id === partner._id ? result.partner : item));
+        })
+        .catch((err) => setVerification((current) => ({ ...current, [partner._id]: { ...(err.response?.data || {}), checking: false, error: err.response?.data?.message || "Eventbrite could not confirm this connection." } })));
+    });
+  }, [partners]);
+
   const money = (amount, currency = "USD") => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount || 0));
   const commissionDue = (partner) => money(Number(partner.grossRevenue || 0) * Number(partner.commissionRate || 0) / 100, partner.currency);
 
@@ -120,7 +122,7 @@ export default function Partners() {
     {error ? <p className="form-error">{error}</p> : null}{success ? <p className="partner-success">{success}</p> : null}
     <section className={`affiliate-automation ${webhookStatus?.configured ? "is-on" : "is-off"}`}><div><span>Automatic sale tracking</span><strong>{webhookStatus?.configured ? "On" : "Needs setup"}</strong><p>{webhookStatus?.configured ? `Eventbrite sends new orders to Growth Operator automatically${webhookStatus.lastReceivedAt ? ` · Last update ${new Date(webhookStatus.lastReceivedAt).toLocaleString()}` : ""}.` : "Turn this on once. After that, purchases update the affiliate ledger without pressing Refresh now."}</p></div>{!webhookStatus?.configured ? <Button loading={automationBusy} onClick={enableAutomation}>Turn on automatic updates</Button> : <span className="automation-live">● Listening for Eventbrite orders</span>}</section>
     <section className="affiliate-summary"><div><span>Active links</span><strong>{partners.filter((partner) => partner.trackingProvider === "eventbrite").length}</strong><small>ready to share</small></div><div><span>Attributed tickets</span><strong>{partners.reduce((sum, partner) => sum + Number(partner.ticketsSold || 0), 0)}</strong><small>reported by Eventbrite</small></div><div><span>Attributed revenue</span><strong>{money(partners.reduce((sum, partner) => sum + Number(partner.grossRevenue || 0), 0))}</strong><small>before commissions</small></div><div><span>Commission due</span><strong>{money(partners.reduce((sum, partner) => sum + Number(partner.grossRevenue || 0) * Number(partner.commissionRate || 0) / 100, 0))}</strong><small>across all partners</small></div></section>
-    <section className="affiliate-journey" aria-label="Affiliate workflow"><div className="is-current"><b>1</b><span><strong>Create</strong><small>Choose partner and event</small></span></div><div><b>2</b><span><strong>Test</strong><small>Open the checkout link</small></span></div><div><b>3</b><span><strong>Share</strong><small>Partner uses this exact link</small></span></div><div><b>4</b><span><strong>Confirm</strong><small>Purchase appears here</small></span></div></section>
+    <section className="affiliate-journey" aria-label="Affiliate workflow"><div className="is-current"><b>1</b><span><strong>Create</strong><small>Choose partner and event</small></span></div><div><b>2</b><span><strong>Share</strong><small>Partner uses the exact link</small></span></div><div><b>3</b><span><strong>Monitor</strong><small>Growth Operator checks Eventbrite</small></span></div><div><b>4</b><span><strong>Confirm</strong><small>Attributed purchase appears here</small></span></div></section>
     <section className="affiliate-section-heading"><div><span>YOUR PARTNERS</span><h2>Affiliate links and performance</h2></div><p>Each partner has one clear link and one place to verify it.</p></section>
     <section className="affiliate-partner-list">
       {partners.length ? partners.map((partner) => {
@@ -132,13 +134,13 @@ export default function Partners() {
             <div className="affiliate-card-title"><div className="affiliate-monogram">{String(partner.name || "A").charAt(0).toUpperCase()}</div><div><h3>{partner.name}</h3><p>{partner.company || partner.email || "Independent partner"}</p></div></div>
             <span className={`affiliate-status ${confirmed ? "is-confirmed" : linked ? "is-ready" : "is-unlinked"}`}>{confirmed ? "Sale confirmed" : linked ? "Link ready" : "Action needed"}</span>
             <div className="affiliate-event"><span>EVENT</span><strong>{partner.eventName || "Not connected to Eventbrite"}</strong></div>
-            {linked ? <div className="affiliate-link-box"><span>AFFILIATE CHECKOUT LINK</span><code>{partner.referralLink}</code><div><Button size="sm" onClick={() => copyLink(partner)}>Copy affiliate link</Button><Button size="sm" variant="outline" onClick={() => window.open(partner.referralLink, "_blank", "noopener,noreferrer")}>Test checkout</Button></div><small>Testing opens the same Eventbrite checkout your buyers will see. It does not create a purchase.</small></div> : <div className="affiliate-unlinked"><strong>Connect {partner.name}’s existing Eventbrite tracking link</strong><p>This partner record cannot track a purchase until it is attached to the bootcamp and its existing Eventbrite link.</p><Button size="sm" onClick={() => openLinkExisting(partner)}>Connect existing link</Button></div>}
+            {linked ? <div className="affiliate-link-box"><span>AFFILIATE CHECKOUT LINK</span><code>{partner.referralLink}</code><div><Button size="sm" onClick={() => copyLink(partner)}>Copy affiliate link</Button></div><small>Share this exact link. Growth Operator automatically checks Eventbrite for attributed purchases.</small></div> : <div className="affiliate-unlinked"><strong>Connect {partner.name}’s existing Eventbrite tracking link</strong><p>This partner record cannot track a purchase until it is attached to the bootcamp and its existing Eventbrite link.</p><Button size="sm" onClick={() => openLinkExisting(partner)}>Connect existing link</Button></div>}
           </div>
           <aside className="affiliate-card-results">
             <div className="affiliate-metrics"><div><span>Tickets</span><strong>{partner.ticketsSold || 0}</strong></div><div><span>Revenue</span><strong>{partner.revenue || money(0, partner.currency)}</strong></div><div><span>Commission</span><strong>{commissionDue(partner)}</strong><small>{partner.commissionRate || 0}% rate</small></div></div>
-            <div className="affiliate-tracking-summary"><span>TRACKING STATUS</span><strong>{confirmed ? "Purchase attribution confirmed" : linked ? "Setup ready; waiting for a purchase" : "Not connected"}</strong><p>{confirmed ? `Eventbrite last returned an attributed sale ${new Date(partner.lastSaleAt).toLocaleString()}.` : linked ? "The link can be shared now. Confirmation appears only after someone completes a real purchase through it." : "Connect the existing Eventbrite link before sharing."}</p></div>
-            {result?.checks ? <div className={`affiliate-check-result ${result.checks.eventbriteSync && webhookStatus?.configured ? "is-pass" : "is-fail"}`}><strong>{result.checks.eventbriteSync && webhookStatus?.configured ? "Setup check passed" : "Tracking needs attention"}</strong><ul><li className={result.checks.validEventbriteLink ? "pass" : "fail"}>Eventbrite checkout link</li><li className={result.checks.trackingCodeMatches ? "pass" : "fail"}>Unique partner code</li><li className={result.checks.sameEventPage ? "pass" : "fail"}>Correct bootcamp checkout</li><li className={result.checks.eventConnected ? "pass" : "fail"}>Bootcamp event connection</li><li className={result.checks.eventbriteSync ? "pass" : "fail"}>Eventbrite sales connection</li><li className={webhookStatus?.configured ? "pass" : "fail"}>Automatic purchase updates</li></ul></div> : null}
-            <div className="affiliate-card-actions">{linked ? <Button size="sm" loading={syncingId === partner._id} onClick={() => verifyPartner(partner)}>Verify setup & sales</Button> : null}<Button size="sm" variant="outline" onClick={() => { setError(""); setForm({ ...partner, linkExisting: false, localEventId: String(partner.localEventId || "") }); }}>Edit partner</Button></div>
+            <div className="affiliate-tracking-summary"><span>TRACKING STATUS</span><strong>{confirmed ? "End-to-end confirmed" : result?.checking ? "Checking Eventbrite automatically…" : result?.checks?.eventbriteSync && webhookStatus?.configured ? "Connected and monitoring" : linked ? "Connection needs attention" : "Not connected"}</strong><p>{confirmed ? `Eventbrite returned a completed purchase attributed to ${partner.name} on ${new Date(partner.lastSaleAt).toLocaleString()}.` : result?.checking ? "Growth Operator is checking the event, affiliate code, sales feed, and automatic order updates now." : result?.checks?.eventbriteSync && webhookStatus?.configured ? `Everything is connected. No completed Eventbrite order attributed to ${partner.name} has appeared yet.` : result?.error || (linked ? "Growth Operator could not confirm every Eventbrite connection check." : "Connect the existing Eventbrite link before sharing.")}</p></div>
+            {result?.checks ? <div className={`affiliate-check-result ${result.checks.eventbriteSync && webhookStatus?.configured ? "is-pass" : "is-fail"}`}><strong>{result.checks.eventbriteSync && webhookStatus?.configured ? "Automatic monitoring is active" : "Tracking needs attention"}</strong><ul><li className={result.checks.validEventbriteLink ? "pass" : "fail"}>Eventbrite checkout link</li><li className={result.checks.trackingCodeMatches ? "pass" : "fail"}>Unique partner code</li><li className={result.checks.sameEventPage ? "pass" : "fail"}>Correct bootcamp checkout</li><li className={result.checks.eventConnected ? "pass" : "fail"}>Bootcamp event connection</li><li className={result.checks.eventbriteSync ? "pass" : "fail"}>Eventbrite sales connection</li><li className={webhookStatus?.configured ? "pass" : "fail"}>Automatic purchase updates</li></ul></div> : null}
+            <div className="affiliate-card-actions"><Button size="sm" variant="outline" onClick={() => { setError(""); setForm({ ...partner, linkExisting: false, localEventId: String(partner.localEventId || "") }); }}>Edit partner</Button></div>
             <small className="affiliate-last-sync">{partner.lastSyncedAt ? `Last checked ${new Date(partner.lastSyncedAt).toLocaleString()}` : "Not checked yet"}</small>
           </aside>
         </article>;
