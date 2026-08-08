@@ -57,6 +57,21 @@ const COMMUNITY_PARTNER_PRESET = {
   intervalMinutes: 60,
 };
 
+const INVESTOR_PROSPECT_PRESET = {
+  id: "eventbootcamp-qualified-investor-prospects",
+  monitorType: "investor_profile",
+  name: "EventBootcamp qualified investor prospects",
+  query: "Find U.S. professionals, business owners, practice owners, executives, and self-described investors whose public profiles or public activity show a fit for EventBootcamp and multifamily or passive investing.",
+  locations: ["United States"],
+  negativeKeywords: ["wholesaler", "realtor", "real estate agent", "flipper", "bird dog", "student", "homework", "job seeker", "hiring", "crypto", "forex"],
+  intentCategories: [
+    { name: "Self-described investor fit", phrases: ["accredited investor", "limited partner", "LP investor", "passive investor", "multifamily investor", "syndication investor"] },
+    { name: "Professional fit", phrases: ["Managing Partner", "Founder", "Tech Founder", "Physician", "Orthodontist", "Dentist", "Software Architect", "Vice President", "VP", "Director", "Practice Owner", "Business Owner"] },
+  ],
+  feedUrls: [],
+  intervalMinutes: 30,
+};
+
 const router = express.Router();
 const RECOMMENDED_MONITOR_SOURCES = ["linkedin_public", "facebook_public", "meetup_public", "community_directories", "bing_web", "reddit_rss"];
 
@@ -90,7 +105,7 @@ router.get("/research/monitors", async (req, res) => {
   return res.json({ success: true, monitors });
 });
 
-router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: [AUGUST_22_PRESET, COMMUNITY_PARTNER_PRESET] }));
+router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: [INVESTOR_PROSPECT_PRESET, AUGUST_22_PRESET, COMMUNITY_PARTNER_PRESET] }));
 
 router.post("/research/monitors", async (req, res) => {
   try {
@@ -102,7 +117,7 @@ router.post("/research/monitors", async (req, res) => {
       workspaceId: req.auth.workspaceId,
       userId: req.auth.user?._id || null,
       name: String(req.body?.name || query).trim().slice(0, 160),
-      monitorType: req.body?.monitorType === "community_partner" ? "community_partner" : "buyer_intent",
+      monitorType: ["buyer_intent", "community_partner", "investor_profile"].includes(req.body?.monitorType) ? req.body.monitorType : "buyer_intent",
       query,
       keywords: (req.body?.keywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
       intentCategories: (req.body?.intentCategories || []).slice(0, 12).map((category) => ({ name: String(category.name || "Intent").trim().slice(0, 80), phrases: (category.phrases || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 30) })),

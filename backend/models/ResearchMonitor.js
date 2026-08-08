@@ -4,7 +4,7 @@ const researchMonitorSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   name: { type: String, required: true, trim: true, maxlength: 160 },
-  monitorType: { type: String, enum: ["buyer_intent", "community_partner"], default: null, index: true },
+  monitorType: { type: String, enum: ["buyer_intent", "community_partner", "investor_profile"], default: null, index: true },
   query: { type: String, required: true, trim: true, maxlength: 1200 },
   keywords: [{ type: String, trim: true }],
   intentCategories: [{

@@ -5,7 +5,7 @@ const IntentSignal = require("../models/IntentSignal");
 const ResearchMonitor = require("../models/ResearchMonitor");
 const MonitorActivity = require("../models/MonitorActivity");
 const InAppNotification = require("../models/InAppNotification");
-const { collectMonitorSignals, isCommunityPartnerMonitor } = require("./intentSourceService");
+const { collectMonitorSignals, isCommunityPartnerMonitor, isInvestorProfileMonitor } = require("./intentSourceService");
 const { researchPublicWebsite } = require("./publicWebsiteResearchService");
 
 const RUNNER_INTERVAL_MS = Math.max(15000, Number(process.env.RESEARCH_WORKER_POLL_MS) || 60000);
@@ -33,6 +33,17 @@ function scoreSignal(signal, monitor) {
   });
   const excluded = negative.filter((keyword) => content.includes(keyword));
   const buyer = signalEligibility(signal, monitor);
+  if (isInvestorProfileMonitor(monitor)) {
+    let prospectScore = buyer.eligible ? 35 : 0;
+    const prospectReasons = buyer.reasons.slice();
+    if (/\b(?:accredited investor|limited partner|lp investor|passive investor|multifamily investor|syndication investor)\b/i.test(content)) { prospectScore += 30; prospectReasons.push("Self-described investor evidence"); }
+    if (/\b(?:vice president|vp|director|physician|doctor|orthodontist|dentist|software architect|tech founder|founder|managing partner|partner|practice owner|business owner|executive)\b/i.test(content)) { prospectScore += 25; prospectReasons.push("Matches a target professional role"); }
+    if (/\b(?:owner|founder|partner|principal|president|chief executive|ceo)\b/i.test(content)) { prospectScore += 10; prospectReasons.push("Shows business or practice ownership"); }
+    if (/\b(?:webinar|conference|meetup|reia|multifamily|syndication|crowdfunding|passive income)\b/i.test(content)) { prospectScore += 10; prospectReasons.push("Shows relevant investment or event activity"); }
+    if (matched.length) { prospectScore += Math.min(10, matched.length * 2); prospectReasons.push(`Matched ${Math.min(matched.length, 5)} targeting rule${matched.length === 1 ? "" : "s"}`); }
+    if (excluded.length) { prospectScore = 0; prospectReasons.push(`Excluded terms: ${excluded.join(", ")}`); }
+    return { score: Math.min(100, prospectScore), reasons: prospectReasons, matched };
+  }
   if (isCommunityPartnerMonitor(monitor)) {
     let partnerScore = buyer.eligible ? 35 : 0;
     const partnerReasons = buyer.reasons.slice();
@@ -67,7 +78,23 @@ function communityPartnerAssessment(signal, monitor) {
   return { eligible: true, reason: "", reasons: ["Public evidence identifies a relevant real-estate community or leader"] };
 }
 
+function investorProfileAssessment(signal, monitor) {
+  const basic = audienceEligibility(signal);
+  if (!basic.eligible) return { ...basic, reasons: [basic.reason] };
+  const text = `${signal.title || ""} ${signal.excerpt || ""} ${signal.organizationName || ""}`.toLowerCase();
+  const excluded = (monitor.negativeKeywords || []).map((value) => String(value).toLowerCase()).find((keyword) => keyword && text.includes(keyword));
+  if (excluded) return { eligible: false, reason: `Excluded term: ${excluded}`, reasons: [`Excluded term: ${excluded}`] };
+  const professionalFit = /\b(?:vice president|vp|director|physician|doctor|orthodontist|dentist|software architect|tech founder|founder|managing partner|partner|practice owner|business owner|executive)\b/i.test(text);
+  const investorFit = /\b(?:accredited investor|limited partner|lp investor|passive investor|multifamily investor|syndication investor)\b/i.test(text);
+  if (!professionalFit && !investorFit) return { eligible: false, reason: "No target professional role or self-described investor evidence.", reasons: ["Missing professional or investor fit"] };
+  const reasons = [];
+  if (professionalFit) reasons.push("Public evidence matches a target professional role");
+  if (investorFit) reasons.push("Public evidence includes self-described investor language");
+  return { eligible: true, reason: "", reasons };
+}
+
 function signalEligibility(signal, monitor) {
+  if (isInvestorProfileMonitor(monitor || {})) return investorProfileAssessment(signal, monitor || {});
   return isCommunityPartnerMonitor(monitor || {}) ? communityPartnerAssessment(signal, monitor || {}) : buyerIntentAssessment(signal);
 }
 
@@ -178,8 +205,10 @@ async function runResearchMonitor(monitorId) {
         const eligibility = signalEligibility(signal, monitor);
         if (!eligibility.eligible) { rejected += 1; continue; }
         const ranking = scoreSignal(signal, monitor);
-        if (!ranking.matched.length || ranking.score < 45) { rejected += 1; continue; }
-        const classification = isCommunityPartnerMonitor(monitor)
+        if ((!isInvestorProfileMonitor(monitor) && !ranking.matched.length) || ranking.score < 45) { rejected += 1; continue; }
+        const classification = isInvestorProfileMonitor(monitor)
+          ? { classification: "uncertain", method: "rules", reason: "Matched public professional or self-described investor evidence." }
+          : isCommunityPartnerMonitor(monitor)
           ? { classification: "uncertain", method: "rules", reason: "Matched public community-partner evidence." }
           : await classifySignal(signal);
         if (["hypothetical_or_student", "promotion", "job_seeker", "irrelevant"].includes(classification.classification)) { rejected += 1; continue; }
@@ -207,7 +236,7 @@ async function runResearchMonitor(monitorId) {
       } catch (_error) { await IntentSignal.updateOne({ _id: candidate.signalId }, { $set: { websiteResearchStatus: "failed" } }); }
     }
     await activity(monitor, runId, "websites_researched", `Researched ${websitesResearched} public websites.`, websitesResearched);
-    const resultLabel = isCommunityPartnerMonitor(monitor) ? "community partner leads" : "buyer-intent signals";
+    const resultLabel = isInvestorProfileMonitor(monitor) ? "qualified investor prospects" : isCommunityPartnerMonitor(monitor) ? "community partner leads" : "buyer-intent signals";
     await activity(monitor, runId, "leads_prepared", `${found} ${resultLabel} passed the filters.`, found);
     for (const failure of collected.failures) {
       await activity(monitor, runId, "source_failure", `${failure.source} failed: ${failure.message}`, 1, failure);
@@ -261,4 +290,4 @@ function startResearchMonitorRunner() {
   return timer;
 }
 
-module.exports = { audienceEligibility, buyerIntentAssessment, classifySignal, communityPartnerAssessment, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, signalEligibility, startResearchMonitorRunner, scoreSignal };
+module.exports = { audienceEligibility, buyerIntentAssessment, classifySignal, communityPartnerAssessment, investorProfileAssessment, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, signalEligibility, startResearchMonitorRunner, scoreSignal };

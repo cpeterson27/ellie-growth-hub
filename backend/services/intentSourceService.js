@@ -33,6 +33,10 @@ function isCommunityPartnerMonitor(monitor) {
   return /community leaders?|organizers?|group admins?|group owners?|meetup hosts?|association (?:directors?|presidents?)|podcast hosts?|newsletter publishers?/i.test(`${monitor.query || ""} ${(monitor.keywords || []).join(" ")}`);
 }
 
+function isInvestorProfileMonitor(monitor) {
+  return monitor.monitorType === "investor_profile";
+}
+
 function normalizeSignal(source, item = {}) {
   const sourceUrl = String(item.sourceUrl || "").trim();
   if (!sourceUrl) return null;
@@ -176,7 +180,12 @@ async function searchRedditRss(monitor, limit) {
 
 async function searchBingWeb(monitor, limit) {
   const baseQuery = booleanQueryFor(monitor);
-  const queries = [
+  const queries = isInvestorProfileMonitor(monitor) ? [
+    `(\"accredited investor\" OR \"limited partner\" OR \"LP investor\" OR \"passive investor\" OR \"multifamily investor\") (physician OR orthodontist OR founder OR \"managing partner\" OR \"software architect\" OR VP OR director)`,
+    `(inurl:bio OR inurl:team OR inurl:leadership OR inurl:about) (\"passive investor\" OR \"real estate investor\" OR multifamily) (founder OR physician OR dentist OR executive OR director)`,
+    `(site:meetup.com OR site:eventbrite.com OR site:biggerpockets.com) (\"passive income\" OR \"multifamily investing\" OR syndication OR \"accredited investor\") (${baseQuery})`,
+    baseQuery,
+  ] : [
     `(site:facebook.com/groups OR site:linkedin.com/groups OR site:x.com OR site:twitter.com OR site:instagram.com OR site:threads.net) (${baseQuery})`,
     `(site:youtube.com OR site:biggerpockets.com OR site:meetup.com OR site:eventbrite.com) (${baseQuery})`,
     `(site:discord.com OR site:discord.gg OR inurl:forum OR "real estate investors association" OR "local REIA") (${baseQuery})`,
@@ -535,4 +544,4 @@ async function collectMonitorSignals(monitor) {
   };
 }
 
-module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, extractXmlItems, isCommunityPartnerMonitor, normalizeSignal, queryFor, searchMeetupPublic, termsFor };
+module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, extractXmlItems, isCommunityPartnerMonitor, isInvestorProfileMonitor, normalizeSignal, queryFor, searchMeetupPublic, termsFor };
