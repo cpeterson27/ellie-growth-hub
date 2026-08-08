@@ -120,6 +120,51 @@ router.post("/eventbrite-links/:id/sync", async (req, res) => {
     return res.status(400).json({ message: error.response?.data?.error_description || error.message || "Unable to sync affiliate sales." });
   }
 });
+router.post("/eventbrite-links/:id/verify", async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.params.id);
+    if (!partner) return res.status(404).json({ message: "Partner not found." });
+    if (!partner.localEventId || partner.trackingProvider !== "eventbrite") {
+      return res.status(400).json({ message: "Connect this partner to an Eventbrite event first." });
+    }
+    const event = await Event.findById(partner.localEventId);
+    if (!event) return res.status(404).json({ message: "The connected event could not be found." });
+
+    const referralUrl = new URL(String(partner.referralLink || ""));
+    const eventUrl = new URL(String(event.integrations?.eventbrite?.url || ""));
+    const linkCode = String(referralUrl.searchParams.get("aff") || "").trim().toLowerCase();
+    const savedCode = String(partner.referralCode || "").trim().toLowerCase();
+    const eventbriteEventId = String(event.integrations?.eventbrite?.eventId || "").trim();
+    const validEventbriteLink = /(^|\.)eventbrite\.com$/i.test(referralUrl.hostname);
+    const sameEventPage = referralUrl.origin === eventUrl.origin && (
+      referralUrl.pathname.replace(/\/$/, "") === eventUrl.pathname.replace(/\/$/, "") ||
+      Boolean(eventbriteEventId && referralUrl.pathname.includes(eventbriteEventId) && eventUrl.pathname.includes(eventbriteEventId))
+    );
+    const trackingCodeMatches = Boolean(linkCode && savedCode && linkCode === savedCode);
+    const eventConnected = Boolean(eventbriteEventId && String(partner.eventbriteEventId || "") === eventbriteEventId);
+
+    if (!validEventbriteLink || !trackingCodeMatches || !eventConnected || !sameEventPage) {
+      return res.status(400).json({
+        message: "This affiliate link needs attention before it is shared.",
+        checks: { validEventbriteLink, trackingCodeMatches, eventConnected, sameEventPage, eventbriteSync: false },
+      });
+    }
+
+    await syncEvent(partner.localEventId);
+    const refreshed = await Partner.findById(partner._id);
+    const checks = { validEventbriteLink, trackingCodeMatches, eventConnected, sameEventPage, eventbriteSync: true };
+    return res.json({
+      partner: refreshed,
+      checks,
+      message: refreshed.lastSaleAt
+        ? "Tracking is working. Eventbrite has returned at least one purchase for this affiliate link."
+        : "The link, event, tracking code, and Eventbrite connection all passed. No purchase has been attributed to this link yet.",
+    });
+  } catch (error) {
+    await Partner.updateOne({ _id: req.params.id }, { $set: { lastSyncedAt: new Date(), lastSyncStatus: "failed", lastSyncError: error.response?.data?.error_description || error.message || "Unable to verify affiliate tracking." } }).catch(() => {});
+    return res.status(400).json({ message: error.response?.data?.error_description || error.message || "Unable to verify affiliate tracking." });
+  }
+});
 router.post("/", async (req, res) => { try { const partner = await Partner.create(req.body); res.status(201).json(partner); } catch (err) { res.status(400).json({ message: err.message || "Unable to create partner" }); } });
 router.patch("/:id", async (req, res) => { try { const partner = await Partner.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }); if (!partner) return res.status(404).json({ message: "Partner not found" }); res.json(partner); } catch { res.status(400).json({ message: "Unable to update partner" }); } });
 module.exports = router;

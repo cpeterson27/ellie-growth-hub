@@ -423,6 +423,7 @@ export const createPartner = (data) => api.post("/partners", data).then((res) =>
 export const updatePartner = (partnerId, data) => api.patch(`/partners/${partnerId}`, data).then((res) => res.data);
 export const createEventbriteAffiliateLink = (data) => api.post("/partners/eventbrite-links", data).then((res) => res.data);
 export const syncEventbriteAffiliate = (partnerId) => api.post(`/partners/eventbrite-links/${partnerId}/sync`).then((res) => res.data);
+export const verifyEventbriteAffiliate = (partnerId) => api.post(`/partners/eventbrite-links/${partnerId}/verify`).then((res) => res.data);
 export const fetchEventbriteAffiliateSales = (limit = 25) => api.get("/partners/eventbrite-sales", { params: { limit } }).then((res) => res.data);
 export const linkExistingEventbriteAffiliate = (partnerId, data) => api.patch(`/partners/eventbrite-links/${partnerId}/link-existing`, data).then((res) => res.data);
 

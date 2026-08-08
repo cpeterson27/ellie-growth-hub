@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
-import Table from "../components/Table.jsx";
-import { configureEventbriteWebhook, createEventbriteAffiliateLink, fetchEventbriteAffiliateSales, fetchEventbriteWebhookStatus, fetchEvents, fetchPartners, linkExistingEventbriteAffiliate, syncEventbriteAffiliate, updatePartner } from "../services/api.js";
+import { configureEventbriteWebhook, createEventbriteAffiliateLink, fetchEventbriteAffiliateSales, fetchEventbriteWebhookStatus, fetchEvents, fetchPartners, linkExistingEventbriteAffiliate, updatePartner, verifyEventbriteAffiliate } from "../services/api.js";
 import "./Partners.css";
 
 const blank = { name: "", company: "", email: "", phone: "", type: "affiliate", referralCode: "", referralLink: "", localEventId: "", commissionRate: "", notes: "" };
@@ -18,6 +17,7 @@ export default function Partners() {
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
   const [syncingId, setSyncingId] = useState("");
+  const [verification, setVerification] = useState({});
   const [sales, setSales] = useState([]);
   const [webhookStatus, setWebhookStatus] = useState(null);
   const [automationBusy, setAutomationBusy] = useState(false);
@@ -27,7 +27,7 @@ export default function Partners() {
     if (!form || form._id || !form.localEventId || !form.name.trim()) return "";
     const selected = connectedEvents.find((event) => String(event._id) === String(form.localEventId));
     if (!selected?.integrations?.eventbrite?.url) return "";
-    try { const url = new URL(selected.integrations.eventbrite.url); url.searchParams.set("aff", slug(form.name)); return url.toString(); } catch (_error) { return ""; }
+    try { const url = new URL(selected.integrations.eventbrite.url); url.searchParams.set("aff", slug(form.name)); return url.toString(); } catch { return ""; }
   }, [form, connectedEvents]);
   const load = async () => {
     try {
@@ -56,17 +56,17 @@ export default function Partners() {
         if (!form.localEventId) return setError("Choose the Eventbrite bootcamp event.");
         const result = await linkExistingEventbriteAffiliate(form._id, { localEventId: form.localEventId, referralLink: form.referralLink, referralCode: form.referralCode });
         let automatic = false;
-        try { const status = await configureEventbriteWebhook(); setWebhookStatus(status); automatic = Boolean(status.configured); } catch (_error) {}
+        try { const status = await configureEventbriteWebhook(); setWebhookStatus(status); automatic = Boolean(status.configured); } catch { /* Manual verification remains available. */ }
         setSuccess(`${form.name} is now linked to ${result.partner.eventName}. ${result.syncWarning ? `The link was saved, but the first sales refresh needs attention: ${result.syncWarning}` : "Existing attributed sales were checked."} ${automatic ? "Automatic updates are on." : "Turn on automatic updates below if the status still says Needs setup."}`);
       } else if (form._id) await updatePartner(form._id, { name: form.name, company: form.company, email: form.email, phone: form.phone, commissionRate: form.commissionRate, notes: form.notes });
       else {
         if (!form.localEventId) return setError("Choose the Eventbrite bootcamp event.");
         const created = await createEventbriteAffiliateLink({ ...form, referralCode: "" });
         let copied = false;
-        try { await navigator.clipboard.writeText(created.referralLink); copied = true; } catch (_error) {}
+        try { await navigator.clipboard.writeText(created.referralLink); copied = true; } catch { /* The link remains available on the partner card. */ }
         let automatic = false;
-        try { const status = await configureEventbriteWebhook(); setWebhookStatus(status); automatic = Boolean(status.configured); } catch (_error) {}
-        setSuccess(`Affiliate link created for ${created.name}${copied ? " and copied to your clipboard" : ". Use Copy link in the table to copy it"}. ${automatic ? "Automatic Eventbrite sale updates are on." : "Automatic updates still need setup; use Turn on automatic updates below."}`);
+        try { const status = await configureEventbriteWebhook(); setWebhookStatus(status); automatic = Boolean(status.configured); } catch { /* Manual verification remains available. */ }
+        setSuccess(`Affiliate link created for ${created.name}${copied ? " and copied to your clipboard" : ". Use Copy affiliate link on the partner card"}. ${automatic ? "Automatic Eventbrite sale updates are on." : "Automatic updates still need setup; use Turn on automatic updates below."}`);
       }
       setForm(null);
       await load();
@@ -77,18 +77,28 @@ export default function Partners() {
     try { await navigator.clipboard.writeText(partner.referralLink); setSuccess(`${partner.name}’s affiliate link was copied.`); }
     catch { setError("Your browser blocked copying. Open Edit and copy the link manually."); }
   };
-  const syncPartner = async (partner) => {
+  const verifyPartner = async (partner) => {
     try {
       setSyncingId(partner._id); setError(""); setSuccess("");
-      await syncEventbriteAffiliate(partner._id);
+      const result = await verifyEventbriteAffiliate(partner._id);
+      setVerification((current) => ({ ...current, [partner._id]: result }));
       await load();
-      setSuccess(`Eventbrite sales refreshed for ${partner.name}.`);
-    } catch (err) { setError(err.response?.data?.message || "Unable to refresh Eventbrite affiliate sales."); }
+      setSuccess(`${partner.name}: ${result.message}${webhookStatus?.configured ? " Automatic purchase updates are on." : " Automatic purchase updates still need setup."}`);
+    } catch (err) {
+      if (err.response?.data?.checks) setVerification((current) => ({ ...current, [partner._id]: err.response.data }));
+      setError(err.response?.data?.message || "Unable to verify Eventbrite affiliate tracking.");
+    }
     finally { setSyncingId(""); }
   };
   const openLinkExisting = (partner) => {
     setError(""); setSuccess("");
     setForm({ ...partner, linkExisting: true, localEventId: String(connectedEvents[0]?._id || ""), referralLink: partner.referralLink || "", referralCode: partner.referralCode || slug(partner.name) });
+  };
+  const updateExistingLink = (value) => {
+    let code = form.referralCode;
+    try { code = new URL(value).searchParams.get("aff") || code; }
+    catch { /* Keep the existing code while the URL is incomplete. */ }
+    setForm({ ...form, referralLink: value, referralCode: existingCode(code) });
   };
   const enableAutomation = async () => {
     try {
@@ -102,31 +112,45 @@ export default function Partners() {
     } finally { setAutomationBusy(false); }
   };
 
-  const columns = [
-    { header: "Affiliate", render: (row) => <div className="partner-identity"><strong>{row.name}</strong><small>{row.company || row.email || "Independent partner"}</small></div> },
-    { header: "Event", render: (row) => row.eventName || "Not linked" },
-    { header: "Commission", render: (row) => `${row.commissionRate || 0}%` },
-    { header: "Tickets", accessor: "ticketsSold" },
-    { header: "Revenue", render: (row) => <div className="partner-identity"><strong>{row.revenue || "$0"}</strong><small>{row.lastSyncedAt ? `Synced ${new Date(row.lastSyncedAt).toLocaleString()}` : "Not synced yet"}</small></div> },
-    { header: "Commission due", render: (row) => new Intl.NumberFormat("en-US", { style: "currency", currency: row.currency || "USD" }).format(Number(row.grossRevenue || 0) * Number(row.commissionRate || 0) / 100) },
-    { header: "Tracking", render: (row) => <div className={`tracking-state ${row.lastSaleAt ? "is-confirmed" : row.trackingProvider === "eventbrite" ? "is-ready" : "is-unlinked"}`}><strong>{row.lastSaleAt ? "Confirmed" : row.trackingProvider === "eventbrite" ? "Link ready" : "Not linked"}</strong><small>{row.lastSaleAt ? "Eventbrite returned an attributed sale" : row.trackingProvider === "eventbrite" ? "Awaiting first attributed purchase" : "Connect this partner to an event"}</small></div> },
-    { header: "Actions", render: (row) => <div className="partner-actions">{row.trackingProvider !== "eventbrite" ? <Button size="sm" onClick={() => openLinkExisting(row)}>Link Eventbrite</Button> : null}{row.referralLink ? <Button size="sm" onClick={() => copyLink(row)}>Copy link</Button> : null}{row.referralLink ? <Button size="sm" variant="outline" onClick={() => window.open(row.referralLink, "_blank", "noopener,noreferrer")}>Test link</Button> : null}{row.trackingProvider === "eventbrite" ? <Button size="sm" variant="outline" loading={syncingId === row._id} onClick={() => syncPartner(row)}>Refresh now</Button> : null}<Button size="sm" variant="outline" onClick={() => { setError(""); setForm({ ...row, linkExisting: false, localEventId: String(row.localEventId || "") }); }}>Edit</Button></div> },
-  ];
+  const money = (amount, currency = "USD") => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(amount || 0));
+  const commissionDue = (partner) => money(Number(partner.grossRevenue || 0) * Number(partner.commissionRate || 0) / 100, partner.currency);
 
   return <div className="page-dashboard partners-page">
-    <div className="page-header"><div><h1 className="page-title">Affiliate links</h1><p className="page-subtitle">Choose a partner and event. Growth Operator creates the unique Eventbrite link and tracks attributed sales.</p></div><Button onClick={openNew}>+ Create affiliate link</Button></div>
+    <header className="affiliate-hero"><div><span className="affiliate-eyebrow">PARTNER REVENUE</span><h1>Affiliate partnerships</h1><p>Create a unique Eventbrite checkout link, share it with a partner, and see every attributed ticket and commission in one place.</p></div><Button onClick={openNew}>Create affiliate link</Button></header>
     {error ? <p className="form-error">{error}</p> : null}{success ? <p className="partner-success">{success}</p> : null}
     <section className={`affiliate-automation ${webhookStatus?.configured ? "is-on" : "is-off"}`}><div><span>Automatic sale tracking</span><strong>{webhookStatus?.configured ? "On" : "Needs setup"}</strong><p>{webhookStatus?.configured ? `Eventbrite sends new orders to Growth Operator automatically${webhookStatus.lastReceivedAt ? ` · Last update ${new Date(webhookStatus.lastReceivedAt).toLocaleString()}` : ""}.` : "Turn this on once. After that, purchases update the affiliate ledger without pressing Refresh now."}</p></div>{!webhookStatus?.configured ? <Button loading={automationBusy} onClick={enableAutomation}>Turn on automatic updates</Button> : <span className="automation-live">● Listening for Eventbrite orders</span>}</section>
-    <section className="affiliate-summary"><div><span>Active affiliate links</span><strong>{partners.filter((partner) => partner.trackingProvider === "eventbrite").length}</strong></div><div><span>Attributed tickets</span><strong>{partners.reduce((sum, partner) => sum + Number(partner.ticketsSold || 0), 0)}</strong></div><div><span>Connected Eventbrite events</span><strong>{connectedEvents.length}</strong></div></section>
-    <div className="affiliate-explainer"><strong>How this works</strong><span>You enter the affiliate’s name and choose the bootcamp. Growth Operator creates and copies the unique Eventbrite link—there is no code for you to invent. Share that exact link. With automatic tracking on, Eventbrite notifies Growth Operator after an attributed order and the ticket, revenue, buyer, refund status, and commission are recorded here. Refresh now is only a backup.</span></div>
-    <DashboardCard title="Affiliate performance"><Table columns={columns} data={partners} emptyMessage="Create your first Eventbrite affiliate link." /></DashboardCard>
+    <section className="affiliate-summary"><div><span>Active links</span><strong>{partners.filter((partner) => partner.trackingProvider === "eventbrite").length}</strong><small>ready to share</small></div><div><span>Attributed tickets</span><strong>{partners.reduce((sum, partner) => sum + Number(partner.ticketsSold || 0), 0)}</strong><small>reported by Eventbrite</small></div><div><span>Attributed revenue</span><strong>{money(partners.reduce((sum, partner) => sum + Number(partner.grossRevenue || 0), 0))}</strong><small>before commissions</small></div><div><span>Commission due</span><strong>{money(partners.reduce((sum, partner) => sum + Number(partner.grossRevenue || 0) * Number(partner.commissionRate || 0) / 100, 0))}</strong><small>across all partners</small></div></section>
+    <section className="affiliate-journey" aria-label="Affiliate workflow"><div className="is-current"><b>1</b><span><strong>Create</strong><small>Choose partner and event</small></span></div><div><b>2</b><span><strong>Test</strong><small>Open the checkout link</small></span></div><div><b>3</b><span><strong>Share</strong><small>Partner uses this exact link</small></span></div><div><b>4</b><span><strong>Confirm</strong><small>Purchase appears here</small></span></div></section>
+    <section className="affiliate-section-heading"><div><span>YOUR PARTNERS</span><h2>Affiliate links and performance</h2></div><p>Each partner has one clear link and one place to verify it.</p></section>
+    <section className="affiliate-partner-list">
+      {partners.length ? partners.map((partner) => {
+        const linked = partner.trackingProvider === "eventbrite" && partner.referralLink;
+        const confirmed = Boolean(partner.lastSaleAt);
+        const result = verification[partner._id];
+        return <article className="affiliate-partner-card" key={partner._id}>
+          <div className="affiliate-card-main">
+            <div className="affiliate-card-title"><div className="affiliate-monogram">{String(partner.name || "A").charAt(0).toUpperCase()}</div><div><h3>{partner.name}</h3><p>{partner.company || partner.email || "Independent partner"}</p></div></div>
+            <span className={`affiliate-status ${confirmed ? "is-confirmed" : linked ? "is-ready" : "is-unlinked"}`}>{confirmed ? "Sale confirmed" : linked ? "Link ready" : "Action needed"}</span>
+            <div className="affiliate-event"><span>EVENT</span><strong>{partner.eventName || "Not connected to Eventbrite"}</strong></div>
+            {linked ? <div className="affiliate-link-box"><span>AFFILIATE CHECKOUT LINK</span><code>{partner.referralLink}</code><div><Button size="sm" onClick={() => copyLink(partner)}>Copy affiliate link</Button><Button size="sm" variant="outline" onClick={() => window.open(partner.referralLink, "_blank", "noopener,noreferrer")}>Test checkout</Button></div><small>Testing opens the same Eventbrite checkout your buyers will see. It does not create a purchase.</small></div> : <div className="affiliate-unlinked"><strong>Connect {partner.name}’s existing Eventbrite tracking link</strong><p>This partner record cannot track a purchase until it is attached to the bootcamp and its existing Eventbrite link.</p><Button size="sm" onClick={() => openLinkExisting(partner)}>Connect existing link</Button></div>}
+          </div>
+          <aside className="affiliate-card-results">
+            <div className="affiliate-metrics"><div><span>Tickets</span><strong>{partner.ticketsSold || 0}</strong></div><div><span>Revenue</span><strong>{partner.revenue || money(0, partner.currency)}</strong></div><div><span>Commission</span><strong>{commissionDue(partner)}</strong><small>{partner.commissionRate || 0}% rate</small></div></div>
+            <div className="affiliate-tracking-summary"><span>TRACKING STATUS</span><strong>{confirmed ? "Purchase attribution confirmed" : linked ? "Setup ready; waiting for a purchase" : "Not connected"}</strong><p>{confirmed ? `Eventbrite last returned an attributed sale ${new Date(partner.lastSaleAt).toLocaleString()}.` : linked ? "The link can be shared now. Confirmation appears only after someone completes a real purchase through it." : "Connect the existing Eventbrite link before sharing."}</p></div>
+            {result?.checks ? <div className={`affiliate-check-result ${result.checks.eventbriteSync && webhookStatus?.configured ? "is-pass" : "is-fail"}`}><strong>{result.checks.eventbriteSync && webhookStatus?.configured ? "Setup check passed" : "Tracking needs attention"}</strong><ul><li className={result.checks.validEventbriteLink ? "pass" : "fail"}>Eventbrite checkout link</li><li className={result.checks.trackingCodeMatches ? "pass" : "fail"}>Unique partner code</li><li className={result.checks.sameEventPage ? "pass" : "fail"}>Correct bootcamp checkout</li><li className={result.checks.eventConnected ? "pass" : "fail"}>Bootcamp event connection</li><li className={result.checks.eventbriteSync ? "pass" : "fail"}>Eventbrite sales connection</li><li className={webhookStatus?.configured ? "pass" : "fail"}>Automatic purchase updates</li></ul></div> : null}
+            <div className="affiliate-card-actions">{linked ? <Button size="sm" loading={syncingId === partner._id} onClick={() => verifyPartner(partner)}>Verify setup & sales</Button> : null}<Button size="sm" variant="outline" onClick={() => { setError(""); setForm({ ...partner, linkExisting: false, localEventId: String(partner.localEventId || "") }); }}>Edit partner</Button></div>
+            <small className="affiliate-last-sync">{partner.lastSyncedAt ? `Last checked ${new Date(partner.lastSyncedAt).toLocaleString()}` : "Not checked yet"}</small>
+          </aside>
+        </article>;
+      }) : <div className="affiliate-empty"><strong>No affiliate links yet</strong><p>Create a link for your first partner. Growth Operator generates the tracking code automatically.</p><Button onClick={openNew}>Create first affiliate link</Button></div>}
+    </section>
     <DashboardCard title="Recent affiliate purchases">{sales.length ? <div className="affiliate-sales-list">{sales.map((sale) => <article key={sale._id}><div><strong>{sale.partnerId?.name || sale.affiliateCode}</strong><span>{sale.buyerName || sale.buyerEmail || "Eventbrite attendee"}</span></div><div><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: sale.currency || "USD" }).format(Number(sale.grossRevenue || 0))}</strong><span>{sale.ticketClassName || "Ticket"} · {sale.status}</span></div><time>{sale.purchasedAt ? new Date(sale.purchasedAt).toLocaleString() : "Synced from Eventbrite"}</time></article>)}</div> : <div className="table-state table-state--empty">No affiliate purchases have been attributed yet. New purchases will appear here automatically when tracking is on.</div>}</DashboardCard>
     <Modal isOpen={Boolean(form)} onClose={() => setForm(null)} title={form?.linkExisting ? `Link ${form.name} to Eventbrite` : form?._id ? "Edit affiliate" : "Create Eventbrite affiliate link"} footer={<><Button variant="outline" onClick={() => setForm(null)}>Cancel</Button><Button onClick={save} loading={saving}>{form?.linkExisting ? "Link and check sales" : form?._id ? "Save changes" : "Create and copy link"}</Button></>}>
       {form ? <div className="affiliate-form">{error ? <p className="form-error">{error}</p> : null}
         {!form._id || form.linkExisting ? <label><span>Bootcamp event</span><select value={form.localEventId} onChange={(event) => setForm({ ...form, localEventId: event.target.value })}><option value="">Choose an Eventbrite event</option>{connectedEvents.map((event) => <option key={event._id} value={event._id}>{event.name}</option>)}</select><small>{connectedEvents.length ? "Only events already connected to Eventbrite appear here." : "Connect or import the bootcamp event on the Events page first."}</small></label> : <div className="affiliate-readonly"><span>Event</span><strong>{form.eventName || "Eventbrite event"}</strong></div>}
         {form.linkExisting ? <div className="affiliate-link-help"><strong>{form.name}’s link was created in Eventbrite</strong><span>Paste that exact tracking link below. Growth Operator will read the affiliate code after <b>aff=</b>, attach it to this record, check previous sales, and track future purchases automatically.</span></div> : null}
         <div className="affiliate-form-grid"><label><span>Affiliate name</span><input value={form.name || ""} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label><label><span>Company</span><input value={form.company || ""} onChange={(event) => setForm({ ...form, company: event.target.value })} /></label><label><span>Email</span><input type="email" value={form.email || ""} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label><label><span>Commission %</span><input type="number" min="0" max="100" step="0.1" value={form.commissionRate ?? ""} onChange={(event) => setForm({ ...form, commissionRate: event.target.value })} /></label></div>
-        {!form._id ? <div className="generated-link-preview"><span>Growth Operator will create</span><strong>{linkPreview || "Enter the affiliate name to preview the Eventbrite link"}</strong><small>The unique tracking identifier is generated automatically. You only need to copy and share the finished link.</small></div> : form.linkExisting ? <><label><span>Existing Eventbrite tracking link</span><textarea placeholder="Paste the complete Eventbrite link here" value={form.referralLink || ""} onChange={(event) => { const value = event.target.value; let code = form.referralCode; try { code = new URL(value).searchParams.get("aff") || code; } catch (_error) {} setForm({ ...form, referralLink: value, referralCode: existingCode(code) }); }} /><small>The complete URL is best. Growth Operator extracts its tracking information automatically.</small></label><details className="tracking-code-fallback"><summary>I only have the Eventbrite tracking name</summary><label><span>Exact Eventbrite tracking name</span><input value={form.referralCode || ""} onChange={(event) => setForm({ ...form, referralCode: existingCode(event.target.value) })} /><small>Use this only when the full Eventbrite link is unavailable, including its exact capitalization.</small></label></details></> : <div className="affiliate-readonly"><span>Tracking</span><strong>{form.lastSaleAt ? "Confirmed by an Eventbrite purchase" : "Link ready—awaiting its first attributed purchase"}</strong></div>}
+        {!form._id ? <div className="generated-link-preview"><span>Growth Operator will create</span><strong>{linkPreview || "Enter the affiliate name to preview the Eventbrite link"}</strong><small>The unique tracking identifier is generated automatically. You only need to copy and share the finished link.</small></div> : form.linkExisting ? <><label><span>Existing Eventbrite tracking link</span><textarea placeholder="Paste the complete Eventbrite link here" value={form.referralLink || ""} onChange={(event) => updateExistingLink(event.target.value)} /><small>The complete URL is best. Growth Operator extracts its tracking information automatically.</small></label><details className="tracking-code-fallback"><summary>I only have the Eventbrite tracking name</summary><label><span>Exact Eventbrite tracking name</span><input value={form.referralCode || ""} onChange={(event) => setForm({ ...form, referralCode: existingCode(event.target.value) })} /><small>Use this only when the full Eventbrite link is unavailable, including its exact capitalization.</small></label></details></> : <div className="affiliate-readonly"><span>Tracking</span><strong>{form.lastSaleAt ? "Confirmed by an Eventbrite purchase" : "Link ready—awaiting its first attributed purchase"}</strong></div>}
         {form.referralLink && !form.linkExisting ? <label><span>Affiliate link</span><textarea readOnly value={form.referralLink} /></label> : null}
         <label><span>Internal notes</span><textarea value={form.notes || ""} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
       </div> : null}
