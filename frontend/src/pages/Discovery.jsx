@@ -80,7 +80,7 @@ const identifiedPersonName = (signal) => {
   const name = displayText(signal?.authorName);
   if (!name || /^(?:account not available|no person identified|unknown|anonymous|\/?u\/|@|https?:\/\/)/i.test(name)) return "";
   if (!/^[\p{L}.'’ -]+$/u.test(name) || name.split(/\s+/).length < 2) return "";
-  if (/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club)\b/i.test(name)) return "";
+  if (/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club|team|staff|editorial|support|customer service|meetup|linkedin|facebook)\b/i.test(name)) return "";
   return name;
 };
 

@@ -237,7 +237,7 @@ function supportedPublicPerson(person) {
   return Boolean(name
     && /^[\p{L}.'’ -]+$/u.test(name)
     && name.split(/\s+/).length >= 2
-    && !/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club)\b/i.test(name));
+    && !/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club|team|staff|editorial|support|customer service|meetup|linkedin|facebook)\b/i.test(name));
 }
 
 router.post("/research/signals/:signalId/identity-research", async (req, res) => {
@@ -262,6 +262,8 @@ router.post("/research/signals/:signalId/identity-research", async (req, res) =>
   }
 
   try {
+    const previousPeople = (signal.people || []).map((person) => person.toObject ? person.toObject() : person);
+    const priorAutomatedIdentity = previousPeople.some((person) => person.name === signal.authorName && person.evidenceUrl === signal.authorUrl);
     const targets = [signal.sourceUrl];
     if (signal.organizationDomain) targets.push(`https://${signal.organizationDomain}`);
     const results = [];
@@ -271,7 +273,8 @@ router.post("/research/signals/:signalId/identity-research", async (req, res) =>
     const people = [...new Map(results.flatMap((result) => result.people || [])
       .filter(supportedPublicPerson)
       .map((person) => [`${person.name.toLowerCase()}|${person.evidenceUrl}`, person])).values()];
-    const publishedEmails = [...new Set([...(signal.publishedEmails || []), ...results.flatMap((result) => result.emails || [])])].slice(0, 20);
+    const platformEmail = /@(?:meetup|facebook|linkedin)\.com$/i;
+    const publishedEmails = [...new Set([...(signal.publishedEmails || []), ...results.flatMap((result) => result.emails || [])].filter((email) => !platformEmail.test(email)))].slice(0, 20);
     const evidence = [...new Map([...(signal.evidence || []).map((item) => item.toObject ? item.toObject() : item), ...results.flatMap((result) => result.evidence || [])]
       .filter((item) => item?.url)
       .map((item) => [item.url, item])).values()];
@@ -280,6 +283,10 @@ router.post("/research/signals/:signalId/identity-research", async (req, res) =>
     signal.publishedEmails = publishedEmails;
     signal.evidence = evidence;
     signal.websiteResearchStatus = results.some((result) => result.status === "completed") ? "completed" : results.some((result) => result.status === "blocked") ? "blocked" : "failed";
+    if (priorAutomatedIdentity && !people.some((person) => person.name === signal.authorName && person.evidenceUrl === signal.authorUrl)) {
+      signal.authorName = "";
+      signal.authorUrl = "";
+    }
 
     if (!results.some((result) => result.status === "completed")) {
       signal.identityResolution = {
@@ -322,6 +329,7 @@ router.post("/research/signals/:signalId/convert", async (req, res) => {
   if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
   const name = String(req.body?.name || signal.authorName || "").trim();
   if (!name) return res.status(400).json({ success: false, error: "Add the person's name before creating a CRM lead." });
+  if (!supportedPublicPerson({ name })) return res.status(400).json({ success: false, error: "This is a platform, team, or organization name—not an identified person. Research a real named contact before creating the CRM lead." });
   if (/^(?:\/?u\/|@|https?:\/\/)/i.test(name)) return res.status(400).json({ success: false, error: "A public username is not a verified real name. Research and enter the person's real name before creating the CRM record." });
   const organizationName = String(req.body?.company || signal.organizationName || signal.organizationDomain || "").trim();
   if (organizationName && signal.identityResolution?.status !== "supported") return res.status(400).json({ success: false, error: "The company connection is not supported by public evidence. Add this lead without a company or review the source first." });
@@ -352,7 +360,7 @@ function identifiedSignalPersonName(signal) {
   const name = String(signal.authorName || "").replace(/\s+/g, " ").trim();
   if (!name || /^(?:account not available|no person identified|unknown|anonymous|\/?u\/|@|https?:\/\/)/i.test(name)) return "";
   if (!/^[\p{L}.'’ -]+$/u.test(name) || name.split(/\s+/).length < 2) return "";
-  if (/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club)\b/i.test(name)) return "";
+  if (/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club|team|staff|editorial|support|customer service|meetup|linkedin|facebook)\b/i.test(name)) return "";
   return name;
 }
 

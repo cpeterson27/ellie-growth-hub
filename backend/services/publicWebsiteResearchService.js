@@ -6,6 +6,7 @@ const USER_AGENT = "GrowthOperatorResearchBot/1.0 (+https://ellie-ai-backend.onr
 const PRIVATE_IPV4 = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const ROLE_LINK_PATTERN = /(?:about|team|leadership|people|management|founder|contact)/i;
+const PLATFORM_HOST_PATTERN = /(?:^|\.)(?:meetup\.com|facebook\.com|linkedin\.com|reddit\.com)$/i;
 
 async function safeUrl(rawUrl) {
   const url = new URL(rawUrl);
@@ -34,14 +35,18 @@ function jsonLdPeople(html, evidenceUrl) {
   for (const match of String(html || "").matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
     try {
       const parsed = JSON.parse(match[1]);
-      const queue = Array.isArray(parsed) ? [...parsed] : [parsed];
+      const queue = (Array.isArray(parsed) ? parsed : [parsed]).map((value) => ({ value, relation: "root" }));
       while (queue.length) {
-        const item = queue.shift();
+        const { value: item, relation } = queue.shift();
         if (!item || typeof item !== "object") continue;
-        if (Array.isArray(item)) { queue.push(...item); continue; }
+        if (Array.isArray(item)) { queue.push(...item.map((value) => ({ value, relation }))); continue; }
         const types = Array.isArray(item["@type"]) ? item["@type"] : [item["@type"]];
-        if (types.includes("Person") && item.name) people.push({ name: String(item.name), title: String(item.jobTitle || ""), evidenceUrl });
-        for (const value of Object.values(item)) if (value && typeof value === "object") queue.push(value);
+        const leadershipRelation = /^(?:root|organizer|founder|employee|director|leader|host|contactPoint)$/i.test(relation);
+        if (types.includes("Person") && item.name && (leadershipRelation || item.jobTitle)) {
+          const relationTitle = relation === "root" ? "" : relation.replace(/([a-z])([A-Z])/g, "$1 $2");
+          people.push({ name: String(item.name), title: String(item.jobTitle || relationTitle), evidenceUrl });
+        }
+        for (const [key, value] of Object.entries(item)) if (value && typeof value === "object") queue.push({ value, relation: key });
       }
     } catch (_error) {}
   }
@@ -82,7 +87,10 @@ async function fetchPublicPage(url) {
 async function researchPublicWebsite(startUrl) {
   const first = await fetchPublicPage(startUrl);
   if (first.blocked) return { status: "blocked", emails: [], people: [], evidence: [] };
-  const targets = [new URL(first.url), ...pageLinks(first.html, first.url)];
+  const firstUrl = new URL(first.url);
+  // Social/community platforms link to their own editorial, support, and staff
+  // pages. Those people do not represent the group being researched.
+  const targets = [firstUrl, ...(PLATFORM_HOST_PATTERN.test(firstUrl.hostname) ? [] : pageLinks(first.html, first.url))];
   const pages = [first];
   for (const target of targets.slice(1, 5)) {
     await new Promise((resolve) => setTimeout(resolve, 700));
@@ -91,7 +99,10 @@ async function researchPublicWebsite(startUrl) {
       if (!page.blocked) pages.push(page);
     } catch (_error) {}
   }
-  const emails = [...new Set(pages.flatMap((page) => `${plainText(page.html)} ${page.html}`.match(EMAIL_PATTERN) || []).map((email) => email.toLowerCase()).filter((email) => !/example\.(?:com|org)|sentry|wixpress|cloudflare/i.test(email)))].slice(0, 20);
+  const emails = [...new Set(pages.flatMap((page) => {
+    const mailto = [...String(page.html || "").matchAll(/mailto:([^?"'<>\s]+)/gi)].map((match) => match[1].replace(/%40/gi, "@").replace(/%2e/gi, "."));
+    return [...(plainText(page.html).match(EMAIL_PATTERN) || []), ...mailto];
+  }).map((email) => email.toLowerCase()).filter((email) => !/example\.(?:com|org)|sentry|wixpress|cloudflare/i.test(email)))].slice(0, 20);
   const people = [...new Map(pages.flatMap((page) => jsonLdPeople(page.html, page.url)).map((person) => [`${person.name}|${person.title}`, person])).values()].slice(0, 25);
   return { status: "completed", emails, people, evidence: pages.map((page) => ({ label: "Public company website", url: page.url, observedAt: new Date() })) };
 }
