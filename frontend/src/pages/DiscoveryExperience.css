@@ -124,7 +124,7 @@
 .lead-view-tabs button.is-active { background: #fff; box-shadow: 0 1px 4px #23352e18; color: #174c3e; }
 
 .intent-signal-list { gap: .8rem; }
-.intent-signal-list > article { align-items: start; background: #fff; border: 1px solid #dfe5e2; border-left: 4px solid #d39b35; border-radius: 14px; display: grid; gap: 1.1rem; grid-template-columns: 100px minmax(280px, 1fr) minmax(190px, .42fr) 170px; padding: 1rem; }
+.intent-signal-list > article { align-items: start; background: #fff; border: 1px solid #dfe5e2; border-left: 4px solid #d39b35; border-radius: 14px; display: grid; gap: 1.1rem; grid-template-columns: 100px minmax(280px, 1fr) minmax(190px, .42fr) minmax(210px,.5fr); padding: 1rem; }
 .intent-signal-list > article.is-qualified { border-left-color: #278261; }
 .signal-priority { background: #f8f3e8; border-radius: 10px; display: grid; gap: .15rem; padding: .7rem; }
 .signal-priority span { color: #7f6c45; font-size: .65rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
@@ -145,6 +145,7 @@
 .published-email-note { background: #fff3d9; border-radius: 7px; color: #76551d; font-size: .7rem; margin-top: .5rem; padding: .5rem; }
 .intent-signal-actions { align-self: stretch; display: flex; flex-direction: column; gap: .45rem; justify-content: center; }
 .intent-signal-actions > small { color: var(--text-muted); font-size: .68rem; line-height: 1.4; }
+.intent-progress { grid-template-columns: repeat(auto-fit,minmax(105px,1fr)); }
 .identity-research-result { background: #edf5f1; border-left: 3px solid #28765f; border-radius: 8px; display: grid; gap: .3rem; padding: .65rem; }
 .identity-research-result.is-no_person_found { background: #f7f1e4; border-left-color: #b47b24; }
 .identity-research-result.is-error, .identity-research-result.is-source_unavailable { background: #f8eae6; border-left-color: #a84e39; }
@@ -209,7 +210,7 @@
   .lead-review-hero,
   .people-search-guide { grid-template-columns: 1fr; }
   .intent-signal-list > article { grid-template-columns: 90px minmax(0, 1fr) 180px; }
-  .intent-signal-actions { flex-direction: row; grid-column: 2 / -1; justify-content: flex-start; }
+  .intent-signal-actions { grid-column: 2 / -1; }
 }
 @media (max-width: 760px) {
   .monitoring-guide,

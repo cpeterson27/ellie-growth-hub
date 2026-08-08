@@ -200,6 +200,15 @@ router.get("/research/signals", async (req, res) => {
   if (req.query.monitorId) filter.monitorId = req.query.monitorId;
   if (req.query.status) filter.status = req.query.status;
   const signals = await IntentSignal.find(filter).sort({ score: -1, publishedAt: -1, discoveredAt: -1 }).limit(limit).lean();
+  const stalePlatformIdentities = signals.filter((signal) => invalidPlatformIdentityName(signal.authorName));
+  if (stalePlatformIdentities.length) await Promise.all(stalePlatformIdentities.map(async (signal) => {
+    signal.authorName = "";
+    signal.authorUrl = "";
+    signal.people = (signal.people || []).filter((person) => !invalidPlatformIdentityName(person.name));
+    signal.publishedEmails = (signal.publishedEmails || []).filter((email) => !/@(?:meetup|facebook|linkedin)\.com$/i.test(email));
+    signal.identityResolution = { status: "unresolved", reason: "A platform staff or editorial identity was removed because it is not the community's contact person.", evidenceUrls: [] };
+    await IntentSignal.updateOne({ _id: signal._id, workspaceId: req.auth.workspaceId }, { $set: { authorName: "", authorUrl: "", people: signal.people, publishedEmails: signal.publishedEmails, identityResolution: signal.identityResolution } });
+  }));
   const monitorIds = [...new Set(signals.map((signal) => String(signal.monitorId || "")).filter(Boolean))];
   const monitorMap = new Map((await ResearchMonitor.find({ _id: { $in: monitorIds } }).lean()).map((monitor) => [String(monitor._id), monitor]));
   const assessed = signals.map((signal) => { const monitor = monitorMap.get(String(signal.monitorId)); return { signal, eligibility: signalEligibility(signal, monitor), ranking: monitor ? scoreSignal(signal, monitor) : null }; });
@@ -232,12 +241,17 @@ router.patch("/research/signals/:signalId", async (req, res) => {
   return res.json({ success: true, signal });
 });
 
+function invalidPlatformIdentityName(value) {
+  return /\b(?:team|staff|editorial|support|customer service|meetup|linkedin|facebook)\b/i.test(String(value || ""));
+}
+
 function supportedPublicPerson(person) {
   const name = String(person?.name || "").replace(/\s+/g, " ").trim();
   return Boolean(name
     && /^[\p{L}.'’ -]+$/u.test(name)
     && name.split(/\s+/).length >= 2
-    && !/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club|team|staff|editorial|support|customer service|meetup|linkedin|facebook)\b/i.test(name));
+    && !/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club)\b/i.test(name)
+    && !invalidPlatformIdentityName(name));
 }
 
 router.post("/research/signals/:signalId/identity-research", async (req, res) => {

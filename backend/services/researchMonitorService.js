@@ -47,7 +47,7 @@ function scoreSignal(signal, monitor) {
   if (isCommunityPartnerMonitor(monitor)) {
     let partnerScore = buyer.eligible ? 35 : 0;
     const partnerReasons = buyer.reasons.slice();
-    if (buyer.eligible && ["meetup_public", "configured_community", "community_directory"].includes(signal.source)) { partnerScore += 20; partnerReasons.push("Verified through a direct public community source"); }
+    if (buyer.eligible && ["meetup_public", "configured_community", "community_directory"].includes(signal.source)) { partnerScore += 20; partnerReasons.push("Found on a direct public community page"); }
     if (buyer.eligible && matched.length) { partnerScore += Math.min(15, matched.length * 3); partnerReasons.push(`Matched ${Math.min(matched.length, 5)} targeting rule${matched.length === 1 ? "" : "s"}`); }
     if (/association|REIA|organizer|president|director|founder|host|admin|club|network|meetup/i.test(content)) { partnerScore += 15; partnerReasons.push("Shows community or leadership evidence"); }
     if (Number(signal.raw?.memberCount) >= 500) { partnerScore += 10; partnerReasons.push(`${Number(signal.raw.memberCount).toLocaleString()} public members`); }
@@ -75,7 +75,7 @@ function communityPartnerAssessment(signal, monitor) {
   const realEstate = /real estate|multifamily|apartment|landlord|rental propert|syndication|commercial propert|REIA|wealth building/i.test(text);
   const community = /community|association|meetup|group|club|network|forum|mastermind|podcast|newsletter|organizer|founder|president|director|host|admin|conference/i.test(text);
   if (!realEstate || !community) return { eligible: false, reason: "No clear active real-estate community or leadership evidence.", reasons: ["Missing real-estate community evidence"] };
-  return { eligible: true, reason: "", reasons: ["Public evidence identifies a relevant real-estate community or leader"] };
+  return { eligible: true, reason: "", reasons: ["Public evidence identifies a relevant real-estate community; a named leader still requires separate evidence"] };
 }
 
 function investorProfileAssessment(signal, monitor) {
