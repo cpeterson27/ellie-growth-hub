@@ -37,10 +37,14 @@ router.post("/eventbrite-links", async (req, res) => {
     if (!eventbriteEventId || !eventUrl) return res.status(400).json({ message: "Choose an event that is connected to Eventbrite." });
     const name = String(req.body?.name || "").trim();
     if (!name) return res.status(400).json({ message: "Partner name is required." });
-    const referralCode = trackingCode(req.body?.referralCode || name);
-    if (referralCode.length < 3) return res.status(400).json({ message: "Use an affiliate code with at least 3 letters or numbers." });
-    const duplicate = await Partner.findOne({ eventbriteEventId, referralCode: new RegExp(`^${referralCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") });
-    if (duplicate) return res.status(409).json({ message: "That affiliate code is already being used for this event." });
+    const baseCode = trackingCode(req.body?.referralCode || name);
+    if (baseCode.length < 3) return res.status(400).json({ message: "Enter the affiliate's full name so Growth Operator can create a unique link." });
+    let referralCode = baseCode;
+    let suffix = 2;
+    while (await Partner.exists({ eventbriteEventId, referralCode: new RegExp(`^${referralCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") })) {
+      referralCode = `${baseCode.slice(0, 55)}-${suffix}`;
+      suffix += 1;
+    }
     const referralLink = eventbriteAffiliateUrl(eventUrl, referralCode);
     const partner = await Partner.create({
       workspaceId: req.auth.workspaceId,
