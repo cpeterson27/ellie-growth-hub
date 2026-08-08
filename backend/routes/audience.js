@@ -406,8 +406,11 @@ router.post("/research/signals/:signalId/email-drafts/:draftId/transfer", async 
   if (!draft) return res.status(404).json({ success: false, error: "Email draft not found." });
   if (draft.status !== "reviewed") return res.status(400).json({ success: false, error: "Review and save the draft before moving it to Outreach." });
   if (!draft.templateAudienceKey || !draft.templateAudienceLabel || !draft.templateVersion) return res.status(400).json({ success: false, error: "This is an older untracked draft. Click Choose another campaign, select the campaign again, and generate a new draft from its approved template." });
+  const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
+  if (!signal || !identifiedSignalPersonName(signal)) return res.status(400).json({ success: false, error: "This draft is not linked to a valid identified person. Research a real named contact before moving anything to Outreach." });
   const contact = await Contact.findOne({ sourceProvider: "intent_monitor", providerContactId: String(req.params.signalId) });
   if (!contact) return res.status(400).json({ success: false, error: "This person is not linked to a CRM contact yet. Close this window, click Add researched person to CRM, complete the contact, then reopen this draft." });
+  if (!supportedPublicPerson({ name: contact.name || `${contact.firstName || ""} ${contact.lastName || ""}` })) return res.status(400).json({ success: false, error: "The linked CRM record is a platform or organization name—not a person. Identify a real contact before moving this draft to Outreach." });
   if (!contact.email) return res.status(400).json({ success: false, error: "This CRM contact has no email address. Open Contact next steps, add the email, save the contact, then try again." });
   if (contact.emailStatus !== "verified") return res.status(400).json({ success: false, error: "This email has not been confirmed. Open Contact next steps and check ‘I know this email address is correct’ only if you personally confirmed it, save the contact, then try again." });
   await Contact.updateOne({ _id: contact._id }, { $addToSet: { campaignIds: draft.campaignId } });
