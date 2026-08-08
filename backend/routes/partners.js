@@ -9,6 +9,10 @@ function trackingCode(value) {
   return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 }
 
+function existingTrackingCode(value) {
+  return String(value || "").trim().replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+}
+
 function eventbriteAffiliateUrl(rawUrl, code) {
   const url = new URL(rawUrl);
   if (!/(^|\.)eventbrite\.com$/i.test(url.hostname)) throw new Error("This event does not have a valid Eventbrite registration URL.");
@@ -58,6 +62,46 @@ router.post("/eventbrite-links", async (req, res) => {
     return res.status(201).json(partner);
   } catch (error) {
     return res.status(400).json({ message: error.message || "Unable to create the Eventbrite affiliate link." });
+  }
+});
+router.patch("/eventbrite-links/:id/link-existing", async (req, res) => {
+  try {
+    const [partner, event] = await Promise.all([Partner.findById(req.params.id), Event.findById(req.body?.localEventId)]);
+    if (!partner) return res.status(404).json({ message: "Partner not found." });
+    if (!event) return res.status(404).json({ message: "Choose the Eventbrite bootcamp event." });
+    const eventbriteEventId = String(event.integrations?.eventbrite?.eventId || "").trim();
+    const eventUrl = String(event.integrations?.eventbrite?.url || "").trim();
+    if (!eventbriteEventId || !eventUrl) return res.status(400).json({ message: "Choose an event that is connected to Eventbrite." });
+
+    let suppliedLink = String(req.body?.referralLink || "").trim();
+    let codeFromLink = "";
+    if (suppliedLink) {
+      const parsed = new URL(suppliedLink);
+      if (!/(^|\.)eventbrite\.com$/i.test(parsed.hostname)) return res.status(400).json({ message: "Paste the complete tracking link created by Eventbrite." });
+      codeFromLink = existingTrackingCode(parsed.searchParams.get("aff"));
+      if (!codeFromLink) return res.status(400).json({ message: "That URL has no Eventbrite affiliate code. Copy the exact tracking link, including its aff parameter." });
+    }
+    const referralCode = codeFromLink || existingTrackingCode(req.body?.referralCode);
+    if (referralCode.length < 3) return res.status(400).json({ message: "Paste the existing Eventbrite tracking link or enter its tracking code." });
+    const duplicate = await Partner.findOne({ _id: { $ne: partner._id }, eventbriteEventId, referralCode: new RegExp(`^${referralCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") });
+    if (duplicate) return res.status(409).json({ message: `That Eventbrite code is already linked to ${duplicate.name}.` });
+    suppliedLink = suppliedLink || eventbriteAffiliateUrl(eventUrl, referralCode);
+
+    partner.workspaceId = partner.workspaceId || req.auth.workspaceId;
+    partner.userId = partner.userId || req.auth.user?._id || null;
+    partner.localEventId = event._id;
+    partner.eventbriteEventId = eventbriteEventId;
+    partner.eventName = event.name;
+    partner.trackingProvider = "eventbrite";
+    partner.referralCode = referralCode;
+    partner.referralLink = suppliedLink;
+    await partner.save();
+
+    let syncWarning = "";
+    try { await syncEvent(event._id); } catch (error) { syncWarning = error.response?.data?.error_description || error.message || "The link was saved, but sales could not be refreshed yet."; }
+    return res.json({ partner: await Partner.findById(partner._id), syncWarning });
+  } catch (error) {
+    return res.status(400).json({ message: error.message || "Unable to link this partner to Eventbrite." });
   }
 });
 router.post("/eventbrite-links/:id/sync", async (req, res) => {
