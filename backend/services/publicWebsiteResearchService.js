@@ -91,7 +91,7 @@ async function researchPublicWebsite(startUrl) {
       if (!page.blocked) pages.push(page);
     } catch (_error) {}
   }
-  const emails = [...new Set(pages.flatMap((page) => plainText(page.html).match(EMAIL_PATTERN) || []).map((email) => email.toLowerCase()).filter((email) => !/example\.(?:com|org)|sentry|wixpress|cloudflare/i.test(email)))].slice(0, 20);
+  const emails = [...new Set(pages.flatMap((page) => `${plainText(page.html)} ${page.html}`.match(EMAIL_PATTERN) || []).map((email) => email.toLowerCase()).filter((email) => !/example\.(?:com|org)|sentry|wixpress|cloudflare/i.test(email)))].slice(0, 20);
   const people = [...new Map(pages.flatMap((page) => jsonLdPeople(page.html, page.url)).map((person) => [`${person.name}|${person.title}`, person])).values()].slice(0, 25);
   return { status: "completed", emails, people, evidence: pages.map((page) => ({ label: "Public company website", url: page.url, observedAt: new Date() })) };
 }

@@ -145,6 +145,14 @@
 .published-email-note { background: #fff3d9; border-radius: 7px; color: #76551d; font-size: .7rem; margin-top: .5rem; padding: .5rem; }
 .intent-signal-actions { align-self: stretch; display: flex; flex-direction: column; gap: .45rem; justify-content: center; }
 .intent-signal-actions > small { color: var(--text-muted); font-size: .68rem; line-height: 1.4; }
+.identity-research-result { background: #edf5f1; border-left: 3px solid #28765f; border-radius: 8px; display: grid; gap: .3rem; padding: .65rem; }
+.identity-research-result.is-no_person_found { background: #f7f1e4; border-left-color: #b47b24; }
+.identity-research-result.is-error, .identity-research-result.is-source_unavailable { background: #f8eae6; border-left-color: #a84e39; }
+.identity-research-result > strong { font-size: .76rem; }
+.identity-research-result > span { color: #596963; font-size: .7rem; line-height: 1.4; }
+.identity-research-result > div { display: grid; gap: .35rem; }
+.identity-research-result button { background: #fff; border: 1px solid #cbd9d3; border-radius: 7px; color: #173e34; cursor: pointer; display: grid; font: inherit; font-size: .7rem; padding: .45rem; text-align: left; }
+.identity-research-result button small { color: #65736e; }
 .activity-help { color: var(--text-muted); font-size: .76rem; margin: .5rem 0 0; }
 .crm-review-explainer { background: #edf5f1; border-radius: 9px; color: #52645d; font-size: .78rem; line-height: 1.5; margin: 0 0 1rem; padding: .75rem .9rem; }
 .crm-review-explainer strong { color: #174c3e; }

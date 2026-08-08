@@ -337,6 +337,9 @@ export const fetchIntentSignals = (params = {}) =>
 export const updateIntentSignal = (signalId, status) =>
   api.patch(`/audience/research/signals/${signalId}`, { status }).then((res) => res.data);
 
+export const researchIntentSignalIdentity = (signalId, payload = {}) =>
+  api.post(`/audience/research/signals/${signalId}/identity-research`, payload).then((res) => res.data);
+
 export const convertIntentSignal = (signalId, payload = {}) =>
   api.post(`/audience/research/signals/${signalId}/convert`, payload).then((res) => res.data);
 

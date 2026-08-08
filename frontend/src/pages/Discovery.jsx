@@ -30,6 +30,7 @@ import {
   runResearchMonitor,
   updateResearchMonitor,
   updateIntentSignal,
+  researchIntentSignalIdentity,
   convertIntentSignal,
   generateIntentEmailDraft,
   updateIntentEmailDraft,
@@ -103,6 +104,15 @@ const monitorGoal = (type) => type === "investor_profile" ? "qualified investor 
 const monitorAudienceLabel = (type) => type === "investor_profile" ? "Describe the professional or investor you want" : type === "community_partner" ? "Describe the community partner you want" : "Describe the adult ticket buyer you want";
 const monitorKeywordLabel = (type) => type === "investor_profile" ? "Professional titles and investor phrases" : type === "community_partner" ? "Community and leadership phrases" : "Buying-intent phrases";
 
+function IdentityResearchResult({ result, busy, onSelect }) {
+  if (!result) return null;
+  return <div className={`identity-research-result is-${result.status || "complete"}`} role="status">
+    <strong>{result.status === "person_found" ? "Public contact found" : result.status === "choose_person" ? "Choose the correct public contact" : ["error", "source_unavailable"].includes(result.status) ? "Public page could not be checked" : "No public contact listed"}</strong>
+    <span>{result.message}</span>
+    {result.status === "choose_person" ? <div>{(result.people || []).map((person) => <button type="button" key={`${person.name}-${person.evidenceUrl}`} disabled={busy} onClick={() => onSelect(person)}><b>{person.name}</b>{person.title ? ` · ${person.title}` : ""}<small>Use this evidence-backed person</small></button>)}</div> : null}
+  </div>;
+}
+
 const examples = [
   "Find multifamily property managers in Florida and Texas with 10–100 employees",
   "Find independent event venues in Sacramento that serve business groups",
@@ -166,6 +176,7 @@ export default function Discovery() {
   const [monitorSaving, setMonitorSaving] = useState(false);
   const [monitorRunningId, setMonitorRunningId] = useState("");
   const [signalBusyId, setSignalBusyId] = useState("");
+  const [identityResults, setIdentityResults] = useState({});
   const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "company");
   const [monitorPresets, setMonitorPresets] = useState([]);
   const [monitorActivity, setMonitorActivity] = useState([]);
@@ -400,7 +411,7 @@ export default function Discovery() {
       if (status === "qualified") {
         setLeadView("qualified");
         if (identifiedPersonName(signal)) openEmailDraft({ ...signal, status: "qualified" });
-        else researchSignalIdentity({ ...signal, status: "qualified" });
+        else await researchSignalIdentity({ ...signal, status: "qualified" });
       }
     } finally { setSignalBusyId(""); }
   };
@@ -427,11 +438,18 @@ export default function Discovery() {
     setDraftCampaignId(String(existing?.campaignId || eligibleCampaigns[0]?._id || ""));
   };
 
-  const researchSignalIdentity = (signal) => {
-    const account = publicAccount(signal);
-    const prompt = `Research 1 prospect for the Deal to Close Bootcamp. Start with this exact public account ${account.label} and post: ${signal.sourceUrl}. Determine whether public evidence supports the real adult person's name, business or company, and role. Find a visibly published business email or official public contact page only when evidence supports the same identity. Do not guess, infer identity from the username, or mark an email verified. If identity cannot be established, say so clearly and recommend only the public platform contact options.`;
-    const params = new URLSearchParams({ prompt, autostart: "1", task: "intent-identity", sourceUrl: signal.sourceUrl || account.url || "", leadLabel: account.label, returnTo: `/discovery?tab=leads&signalId=${signal._id}` });
-    navigate(`/jarvis?${params.toString()}`);
+  const researchSignalIdentity = async (signal, selectedPerson = null) => {
+    try {
+      setSignalBusyId(signal._id);
+      const result = await researchIntentSignalIdentity(signal._id, selectedPerson ? { selectedPerson } : {});
+      setIdentityResults((current) => ({ ...current, [signal._id]: result }));
+      setNotice(result.message || "Public identity research finished.");
+      await loadAutomaticResearch();
+    } catch (error) {
+      const message = error.response?.data?.error || "Unable to research this public source.";
+      setIdentityResults((current) => ({ ...current, [signal._id]: { status: "error", message } }));
+      setNotice(message);
+    } finally { setSignalBusyId(""); }
   };
 
   const openRedditDrafts = (signal) => {
@@ -730,11 +748,11 @@ export default function Discovery() {
     {activeTab === "leads" ? <><section className="lead-review-hero"><div><span>Your decision queue</span><h2>Potential buyers and community opportunities</h2><p>Some results identify a real person; others identify a relevant community or organization. Growth Operator must find a named contact before preparing person-level outreach.</p></div><div className="lead-review-stats"><div><strong>{intentSignals.filter((signal) => signal.status === "new").length}</strong><span>need a decision</span></div><div><strong>{intentSignals.filter((signal) => signal.status === "qualified").length}</strong><span>worth following up</span></div><div><strong>{intentSignals.filter((signal) => signal.publishedEmails?.length).length}</strong><span>with a published email</span></div></div></section>
     <section className="lead-workflow"><div><strong>1. Read the need</strong><span>Confirm this is a real current problem—not advice, promotion, or general content.</span></div><div><strong>2. Open the evidence</strong><span>The source account is only a public username; it is not a verified real identity.</span></div><div><strong>3. Save or reject</strong><span>Saving keeps it for later CRM research. It does not contact or import anyone.</span></div></section>
     <DashboardCard title="Buyer-intent review" action={<div className="lead-view-tabs"><button type="button" className={leadView === "new" ? "is-active" : ""} onClick={() => setLeadView("new")}>Needs a decision</button><button type="button" className={leadView === "qualified" ? "is-active" : ""} onClick={() => setLeadView("qualified")}>Saved possible leads</button><button type="button" className={leadView === "all" ? "is-active" : ""} onClick={() => setLeadView("all")}>All active</button></div>}>
-      {visibleSignals.length ? <div className="intent-signal-list">{visibleSignals.map((signal) => { const account = publicAccount(signal); const hasIdentifiedPerson = Boolean(identifiedPersonName(signal)); return <article key={signal._id} className={`is-${signal.status}`}>
+      {visibleSignals.length ? <div className="intent-signal-list">{visibleSignals.map((signal) => { const account = publicAccount(signal); const hasIdentifiedPerson = Boolean(identifiedPersonName(signal)); const identityResult = identityResults[signal._id]; return <article key={signal._id} className={`is-${signal.status}`}>
         <div className="signal-priority"><span>Priority</span><strong>{signal.score >= 75 ? "High" : signal.score >= 55 ? "Medium" : "Review"}</strong><small>{signal.score}/100 match</small></div>
         <div className="intent-signal-main"><div><span>{signal.source.replaceAll("_", " ")}</span><small>{signal.publishedAt ? new Date(signal.publishedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "New"}</small></div><h3>{displayText(signal.title) || "Public buyer-intent signal"}</h3><p>{displayText(signal.excerpt) || "Open the original source to review the context."}</p><div className="signal-why"><strong>Why it scored {signal.score}/100</strong><span>{(signal.scoreReasons || []).slice(0, 3).join(" · ") || "A specific current need matched your audience rules."}</span></div><a href={signal.sourceUrl} target="_blank" rel="noreferrer">View original public post ↗</a></div>
         <aside className="signal-contact"><span>{hasIdentifiedPerson ? "Identified person" : "Contact person"}</span>{account.url ? <a href={account.url} target="_blank" rel="noreferrer">{account.label} ↗</a> : <strong>{account.label}</strong>}<small>{hasIdentifiedPerson ? "A public source displays this name. Review the evidence before adding the person to CRM." : "This result is a community or organization. Growth Operator must identify a real contact person before drafting email."}</small>{signal.organizationName || signal.organizationDomain ? <><span>Organization</span><strong>{signal.identityResolution?.status === "supported" ? (signal.organizationName || signal.organizationDomain) : "Not established"}</strong></> : null}{signal.publishedEmails?.length ? <div className="published-email-note">Published email found · still unverified</div> : null}</aside>
-        <div className="intent-signal-actions">{["qualified", "converted"].includes(signal.status) ? <><div className="intent-next-step"><span>Next step</span><strong>{!hasIdentifiedPerson ? "Find a real contact person and email" : !signal.emailDrafts?.length ? "Create the Deal to Close email" : !signal.crmContact ? "Add the identified person to CRM" : signal.crmContact.emailStatus !== "verified" ? "Confirm the contact email" : "Review and move the draft to Outreach"}</strong><small>Nothing is sent automatically.</small></div><div className="intent-action-row">{hasIdentifiedPerson ? <Button size="sm" onClick={() => openEmailDraft(signal)}>{signal.emailDrafts?.length ? "Review generated email" : "Generate Deal to Close email"}</Button> : <Button size="sm" onClick={() => researchSignalIdentity(signal)}>Find contact person & email</Button>}{/reddit/i.test(signal.source || "") ? <Button size="sm" variant="outline" onClick={() => openRedditDrafts(signal)}>Create Reddit reply & DM</Button> : null}{hasIdentifiedPerson ? <Button size="sm" variant="outline" onClick={() => researchSignalIdentity(signal)}>Research identity & email</Button> : null}{signal.status === "converted" ? <Button size="sm" variant="outline" onClick={() => navigate(`/contacts?tab=attention&search=${encodeURIComponent(signal.crmContact?.name || "Identity research needed")}`)}>Open contact next steps</Button> : hasIdentifiedPerson ? <Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => addSignalToCrm(signal)}>Add identified person to CRM</Button> : null}</div><ol className="intent-progress"><li className="is-done">Opportunity approved</li><li className={hasIdentifiedPerson ? "is-done" : ""}>Person identified</li><li className={signal.crmContact ? "is-done" : ""}>CRM contact added</li><li className={signal.crmContact?.emailStatus === "verified" ? "is-done" : ""}>Email confirmed</li><li className={signal.emailDrafts?.some((draft) => draft.status === "transferred") ? "is-done" : ""}>Ready in Outreach</li></ol><small>{hasIdentifiedPerson ? "The identified person still requires CRM and email review before Outreach." : "Growth Operator will research the organization’s public leadership and contact information. Do not guess a name."}</small></> : <><Button size="sm" disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>{hasIdentifiedPerson ? "Yes—prepare follow-up" : "Yes—find the contact person"}</Button><small>{hasIdentifiedPerson ? "Saves the lead and opens an unsent email draft." : "Saves the opportunity and starts public research for a real named contact. No email is drafted yet."}</small></>}<Button size="sm" variant="outline" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => reviewSignal(signal, "dismissed")}>Not a fit</Button></div>
+        <div className="intent-signal-actions">{["qualified", "converted"].includes(signal.status) ? <><div className="intent-next-step"><span>Next step</span><strong>{!hasIdentifiedPerson ? "Find a real contact person and email" : !signal.emailDrafts?.length ? "Create the Deal to Close email" : !signal.crmContact ? "Add the identified person to CRM" : signal.crmContact.emailStatus !== "verified" ? "Confirm the contact email" : "Review and move the draft to Outreach"}</strong><small>Nothing is sent automatically.</small></div><div className="intent-action-row">{hasIdentifiedPerson ? <Button size="sm" onClick={() => openEmailDraft(signal)}>{signal.emailDrafts?.length ? "Review generated email" : "Generate Deal to Close email"}</Button> : <Button size="sm" loading={signalBusyId === signal._id} onClick={() => researchSignalIdentity(signal)}>Find contact person & email</Button>}{/reddit/i.test(signal.source || "") ? <Button size="sm" variant="outline" onClick={() => openRedditDrafts(signal)}>Create Reddit reply & DM</Button> : null}{hasIdentifiedPerson ? <Button size="sm" variant="outline" loading={signalBusyId === signal._id} onClick={() => researchSignalIdentity(signal)}>Research identity & email</Button> : null}{signal.status === "converted" ? <Button size="sm" variant="outline" onClick={() => navigate(`/contacts?tab=attention&search=${encodeURIComponent(signal.crmContact?.name || "Identity research needed")}`)}>Open contact next steps</Button> : hasIdentifiedPerson ? <Button size="sm" variant="outline" disabled={signalBusyId === signal._id} onClick={() => addSignalToCrm(signal)}>Add identified person to CRM</Button> : null}</div><IdentityResearchResult result={identityResult} busy={signalBusyId === signal._id} onSelect={(person) => researchSignalIdentity(signal, person)} /><ol className="intent-progress"><li className="is-done">Opportunity approved</li><li className={hasIdentifiedPerson ? "is-done" : ""}>Person identified</li><li className={signal.crmContact ? "is-done" : ""}>CRM contact added</li><li className={signal.crmContact?.emailStatus === "verified" ? "is-done" : ""}>Email confirmed</li><li className={signal.emailDrafts?.some((draft) => draft.status === "transferred") ? "is-done" : ""}>Ready in Outreach</li></ol><small>{hasIdentifiedPerson ? "The identified person still requires CRM and email review before Outreach." : "Growth Operator checks the public page directly without OpenAI credits. If no person is published, keep this as a community opportunity."}</small></> : <><Button size="sm" loading={signalBusyId === signal._id} disabled={signalBusyId === signal._id} onClick={() => reviewSignal(signal, "qualified")}>{hasIdentifiedPerson ? "Yes—prepare follow-up" : "Yes—find the contact person"}</Button><small>{hasIdentifiedPerson ? "Saves the lead and opens an unsent email draft." : "Saves the opportunity and checks its public pages for a named contact. No email is drafted yet."}</small></>}<Button size="sm" variant="outline" disabled={signalBusyId === signal._id || signal.status === "converted"} onClick={() => reviewSignal(signal, "dismissed")}>Not a fit</Button></div>
       </article>; })}</div> : <div className="friendly-empty"><strong>{leadView === "new" ? "You’re caught up" : "No leads in this view"}</strong><p>{leadView === "new" ? "Growth Operator will place the next plausible adult buyer here after the automatic filters run." : "Change the view above or wait for the next monitoring check."}</p></div>}
     </DashboardCard></> : null}
 

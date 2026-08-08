@@ -25,6 +25,7 @@ const { runMarketResearchJob } = require("../services/externalMarketResearchServ
 const { requestResearchMonitorRun, runResearchMonitor, scoreSignal, signalEligibility } = require("../services/researchMonitorService");
 const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEmailDraftService");
 const { researchAudienceForSignal } = require("../services/researchAudienceTemplates");
+const { researchPublicWebsite } = require("../services/publicWebsiteResearchService");
 
 const AUGUST_22_PRESET = {
   id: "august-22-nationwide-online-event",
@@ -229,6 +230,91 @@ router.patch("/research/signals/:signalId", async (req, res) => {
   if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
   if (status === "qualified") await InAppNotification.create({ workspaceId: req.auth.workspaceId, userId: req.auth.user?._id || null, monitorId: signal.monitorId, signalId: signal._id, type: "qualified_lead", title: "Qualified lead ready for review", message: `${signal.title || "A public lead"} was qualified. CRM import still requires individual approval.` });
   return res.json({ success: true, signal });
+});
+
+function supportedPublicPerson(person) {
+  const name = String(person?.name || "").replace(/\s+/g, " ").trim();
+  return Boolean(name
+    && /^[\p{L}.'’ -]+$/u.test(name)
+    && name.split(/\s+/).length >= 2
+    && !/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club)\b/i.test(name));
+}
+
+router.post("/research/signals/:signalId/identity-research", async (req, res) => {
+  const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
+  if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
+
+  const selected = req.body?.selectedPerson;
+  if (selected) {
+    const match = (signal.people || []).find((person) => person.name === String(selected.name || "").trim()
+      && person.evidenceUrl === String(selected.evidenceUrl || "").trim()
+      && supportedPublicPerson(person));
+    if (!match) return res.status(400).json({ success: false, error: "Choose a person supported by the saved public evidence." });
+    signal.authorName = match.name;
+    signal.authorUrl = match.evidenceUrl;
+    signal.identityResolution = {
+      status: "supported",
+      reason: `${match.name}${match.title ? ` (${match.title})` : ""} is explicitly named on the cited public page.`,
+      evidenceUrls: [match.evidenceUrl],
+    };
+    await signal.save();
+    return res.json({ success: true, status: "person_found", signal, person: match, message: `${match.name} was attached from public evidence. Any published email remains unverified.` });
+  }
+
+  try {
+    const targets = [signal.sourceUrl];
+    if (signal.organizationDomain) targets.push(`https://${signal.organizationDomain}`);
+    const results = [];
+    for (const target of [...new Set(targets.filter((url) => /^https?:\/\//i.test(url)))].slice(0, 2)) {
+      try { results.push(await researchPublicWebsite(target)); } catch (_error) {}
+    }
+    const people = [...new Map(results.flatMap((result) => result.people || [])
+      .filter(supportedPublicPerson)
+      .map((person) => [`${person.name.toLowerCase()}|${person.evidenceUrl}`, person])).values()];
+    const publishedEmails = [...new Set([...(signal.publishedEmails || []), ...results.flatMap((result) => result.emails || [])])].slice(0, 20);
+    const evidence = [...new Map([...(signal.evidence || []).map((item) => item.toObject ? item.toObject() : item), ...results.flatMap((result) => result.evidence || [])]
+      .filter((item) => item?.url)
+      .map((item) => [item.url, item])).values()];
+
+    signal.people = people;
+    signal.publishedEmails = publishedEmails;
+    signal.evidence = evidence;
+    signal.websiteResearchStatus = results.some((result) => result.status === "completed") ? "completed" : results.some((result) => result.status === "blocked") ? "blocked" : "failed";
+
+    if (!results.some((result) => result.status === "completed")) {
+      signal.identityResolution = {
+        status: "unresolved",
+        reason: "The public source blocked automated reading or was unavailable. No identity was added.",
+        evidenceUrls: evidence.map((item) => item.url).slice(0, 10),
+      };
+      await signal.save();
+      return res.json({ success: true, status: "source_unavailable", signal, message: "This public page would not allow an automated contact check. No identity was added. Open the original source and use its public group-contact option." });
+    }
+
+    if (people.length === 1) {
+      const person = people[0];
+      signal.authorName = person.name;
+      signal.authorUrl = person.evidenceUrl;
+      signal.identityResolution = {
+        status: "supported",
+        reason: `${person.name}${person.title ? ` (${person.title})` : ""} is explicitly named on the cited public page.`,
+        evidenceUrls: [person.evidenceUrl],
+      };
+      await signal.save();
+      return res.json({ success: true, status: "person_found", signal, person, message: `${person.name} was found on a public page. Any published email remains unverified.` });
+    }
+
+    signal.identityResolution = {
+      status: "unresolved",
+      reason: people.length > 1 ? "Several people are named in the public evidence; select the correct contact." : "The checked public pages do not publish a named organizer or contact person.",
+      evidenceUrls: evidence.map((item) => item.url).slice(0, 10),
+    };
+    await signal.save();
+    if (people.length > 1) return res.json({ success: true, status: "choose_person", signal, people, message: "Several people are named publicly. Choose the correct contact below; Growth Operator will not guess." });
+    return res.json({ success: true, status: "no_person_found", signal, message: "No named organizer or contact person is published on this page. Keep it as a community opportunity or contact the group through the original platform." });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message || "Unable to research this public source." });
+  }
 });
 
 router.post("/research/signals/:signalId/convert", async (req, res) => {
