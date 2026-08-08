@@ -88,7 +88,7 @@ router.get("/research/sources", (_req, res) => {
       { id: "meetup_public", name: "Public Meetup real-estate groups", accountRequired: false },
       { id: "community_directories", name: "Public REIA and real-estate club directories", accountRequired: false },
       { id: "gdelt", name: "Worldwide news (GDELT)", accountRequired: false },
-      { id: "sec_form_d", name: "SEC EDGAR Form D filings", accountRequired: false },
+      { id: "sec_form_d", name: "SEC Form D related people", accountRequired: false },
       { id: "bluesky", name: "Public Bluesky posts", accountRequired: false },
       { id: "hacker_news", name: "Hacker News discussions", accountRequired: false },
       { id: "stack_exchange", name: "Stack Exchange questions", accountRequired: false },

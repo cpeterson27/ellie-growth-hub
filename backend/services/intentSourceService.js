@@ -319,15 +319,75 @@ async function searchGoogleWeb(monitor, limit) {
   })])).values()].filter(Boolean).slice(0, limit);
 }
 
+function xmlValue(xml, tagName) {
+  const escaped = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return decodeEntities(clean(String(xml || "").match(new RegExp(`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`, "i"))?.[1] || ""));
+}
+
+function xmlBlocks(xml, tagName) {
+  const escaped = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [...String(xml || "").matchAll(new RegExp(`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`, "gi"))].map((match) => match[1]);
+}
+
+function parseSecFormD(xml, filing = {}) {
+  const issuer = xmlValue(xml, "entityName");
+  const issuerAddress = xmlBlocks(xml, "issuerAddress")[0] || "";
+  const industry = xmlValue(xml, "industryGroupType");
+  const fundType = xmlValue(xml, "investmentFundType");
+  const totalOfferingAmount = xmlValue(xml, "totalOfferingAmount");
+  const totalAmountSold = xmlValue(xml, "totalAmountSold");
+  const filingUrl = filing.sourceUrl || "";
+  const filedAt = filing.publishedAt || null;
+  return xmlBlocks(xml, "relatedPersonInfo").flatMap((block, index) => {
+    const nameBlock = xmlBlocks(block, "relatedPersonName")[0] || "";
+    const firstName = xmlValue(nameBlock, "firstName");
+    const middleName = xmlValue(nameBlock, "middleName");
+    const lastName = xmlValue(nameBlock, "lastName");
+    if (!firstName || /^n\/?a$/i.test(firstName) || /\b(?:llc|l\.l\.c\.|lp|l\.p\.|inc\.?|corp\.?|company|fund|partners?)\b/i.test(lastName)) return [];
+    const name = [firstName, middleName, lastName].filter((part) => part && !/^n\/?a$/i.test(part)).join(" ").trim();
+    if (!name || !/\s/.test(name)) return [];
+    const addressBlock = xmlBlocks(block, "relatedPersonAddress")[0] || "";
+    const relationships = xmlBlocks(block, "relationship").map((value) => clean(value)).filter(Boolean);
+    const clarification = xmlValue(block, "relationshipClarification");
+    const city = xmlValue(addressBlock, "city") || xmlValue(issuerAddress, "city");
+    const state = xmlValue(addressBlock, "stateOrCountry") || xmlValue(issuerAddress, "stateOrCountry");
+    const postalCode = xmlValue(addressBlock, "zipCode") || xmlValue(issuerAddress, "zipCode");
+    const role = [...relationships, clarification].filter(Boolean).join(" · ") || "Related person";
+    const offering = [industry, fundType, totalOfferingAmount && `Offering: ${totalOfferingAmount}`, totalAmountSold && `Sold: ${totalAmountSold}`].filter(Boolean).join(" · ");
+    return [normalizeSignal("sec_form_d", {
+      sourceId: `${filing.sourceId || hashId(filingUrl)}:${index}:${name}`,
+      sourceUrl: filingUrl,
+      title: `${name} — ${role} at ${issuer || "Form D issuer"}`,
+      excerpt: [offering, [city, state, postalCode].filter(Boolean).join(", "), "Named in the filing's Related Persons section."].filter(Boolean).join(" · "),
+      authorName: name,
+      organizationName: issuer,
+      publishedAt: filedAt,
+      evidenceLabel: "SEC Form D related person",
+      raw: { filingType: filing.filingType || "D", role, city, state, postalCode, industry, fundType, totalOfferingAmount, totalAmountSold },
+    })].filter(Boolean);
+  });
+}
+
 async function searchSecFormD(monitor, limit) {
   const url = "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=D&company=&dateb=&owner=include&start=0&count=100&output=atom";
-  const signals = await fetchFeed(url, "sec_form_d", "SEC EDGAR Form D filing", 100);
-  const terms = termsFor(monitor, 12).map((term) => term.toLowerCase());
-  const filtered = signals.filter((signal) => {
-    const text = `${signal.title} ${signal.excerpt}`.toLowerCase();
-    return !terms.length || terms.some((term) => text.includes(term));
-  });
-  return filtered.slice(0, limit);
+  const filings = (await fetchFeed(url, "sec_form_d", "SEC EDGAR Form D filing", 100))
+    .filter((filing) => /^D(?:\/A)?\s+-/i.test(filing.title))
+    .map((filing) => ({ ...filing, filingType: filing.title.match(/^(D(?:\/A)?)/i)?.[1] || "D" }))
+    .slice(0, Math.min(40, Math.max(limit, 10)));
+  const people = [];
+  for (let offset = 0; offset < filings.length && people.length < limit; offset += 5) {
+    const batch = filings.slice(offset, offset + 5);
+    const responses = await Promise.allSettled(batch.map(async (filing) => {
+      const parsed = new URL(filing.sourceUrl);
+      const path = parsed.pathname.replace(/\/[^/]+-index\.htm$/i, "/primary_doc.xml");
+      const response = await axios.get(`https://www.sec.gov${path}`, { timeout: REQUEST_TIMEOUT, responseType: "text", maxContentLength: 1024 * 1024, headers: { Accept: "application/xml,text/xml", "User-Agent": USER_AGENT } });
+      return parseSecFormD(response.data, filing);
+    }));
+    people.push(...responses.flatMap((response) => response.status === "fulfilled" ? response.value : []));
+    if (offset + 5 < filings.length && people.length < limit) await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  const relevant = people.filter((signal) => /real estate|commercial|multifamily|apartment|property|pooled investment fund|private equity fund|venture capital fund|hedge fund|investment fund/i.test(`${signal.organizationName} ${signal.excerpt}`));
+  return (relevant.length ? relevant : people).slice(0, limit);
 }
 
 const DISCUSSION_PATH = /\/(?:topics?|threads?|discussions?|posts?)\//i;
@@ -544,4 +604,4 @@ async function collectMonitorSignals(monitor) {
   };
 }
 
-module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, extractXmlItems, isCommunityPartnerMonitor, isInvestorProfileMonitor, normalizeSignal, queryFor, searchMeetupPublic, termsFor };
+module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, extractXmlItems, isCommunityPartnerMonitor, isInvestorProfileMonitor, normalizeSignal, parseSecFormD, queryFor, searchMeetupPublic, termsFor };
