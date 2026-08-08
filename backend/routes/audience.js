@@ -262,11 +262,20 @@ function campaignRegistrationLinks(campaign) {
   };
 }
 
+function identifiedSignalPersonName(signal) {
+  const name = String(signal.authorName || "").replace(/\s+/g, " ").trim();
+  if (!name || /^(?:account not available|no person identified|unknown|anonymous|\/?u\/|@|https?:\/\/)/i.test(name)) return "";
+  if (!/^[\p{L}.'’ -]+$/u.test(name) || name.split(/\s+/).length < 2) return "";
+  if (/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club)\b/i.test(name)) return "";
+  return name;
+}
+
 router.post("/research/signals/:signalId/email-drafts", async (req, res) => {
   try {
     const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
     if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
     if (!['qualified', 'converted'].includes(signal.status)) return res.status(400).json({ success: false, error: "Save this as a possible lead before creating an email draft." });
+    if (!identifiedSignalPersonName(signal)) return res.status(400).json({ success: false, error: "This result identifies a community or organization, not a person. Use Find contact person & email before creating a person-level email draft." });
     const campaign = await Campaign.findById(req.body?.campaignId).populate("eventId");
     if (!campaign) return res.status(404).json({ success: false, error: "Choose a valid event campaign." });
     const monitor = await ResearchMonitor.findById(signal.monitorId).lean();
