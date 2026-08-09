@@ -35,7 +35,7 @@ import {
   prepareJarvisContactFieldUpdate,
   confirmJarvisContactFieldUpdate,
 } from "../services/api.js";
-import { useInitiative } from "../context/InitiativeContext.jsx";
+import useInitiative from "../context/useInitiative.js";
 
 const recognizedImportHeaders = [
   "Name",
@@ -267,6 +267,7 @@ const manualContactDefaults = {
   confirmEmailManually: false,
   canReceiveCampaignEmail: false,
 };
+const createImportBatchId = () => `csv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const CRM_PIPELINE_STAGES = [
   "New lead",
@@ -481,7 +482,6 @@ export default function Contacts() {
   const [contacts, setContacts] = useState([]);
   const [contactOverview, setContactOverview] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const [campaigns, setCampaigns] = useState([]);
   const [campaignId, setCampaignId] = useState(() =>
@@ -497,7 +497,7 @@ export default function Contacts() {
   const [importRows, setImportRows] = useState([]);
   const [importHeaders, setImportHeaders] = useState([]);
   const [importFileName, setImportFileName] = useState("");
-  const [importPasteText, setImportPasteText] = useState("");
+  const [, setImportPasteText] = useState("");
   const [importSource, setImportSource] = useState("csv");
   const [importWorkspaceMode, setImportWorkspaceMode] = useState("import");
   const [importCampaignId, setImportCampaignId] = useState("");
@@ -548,17 +548,23 @@ export default function Contacts() {
   const cardVideoRef = useRef(null);
   const cardStreamRef = useRef(null);
   const cardFrameRef = useRef(null);
+  const cardDeepLinkHandled = useRef(false);
+  const loadContactsRef = useRef(null);
   const pageSize = 15;
 
   useEffect(() => {
-    if (searchParams.get("scan") !== "business-card") return;
-    setCardDraft(manualContactDefaults);
-    setCardRaw("");
-    setCardStatus("");
-    setCardDuplicate(null);
-    setCardCampaignId(campaignId || "");
-    setCardCaptureOpen(true);
-  }, []);
+    if (cardDeepLinkHandled.current || searchParams.get("scan") !== "business-card") return;
+    cardDeepLinkHandled.current = true;
+    const openScanner = window.setTimeout(() => {
+      setCardDraft(manualContactDefaults);
+      setCardRaw("");
+      setCardStatus("");
+      setCardDuplicate(null);
+      setCardCampaignId(campaignId || "");
+      setCardCaptureOpen(true);
+    }, 0);
+    return () => window.clearTimeout(openScanner);
+  }, [campaignId, searchParams]);
   const importCampaignTargetId = String(
     importSummary?.campaignId ||
       campaigns.find(
@@ -903,9 +909,11 @@ export default function Contacts() {
       setLoading(false);
     }
   }
+  useEffect(() => { loadContactsRef.current = loadContacts; });
 
   useEffect(() => {
-    loadContacts();
+    const refreshContacts = window.setTimeout(() => loadContactsRef.current?.(), 0);
+    return () => window.clearTimeout(refreshContacts);
   }, [contactTab, campaignId, searchTerm, searchParams]);
 
   useEffect(() => {
@@ -939,7 +947,8 @@ export default function Contacts() {
   }
 
   useEffect(() => {
-    setCurrentPage(1);
+    const resetPage = window.setTimeout(() => setCurrentPage(1), 0);
+    return () => window.clearTimeout(resetPage);
   }, [contactTab, campaignId, searchTerm]);
 
   useEffect(() => {
@@ -951,15 +960,18 @@ export default function Contacts() {
   }, []);
 
   useEffect(() => {
-    setCampaignId(
-      searchParams.get("allCampaigns") === "true"
-        ? ""
-        : searchParams.get("campaignId") ||
-            (initiativeId === "all" ? "" : initiativeId),
-    );
-    if (searchParams.get("tab")) setContactTab(searchParams.get("tab"));
-    if (searchParams.get("search") !== null)
-      setSearchTerm(searchParams.get("search") || "");
+    const applyUrlState = window.setTimeout(() => {
+      setCampaignId(
+        searchParams.get("allCampaigns") === "true"
+          ? ""
+          : searchParams.get("campaignId") ||
+              (initiativeId === "all" ? "" : initiativeId),
+      );
+      if (searchParams.get("tab")) setContactTab(searchParams.get("tab"));
+      if (searchParams.get("search") !== null)
+        setSearchTerm(searchParams.get("search") || "");
+    }, 0);
+    return () => window.clearTimeout(applyUrlState);
   }, [initiativeId, searchParams]);
 
   function openCsvImport() {
@@ -1106,7 +1118,7 @@ export default function Contacts() {
       skipEmptyLines: "greedy",
       delimiter: String(text || "").includes("\t") ? "\t" : "",
       transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(),
-      complete: async ({ data, meta, errors }) => {
+      complete: async ({ data, errors }) => {
         const normalizedData = normalizeContactRows(data);
         const normalizedHeaders = [
           ...new Set(normalizedData.flatMap((row) => Object.keys(row))),
@@ -1361,7 +1373,7 @@ export default function Contacts() {
       };
     });
     const batch = {
-      id: `csv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: createImportBatchId(),
       fileName: importFileName || "Pasted CSV",
     };
     const saved = await saveIngestion(
@@ -2361,152 +2373,6 @@ export default function Contacts() {
           </div>
         )}
       </DashboardCard>
-
-      {false ? (
-        <DashboardCard title="Find Leads">
-          <div className="lead-search-retired">
-            <p>
-              Direct provider search has been retired. Use Growth Operator Market
-              Intelligence or import a completed CSV here.
-            </p>
-            <p>
-              <small>
-                Growth Operator now uses its own research and review workflow.
-              </small>
-            </p>
-            <Button onClick={openCsvImport}>Import contact CSV</Button>
-            <Button variant="outline" onClick={() => navigate("/marketing")}>
-              Open Organization Discovery
-            </Button>
-            <small>
-              Native lead research is available from Discovery.
-            </small>
-          </div>
-          <div style={{ display: "none" }}>
-            <select
-              value={campaignId}
-              onChange={(event) => setCampaignId(event.target.value)}
-              className="select-input"
-            >
-              <option value="">Select campaign</option>
-              {campaigns.map((campaign) => (
-                <option key={campaign._id} value={campaign._id}>
-                  {campaign.name}
-                </option>
-              ))}
-            </select>
-            {[
-              ["title", "Job title"],
-              ["location", "Location"],
-              ["industry", "Industry"],
-              ["employeeSize", "Company employee size"],
-            ].map(([key, label]) => (
-              <input
-                key={key}
-                className="select-input"
-                placeholder={label}
-                value={filters[key]}
-                onChange={(event) =>
-                  setFilters({ ...filters, [key]: event.target.value })
-                }
-              />
-            ))}
-            <Button loading={false} onClick={() => navigate("/discovery")}>
-              Search Leads
-            </Button>
-          </div>
-          {false ? <p /> : null}
-          {false ? (
-            <>
-              <p>0 selected</p>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setSelectedLeads(
-                    [],
-                  )
-                }
-              >
-                Select all / Clear all
-              </Button>
-              <div style={{ overflowX: "auto", marginTop: "1rem" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Select</th>
-                      <th>Name</th>
-                      <th>Role</th>
-                      <th>Company</th>
-                      <th>Email</th>
-                      <th>Location</th>
-                      <th>LinkedIn</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[].map((lead) => {
-                      const id =
-                        lead.providerContactId || lead.email || lead.linkedinUrl;
-                      const selected = false;
-                      return (
-                        <tr key={id}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => {}}
-                            />
-                          </td>
-                          <td>{lead.name}</td>
-                          <td>{lead.title}</td>
-                          <td>{lead.company}</td>
-                          <td>{lead.email || "Unavailable"}</td>
-                          <td>{lead.location}</td>
-                          <td>
-                            {lead.linkedinUrl ? (
-                              <a
-                                href={lead.linkedinUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Open
-                              </a>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <Button
-                variant="primary"
-                disabled
-                onClick={() => {
-                  if (!campaignId)
-                    return setError(
-                      "Select a campaign before importing selected leads.",
-                    );
-                  navigate("/discovery");
-                }}
-              >
-                Import to Growth Operator
-                {campaignId ? " and Add to Selected Campaign" : ""}
-              </Button>
-            </>
-          ) : (
-            <p>Use Discovery to research and review leads.</p>
-          )}
-          {importSummary ? (
-            <p>
-              MongoDB: {importSummary.mongoCreated} created,{" "}
-              {importSummary.mongoUpdated} updated, {importSummary.failed || 0}{" "}
-              failed.
-            </p>
-          ) : null}
-        </DashboardCard>
-      ) : null}
 
       <Modal
         isOpen={isCardCaptureOpen}

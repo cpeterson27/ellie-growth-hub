@@ -28,7 +28,10 @@ export default function Marketing() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { loadFeed(); }, []);
+  useEffect(() => {
+    const initialLoad = window.setTimeout(loadFeed, 0);
+    return () => window.clearTimeout(initialLoad);
+  }, []);
 
   const savePost = () => {
     if (!draft.copy.trim()) { setError("Write the post before saving a draft."); return; }

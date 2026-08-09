@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiArrowUpRight, FiBriefcase, FiCpu, FiImage, FiLock, FiMail, FiShield, FiTrash2, FiUser, FiUsers } from "react-icons/fi";
 import Button from "../components/Button.jsx";
-import { useAuth } from "../context/AuthContext.jsx";
+import useAuth from "../context/useAuth.js";
 import { changePassword, createMcpAccessToken, createWorkspaceMember, fetchCampaigns, fetchGmailConnection, fetchMcpAccessTokens, fetchOAuthConnections, fetchWorkspaceConfig, fetchWorkspaceMembers, getGptActionsSchemaEndpoint, getMcpEndpoint, revokeMcpAccessToken, revokeOAuthConnection, updateWorkspaceConfig, uploadEventImage } from "../services/api.js";
 import { getWorkspaceSettings, saveWorkspaceSettings } from "../utils/workspaceSettings.js";
 import "./Settings.css";

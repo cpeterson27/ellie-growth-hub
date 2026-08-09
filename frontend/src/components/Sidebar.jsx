@@ -14,7 +14,7 @@ import {
   FiCheckCircle,
   FiLogOut,
 } from "react-icons/fi";
-import { useAuth } from "../context/AuthContext.jsx";
+import useAuth from "../context/useAuth.js";
 import "./Sidebar.css";
 
 const navItems = [

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { FiArrowRight, FiCheck, FiLayers, FiLock, FiMail, FiSearch, FiStar, FiUsers, FiZap } from "react-icons/fi";
-import { useAuth } from "../context/AuthContext.jsx";
+import useAuth from "../context/useAuth.js";
 import "./Landing.css";
 
 const features = [

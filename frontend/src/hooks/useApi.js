@@ -29,8 +29,8 @@ export function useOutreach(campaignId) {
 
   useEffect(() => {
     if (!campaignId) {
-      setLoading(false);
-      return;
+      const resetLoading = window.setTimeout(() => { setOutreach([]); setLoading(false); }, 0);
+      return () => window.clearTimeout(resetLoading);
     }
     let active = true;
     fetchOutreach(campaignId)

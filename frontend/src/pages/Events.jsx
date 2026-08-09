@@ -210,6 +210,7 @@ export default function Events() {
       : "",
   );
   const deepLinkHandled = useRef(false);
+  const openManageRef = useRef(null);
 
   const campaignsByEvent = useMemo(
     () =>
@@ -437,6 +438,7 @@ export default function Events() {
       setWorkingId("");
     }
   };
+  useEffect(() => { openManageRef.current = openManage; });
 
   useEffect(() => {
     if (deepLinkHandled.current || !events.length) return;
@@ -446,10 +448,11 @@ export default function Events() {
     const event = events.find((item) => String(item._id) === String(eventId));
     if (!event) return;
     deepLinkHandled.current = true;
-    openManage(event).then(() => {
+    const openDeepLink = window.setTimeout(() => Promise.resolve(openManageRef.current?.(event)).then(() => {
       setManageTab(params.get("tab") === "strategy" ? "strategy" : "listing");
       window.history.replaceState({}, "", window.location.pathname);
-    });
+    }), 0);
+    return () => window.clearTimeout(openDeepLink);
   }, [events]);
 
   const saveEvent = async (confirmed = false) => {

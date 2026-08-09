@@ -35,7 +35,8 @@ async function runFrontendTests() {
 
     // Test 4: Messages display
     if (
-      !component.includes("messages.map") ||
+      !component.includes("messages.filter") ||
+      !component.includes(".map((msg)") ||
       !component.includes("jarvis-message")
     ) {
       throw new Error("Message display not found");
@@ -51,10 +52,12 @@ async function runFrontendTests() {
     }
     console.log("✓ Test 5: Available actions display as buttons");
 
+    const api = readFileSync("./src/services/api.js", "utf8");
+
     // Test 6: Create campaign action
     if (
       !component.includes("create_campaign") ||
-      !component.includes("/jarvis/actions/recommend-campaign")
+      !api.includes("/jarvis/actions/recommend-campaign")
     ) {
       throw new Error("Create campaign action not found");
     }
@@ -63,7 +66,7 @@ async function runFrontendTests() {
     // Test 7: Prepare recipients action
     if (
       !component.includes("prepare_recipients") ||
-      !component.includes("/jarvis/actions/prepare-recipients")
+      !api.includes("/jarvis/actions/prepare-recipients")
     ) {
       throw new Error("Prepare recipients action not found");
     }
@@ -72,7 +75,7 @@ async function runFrontendTests() {
     // Test 8: Send test email action
     if (
       !component.includes("send_test_email") ||
-      !component.includes("/jarvis/actions/send-test-email")
+      !api.includes("/jarvis/actions/send-test-email")
     ) {
       throw new Error("Send test email action not found");
     }
@@ -89,7 +92,6 @@ async function runFrontendTests() {
     console.log("✓ Test 9: useJarvis hook manages state");
 
     // Test 10: API service configured
-    const api = readFileSync("./src/services/api.js", "utf8");
     if (
       !api.includes("jarvisChat") ||
       !api.includes("jarvisRecommendCampaign") ||

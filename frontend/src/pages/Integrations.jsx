@@ -85,7 +85,10 @@ export default function Integrations() {
     await loadProviders();
   };
 
-  useEffect(() => { loadProviders(); }, []);
+  useEffect(() => {
+    const initialLoad = window.setTimeout(loadProviders, 0);
+    return () => window.clearTimeout(initialLoad);
+  }, []);
 
   const latestEventbriteSync = events
     .map((event) => event.eventbriteLogistics?.lastSyncedAt)

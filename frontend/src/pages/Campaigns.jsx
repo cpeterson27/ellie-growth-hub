@@ -6,7 +6,7 @@ import Modal from "../components/Modal.jsx";
 import CampaignModal from "../components/CampaignModal.jsx";
 import { createCampaign, deleteCampaign, fetchCampaignDeletionPreview, fetchCampaigns } from "../services/api.js";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
-import { useInitiative } from "../context/InitiativeContext.jsx";
+import useInitiative from "../context/useInitiative.js";
 import "./Campaigns.css";
 
 const audienceOptions = ["Airbnb investors", "Real estate investors", "House flippers", "Property management companies", "Multifamily investors", "Experienced real-estate operators", "Affiliate and referral partners"];
@@ -31,12 +31,18 @@ export default function Campaigns() {
     catch (err) { console.error("LOAD CAMPAIGNS ERROR:", err); setError("Unable to load campaigns"); }
     finally { setLoading(false); }
   };
-  useEffect(() => { loadCampaigns(); }, []);
+  useEffect(() => {
+    const initialLoad = window.setTimeout(loadCampaigns, 0);
+    return () => window.clearTimeout(initialLoad);
+  }, []);
   useEffect(() => {
     if (searchParams.get("create") !== "program") return;
-    setDefaultCampaignKind("program");
-    setIsOpen(true);
-    setSearchParams({}, { replace: true });
+    const openProgram = window.setTimeout(() => {
+      setDefaultCampaignKind("program");
+      setIsOpen(true);
+      setSearchParams({}, { replace: true });
+    }, 0);
+    return () => window.clearTimeout(openProgram);
   }, [searchParams, setSearchParams]);
 
   const openDeleteModal = async (campaign) => {

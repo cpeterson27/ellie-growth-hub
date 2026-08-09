@@ -18,7 +18,7 @@ import {
   updateOutreach,
 } from "../services/api.js";
 import "./Outreach.css";
-import { useInitiative } from "../context/InitiativeContext.jsx";
+import useInitiative from "../context/useInitiative.js";
 
 const labels = {
   active: "Needs attention",
@@ -134,7 +134,8 @@ export default function Outreach() {
     }
   }, [params, loadItems, initiativeId]);
   useEffect(() => {
-    load();
+    const initialLoad = window.setTimeout(load, 0);
+    return () => window.clearTimeout(initialLoad);
   }, [load]);
   useEffect(() => {
     if (!selected?._id) return undefined;
@@ -180,9 +181,15 @@ export default function Outreach() {
   const pageSize = 15;
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const visibleItems = filtered.slice((page - 1) * pageSize, page * pageSize);
-  useEffect(() => setPage(1), [filter, search, selected?._id]);
   useEffect(() => {
-    if (page > pageCount) setPage(pageCount);
+    const resetPage = window.setTimeout(() => setPage(1), 0);
+    return () => window.clearTimeout(resetPage);
+  }, [filter, search, selected?._id]);
+  useEffect(() => {
+    if (page > pageCount) {
+      const clampPage = window.setTimeout(() => setPage(pageCount), 0);
+      return () => window.clearTimeout(clampPage);
+    }
   }, [page, pageCount]);
   const review = async (item) => {
     try {

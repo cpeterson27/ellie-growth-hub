@@ -61,26 +61,28 @@ export default function CampaignModal({
 
   useEffect(() => {
     if (!isOpen) return;
-
-    if (initialData) {
-      const campaignKind = initialData.campaignKind || "event";
-      const choices = campaignKind === "program" ? PROGRAM_TEMPLATES : EVENT_TEMPLATES;
-      setForm({
-        name: initialData.name || "",
-        campaignKind,
-        programName: initialData.programName || "",
-        startDate: initialData.startDate ? initialData.startDate.split("T")[0] : "",
-        ticketPrice: initialData.ticketPrice ?? "",
-        ticketGoal: initialData.ticketGoal ?? "",
-        audience: initialData.audience || [],
-        description: initialData.description || "",
-        brand: { logoUrl: initialData.brand?.logoUrl || "", websiteUrl: initialData.brand?.websiteUrl || "", accentColor: initialData.brand?.accentColor || "#173f36" },
-        templateKey: initialData.templateKey || choices[0].key,
-      });
-    } else {
-      setForm(createEmptyForm(defaultCampaignKind));
-    }
-    setError("");
+    const resetForm = window.setTimeout(() => {
+      if (initialData) {
+        const campaignKind = initialData.campaignKind || "event";
+        const choices = campaignKind === "program" ? PROGRAM_TEMPLATES : EVENT_TEMPLATES;
+        setForm({
+          name: initialData.name || "",
+          campaignKind,
+          programName: initialData.programName || "",
+          startDate: initialData.startDate ? initialData.startDate.split("T")[0] : "",
+          ticketPrice: initialData.ticketPrice ?? "",
+          ticketGoal: initialData.ticketGoal ?? "",
+          audience: initialData.audience || [],
+          description: initialData.description || "",
+          brand: { logoUrl: initialData.brand?.logoUrl || "", websiteUrl: initialData.brand?.websiteUrl || "", accentColor: initialData.brand?.accentColor || "#173f36" },
+          templateKey: initialData.templateKey || choices[0].key,
+        });
+      } else {
+        setForm(createEmptyForm(defaultCampaignKind));
+      }
+      setError("");
+    }, 0);
+    return () => window.clearTimeout(resetForm);
   }, [isOpen, initialData, defaultCampaignKind]);
 
   useEffect(() => {

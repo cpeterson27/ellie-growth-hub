@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
@@ -207,12 +207,18 @@ export default function Discovery() {
     intervalMinutes: 60,
     intentCategories: [],
   });
+  const initialLoadRef = useRef(null);
+  const refreshResearchRef = useRef(null);
 
   useEffect(() => {
     const question = String(searchParams.get("question") || "").trim();
-    if (question) setMarketQuestion(question);
     const tab = String(searchParams.get("tab") || "").trim();
-    if (["company", "monitoring", "leads", "people", "saved"].includes(tab)) setActiveTab(tab);
+    if (!question && !["company", "monitoring", "leads", "people", "saved"].includes(tab)) return;
+    const applyUrlState = window.setTimeout(() => {
+      if (question) setMarketQuestion(question);
+      if (["company", "monitoring", "leads", "people", "saved"].includes(tab)) setActiveTab(tab);
+    }, 0);
+    return () => window.clearTimeout(applyUrlState);
   }, [searchParams]);
 
   useEffect(() => {
@@ -270,20 +276,27 @@ export default function Discovery() {
   };
 
   useEffect(() => {
-    loadProspects().catch(() => setNotice("Unable to load prospects."));
-    fetchCampaigns().then((items) => setCampaigns(Array.isArray(items) ? items : [])).catch(() => {});
-    fetchDiscoveryTemplates().then((data) => setTemplates(data.templates || [])).catch(() => {});
-    fetchMarketResearchSources().then((data) => setResearchSource(data.sources?.[0] || null)).catch(() => {});
-    fetchResearchMonitorPresets().then((data) => setMonitorPresets(data.presets || [])).catch(() => {});
-    loadResearchHistory();
-    loadPeoplePreviews();
-    loadAutomaticResearch();
-    const refreshHistory = window.setInterval(() => {
+    refreshResearchRef.current = () => {
       loadResearchHistory();
       loadPeoplePreviews();
       loadAutomaticResearch();
+    };
+    initialLoadRef.current = () => {
+      loadProspects().catch(() => setNotice("Unable to load prospects."));
+      fetchCampaigns().then((items) => setCampaigns(Array.isArray(items) ? items : [])).catch(() => {});
+      fetchDiscoveryTemplates().then((data) => setTemplates(data.templates || [])).catch(() => {});
+      fetchMarketResearchSources().then((data) => setResearchSource(data.sources?.[0] || null)).catch(() => {});
+      fetchResearchMonitorPresets().then((data) => setMonitorPresets(data.presets || [])).catch(() => {});
+      refreshResearchRef.current?.();
+    };
+  });
+
+  useEffect(() => {
+    const initialLoad = window.setTimeout(() => initialLoadRef.current?.(), 0);
+    const refreshHistory = window.setInterval(() => {
+      refreshResearchRef.current?.();
     }, 15000);
-    return () => window.clearInterval(refreshHistory);
+    return () => { window.clearTimeout(initialLoad); window.clearInterval(refreshHistory); };
   }, []);
 
   const createMonitor = async () => {

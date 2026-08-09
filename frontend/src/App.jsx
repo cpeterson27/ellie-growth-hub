@@ -4,7 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
 
 import { InitiativeProvider } from "./context/InitiativeContext.jsx";
-import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import useAuth from "./context/useAuth.js";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Events = lazy(() => import("./pages/Events.jsx"));

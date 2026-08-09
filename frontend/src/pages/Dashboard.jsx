@@ -6,7 +6,7 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import Button from "../components/Button.jsx";
 import { fetchCampaigns, fetchEvents, fetchOutreach } from "../services/api.js";
 import "./Dashboard.css";
-import { useInitiative } from "../context/InitiativeContext.jsx";
+import useInitiative from "../context/useInitiative.js";
 
 const eventRevenue = (event) => Number(event.eventbriteLogistics?.grossRevenue || 0) || (Number(event.ticketsSold || 0) * Number(event.ticketPrice || 0));
 const eventDate = (event) => event.startDate ? new Date(event.startDate) : null;
@@ -33,7 +33,10 @@ export default function Dashboard() {
     if (initiativeId === "all" || !events.length || !campaigns.length) return;
     const campaign = campaigns.find((item) => item._id === initiativeId);
     const campaignEventId = String(campaign?.eventId?._id || campaign?.eventId || "");
-    if (campaignEventId && events.some((event) => String(event._id) === campaignEventId)) setSelectedId(campaignEventId);
+    if (campaignEventId && events.some((event) => String(event._id) === campaignEventId)) {
+      const selectCampaignEvent = window.setTimeout(() => setSelectedId(campaignEventId), 0);
+      return () => window.clearTimeout(selectCampaignEvent);
+    }
   }, [initiativeId, campaigns, events]);
 
   const selected = events.find((event) => event._id === selectedId) || events[0];
@@ -44,7 +47,10 @@ export default function Dashboard() {
     setSelectedId(events[nextIndex]._id);
   };
   useEffect(() => {
-    if (!selected?._id) return setOutreachCount(0);
+    if (!selected?._id) {
+      const resetOutreach = window.setTimeout(() => setOutreachCount(0), 0);
+      return () => window.clearTimeout(resetOutreach);
+    }
     fetchOutreach(selected._id).then((items) => setOutreachCount((Array.isArray(items) ? items : items?.outreach || []).length)).catch(() => setOutreachCount(0));
   }, [selected?._id]);
 

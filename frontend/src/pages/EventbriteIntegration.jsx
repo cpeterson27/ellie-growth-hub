@@ -42,7 +42,10 @@ export default function EventbriteIntegration() {
     }
   };
 
-  useEffect(() => { loadStatus(); }, []);
+  useEffect(() => {
+    const initialLoad = window.setTimeout(loadStatus, 0);
+    return () => window.clearTimeout(initialLoad);
+  }, []);
 
   const latestSync = events
     .map((event) => event.eventbriteLogistics?.lastSyncedAt)

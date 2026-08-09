@@ -38,7 +38,10 @@ export default function CampaignWorkspace() {
   const [activeSection, setActiveSection] = useState("email");
 
   useEffect(() => {
-    if (!id) { setError("Campaign ID missing."); setLoading(false); return; }
+    if (!id) {
+      const missingId = window.setTimeout(() => { setError("Campaign ID missing."); setLoading(false); }, 0);
+      return () => window.clearTimeout(missingId);
+    }
     fetchCampaign(id)
       .then(setCampaign)
       .catch((err) => setError(err.response?.data?.error || "Unable to load campaign."))

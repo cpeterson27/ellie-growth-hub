@@ -226,7 +226,7 @@ export default function JarvisChat() {
       audio.onended = stopSpeaking;
       audio.onerror = () => { stopSpeaking(); setSpeechError("Jarvis voice could not be played."); };
       await audio.play();
-    } catch (voiceError) {
+    } catch {
       stopSpeaking();
       if (voiceMode !== "openai" && speakWithBrowser(spokenText, id)) return;
       setSpeechError("OpenAI voice is unavailable. Choose Automatic or Browser voice to keep Jarvis speaking without API credits.");
@@ -299,19 +299,27 @@ export default function JarvisChat() {
       setNextId(nextId + 2);
     }
   };
+  const submitPromptRef = useRef(submitPrompt);
+  useEffect(() => { submitPromptRef.current = submitPrompt; });
+  const initialAutoPromptRef = useRef({
+    prompt: String(searchParams.get("prompt") || "").trim(),
+    autostart: searchParams.get("autostart") === "1",
+  });
 
   useEffect(() => {
-    const initialPrompt = String(searchParams.get("prompt") || "").trim();
-    if (searchParams.get("autostart") !== "1" || !initialPrompt || autoPromptStartedRef.current) return;
+    const { prompt: initialPrompt, autostart } = initialAutoPromptRef.current;
+    if (!autostart || !initialPrompt || autoPromptStartedRef.current) return;
     autoPromptStartedRef.current = true;
     setResearchStartedAt(Date.now());
     setInput("");
-    submitPrompt(initialPrompt);
+    submitPromptRef.current(initialPrompt);
   }, []);
 
   const intentResearchResult = messages.find((message) => message.data?.researchQuestion);
   const intentResearchState = intentResearchResult ? "complete" : error ? "failed" : researchElapsedSeconds >= 240 ? "delayed" : loading ? "searching" : researchStartedAt ? "waiting" : "starting";
 
+  const speakWithBrowserRef = useRef(speakWithBrowser);
+  useEffect(() => { speakWithBrowserRef.current = speakWithBrowser; });
   useEffect(() => {
     if (!researchStartedAt || ["complete", "failed", "delayed"].includes(intentResearchState)) return undefined;
     const updateElapsed = () => setResearchElapsedSeconds(Math.max(0, Math.floor((Date.now() - researchStartedAt) / 1000)));
@@ -323,7 +331,7 @@ export default function JarvisChat() {
   useEffect(() => {
     if (!intentResearchTask || !error || !autoSpeak || spokenResearchErrorRef.current === error) return;
     spokenResearchErrorRef.current = error;
-    speakWithBrowser(`Jarvis finished the search but could not establish a supported identity. No contact was added. You can use the original public post to reply or message the account manually.`, "research-error");
+    speakWithBrowserRef.current(`Jarvis finished the search but could not establish a supported identity. No contact was added. You can use the original public post to reply or message the account manually.`, "research-error");
   }, [error, intentResearchTask, autoSpeak]);
 
   const handleSendMessage = (e) => {
@@ -475,6 +483,8 @@ export default function JarvisChat() {
     };
     recognition.start();
   };
+  const startListeningRef = useRef(startListening);
+  useEffect(() => { startListeningRef.current = startListening; });
 
   const handleVoiceCore = () => {
     if (listening) {
@@ -492,12 +502,12 @@ export default function JarvisChat() {
     const onShortcut = (event) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "j" && !loading) {
         event.preventDefault();
-        startListening();
+        startListeningRef.current();
       }
     };
     window.addEventListener("keydown", onShortcut);
     return () => window.removeEventListener("keydown", onShortcut);
-  }, [loading, voiceName]);
+  }, [loading]);
 
   const saveProfile = async (event) => {
     event.preventDefault();

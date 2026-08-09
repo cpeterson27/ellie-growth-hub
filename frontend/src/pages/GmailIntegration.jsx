@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FiArchive, FiArrowLeft, FiEye, FiEyeOff, FiInbox, FiMail, FiRefreshCw, FiSearch, FiSend, FiTrash2 } from "react-icons/fi";
 import Button from "../components/Button.jsx";
@@ -50,6 +50,7 @@ export default function GmailIntegration() {
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [selectedThreadIds, setSelectedThreadIds] = useState([]);
   const [bulkActionRunning, setBulkActionRunning] = useState(false);
+  const loadRef = useRef(null);
 
   const query = search.trim() ? search.trim() : mailboxQueries[mailbox] || mailboxQueries.inbox;
   const needsModifyPermission = status?.connected && !status.scopes?.includes("https://www.googleapis.com/auth/gmail.modify");
@@ -79,7 +80,11 @@ export default function GmailIntegration() {
     }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, [mailbox, campaignPage]);
+  useEffect(() => { loadRef.current = load; });
+  useEffect(() => {
+    const refreshMailbox = window.setTimeout(() => loadRef.current?.(), 0);
+    return () => window.clearTimeout(refreshMailbox);
+  }, [mailbox, campaignPage]);
 
   const openThread = async (thread) => {
     try {

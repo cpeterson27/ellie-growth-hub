@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FiSearch, FiMenu, FiCpu, FiCamera, FiPlus } from "react-icons/fi";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
-import { useInitiative } from "../context/InitiativeContext.jsx";
+import useInitiative from "../context/useInitiative.js";
 import { fetchWorkspaceConfig } from "../services/api.js";
 import "./Navbar.css";
 

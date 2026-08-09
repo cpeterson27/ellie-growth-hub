@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchCampaigns } from "../services/api.js";
-
-const InitiativeContext = createContext(null);
+import InitiativeContext from "./InitiativeContextValue.js";
 
 export function InitiativeProvider({ children }) {
   const [campaigns, setCampaigns] = useState([]);
@@ -19,8 +18,4 @@ export function InitiativeProvider({ children }) {
   const selected = campaigns.find((campaign) => campaign._id === selectedId) || null;
   const value = useMemo(() => ({ campaigns, selected, selectedId, setSelectedId }), [campaigns, selected, selectedId]);
   return <InitiativeContext.Provider value={value}>{children}</InitiativeContext.Provider>;
-}
-
-export function useInitiative() {
-  return useContext(InitiativeContext) || { campaigns: [], selected: null, selectedId: "all", setSelectedId: () => {} };
 }

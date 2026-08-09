@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FiCheck, FiClipboard, FiCode, FiX } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import { approveDevelopmentRequest, fetchDevelopmentRequests, rejectDevelopmentRequest } from "../services/api.js";
@@ -10,6 +10,8 @@ export default function DevelopmentRequests() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState("");
+  const initialSecret = useRef(secret);
+  const loadRef = useRef(null);
 
   const load = async (approvalSecret = secret) => {
     if (!approvalSecret) return;
@@ -25,8 +27,13 @@ export default function DevelopmentRequests() {
       setLoading(false);
     }
   };
+  useEffect(() => { loadRef.current = load; });
 
-  useEffect(() => { if (secret) load(secret); }, []);
+  useEffect(() => {
+    if (!initialSecret.current) return;
+    const initialLoad = window.setTimeout(() => loadRef.current?.(initialSecret.current), 0);
+    return () => window.clearTimeout(initialLoad);
+  }, []);
 
   const updateRequest = async (id, decision) => {
     try {
