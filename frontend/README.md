@@ -1,18 +1,34 @@
-# React + Vite
+# Ellie AI Growth Operator frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This directory contains the private React 19 and Vite application for Ellie AI
+Growth Operator. The Express API lives in `../backend`.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+printf 'VITE_API_BASE_URL=http://localhost:5001/api\n' > .env
+npm run dev
+```
 
-## React Compiler
+Open `http://localhost:5173/login`. The backend must be running, and an owner
+account must already exist. See the [project README](../README.md) for backend
+setup and owner creation.
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+`VITE_API_BASE_URL` is the only frontend environment variable. It must include
+the `/api` suffix. When omitted, the application defaults to
+`http://localhost:5001/api`.
 
-Note: This will impact Vite dev & build performances.
+## Commands
 
-## Expanding the ESLint configuration
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite development server |
+| `npm run build` | Create the production build in `dist/` |
+| `npm run lint` | Run ESLint |
+| `npm run preview` | Preview the production build locally |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The production host must serve the built single-page application with fallback
+routing to `index.html`. Configure its build-time `VITE_API_BASE_URL` to point
+to the public backend API. Never place backend credentials in frontend
+environment variables.

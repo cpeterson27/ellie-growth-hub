@@ -29,6 +29,8 @@ Ellie AI organizes the work surrounding an event:
 - Assign one or many contacts to a campaign.
 - Generate, review, approve, and send personalized outreach.
 - Track campaign activity, replies, registrations, attendees, and event results.
+- Create Eventbrite affiliate links and reconcile attributed ticket sales,
+  revenue, and commissions for partners.
 - Use Jarvis to summarize workspace information and help plan next actions.
 
 The system uses MongoDB as its primary operational database. External services
@@ -255,6 +257,18 @@ code changes are completed through the development workflow.
 Jarvis's cloud memory is a synchronized copy of approved Obsidian notes. The
 deployed application does not directly read a private local vault.
 
+### 9. Partners and affiliate tracking
+
+The Partners workspace creates or connects a unique Eventbrite affiliate link
+for each partner. Ellie AI can synchronize attributed attendees, gross revenue,
+and commission due, and it preserves individual affiliate-sale records for
+audit and reporting. Eventbrite remains the source of truth for purchases.
+
+Automatic purchase updates use the secured Eventbrite webhook described above.
+The dashboard also supports a manual refresh and an end-to-end connection check
+before a link is shared. A valid tracking link does not count as a sale; Ellie
+AI confirms a conversion only after Eventbrite returns an attributed purchase.
+
 ## Recommended operating rules
 
 - Do not send to risky, unknown, undeliverable, or unsubscribed addresses.
@@ -278,17 +292,28 @@ deployed application does not directly read a private local vault.
 | Ellie Market Intelligence | Organization research, scoring, and prospect review |
 | OpenAI | Jarvis response generation and workspace assistance |
 | Obsidian bridge | Approved long-term notes for Jarvis |
+| Gmail | Authorized inbox search and approved email sending |
+| Monday.com | Optional contact synchronization |
 | MongoDB | Primary application data and workflow history |
 
 Integration credentials belong only in secured backend environment settings.
 They must never be stored in the browser, committed to the repository, included
 in screenshots, or shared in documentation.
 
-## Product direction
+## Accounts, access, and product direction
 
-The current application is an event-marketing CRM built for Ellie AI's operating
-workflow. The architecture is moving toward a multi-business product in which
-each customer has:
+The operational application is private. It has invitation-only users,
+server-side sessions, secure cookies, CSRF protection, workspace memberships,
+and owner, admin, member, and viewer roles. There is no public signup endpoint.
+The first owner is created intentionally from the backend command line.
+
+The current release supports one locked workspace. Although the account and
+membership foundation exists, existing business records still require complete
+workspace backfill and query-level tenant enforcement before unrelated client
+workspaces can safely share one deployment.
+
+The architecture is moving toward a multi-business product in which each
+customer has:
 
 - Their own users, roles, and permissions.
 - Their own contacts, events, campaigns, templates, and reporting.
@@ -296,10 +321,115 @@ each customer has:
 - Isolated credentials and data.
 - An audit trail for sensitive actions.
 
-Public access should not expose the operational dashboard. A sellable version
-requires authenticated accounts, organization-level data isolation, role-based
-permissions, secure onboarding, subscription management, and production audit
-controls.
+Public access must not expose the operational dashboard. A sellable version
+still requires complete organization-level data isolation, secure customer
+onboarding, subscription management, and production audit controls.
+
+## Technology
+
+- Frontend: React 19, Vite, React Router, Axios, and Recharts.
+- Backend: Node.js, Express, Mongoose, and MongoDB.
+- AI and delivery: OpenAI and Resend, with optional external integrations.
+- Authentication: server-side sessions with secure cookie or bearer-session
+  support and CSRF protection.
+- Background work: a database-leased research monitor running inside the web
+  process by default or in the separate worker process.
+
+## Local development
+
+### Prerequisites
+
+- Node.js 20 or newer and npm.
+- A reachable MongoDB database.
+- Integration credentials only for the optional features you intend to use.
+
+### 1. Configure the backend
+
+```bash
+cd backend
+npm install
+cp .env.example .env
+```
+
+At minimum, set `MONGO_URI`, `FRONTEND_URL=http://localhost:5173`, and a strong
+`INTEGRATION_CREDENTIAL_ENCRYPTION_KEY`. Keep all secrets in `backend/.env`;
+the file is ignored by Git. The comments in `backend/.env.example` explain the
+optional integration groups.
+
+Create the first owner account:
+
+```bash
+npm run create-owner -- owner@example.com "Owner Name"
+```
+
+The command securely prompts for a password of at least 12 characters.
+
+Start the API on `http://localhost:5001`:
+
+```bash
+npm run dev
+```
+
+The web process runs the research monitor automatically. To run it as a
+separate service, set `RESEARCH_WORKER_MODE=external` on the web process and run
+`npm run start:worker` in another backend process using the same database and
+environment configuration.
+
+### 2. Configure the frontend
+
+```bash
+cd frontend
+npm install
+printf 'VITE_API_BASE_URL=http://localhost:5001/api\n' > .env
+npm run dev
+```
+
+Open `http://localhost:5173/login` and sign in with the owner account. If
+`VITE_API_BASE_URL` is omitted, the frontend uses
+`http://localhost:5001/api` by default.
+
+## Validation
+
+Run these checks before deploying documentation or application changes:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+
+cd ../backend
+node --check server.js
+node --check worker.js
+```
+
+The repository also contains focused `backend/test-*.js` and frontend test
+scripts. They are integration-oriented and may require MongoDB, provider
+credentials, or seeded data. The backend does not currently have a unified
+automated `npm test` suite.
+
+## Deployment notes
+
+- Build the frontend with `npm run build` from `frontend/` and configure
+  `VITE_API_BASE_URL` with the public backend `/api` URL.
+- Run the backend with `npm start` from `backend/`.
+- Set `NODE_ENV=production`, `FRONTEND_URL`, `PUBLIC_BACKEND_URL`, `MONGO_URI`,
+  the encryption/signing secrets, and the credentials required by enabled
+  integrations in the hosting provider's secret settings.
+- If a dedicated worker is deployed, run `npm run start:worker` and set
+  `RESEARCH_WORKER_MODE=external` on the web service.
+- Configure provider callback and webhook URLs only after the final public
+  backend hostname is known. Never place server credentials in `VITE_*`
+  variables.
+
+## Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `frontend/` | React/Vite application |
+| `backend/` | Express API, models, services, scripts, and research worker |
+| `docs/` | Operations, integration, data, and setup reference guides |
+| `tools/jarvis-vault-bridge/` | Optional Obsidian-to-cloud memory synchronizer |
+| `tools/jarvis-mac-companion/` | Optional macOS Jarvis companion |
 
 ## Additional reference guides
 
@@ -307,3 +437,9 @@ controls.
 - [Jarvis and Obsidian memory](docs/JARVIS_OBSIDIAN_SETUP.md)
 - [Lead data and audience targeting](docs/LEAD_DATA_AND_TARGETING.md)
 - [Contact import template](docs/ELLIE_CONTACT_IMPORT_TEMPLATE.csv)
+- [Current build status](docs/CURRENT_BUILD_STATUS.md)
+- [MCP and data index](docs/ELLIE_MCP_AND_DATA_INDEX.md)
+- [Business data feed](docs/BUSINESS_DATA_FEED.md)
+- [Integration credential migration](docs/INTEGRATION_CREDENTIAL_MIGRATION.md)
+- [Jarvis vault bridge](tools/jarvis-vault-bridge/README.md)
+- [Jarvis Mac companion](tools/jarvis-mac-companion/README.md)
