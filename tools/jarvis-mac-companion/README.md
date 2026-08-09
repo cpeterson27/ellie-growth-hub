@@ -1,7 +1,7 @@
 # Jarvis Mac Companion
 
 This optional Mac helper provides the Jared-style global hotkey. It does not
-host Ellie or store an OpenAI key. It sends a spoken request to the deployed
+host the application or store an OpenAI key. It sends a spoken request to the deployed
 Jarvis endpoint and speaks the returned answer with a macOS voice.
 
 Build and start it from this folder:

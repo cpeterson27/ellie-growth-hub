@@ -30,7 +30,7 @@ such as "Jarvis, sync my vault" must not be treated as a completed action.
 Use a one-time sync after changing important notes:
 
 ```bash
-cd /Users/cassandrapeterson/ellie-growth-hub/tools/jarvis-vault-bridge
+cd tools/jarvis-vault-bridge
 npm run sync
 ```
 

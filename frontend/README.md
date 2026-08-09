@@ -1,7 +1,7 @@
-# Ellie AI Growth Operator frontend
+# AI Growth Operator frontend
 
-This directory contains the private React 19 and Vite application for Ellie AI
-Growth Operator. The Express API lives in `../backend`.
+This directory contains the private React 19 and Vite application for AI Growth
+Operator. The Express API lives in `../backend`.
 
 ## Local development
 

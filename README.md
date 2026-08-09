@@ -1,6 +1,6 @@
-# Ellie AI Growth Operator
+# AI Growth Operator
 
-Ellie AI Growth Operator is a private event-marketing workspace that combines
+AI Growth Operator is a private event-marketing workspace that combines
 contact management, audience discovery, campaign planning, email outreach,
 Eventbrite operations, and an AI assistant in one application.
 
@@ -20,7 +20,7 @@ When a user approves a Live Lead, Growth Operator immediately presents an editab
 
 ## What the product does
 
-Ellie AI organizes the work surrounding an event:
+AI Growth Operator organizes the work surrounding an event:
 
 - Manage events and connect each event to its marketing campaign.
 - Import contacts from CSV and preserve incomplete records for later research.
@@ -35,7 +35,7 @@ Ellie AI organizes the work surrounding an event:
 
 The system uses MongoDB as its primary operational database. External services
 such as Eventbrite, Emailable, Resend, OpenAI, and the Jarvis memory
-bridge contribute specialized capabilities, but Ellie AI remains the central
+bridge contribute specialized capabilities, but AI Growth Operator remains the central
 workspace.
 
 ## How the main workflow fits together
@@ -52,18 +52,18 @@ An event and a campaign are related, but they are not the same:
 
 An event should have only one matching campaign for the same promotion unless
 the team intentionally creates separate campaigns for different audiences or
-offers. When a campaign already exists, Ellie AI should show **View Campaign**
+offers. When a campaign already exists, AI Growth Operator should show **View Campaign**
 instead of asking the user to create a duplicate.
 
 ### 2. Eventbrite connection
 
-Eventbrite is the ticketing and registration system. Ellie AI is the operating
+Eventbrite is the ticketing and registration system. AI Growth Operator is the operating
 workspace around it.
 
-Once an Eventbrite account is authorized, Ellie AI can:
+Once an Eventbrite account is authorized, AI Growth Operator can:
 
 - Import an existing Eventbrite event.
-- Plan a new event as an Ellie-only draft without creating anything in
+- Plan a new event as a local-only draft without creating anything in
   Eventbrite.
 - Create an Eventbrite draft only after the required listing information is
   ready, and publish it through a separate confirmation.
@@ -76,26 +76,26 @@ Once an Eventbrite account is authorized, Ellie AI can:
 - Preserve synchronization history so the team can see when data was refreshed.
 
 **Sync Eventbrite** does not create a second event or campaign. It refreshes the
-Ellie AI record with the latest information from the already-connected
+AI Growth Operator record with the latest information from the already-connected
 Eventbrite listing.
 
 Eventbrite's modern event description is stored as a short summary plus
-versioned structured-content modules. Ellie AI retrieves and normalizes those
+versioned structured-content modules. AI Growth Operator retrieves and normalizes those
 modules automatically. The user does not choose or increment version numbers.
 Modern Eventbrite features that are not exposed through the public API, such as
 some Agenda and Lineup configurations, remain in Eventbrite's authoritative
-editor. Ellie AI identifies those fields clearly and provides an **Edit advanced
+editor. AI Growth Operator identifies those fields clearly and provides an **Edit advanced
 content on Eventbrite** link instead of presenting an incomplete editor.
 
-Eventbrite listing data and Ellie AI campaign strategy are intentionally
+Eventbrite listing data and AI Growth Operator campaign strategy are intentionally
 separate:
 
 - **Eventbrite listing:** description, schedule, organizer, tickets, policy,
   media, venue, and registration logistics.
-- **Ellie campaign strategy:** approved target audience, channels, prospect
+- **Growth Operator campaign strategy:** approved target audience, channels, prospect
   filters, campaign assignment, and messaging.
 
-For imported events, Ellie AI may suggest audience groups by finding the
+For imported events, AI Growth Operator may suggest audience groups by finding the
 event's own “Who this event is for,” “Perfect for,” or “Ideal for” section. For
 new events, the planning wizard generates grounded recommendations from the
 event promise, attendee outcomes, ideal-attendee notes, format, price, and
@@ -108,8 +108,8 @@ For near-real-time updates, an Eventbrite webhook can point to
 `https://<backend-host>/api/eventbrite/webhook?token=<EVENTBRITE_WEBHOOK_TOKEN>`.
 This is a one-time connection step in Eventbrite's developer dashboard. The
 token stays in secured backend environment settings and is never returned by a
-public setup endpoint. The webhook notifies Ellie AI of an event, order,
-attendee, check-in, or ticket-class change; Ellie AI then retrieves the
+public setup endpoint. The webhook notifies AI Growth Operator of an event, order,
+attendee, check-in, or ticket-class change; AI Growth Operator then retrieves the
 authoritative record with its server-side OAuth token. The webhook payload
 itself is not trusted as the event record.
 
@@ -130,10 +130,10 @@ the frontend.
 Contacts may be entered manually or imported from a CSV. A usable name is enough
 to retain the relationship, and a verified email is enough for intentional
 manual campaign assignment. It is not enough for automatic audience matching.
-Ellie AI labels a name-and-email-only record **Audience unknown** and waits for
+AI Growth Operator labels a name-and-email-only record **Audience unknown** and waits for
 a real targeting signal such as a title, company, industry, audience profile,
 seniority, keyword, or list.
-Ellie AI does not infer interests or profession from a person's name.
+AI Growth Operator does not infer interests or profession from a person's name.
 Missing company, title, industry, or email information does not cause the person
 to disappear.
 
@@ -153,7 +153,7 @@ automatically add that person to a campaign.
 
 ### 4. Built-in CRM workflow
 
-The Contacts page is Ellie AI's built-in CRM. Manual contacts, CSV imports, and
+The Contacts page is AI Growth Operator's built-in CRM. Manual contacts, CSV imports, and
 contacts synchronized from another CRM enter this page directly. They do not
 need a second approval in Discovery. The CRM is organized around one clear next
 action:
@@ -182,7 +182,7 @@ not delete the contact or erase their history.
 ### 5. Discovery
 
 Discovery is the review area for prospective people and organizations before
-they enter the CRM. It is for net-new prospects found by Ellie's market
+they enter the CRM. It is for net-new prospects found by the AI Growth Operator's market
 intelligence workflow—not for CSV files or people the team already knows.
 Approving a discovered prospect adds that relationship to the CRM; all later
 work happens from Contacts.
@@ -198,7 +198,7 @@ Organization research uses configurable targeting such as:
 
 This makes it possible to research a different audience each time rather than
 locking the application to one permanent profile. Research profiles, matching,
-scoring, review, and CRM handoff are owned by Ellie.
+scoring, review, and CRM handoff are owned by AI Growth Operator.
 
 Approving a discovery prospect accepts the record into the contact workflow. It
 does not automatically make an unsafe email deliverable or send outreach.
@@ -246,7 +246,7 @@ recipient, subject, body, links, and visual presentation.
 
 ### 8. Jarvis
 
-Jarvis is the conversational interface for Ellie AI. It can read approved
+Jarvis is the conversational interface for AI Growth Operator. It can read approved
 workspace data and synchronized memory notes, summarize priorities, explain
 campaign status, and suggest actions.
 
@@ -260,14 +260,15 @@ deployed application does not directly read a private local vault.
 ### 9. Partners and affiliate tracking
 
 The Partners workspace creates or connects a unique Eventbrite affiliate link
-for each partner. Ellie AI can synchronize attributed attendees, gross revenue,
+for each partner. AI Growth Operator can synchronize attributed attendees, gross revenue,
 and commission due, and it preserves individual affiliate-sale records for
 audit and reporting. Eventbrite remains the source of truth for purchases.
 
 Automatic purchase updates use the secured Eventbrite webhook described above.
 The dashboard also supports a manual refresh and an end-to-end connection check
-before a link is shared. A valid tracking link does not count as a sale; Ellie
-AI confirms a conversion only after Eventbrite returns an attributed purchase.
+before a link is shared. A valid tracking link does not count as a sale; AI
+Growth Operator confirms a conversion only after Eventbrite returns an
+attributed purchase.
 
 ## Recommended operating rules
 
@@ -279,7 +280,7 @@ AI confirms a conversion only after Eventbrite returns an attributed purchase.
   is removed from the campaign.
 - Keep sent messages immutable and record resends as new attempts.
 - Preserve archived contacts and campaign history for reporting.
-- Treat Eventbrite as the ticketing source of truth and Ellie AI as the
+- Treat Eventbrite as the ticketing source of truth and AI Growth Operator as the
   marketing and relationship source of truth.
 
 ## Current integrations
@@ -289,7 +290,7 @@ AI confirms a conversion only after Eventbrite returns an attributed purchase.
 | Eventbrite | Events, publishing, orders, attendees, check-ins, and sales |
 | Emailable | Email deliverability verification |
 | Resend | Transactional and campaign email delivery |
-| Ellie Market Intelligence | Organization research, scoring, and prospect review |
+| Growth Operator Market Intelligence | Organization research, scoring, and prospect review |
 | OpenAI | Jarvis response generation and workspace assistance |
 | Obsidian bridge | Approved long-term notes for Jarvis |
 | Gmail | Authorized inbox search and approved email sending |
@@ -436,9 +437,7 @@ automated `npm test` suite.
 - [Jarvis deployed behavior](docs/JARVIS_DEPLOYED_SETUP.md)
 - [Jarvis and Obsidian memory](docs/JARVIS_OBSIDIAN_SETUP.md)
 - [Lead data and audience targeting](docs/LEAD_DATA_AND_TARGETING.md)
-- [Contact import template](docs/ELLIE_CONTACT_IMPORT_TEMPLATE.csv)
 - [Current build status](docs/CURRENT_BUILD_STATUS.md)
-- [MCP and data index](docs/ELLIE_MCP_AND_DATA_INDEX.md)
 - [Business data feed](docs/BUSINESS_DATA_FEED.md)
 - [Integration credential migration](docs/INTEGRATION_CREDENTIAL_MIGRATION.md)
 - [Jarvis vault bridge](tools/jarvis-vault-bridge/README.md)
