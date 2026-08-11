@@ -628,6 +628,10 @@ export default function Contacts() {
       )?._id ||
       "",
   );
+  const latestImportTotal = Number(importSummary?.mongoCreated || 0) + Number(importSummary?.mongoUpdated || 0);
+  const latestCreatedIds = new Set((importSummary?.createdContacts || []).map((contact) => String(contact.id)));
+  const latestUpdatedIds = new Set((importSummary?.updatedContacts || []).map((contact) => String(contact.id)));
+  const latestImportLabel = (contact) => latestCreatedIds.has(String(contact._id)) ? "New" : latestUpdatedIds.has(String(contact._id)) ? "Updated" : "";
   const selectedContacts = contacts.filter((contact) =>
     selectedContactIds.includes(String(contact._id)),
   );
@@ -937,8 +941,10 @@ export default function Contacts() {
                 ? workflow.key === "assigned"
                 : contactTab === "linkedin"
                   ? Boolean(contact.linkedin)
-                  : contactTab === "linkedin-review"
+                : contactTab === "linkedin-review"
                     ? Boolean(contact.linkedin) && ["drafted", "approved"].includes(contact.linkedinOutreach?.status)
+                    : contactTab === "latest-import"
+                      ? Boolean(importSummary?.importBatchId) && contact.lastImportBatchId === importSummary.importBatchId
                 : true;
         return (
           tabMatches &&
@@ -1447,7 +1453,7 @@ export default function Contacts() {
       },
     );
     if (saved) {
-      setContactTab("all");
+      setContactTab("latest-import");
       setCampaignId("");
       setUploadOpen(false);
       setImportRows([]);
@@ -1462,17 +1468,21 @@ export default function Contacts() {
     }
   }
 
-  function viewNewImportedContacts() {
-    const verifiedIds = (importSummary?.createdContacts || [])
+  function viewLatestImportedContacts() {
+    const importedContacts = [
+      ...(importSummary?.createdContacts || []),
+      ...(importSummary?.updatedContacts || []),
+    ];
+    const verifiedIds = importedContacts
       .filter((contact) => contact.emailStatus === "verified")
       .map((contact) => String(contact.id));
-    setContactTab("all");
+    setContactTab("latest-import");
     setCampaignId("");
     setSearchTerm("");
     setCurrentPage(1);
     setSelectedContactIds(verifiedIds);
     setBulkNotice(
-      `${importSummary?.mongoCreated || 0} new contacts are shown at the top. ${verifiedIds.length} with verified emails are selected.`,
+      `${latestImportTotal} contacts from the latest CSV are isolated here. ${verifiedIds.length} with verified emails are selected.`,
     );
     window.setTimeout(
       () =>
@@ -1778,11 +1788,11 @@ export default function Contacts() {
                     <b className="import-receipt-button-label">Open campaign</b>
                   </Button>
                 ) : null}
-                {importSummary.createdContacts?.length ? (
+                {latestImportTotal ? (
                   <Button
                     variant={importCampaignTargetId ? "outline" : "primary"}
                     size="sm"
-                    onClick={viewNewImportedContacts}
+                    onClick={viewLatestImportedContacts}
                   >
                     <b
                       className={
@@ -1791,7 +1801,7 @@ export default function Contacts() {
                           : "import-receipt-button-label"
                       }
                     >
-                      View these {importSummary.mongoCreated} contacts
+                      Review latest import ({latestImportTotal})
                     </b>
                   </Button>
                 ) : null}
@@ -1957,6 +1967,7 @@ export default function Contacts() {
             ["assigned", "Campaign assigned"],
             ["linkedin", "LinkedIn contacts"],
             ["linkedin-review", "LinkedIn review queue"],
+            ...(importSummary?.importBatchId ? [["latest-import", `Latest import (${latestImportTotal})`]] : []),
             ["unsubscribed", `Unsubscribed (${unsubscribedContacts.length})`],
             ["archived", "Archived"],
           ].map(([value, label]) => (
@@ -1969,6 +1980,16 @@ export default function Contacts() {
             </button>
           ))}
         </div>
+        {contactTab === "latest-import" && importSummary?.importBatchId ? (
+          <section className="latest-import-banner" role="status">
+            <div>
+              <span>Latest CSV review</span>
+              <strong>{importSummary.importFileName || "Imported contact file"}</strong>
+              <p>Only people touched by this import are shown: {importSummary.mongoCreated || 0} new and {importSummary.mongoUpdated || 0} updated.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setContactTab("all")}>Return to all contacts</Button>
+          </section>
+        ) : null}
         {contacts.length &&
         !["archived", "unsubscribed"].includes(contactTab) ? (
           <section
@@ -2202,6 +2223,7 @@ export default function Contacts() {
                         >
                           <span className="crm-pipeline__drag" aria-hidden="true">⋮⋮</span>
                           <strong>{contact.name}</strong>
+                          {contactTab === "latest-import" ? <mark className={`latest-import-badge is-${latestImportLabel(contact).toLowerCase()}`}>{latestImportLabel(contact)}</mark> : null}
                           <span>{contact.title || "Role missing"}</span>
                           <small>{contact.company || "Company missing"}</small>
                           <footer>
@@ -2275,6 +2297,7 @@ export default function Contacts() {
                         />
                         <div>
                           <h3>{contact.name}</h3>
+                          {contactTab === "latest-import" ? <mark className={`latest-import-badge is-${latestImportLabel(contact).toLowerCase()}`}>{latestImportLabel(contact)}</mark> : null}
                           <p>
                             {contact.title || "Title missing"}
                             {contact.company
@@ -2433,8 +2456,10 @@ export default function Contacts() {
                 ? "No contacts need a data-quality decision right now."
                 : contactTab === "linkedin"
                   ? "No contacts with LinkedIn profile URLs match this view."
-                  : contactTab === "linkedin-review"
+                : contactTab === "linkedin-review"
                     ? "No LinkedIn drafts are waiting for review or handoff."
+                    : contactTab === "latest-import"
+                      ? "No contacts are associated with the latest import receipt."
                 : "No contacts match this view."}
           </div>
         )}
