@@ -107,6 +107,34 @@ function contactDisplayName(contact = {}) {
   return name || "Identity research needed";
 }
 
+function contactSourceKey(contact = {}) {
+  const sources = [contact.sourceProvider, ...(contact.sources || [])].map((value) => String(value || "").toLowerCase());
+  if (sources.includes("linkedin_csv")) return "linkedin_csv";
+  if (sources.includes("business_card")) return "business_card";
+  if (sources.includes("intent_monitor")) return "intent_monitor";
+  if (sources.includes("monday")) return "monday";
+  if (sources.includes("eventbrite")) return "eventbrite";
+  if (sources.includes("csv")) return "csv";
+  if (sources.includes("manual")) return "manual";
+  return sources.find(Boolean) || "other";
+}
+
+const contactSourceLabels = {
+  linkedin_csv: "LinkedIn CSV",
+  business_card: "Business card",
+  intent_monitor: "Intent monitor",
+  monday: "Monday CRM",
+  eventbrite: "Eventbrite",
+  csv: "CSV import",
+  manual: "Added manually",
+  other: "Other source",
+};
+
+function contactSourceLabel(contact = {}) {
+  const key = contactSourceKey(contact);
+  return contactSourceLabels[key] || key.replaceAll("_", " ");
+}
+
 function isUnsubscribed(contact = {}) {
   return (
     contact.status === "unsubscribed" ||
@@ -521,6 +549,9 @@ export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState(
     () => searchParams.get("search") || "",
   );
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [contactMethodFilter, setContactMethodFilter] = useState("");
+  const [availableSources, setAvailableSources] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [verifyingEmails, setVerifyingEmails] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(null);
@@ -922,6 +953,7 @@ export default function Contacts() {
         fetchContacts({ limit: 100, status: "unsubscribed" }),
       ]);
       const allContacts = response.data || [];
+      setAvailableSources([...new Set(allContacts.map(contactSourceKey))].sort());
       setUnsubscribedContacts(
         [...(unsubscribeResponse.data || [])].sort(
           (a, b) =>
@@ -948,6 +980,12 @@ export default function Contacts() {
                 : true;
         return (
           tabMatches &&
+          (!sourceFilter || contactSourceKey(contact) === sourceFilter) &&
+          (!contactMethodFilter ||
+            (contactMethodFilter === "email" && Boolean(contact.email)) ||
+            (contactMethodFilter === "linkedin" && Boolean(contact.linkedin)) ||
+            (contactMethodFilter === "both" && Boolean(contact.email) && Boolean(contact.linkedin)) ||
+            (contactMethodFilter === "none" && !contact.email && !contact.linkedin)) &&
           (!requestedResearchStatus ||
             contact.researchStatus === requestedResearchStatus) &&
           (!campaignId ||
@@ -980,7 +1018,7 @@ export default function Contacts() {
   useEffect(() => {
     const refreshContacts = window.setTimeout(() => loadContactsRef.current?.(), 0);
     return () => window.clearTimeout(refreshContacts);
-  }, [contactTab, campaignId, searchTerm, searchParams]);
+  }, [contactTab, campaignId, searchTerm, searchParams, sourceFilter, contactMethodFilter, importSummary?.importBatchId]);
 
   useEffect(() => {
     fetchLatestContactImport()
@@ -1178,7 +1216,6 @@ export default function Contacts() {
   }
 
   function prepareImport(text, source = "csv") {
-    setImportSource(source);
     Papa.parse(String(text || ""), {
       header: true,
       skipEmptyLines: "greedy",
@@ -1189,6 +1226,9 @@ export default function Contacts() {
         const normalizedHeaders = [
           ...new Set(normalizedData.flatMap((row) => Object.keys(row))),
         ];
+        const looksLikeLinkedinExport = ["First Name", "Last Name", "Person Linkedin Url", "Connected On"].filter((header) => normalizedHeaders.includes(header)).length >= 3;
+        const resolvedSource = source === "csv" && looksLikeLinkedinExport ? "linkedin_csv" : source;
+        setImportSource(resolvedSource);
         const rows = normalizedData.map((row) =>
           Object.fromEntries(
             Object.entries(row).map(([key, value]) => {
@@ -1239,7 +1279,7 @@ export default function Contacts() {
         try {
           const preview = await previewContactIngestion({
             contacts: rows,
-            source,
+            source: resolvedSource,
           });
           setDuplicatePreview(preview.data);
         } catch (previewError) {
@@ -1670,10 +1710,10 @@ export default function Contacts() {
     <div className="page-dashboard contacts-page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">CRM</h1>
+          <h1 className="page-title">Contacts</h1>
           <p className="page-subtitle">
-            Keep every relationship organized, understand the next action, and
-            move the right people into campaigns.
+            See where every relationship came from, how you can reach them, and
+            what to do next.
           </p>
         </div>
         <div className="crm-header-actions">
@@ -1941,18 +1981,37 @@ export default function Contacts() {
               ))}
             </select>
           </label>
+          <label>
+            Source{" "}
+            <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+              <option value="">All sources</option>
+              {availableSources.map((source) => <option key={source} value={source}>{contactSourceLabels[source] || source.replaceAll("_", " ")}</option>)}
+            </select>
+          </label>
+          <label>
+            Contact method{" "}
+            <select value={contactMethodFilter} onChange={(event) => setContactMethodFilter(event.target.value)}>
+              <option value="">All methods</option>
+              <option value="email">Has email</option>
+              <option value="linkedin">Has LinkedIn profile</option>
+              <option value="both">Has email and LinkedIn</option>
+              <option value="none">No direct contact method</option>
+            </select>
+          </label>
           <input
             className="select-input"
             placeholder="Search contacts"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
-          {campaignId || searchTerm ? (
+          {campaignId || searchTerm || sourceFilter || contactMethodFilter ? (
             <Button
               variant="outline"
               onClick={() => {
                 setCampaignId("");
                 setSearchTerm("");
+                setSourceFilter("");
+                setContactMethodFilter("");
               }}
             >
               Clear filters
@@ -1965,8 +2024,7 @@ export default function Contacts() {
             ["attention", "Data quality review"],
             ["ready", "Ready to assign"],
             ["assigned", "Campaign assigned"],
-            ["linkedin", "LinkedIn contacts"],
-            ["linkedin-review", "LinkedIn review queue"],
+            ["linkedin-review", "LinkedIn outreach"],
             ...(importSummary?.importBatchId ? [["latest-import", `Latest import (${latestImportTotal})`]] : []),
             ["unsubscribed", `Unsubscribed (${unsubscribedContacts.length})`],
             ["archived", "Archived"],
@@ -2223,6 +2281,7 @@ export default function Contacts() {
                         >
                           <span className="crm-pipeline__drag" aria-hidden="true">⋮⋮</span>
                           <strong>{contact.name}</strong>
+                          <span className={`contact-origin is-${contactSourceKey(contact)}`}>{contactSourceLabel(contact)}</span>
                           {contactTab === "latest-import" ? <mark className={`latest-import-badge is-${latestImportLabel(contact).toLowerCase()}`}>{latestImportLabel(contact)}</mark> : null}
                           <span>{contact.title || "Role missing"}</span>
                           <small>{contact.company || "Company missing"}</small>
@@ -2297,6 +2356,7 @@ export default function Contacts() {
                         />
                         <div>
                           <h3>{contact.name}</h3>
+                          <span className={`contact-origin is-${contactSourceKey(contact)}`}>{contactSourceLabel(contact)}</span>
                           {contactTab === "latest-import" ? <mark className={`latest-import-badge is-${latestImportLabel(contact).toLowerCase()}`}>{latestImportLabel(contact)}</mark> : null}
                           <p>
                             {contact.title || "Title missing"}
@@ -3005,6 +3065,12 @@ export default function Contacts() {
               {previewStats?.missingName || 0}; missing email:{" "}
               {previewStats?.missingEmail || 0}; malformed:{" "}
               {previewStats?.malformed || 0}.
+            </p>
+            <p className={`import-source-detection ${importSource === "linkedin_csv" ? "is-linkedin" : ""}`}>
+              <strong>Detected source:</strong>{" "}
+              {importSource === "linkedin_csv"
+                ? "LinkedIn connections export. These contacts will be labeled LinkedIn CSV."
+                : "General CSV import. Contacts will retain CSV import as their origin."}
             </p>
             <section className="contact-list-workbench">
               <div>
