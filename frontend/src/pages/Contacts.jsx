@@ -34,6 +34,8 @@ import {
   fetchJarvisEditableContactFields,
   prepareJarvisContactFieldUpdate,
   confirmJarvisContactFieldUpdate,
+  generateLinkedinContactDraft,
+  updateLinkedinContactOutreach,
 } from "../services/api.js";
 import useInitiative from "../context/useInitiative.js";
 
@@ -50,6 +52,7 @@ const recognizedImportHeaders = [
   "Phone",
   "Work Direct Phone",
   "Person Linkedin Url",
+  "Connected On",
   "Website",
   "Location",
   "City",
@@ -545,12 +548,65 @@ export default function Contacts() {
   const [cardDuplicate, setCardDuplicate] = useState(null);
   const [cardCampaignId, setCardCampaignId] = useState("");
   const [cardScanning, setCardScanning] = useState(false);
+  const [linkedinDraft, setLinkedinDraft] = useState("");
+  const [linkedinTone, setLinkedinTone] = useState("warm_direct");
+  const [linkedinSaving, setLinkedinSaving] = useState(false);
+  const [linkedinNotice, setLinkedinNotice] = useState("");
   const cardVideoRef = useRef(null);
   const cardStreamRef = useRef(null);
   const cardFrameRef = useRef(null);
   const cardDeepLinkHandled = useRef(false);
   const loadContactsRef = useRef(null);
   const pageSize = 15;
+
+  function openContactDetail(contact) {
+    setDetailContact(contact);
+    setLinkedinDraft(contact.linkedinOutreach?.draft || "");
+    setLinkedinTone(contact.linkedinOutreach?.tone || "warm_direct");
+    setLinkedinNotice("");
+  }
+
+  async function generateLinkedinDraft() {
+    if (!detailContact?.linkedin) return;
+    try {
+      setLinkedinSaving(true);
+      setLinkedinNotice("Preparing a personal draft…");
+      const response = await generateLinkedinContactDraft(detailContact._id, linkedinTone);
+      setDetailContact(response.data);
+      setLinkedinDraft(response.data.linkedinOutreach?.draft || "");
+      setLinkedinNotice("Draft prepared. Review and approve it before opening LinkedIn.");
+    } catch (err) {
+      setLinkedinNotice(err.response?.data?.message || "Unable to prepare the draft.");
+    } finally {
+      setLinkedinSaving(false);
+    }
+  }
+
+  async function saveLinkedinOutreach(status, extra = {}) {
+    if (!detailContact) return;
+    try {
+      setLinkedinSaving(true);
+      const response = await updateLinkedinContactOutreach(detailContact._id, { draft: linkedinDraft, tone: linkedinTone, status, ...extra });
+      setDetailContact(response.data);
+      setLinkedinNotice(status === "approved" ? "Approved. The supervised LinkedIn handoff is ready." : "Outreach status saved.");
+      await loadContactsRef.current?.();
+    } catch (err) {
+      setLinkedinNotice(err.response?.data?.message || "Unable to save LinkedIn outreach.");
+    } finally {
+      setLinkedinSaving(false);
+    }
+  }
+
+  async function openLinkedinHandoff() {
+    if (!detailContact?.linkedin || detailContact.linkedinOutreach?.status !== "approved") return;
+    try {
+      await navigator.clipboard.writeText(linkedinDraft);
+      window.open(detailContact.linkedin, "_blank", "noopener,noreferrer");
+      setLinkedinNotice("Draft copied and LinkedIn opened. Paste, review, and send it yourself.");
+    } catch {
+      setLinkedinNotice("Clipboard access was blocked. Copy the draft manually, then open LinkedIn.");
+    }
+  }
 
   useEffect(() => {
     if (cardDeepLinkHandled.current || searchParams.get("scan") !== "business-card") return;
@@ -879,6 +935,10 @@ export default function Contacts() {
               ? workflow.key === "ready"
               : contactTab === "assigned"
                 ? workflow.key === "assigned"
+                : contactTab === "linkedin"
+                  ? Boolean(contact.linkedin)
+                  : contactTab === "linkedin-review"
+                    ? Boolean(contact.linkedin) && ["drafted", "approved"].includes(contact.linkedinOutreach?.status)
                 : true;
         return (
           tabMatches &&
@@ -1895,6 +1955,8 @@ export default function Contacts() {
             ["attention", "Data quality review"],
             ["ready", "Ready to assign"],
             ["assigned", "Campaign assigned"],
+            ["linkedin", "LinkedIn contacts"],
+            ["linkedin-review", "LinkedIn review queue"],
             ["unsubscribed", `Unsubscribed (${unsubscribedContacts.length})`],
             ["archived", "Archived"],
           ].map(([value, label]) => (
@@ -2136,7 +2198,7 @@ export default function Contacts() {
                               String(contact._id),
                             )
                           }
-                          onClick={() => setDetailContact(contact)}
+                          onClick={() => openContactDetail(contact)}
                         >
                           <span className="crm-pipeline__drag" aria-hidden="true">⋮⋮</span>
                           <strong>{contact.name}</strong>
@@ -2185,7 +2247,7 @@ export default function Contacts() {
                   <article
                     className="contact-record"
                     key={contact._id}
-                    onClick={() => setDetailContact(contact)}
+                    onClick={() => openContactDetail(contact)}
                   >
                     <header>
                       <div className="contact-record__identity">
@@ -2279,7 +2341,7 @@ export default function Contacts() {
                           </button>
                           {actionMenu === contact._id ? (
                             <div className="crm-menu">
-                              <button onClick={() => setDetailContact(contact)}>
+                              <button onClick={() => openContactDetail(contact)}>
                                 View details
                               </button>
                               <button
@@ -2369,6 +2431,10 @@ export default function Contacts() {
               ? "No verified contacts are waiting for a campaign assignment."
               : contactTab === "attention"
                 ? "No contacts need a data-quality decision right now."
+                : contactTab === "linkedin"
+                  ? "No contacts with LinkedIn profile URLs match this view."
+                  : contactTab === "linkedin-review"
+                    ? "No LinkedIn drafts are waiting for review or handoff."
                 : "No contacts match this view."}
           </div>
         )}
@@ -3457,6 +3523,58 @@ export default function Contacts() {
                   on {unsubscribeDate(detailContact)}. Growth Operator will keep campaign
                   sending blocked unless the contact explicitly opts in again.
                 </p>
+              </section>
+            ) : null}
+            {detailContact.linkedin ? (
+              <section className="linkedin-outreach-card">
+                <header>
+                  <div>
+                    <span>LinkedIn outreach</span>
+                    <h3>Review the message, then hand it off</h3>
+                    <p>Growth Operator prepares and tracks the draft. You remain responsible for pasting and sending it on LinkedIn.</p>
+                  </div>
+                  <em className={`is-${detailContact.linkedinOutreach?.status || "not_started"}`}>
+                    {(detailContact.linkedinOutreach?.status || "not_started").replaceAll("_", " ")}
+                  </em>
+                </header>
+                <div className="linkedin-outreach-card__toolbar">
+                  <label>Writing style
+                    <select value={linkedinTone} onChange={(event) => setLinkedinTone(event.target.value)}>
+                      <option value="warm_direct">Warm and direct</option>
+                      <option value="friendly_reconnect">Friendly reconnect</option>
+                      <option value="concise_professional">Concise professional</option>
+                    </select>
+                  </label>
+                  <Button size="sm" variant="outline" disabled={linkedinSaving} onClick={generateLinkedinDraft}>
+                    {linkedinSaving ? "Preparing…" : linkedinDraft ? "Regenerate draft" : "Generate draft"}
+                  </Button>
+                </div>
+                <label className="linkedin-outreach-card__draft">
+                  <span>Message draft</span>
+                  <textarea value={linkedinDraft} maxLength={3000} onChange={(event) => setLinkedinDraft(event.target.value)} placeholder="Generate a draft or write your own personal message." />
+                  <small>{linkedinDraft.length} characters</small>
+                </label>
+                <div className="linkedin-outreach-card__actions">
+                  <Button variant="outline" disabled={!linkedinDraft.trim() || linkedinSaving} onClick={() => saveLinkedinOutreach("approved")}>Approve draft</Button>
+                  <Button disabled={detailContact.linkedinOutreach?.status !== "approved" || linkedinSaving} onClick={openLinkedinHandoff}>Copy draft & open LinkedIn ↗</Button>
+                </div>
+                <div className="linkedin-outreach-card__tracking">
+                  <label>Status
+                    <select value={detailContact.linkedinOutreach?.status || "not_started"} onChange={(event) => saveLinkedinOutreach(event.target.value)}>
+                      <option value="not_started">Not started</option>
+                      <option value="drafted">Drafted</option>
+                      <option value="approved">Approved</option>
+                      <option value="sent">Sent</option>
+                      <option value="replied">Replied</option>
+                      <option value="not_interested">Not interested</option>
+                    </select>
+                  </label>
+                  <label>Follow up
+                    <input type="date" value={detailContact.linkedinOutreach?.followUpAt?.slice?.(0, 10) || ""} onChange={(event) => saveLinkedinOutreach(detailContact.linkedinOutreach?.status || "drafted", { followUpAt: event.target.value })} />
+                  </label>
+                </div>
+                {linkedinNotice ? <p className="linkedin-outreach-card__notice" role="status">{linkedinNotice}</p> : null}
+                <p className="linkedin-outreach-card__safety"><strong>Supervised workflow:</strong> this opens the saved profile and copies your approved draft. It never logs into LinkedIn, pastes, clicks Send, or runs unattended.</p>
               </section>
             ) : null}
             {contactDetailGroups.map(([group, fields]) => {

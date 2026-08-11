@@ -406,6 +406,10 @@ export const revokeMcpAccessToken = (id) =>
 export const archiveContact = (contactId) => api.post(`/contacts/${contactId}/archive`).then((res) => res.data);
 export const deleteContact = (contactId, confirmCascade = false) => api.delete(`/contacts/${contactId}`, { data: { confirmCascade } }).then((res) => res.data);
 export const updateContact = (contactId, data) => api.patch(`/contacts/${contactId}`, data).then((res) => res.data);
+export const generateLinkedinContactDraft = (contactId, tone = "warm_direct") =>
+  api.post(`/contacts/${contactId}/linkedin-draft`, { tone }).then((res) => res.data);
+export const updateLinkedinContactOutreach = (contactId, data) =>
+  api.patch(`/contacts/${contactId}/linkedin-outreach`, data).then((res) => res.data);
 export const extractBusinessCard = (image) => api.post("/contacts/business-card/extract", { image }).then((res) => res.data);
 export const resolveDigitalBusinessCard = (url) => api.post("/contacts/business-card/resolve", { url }).then((res) => res.data);
 export const bulkAssignContactsToCampaign = (contactIds, campaignId) =>

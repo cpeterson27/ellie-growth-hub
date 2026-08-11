@@ -145,6 +145,16 @@ const contactSchema = new mongoose.Schema(
     lastImportFileName: { type: String, default: "", trim: true },
     lastImportedAt: { type: Date, default: null },
 
+    linkedinOutreach: {
+      status: { type: String, enum: ["not_started", "drafted", "approved", "sent", "replied", "not_interested"], default: "not_started" },
+      draft: { type: String, default: "", maxlength: 3000 },
+      tone: { type: String, default: "warm_direct" },
+      approvedAt: { type: Date, default: null },
+      sentAt: { type: Date, default: null },
+      followUpAt: { type: Date, default: null },
+      lastGeneratedAt: { type: Date, default: null },
+    },
+
     campaignIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: "Campaign",

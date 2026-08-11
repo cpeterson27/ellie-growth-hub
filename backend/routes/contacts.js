@@ -16,6 +16,7 @@ const Outreach = require("../models/Outreach");
 const { applyResearchClassification } = require("../services/contactResearchService");
 const { assessEmail } = require("../services/emailRiskService");
 const { extractBusinessCard, extractDigitalBusinessCard } = require("../services/businessCardExtractionService");
+const { generateLinkedinDraft } = require("../services/linkedinOutreachService");
 
 const router = express.Router();
 
@@ -653,5 +654,35 @@ router.post("/ingest/preview", async (req, res) => {
 });
 
 router.get("/import/field-map", (req, res) => res.json({ success: true, data: canonicalFieldMap }));
+
+router.post("/:id/linkedin-draft", async (req, res) => {
+  try {
+    const contact = await Contact.findById(req.params.id);
+    if (!contact) return res.status(404).json({ success: false, message: "Contact not found" });
+    if (!contact.linkedin) return res.status(400).json({ success: false, message: "Add this contact’s LinkedIn URL first." });
+    const tone = req.body?.tone || "warm_direct";
+    contact.linkedinOutreach = { ...(contact.linkedinOutreach?.toObject?.() || contact.linkedinOutreach || {}), draft: generateLinkedinDraft(contact, tone), tone, status: "drafted", approvedAt: null, lastGeneratedAt: new Date() };
+    await contact.save();
+    return res.json({ success: true, data: contact, message: "LinkedIn draft prepared. Nothing was sent." });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || "Unable to generate LinkedIn draft" });
+  }
+});
+
+router.patch("/:id/linkedin-outreach", async (req, res) => {
+  try {
+    const contact = await Contact.findById(req.params.id);
+    if (!contact) return res.status(404).json({ success: false, message: "Contact not found" });
+    const allowedStatuses = ["not_started", "drafted", "approved", "sent", "replied", "not_interested"];
+    const status = allowedStatuses.includes(req.body?.status) ? req.body.status : contact.linkedinOutreach?.status || "not_started";
+    const draft = String(req.body?.draft ?? contact.linkedinOutreach?.draft ?? "").trim().slice(0, 3000);
+    if (status === "approved" && !draft) return res.status(400).json({ success: false, message: "Write or generate a draft before approving it." });
+    contact.linkedinOutreach = { ...(contact.linkedinOutreach?.toObject?.() || contact.linkedinOutreach || {}), draft, status, tone: String(req.body?.tone || contact.linkedinOutreach?.tone || "warm_direct"), followUpAt: req.body?.followUpAt ? new Date(req.body.followUpAt) : contact.linkedinOutreach?.followUpAt || null, approvedAt: status === "approved" ? new Date() : contact.linkedinOutreach?.approvedAt || null, sentAt: status === "sent" ? new Date() : contact.linkedinOutreach?.sentAt || null };
+    await contact.save();
+    return res.json({ success: true, data: contact, message: "LinkedIn outreach updated. Nothing was sent." });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || "Unable to update LinkedIn outreach" });
+  }
+});
 
 module.exports = router;
