@@ -17,6 +17,7 @@ const { applyResearchClassification } = require("../services/contactResearchServ
 const { assessEmail } = require("../services/emailRiskService");
 const { extractBusinessCard, extractDigitalBusinessCard } = require("../services/businessCardExtractionService");
 const { generateLinkedinDraft } = require("../services/linkedinOutreachService");
+const { getConnectionPriorities } = require("../services/campaignAudienceService");
 
 const router = express.Router();
 
@@ -369,6 +370,16 @@ router.get("/overview", async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: "Unable to summarize contacts" });
+  }
+});
+
+router.get("/priorities/ranked", async (req, res) => {
+  try {
+    if (!req.query.campaignId) return res.status(400).json({ success: false, message: "Choose a campaign to rank connections." });
+    const result = await getConnectionPriorities(req.query.campaignId);
+    return res.json({ success: true, data: { campaign: { _id: result.campaign._id, name: result.campaign.name, audience: result.campaign.audience || [] }, counts: result.counts, connections: result.ranked } });
+  } catch (error) {
+    return res.status(error.message === "Campaign not found" ? 404 : 400).json({ success: false, message: error.message || "Unable to rank connections" });
   }
 });
 

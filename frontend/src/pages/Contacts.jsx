@@ -18,6 +18,7 @@ import {
 import {
   fetchContacts,
   fetchContactOverview,
+  fetchConnectionPriorities,
   fetchCampaigns,
   ingestContacts,
   previewContactIngestion,
@@ -552,6 +553,9 @@ export default function Contacts() {
   const [sourceFilter, setSourceFilter] = useState("");
   const [contactMethodFilter, setContactMethodFilter] = useState("");
   const [availableSources, setAvailableSources] = useState([]);
+  const [connectionPriorities, setConnectionPriorities] = useState(null);
+  const [priorityLoading, setPriorityLoading] = useState(false);
+  const [priorityFilter, setPriorityFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [verifyingEmails, setVerifyingEmails] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(null);
@@ -1013,12 +1017,34 @@ export default function Contacts() {
       setLoading(false);
     }
   }
+
+  async function loadConnectionPriorities(selectedCampaignId = campaignId) {
+    if (!selectedCampaignId) {
+      setConnectionPriorities(null);
+      return;
+    }
+    try {
+      setPriorityLoading(true);
+      setError("");
+      const response = await fetchConnectionPriorities(selectedCampaignId);
+      setConnectionPriorities(response.data);
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to rank connections for this campaign.");
+    } finally {
+      setPriorityLoading(false);
+    }
+  }
   useEffect(() => { loadContactsRef.current = loadContacts; });
 
   useEffect(() => {
     const refreshContacts = window.setTimeout(() => loadContactsRef.current?.(), 0);
     return () => window.clearTimeout(refreshContacts);
   }, [contactTab, campaignId, searchTerm, searchParams, sourceFilter, contactMethodFilter, importSummary?.importBatchId]);
+
+  useEffect(() => {
+    if (contactTab !== "best-connections") return;
+    loadConnectionPriorities(campaignId);
+  }, [contactTab, campaignId]);
 
   useEffect(() => {
     fetchLatestContactImport()
@@ -2024,6 +2050,7 @@ export default function Contacts() {
             ["attention", "Data quality review"],
             ["ready", "Ready to assign"],
             ["assigned", "Campaign assigned"],
+            ["best-connections", "Best connections"],
             ["linkedin-review", "LinkedIn outreach"],
             ...(importSummary?.importBatchId ? [["latest-import", `Latest import (${latestImportTotal})`]] : []),
             ["unsubscribed", `Unsubscribed (${unsubscribedContacts.length})`],
@@ -2038,6 +2065,53 @@ export default function Contacts() {
             </button>
           ))}
         </div>
+        {contactTab === "best-connections" ? (
+          <section className="best-connections-workspace">
+            <header>
+              <div>
+                <span>CAMPAIGN PRIORITY</span>
+                <h2>Who should you contact first?</h2>
+                <p>Choose a campaign to rank every active relationship by campaign fit, decision authority, reachability, profile confidence, and prior relationship context.</p>
+              </div>
+              <label>Campaign
+                <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}>
+                  <option value="">Choose a campaign</option>
+                  {campaigns.map((campaign) => <option key={campaign._id} value={campaign._id}>{campaign.name}</option>)}
+                </select>
+              </label>
+            </header>
+            {!campaignId ? (
+              <div className="best-connections-empty"><strong>Select the offer or event you are promoting.</strong><p>Scores change by campaign because the best connection for one offer may be a poor fit for another.</p></div>
+            ) : priorityLoading ? (
+              <div className="table-state">Ranking connections…</div>
+            ) : connectionPriorities ? (
+              <>
+                <div className="priority-summary">
+                  <button className={priorityFilter === "all" ? "active" : ""} onClick={() => setPriorityFilter("all")}><strong>{connectionPriorities.counts.total}</strong><span>All ranked</span></button>
+                  <button className={priorityFilter === "high" ? "active high" : "high"} onClick={() => setPriorityFilter("high")}><strong>{connectionPriorities.counts.high}</strong><span>High priority</span></button>
+                  <button className={priorityFilter === "medium" ? "active medium" : "medium"} onClick={() => setPriorityFilter("medium")}><strong>{connectionPriorities.counts.medium}</strong><span>Medium priority</span></button>
+                  <button className={priorityFilter === "low" ? "active low" : "low"} onClick={() => setPriorityFilter("low")}><strong>{connectionPriorities.counts.low}</strong><span>Needs review</span></button>
+                </div>
+                <div className="priority-audience"><strong>Ranking against:</strong>{connectionPriorities.campaign.audience?.length ? connectionPriorities.campaign.audience.map((audience) => <span key={audience}>{audience}</span>) : <em>No confirmed target audience—add one in the campaign before trusting the ranking.</em>}</div>
+                <div className="priority-list">
+                  {connectionPriorities.connections.filter((item) => priorityFilter === "all" || item.priority === priorityFilter).map((item, index) => (
+                    <article key={item.contact._id} className={`priority-card is-${item.priority}`}>
+                      <div className="priority-rank">#{index + 1}</div>
+                      <div className="priority-score"><strong>{item.score}</strong><span>/100</span><em>{item.priority} priority</em></div>
+                      <div className="priority-person">
+                        <h3>{item.contact.name}</h3>
+                        <p>{item.contact.title || "Role missing"}{item.contact.company ? ` · ${item.contact.company}` : ""}</p>
+                        <div>{item.reasons.length ? item.reasons.slice(0, 4).map((reason) => <span key={`${reason.label}-${reason.detail}`} title={`${reason.label}: +${reason.points}`}>{reason.detail}</span>) : <span>Not enough campaign-fit data yet</span>}</div>
+                      </div>
+                      <div className="priority-action"><span>Best channel</span><strong>{item.recommendedChannel}</strong><p>{item.nextAction}</p><Button size="sm" variant="outline" onClick={() => openContactDetail(item.contact)}>Review contact</Button></div>
+                    </article>
+                  ))}
+                </div>
+                <p className="priority-disclosure"><strong>How scoring works:</strong> scores use only saved CRM data and the campaign’s confirmed audience. They do not use private LinkedIn activity, buyer intent, profile views, or inferred personal information.</p>
+              </>
+            ) : null}
+          </section>
+        ) : null}
         {contactTab === "latest-import" && importSummary?.importBatchId ? (
           <section className="latest-import-banner" role="status">
             <div>
@@ -2048,7 +2122,7 @@ export default function Contacts() {
             <Button variant="outline" size="sm" onClick={() => setContactTab("all")}>Return to all contacts</Button>
           </section>
         ) : null}
-        {contacts.length &&
+        {contactTab !== "best-connections" && contacts.length &&
         !["archived", "unsubscribed"].includes(contactTab) ? (
           <section
             className={`contact-bulk-actions ${selectedContactIds.length ? "has-selection" : ""}`}
@@ -2240,7 +2314,7 @@ export default function Contacts() {
             </Button>
           </nav>
         ) : null}
-        {!loading && contacts.length && crmView === "pipeline" ? (
+        {contactTab !== "best-connections" && !loading && contacts.length && crmView === "pipeline" ? (
           <section
             className="crm-pipeline"
             aria-label="Contact lifecycle pipeline"
@@ -2316,7 +2390,7 @@ export default function Contacts() {
             })}
           </section>
         ) : null}
-        {loading ? (
+        {contactTab === "best-connections" ? null : loading ? (
           <div className="table-state">Loading contacts…</div>
         ) : contacts.length && crmView === "list" ? (
           <div className="contact-record-list contact-record-list--compact">

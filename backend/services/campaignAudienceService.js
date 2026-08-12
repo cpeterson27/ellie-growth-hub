@@ -73,6 +73,45 @@ function matchReasons(contact, audiences = []) {
   return reasons;
 }
 
+function connectionPriority(contact, campaign) {
+  let score = 0;
+  const reasons = [];
+  const audienceReasons = matchReasons(contact, campaign.audience || []);
+  const audienceHits = [...new Set(audienceReasons.flatMap((reason) => reason.terms))];
+  if (audienceHits.length) {
+    const points = Math.min(45, 25 + (audienceHits.length - 1) * 7);
+    score += points;
+    reasons.push({ label: "Campaign fit", detail: `Matches ${audienceHits.slice(0, 3).join(", ")}`, points });
+  }
+  const authorityText = `${contact.title || ""} ${contact.seniority || ""}`.toLowerCase();
+  const highAuthority = /\b(owner|founder|co-founder|chief|ceo|cfo|coo|cto|president|partner|principal|vp|vice president|head|director)\b/.test(authorityText);
+  const midAuthority = /\b(manager|lead|senior|broker|investor|operator|developer)\b/.test(authorityText);
+  if (highAuthority) { score += 20; reasons.push({ label: "Decision authority", detail: contact.title || contact.seniority || "Senior decision-maker", points: 20 }); }
+  else if (midAuthority) { score += 12; reasons.push({ label: "Role relevance", detail: contact.title || contact.seniority || "Relevant role", points: 12 }); }
+  if (contact.emailStatus === "verified" && contact.email) { score += 9; reasons.push({ label: "Reachable", detail: "Verified email available", points: 9 }); }
+  else if (contact.email) { score += 4; reasons.push({ label: "Contact method", detail: "Email available but needs review", points: 4 }); }
+  if (contact.linkedin) { score += 8; reasons.push({ label: "Warm channel", detail: "LinkedIn profile available", points: 8 }); }
+  const contextFields = [contact.company, contact.title, contact.industry, contact.seniority].filter(Boolean).length;
+  const contextPoints = Math.min(10, contextFields * 2.5);
+  if (contextPoints) { score += contextPoints; reasons.push({ label: "Profile confidence", detail: `${contextFields} useful profile fields`, points: contextPoints }); }
+  const connectedOn = contact.additionalFields?.["Connected On"] || contact.additionalFields?.connectedOn;
+  if (connectedOn) { score += 5; reasons.push({ label: "Relationship context", detail: `Connected ${connectedOn}`, points: 5 }); }
+  if (contact.replied || contact.lastContacted) { score += 5; reasons.push({ label: "Prior engagement", detail: contact.replied ? "Previously replied" : "Prior contact recorded", points: 5 }); }
+  score = Math.min(100, Math.round(score));
+  const priority = score >= 75 ? "high" : score >= 50 ? "medium" : "low";
+  const recommendedChannel = contact.emailStatus === "verified" && contact.email && contact.linkedin ? "Email, then LinkedIn" : contact.linkedin ? "LinkedIn" : contact.emailStatus === "verified" && contact.email ? "Email" : "Research contact method";
+  const nextAction = !audienceHits.length ? "Review campaign fit" : recommendedChannel === "LinkedIn" ? "Generate a LinkedIn reconnect draft" : recommendedChannel === "Email, then LinkedIn" ? "Start with a personal email and use LinkedIn for follow-up" : recommendedChannel === "Email" ? "Prepare a personal campaign email" : "Find or confirm a safe contact method";
+  return { score, priority, reasons, recommendedChannel, nextAction };
+}
+
+async function getConnectionPriorities(campaignId) {
+  const campaign = await Campaign.findById(campaignId).lean();
+  if (!campaign) throw new Error("Campaign not found");
+  const contacts = await Contact.find({ status: { $nin: ["archived", "unsubscribed", "invalid", "rejected"] } }).lean();
+  const ranked = contacts.map((contact) => ({ contact, ...connectionPriority(contact, campaign) })).sort((a, b) => b.score - a.score || String(a.contact.name).localeCompare(String(b.contact.name)));
+  return { campaign, ranked, counts: { total: ranked.length, high: ranked.filter((item) => item.priority === "high").length, medium: ranked.filter((item) => item.priority === "medium").length, low: ranked.filter((item) => item.priority === "low").length } };
+}
+
 async function getCampaignMatches(campaignId) {
   const campaign = await Campaign.findById(campaignId);
   if (!campaign) throw new Error("Campaign not found");
@@ -140,4 +179,6 @@ module.exports = {
   getCampaignMatches,
   matchReasons,
   searchableText,
+  connectionPriority,
+  getConnectionPriorities,
 };

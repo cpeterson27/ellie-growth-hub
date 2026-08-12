@@ -281,6 +281,8 @@ export const fetchContacts = (params = {}) =>
 
 export const fetchContactOverview = () =>
   api.get("/contacts/overview").then((res) => res.data);
+export const fetchConnectionPriorities = (campaignId) =>
+  api.get("/contacts/priorities/ranked", { params: { campaignId } }).then((res) => res.data);
 
 
 export const fetchIntegrationHub = () =>
