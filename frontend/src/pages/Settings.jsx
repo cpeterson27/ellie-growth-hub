@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiArrowUpRight, FiBriefcase, FiCpu, FiImage, FiLock, FiMail, FiShield, FiTrash2, FiUser, FiUsers } from "react-icons/fi";
+import { FiArrowUpRight, FiBriefcase, FiCheck, FiCopy, FiCpu, FiImage, FiLock, FiMail, FiShield, FiTrash2, FiUser, FiUsers } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import useAuth from "../context/useAuth.js";
 import { changePassword, createMcpAccessToken, createWorkspaceMember, fetchCampaigns, fetchGmailConnection, fetchMcpAccessTokens, fetchOAuthConnections, fetchWorkspaceConfig, fetchWorkspaceMembers, getGptActionsSchemaEndpoint, getMcpEndpoint, revokeMcpAccessToken, revokeOAuthConnection, updateWorkspaceConfig, uploadEventImage } from "../services/api.js";
@@ -29,6 +29,20 @@ export default function Settings() {
   const [newMcpToken, setNewMcpToken] = useState(null);
   const [mcpName, setMcpName] = useState("Growth Operator");
   const [oauthConnections, setOauthConnections] = useState([]);
+  const [copiedValue, setCopiedValue] = useState("");
+
+  const mcpEndpoint = getMcpEndpoint();
+  const codexCommand = `codex mcp add growth-operator --url "${mcpEndpoint}" --bearer-token-env-var GROWTH_OPERATOR_TOKEN`;
+
+  const copyValue = async (label, value) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedValue(label);
+      window.setTimeout(() => setCopiedValue((current) => current === label ? "" : current), 1800);
+    } catch {
+      setError("Copying was blocked by the browser. Select the value and copy it manually.");
+    }
+  };
 
   useEffect(() => {
     fetchWorkspaceConfig().then((config) => {
@@ -222,9 +236,19 @@ export default function Settings() {
         <section className="settings-section">
           <div className="settings-section__heading"><FiCpu /><div><h3>Create a secure private connection</h3><p>For a ChatGPT Plus Custom GPT, create one token here and configure it as a Bearer API key. Tokens expire after 90 days and can be revoked at any time.</p></div></div>
           <div className="settings-ai-create"><input value={mcpName} onChange={(event) => setMcpName(event.target.value)} placeholder="Connection name" /><Button loading={saving} disabled={mcpName.trim().length < 2} onClick={connectAi}>Create connection</Button></div>
-          {newMcpToken ? <div className="settings-token-reveal"><strong>Copy this token now—it will not be shown again.</strong><code>{newMcpToken.token}</code><small>ChatGPT Actions schema: {getGptActionsSchemaEndpoint()}</small><small>MCP URL for compatible clients: {getMcpEndpoint()}</small><small>Keep the Custom GPT private. Publishing it could allow other people to use your Growth Operator permissions.</small></div> : null}
+          {newMcpToken ? <div className="settings-token-reveal"><strong>Copy this token now—it will not be shown again.</strong><div className="settings-copy-row"><code>{newMcpToken.token}</code><button type="button" onClick={() => copyValue("token", newMcpToken.token)}>{copiedValue === "token" ? <FiCheck /> : <FiCopy />}{copiedValue === "token" ? "Copied" : "Copy token"}</button></div><small>Keep this connection private. Anyone with its token can use your Growth Operator permissions.</small></div> : null}
         </section>
-        <section className="settings-section"><div className="settings-section__heading"><FiShield /><div><h3>Active connections</h3><p>Every tool call is workspace-scoped and recorded in Growth Operator's audit log.</p></div></div><div className="team-member-list">{oauthConnections.map((connection) => <div key={connection.id}><span><strong>{connection.name}</strong><small>OAuth connection · {connection.scopes.join(" · ")}</small></span><button className="settings-revoke" onClick={() => disconnectAiApp(connection.clientId)} aria-label={`Disconnect ${connection.name}`}><FiTrash2 /></button></div>)}{mcpTokens.map((token) => <div key={token._id || token.id}><span><strong>{token.name}</strong><small>{token.prefix}… · expires {new Date(token.expiresAt).toLocaleDateString()}</small></span><button className="settings-revoke" onClick={() => revokeAi(token._id || token.id)} aria-label={`Revoke ${token.name}`}><FiTrash2 /></button></div>)}{!oauthConnections.length && !mcpTokens.length ? <p>No AI assistants connected yet.</p> : null}</div></section>
+        <section className="settings-section">
+          <div className="settings-section__heading"><FiCpu /><div><h3>Connect from Codex or another MCP client</h3><p>The server address is always available here. The secret token is shown only once when a connection is created.</p></div></div>
+          <div className="settings-connection-details">
+            <label><span>MCP server URL</span><div className="settings-copy-row"><code>{mcpEndpoint}</code><button type="button" onClick={() => copyValue("endpoint", mcpEndpoint)}>{copiedValue === "endpoint" ? <FiCheck /> : <FiCopy />}{copiedValue === "endpoint" ? "Copied" : "Copy URL"}</button></div></label>
+            <label><span>Codex setup command</span><div className="settings-copy-row"><code>{codexCommand}</code><button type="button" onClick={() => copyValue("codex", codexCommand)}>{copiedValue === "codex" ? <FiCheck /> : <FiCopy />}{copiedValue === "codex" ? "Copied" : "Copy command"}</button></div></label>
+            <ol><li>Save the newly created token in the <code>GROWTH_OPERATOR_TOKEN</code> environment variable.</li><li>Run the Codex command above, then restart Codex.</li></ol>
+            <p className="settings-token-warning"><strong>Didn’t save the token?</strong> For security, it cannot be recovered. Revoke that connection below and create a replacement.</p>
+            <small>ChatGPT Actions schema: {getGptActionsSchemaEndpoint()}</small>
+          </div>
+        </section>
+        <section className="settings-section"><div className="settings-section__heading"><FiShield /><div><h3>Active connections</h3><p>Every tool call is workspace-scoped and recorded in Growth Operator's audit log.</p></div></div><div className="team-member-list">{oauthConnections.map((connection) => <div key={connection.id}><span><strong>{connection.name}</strong><small>OAuth connection · {connection.scopes.join(" · ")}</small></span><button className="settings-revoke" onClick={() => disconnectAiApp(connection.clientId)} aria-label={`Disconnect ${connection.name}`}><FiTrash2 /></button></div>)}{mcpTokens.map((token) => <div key={token._id || token.id}><span><strong>{token.name}</strong><small>{token.prefix}… · expires {new Date(token.expiresAt).toLocaleDateString()} · secret hidden after creation</small></span><button className="settings-revoke" onClick={() => revokeAi(token._id || token.id)} aria-label={`Revoke ${token.name}`}><FiTrash2 /></button></div>)}{!oauthConnections.length && !mcpTokens.length ? <p>No AI assistants connected yet.</p> : null}</div></section>
       </div> : <form className="account-settings-panel account-settings-panel--refined" onSubmit={(event) => { event.preventDefault(); addMember(); }}>
         <header><p className="page-eyebrow">Team access</p><h2>Workspace members</h2><p>Add a teammate with a temporary password, then send their login details securely.</p></header>
         <section className="settings-section"><div className="team-member-list">{members.map((member) => <div key={member.id}><span><strong>{member.name}</strong><small>{member.email}</small></span><em>{member.role}</em></div>)}</div></section>
