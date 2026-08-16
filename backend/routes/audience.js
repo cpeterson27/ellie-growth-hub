@@ -225,11 +225,30 @@ router.get("/research/signals", async (req, res) => {
     providerContactId: { $in: acceptedSignals.map((signal) => String(signal._id)) },
   }).select("name email emailStatus company title researchStatus stage providerContactId website").lean();
   const contactsBySignal = new Map(contacts.map((contact) => [String(contact.providerContactId), contact]));
-  return res.json({ success: true, signals: acceptedSignals.map((signal) => ({
-    ...signal,
-    emailDrafts: draftsBySignal.get(String(signal._id)) || [],
-    crmContact: contactsBySignal.get(String(signal._id)) || null,
-  })), automaticallyRejected: rejected.length });
+  const categorizedSignals = acceptedSignals.map((signal) => {
+    const emailDrafts = draftsBySignal.get(String(signal._id)) || [];
+    const crmContact = contactsBySignal.get(String(signal._id)) || null;
+    const monitor = monitorMap.get(String(signal.monitorId));
+    const opportunityType = opportunityKind(signal, monitor);
+    return {
+      ...signal,
+      opportunityType,
+      monitorType: monitor?.monitorType || "",
+      nextStep: opportunityNextStep(signal, opportunityType, crmContact, emailDrafts),
+      emailDrafts,
+      crmContact,
+    };
+  });
+  const summary = categorizedSignals.reduce((counts, signal) => {
+    counts.total += 1;
+    counts[signal.opportunityType] += 1;
+    counts[signal.status] = (counts[signal.status] || 0) + 1;
+    if (signal.nextStep === "identify_person") counts.needsIdentity += 1;
+    if (signal.nextStep === "verify_email") counts.needsEmailVerification += 1;
+    if (["create_draft", "review_draft", "ready_in_outreach"].includes(signal.nextStep)) counts.contactReady += 1;
+    return counts;
+  }, { total: 0, person: 0, community_partner: 0, organization: 0, intent_signal: 0, new: 0, qualified: 0, converted: 0, needsIdentity: 0, needsEmailVerification: 0, contactReady: 0 });
+  return res.json({ success: true, signals: categorizedSignals, summary, automaticallyRejected: rejected.length });
 });
 
 router.patch("/research/signals/:signalId", async (req, res) => {
@@ -252,6 +271,25 @@ function supportedPublicPerson(person) {
     && name.split(/\s+/).length >= 2
     && !/\b(?:llc|l\.l\.c\.|inc\.?|corp\.?|company|fund|partners?|association|community|group|network|club)\b/i.test(name)
     && !invalidPlatformIdentityName(name));
+}
+
+const COMMUNITY_SOURCES = new Set(["linkedin_public", "facebook_public", "meetup_public", "community_directories"]);
+
+function opportunityKind(signal, monitor) {
+  if (supportedPublicPerson({ name: signal.authorName }) || (signal.people || []).some(supportedPublicPerson)) return "person";
+  if (monitor?.monitorType === "community_partner" || COMMUNITY_SOURCES.has(signal.source)) return "community_partner";
+  if (signal.organizationName || signal.organizationDomain) return "organization";
+  return "intent_signal";
+}
+
+function opportunityNextStep(signal, kind, crmContact, drafts = []) {
+  if (signal.status === "new") return "review_fit";
+  if (kind !== "person" && signal.identityResolution?.status !== "supported") return "identify_person";
+  if (!crmContact) return "add_to_crm";
+  if (crmContact.emailStatus !== "verified") return "verify_email";
+  if (!drafts.length) return "create_draft";
+  if (!drafts.some((draft) => draft.status === "transferred")) return "review_draft";
+  return "ready_in_outreach";
 }
 
 router.post("/research/signals/:signalId/identity-research", async (req, res) => {

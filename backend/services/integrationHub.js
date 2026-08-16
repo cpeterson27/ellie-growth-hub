@@ -115,7 +115,11 @@ class IntegrationHub {
       );
       const isConnected = provider.builtIn || connection?.status === "connected" ||
         (!connection && hasEnvironmentConfiguration);
-      const status = isConnected
+      const status = provider.availability === "planned"
+        ? "planned"
+        : provider.availability === "public_only"
+          ? "public_only"
+          : isConnected
         ? (provider.builtIn ? "ready" : "connected")
         : connection?.status === "configured"
           ? "configuration_required"

@@ -29,24 +29,10 @@ class XAdapter extends BaseIntegration {
    * Verify X connection
    */
   async verify() {
-    try {
-      if (!this.config.bearerToken) {
-        throw new Error("X bearer token not configured");
-      }
-
-      // In production:
-      // const response = await fetch(`${this.baseUrl}/tweets/search/recent`, {
-      //   headers: { Authorization: `Bearer ${this.config.bearerToken}` },
-      //   params: { query: 'from:@test', max_results: 10 }
-      // });
-
-      this.authenticated = true;
-      this.clearError();
-      return { success: true, message: "X configured (not authenticated)" };
-    } catch (error) {
-      this.setError(error.message);
-      return { success: false, error: error.message };
-    }
+    const error = "X customer OAuth and API verification are not implemented.";
+    this.authenticated = false;
+    this.setError(error);
+    return { success: false, available: false, error };
   }
 
   /**
@@ -55,32 +41,8 @@ class XAdapter extends BaseIntegration {
    * @returns {Promise<Object>}
    */
   async postTweet(params) {
-    try {
-      if (!this.config.bearerToken) {
-        throw new Error("X not configured");
-      }
-
-      const { text } = params;
-
-      if (!text) {
-        throw new Error("Tweet text is required");
-      }
-
-      if (text.length > 280) {
-        throw new Error("Tweet text exceeds 280 character limit");
-      }
-
-      // Would call X API here
-      return {
-        success: true,
-        tweetId: `tweet_${Date.now()}`,
-        url: `https://x.com/i/web/status/${Date.now()}`,
-        postedAt: new Date(),
-      };
-    } catch (error) {
-      this.setError(error.message);
-      throw error;
-    }
+    void params;
+    throw new Error("X publishing is unavailable until customer OAuth and the real provider API are implemented.");
   }
 }
 

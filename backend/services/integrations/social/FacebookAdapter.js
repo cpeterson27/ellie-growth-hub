@@ -29,26 +29,10 @@ class FacebookAdapter extends BaseIntegration {
    * Verify Facebook connection
    */
   async verify() {
-    try {
-      if (!this.config.accessToken) {
-        throw new Error("Facebook access token not configured");
-      }
-
-      // In production:
-      // const response = await fetch(`${this.baseUrl}/me`, {
-      //   params: { access_token: this.config.accessToken }
-      // });
-
-      this.authenticated = true;
-      this.clearError();
-      return {
-        success: true,
-        message: "Facebook configured (not authenticated)",
-      };
-    } catch (error) {
-      this.setError(error.message);
-      return { success: false, error: error.message };
-    }
+    const error = "Meta customer OAuth and Graph API verification are not implemented.";
+    this.authenticated = false;
+    this.setError(error);
+    return { success: false, available: false, error };
   }
 
   /**
@@ -57,28 +41,8 @@ class FacebookAdapter extends BaseIntegration {
    * @returns {Promise<Object>}
    */
   async postToPage(params) {
-    try {
-      if (!this.config.accessToken) {
-        throw new Error("Facebook not configured");
-      }
-
-      const { pageId, message } = params;
-
-      if (!pageId || !message) {
-        throw new Error("pageId and message are required");
-      }
-
-      // Would call Facebook API here
-      return {
-        success: true,
-        postId: `facebook_${Date.now()}`,
-        url: `https://facebook.com/posts/${Date.now()}`,
-        postedAt: new Date(),
-      };
-    } catch (error) {
-      this.setError(error.message);
-      throw error;
-    }
+    void params;
+    throw new Error("Facebook publishing is unavailable until customer OAuth and the real Graph API are implemented.");
   }
 }
 

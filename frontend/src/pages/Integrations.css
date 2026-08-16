@@ -93,6 +93,8 @@
 .integration-status--connected,
 .integration-status--ready { background: #d9f4e9; color: #12634f; }
 .integration-status--configuration_required { background: #fff0c9; color: #7b5700; }
+.integration-status--planned { background: #e9e5f7; color: #55458a; }
+.integration-status--public_only { background: #e7f0f7; color: #285c7a; }
 
 .integration-disabled-action {
   background: #f2f0eb;
@@ -108,6 +110,7 @@
 .integration-section-title { font-size:1.25rem;margin:26px 0 12px; }
 .integration-provider-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .integration-provider-card .integration-capabilities{border-top:1px solid #e3e0d9;font-size:.75rem;margin-top:auto;padding-top:12px}
+.integration-limitation { background: #fff8e8; border: 1px solid #ead8a9; border-radius: 10px; color: #6f5b2c; font-size: .78rem; line-height: 1.45; padding: 10px 12px; }
 
 .eventbrite-setup-grid {
   display: grid;

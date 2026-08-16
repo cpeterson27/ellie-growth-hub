@@ -29,26 +29,10 @@ class InstagramAdapter extends BaseIntegration {
    * Verify Instagram connection
    */
   async verify() {
-    try {
-      if (!this.config.accessToken) {
-        throw new Error("Instagram access token not configured");
-      }
-
-      // In production:
-      // const response = await fetch(`${this.baseUrl}/me`, {
-      //   params: { access_token: this.config.accessToken }
-      // });
-
-      this.authenticated = true;
-      this.clearError();
-      return {
-        success: true,
-        message: "Instagram configured (not authenticated)",
-      };
-    } catch (error) {
-      this.setError(error.message);
-      return { success: false, error: error.message };
-    }
+    const error = "Instagram customer OAuth and Graph API verification are not implemented.";
+    this.authenticated = false;
+    this.setError(error);
+    return { success: false, available: false, error };
   }
 
   /**
@@ -57,28 +41,8 @@ class InstagramAdapter extends BaseIntegration {
    * @returns {Promise<Object>}
    */
   async createPost(params) {
-    try {
-      if (!this.config.accessToken) {
-        throw new Error("Instagram not configured");
-      }
-
-      const { accountId, caption, imageUrl } = params;
-
-      if (!accountId || !imageUrl) {
-        throw new Error("accountId and imageUrl are required");
-      }
-
-      // Would call Instagram API here
-      return {
-        success: true,
-        postId: `instagram_${Date.now()}`,
-        url: `https://instagram.com/p/${Date.now()}`,
-        createdAt: new Date(),
-      };
-    } catch (error) {
-      this.setError(error.message);
-      throw error;
-    }
+    void params;
+    throw new Error("Instagram publishing is unavailable until customer OAuth and the real Graph API are implemented.");
   }
 }
 

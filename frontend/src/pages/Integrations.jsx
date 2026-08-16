@@ -18,6 +18,8 @@ const statusLabels = {
   connected: "Connected",
   disconnected: "Disconnected",
   configuration_required: "Setup required",
+  planned: "OAuth planned",
+  public_only: "Public access only",
 };
 
 const externalCrms = [
@@ -34,6 +36,12 @@ function providerSummary(provider, eventbriteReady) {
   }
   if (provider.id === "csv") {
     return "Import contact spreadsheets from Contacts → Import.";
+  }
+  if (provider.id === "linkedin" || provider.id === "facebook") {
+    return `${provider.description}. This is for each customer’s own authorized business assets—not for searching private people or exporting group members.`;
+  }
+  if (provider.id === "meetup") {
+    return "Public Meetup community discovery works without a key. Authenticated Meetup Pro management is not implemented and is not required for current research.";
   }
   return provider.description;
 }
@@ -158,11 +166,16 @@ export default function Integrations() {
                 <div><span className={`integration-status integration-status--${status}`}>{statusLabels[status] || status}</span><h2>{provider.name}</h2></div>
                 <p>{providerSummary(provider, eventbriteReady)}</p>
                 <p className="integration-capabilities">{provider.capabilities?.join(" · ") || "No capabilities reported"}</p>
+                {provider.limitation ? <p className="integration-limitation"><strong>Important:</strong> {provider.limitation}</p> : null}
                 <div className="crm-connection-actions">
                   {isEventbrite ? (
                     <Button onClick={() => navigate("/integrations/eventbrite")}>{eventbriteReady ? "Manage setup" : "Set up Eventbrite"}</Button>
                   ) : provider.id === "csv" ? (
                     <Button variant="outline" onClick={() => navigate("/contacts")}>Import contacts</Button>
+                  ) : provider.status === "public_only" ? (
+                    <Button variant="outline" onClick={() => navigate("/discovery?tab=monitoring")}>Open public discovery</Button>
+                  ) : provider.status === "planned" ? (
+                    <button className="integration-disabled-action" disabled>Customer OAuth coming later</button>
                   ) : (
                     <Button variant="outline" disabled>Details coming soon</Button>
                   )}

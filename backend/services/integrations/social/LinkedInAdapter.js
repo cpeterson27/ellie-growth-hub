@@ -29,26 +29,10 @@ class LinkedInAdapter extends BaseIntegration {
    * Verify LinkedIn connection
    */
   async verify() {
-    try {
-      if (!this.config.accessToken) {
-        throw new Error("LinkedIn access token not configured");
-      }
-
-      // In production:
-      // const response = await fetch(`${this.baseUrl}/me`, {
-      //   headers: { Authorization: `Bearer ${this.config.accessToken}` }
-      // });
-
-      this.authenticated = true;
-      this.clearError();
-      return {
-        success: true,
-        message: "LinkedIn configured (not authenticated)",
-      };
-    } catch (error) {
-      this.setError(error.message);
-      return { success: false, error: error.message };
-    }
+    const error = "LinkedIn customer OAuth and API verification are not implemented.";
+    this.authenticated = false;
+    this.setError(error);
+    return { success: false, available: false, error };
   }
 
   /**
@@ -57,28 +41,8 @@ class LinkedInAdapter extends BaseIntegration {
    * @returns {Promise<Object>}
    */
   async shareContent(params) {
-    try {
-      if (!this.config.accessToken) {
-        throw new Error("LinkedIn not configured");
-      }
-
-      const { content, title } = params;
-
-      if (!content) {
-        throw new Error("Content is required");
-      }
-
-      // Would call LinkedIn API here
-      return {
-        success: true,
-        postId: `linkedin_${Date.now()}`,
-        url: `https://www.linkedin.com/feed/update/${Date.now()}`,
-        sharedAt: new Date(),
-      };
-    } catch (error) {
-      this.setError(error.message);
-      throw error;
-    }
+    void params;
+    throw new Error("LinkedIn publishing is unavailable until customer OAuth and the real provider API are implemented.");
   }
 }
 
