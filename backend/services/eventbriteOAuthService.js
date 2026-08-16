@@ -21,11 +21,14 @@ function stateSecret() {
   return Buffer.from(String(process.env.INTEGRATION_CREDENTIAL_ENCRYPTION_KEY || ""), "base64");
 }
 
-function createState() {
+function createState(workspaceId, userId) {
+  if (!workspaceId || !userId) throw new Error("A signed-in workspace owner is required");
   const secret = stateSecret();
   if (secret.length !== 32) throw new Error("Integration credential encryption is not configured");
   const payload = Buffer.from(JSON.stringify({
     nonce: crypto.randomBytes(18).toString("hex"),
+    workspaceId: String(workspaceId),
+    userId: String(userId),
     expiresAt: Date.now() + 10 * 60 * 1000,
   })).toString("base64url");
   const signature = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
@@ -42,19 +45,19 @@ function verifyState(state) {
     const provided = Buffer.from(signature, "base64url");
     if (provided.length !== expected.length || !crypto.timingSafeEqual(provided, expected)) return false;
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    return Number(decoded.expiresAt) > Date.now();
+    return Number(decoded.expiresAt) > Date.now() && decoded.workspaceId && decoded.userId ? decoded : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-function authorizationUrl() {
+function authorizationUrl(workspaceId, userId) {
   const { clientId, redirectUri } = requireConfig();
   const url = new URL(AUTHORIZE_URL);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("state", createState());
+  url.searchParams.set("state", createState(workspaceId, userId));
   return url.toString();
 }
 

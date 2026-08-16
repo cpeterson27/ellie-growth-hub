@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const intentEmailDraftSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -19,4 +20,5 @@ const intentEmailDraftSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 intentEmailDraftSchema.index({ workspaceId: 1, signalId: 1, campaignId: 1 }, { unique: true });
+intentEmailDraftSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("IntentEmailDraft", intentEmailDraftSchema);

@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const affiliateSaleSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", default: null, index: true },
@@ -21,4 +22,5 @@ const affiliateSaleSchema = new mongoose.Schema({
 
 affiliateSaleSchema.index({ partnerId: 1, eventbriteAttendeeId: 1 }, { unique: true });
 
+affiliateSaleSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("AffiliateSale", affiliateSaleSchema);

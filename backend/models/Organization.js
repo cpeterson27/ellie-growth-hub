@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const organizationSchema = new mongoose.Schema(
   {
@@ -240,4 +241,5 @@ organizationSchema.pre("validate", function normalizeRetiredSource() {
 // Composite: priority + audience tier — for combined views.
 organizationSchema.index({ priorityTier: 1, audienceTier: 1 });
 
+organizationSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("Organization", organizationSchema);

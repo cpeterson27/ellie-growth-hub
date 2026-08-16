@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const partnerSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", default: null, index: true },
@@ -31,4 +32,5 @@ const partnerSchema = new mongoose.Schema({
 
 partnerSchema.index({ eventbriteEventId: 1, referralCode: 1 });
 
+partnerSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("Partner", partnerSchema);

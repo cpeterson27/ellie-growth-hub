@@ -3,6 +3,7 @@ const AuthSession = require("../models/AuthSession");
 require("../models/User");
 require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
+const { runWithWorkspace } = require("../tenancy/workspaceContext");
 
 const COOKIE_NAME = "ellie_session";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -94,7 +95,7 @@ async function requireAuth(req, res, next) {
     };
     session.lastSeenAt = new Date();
     session.save().catch(() => {});
-    next();
+    runWithWorkspace(req.auth.workspaceId, next);
   } catch (error) {
     next(error);
   }

@@ -12,6 +12,7 @@
  */
 
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 
 const contactSchema = new mongoose.Schema(
@@ -265,11 +266,12 @@ const contactSchema = new mongoose.Schema(
 // Prevent duplicate people across integrations
 contactSchema.index(
   {
+    workspaceId: 1,
     email: 1,
   },
   {
     unique: true,
-    sparse: true,
+    partialFilterExpression: { email: { $type: "string" } },
   }
 );
 
@@ -300,7 +302,7 @@ contactSchema.index({
 });
 
 contactSchema.index(
-  { sourceProvider: 1, providerContactId: 1 },
+  { workspaceId: 1, sourceProvider: 1, providerContactId: 1 },
   {
     unique: true,
     partialFilterExpression: { providerContactId: { $type: "string" } },
@@ -316,6 +318,7 @@ contactSchema.index({
 });
 
 
+contactSchema.plugin(workspacePlugin);
 module.exports = mongoose.model(
   "Contact",
   contactSchema

@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const jarvisMemoryNoteSchema = new mongoose.Schema({
   source: { type: String, enum: ["obsidian_bridge"], required: true, default: "obsidian_bridge", index: true },
@@ -9,6 +10,7 @@ const jarvisMemoryNoteSchema = new mongoose.Schema({
   sourceUpdatedAt: { type: Date, default: null },
 }, { timestamps: true, collection: "jarvis_memory_notes" });
 
-jarvisMemoryNoteSchema.index({ source: 1, path: 1 }, { unique: true });
+jarvisMemoryNoteSchema.index({ workspaceId: 1, source: 1, path: 1 }, { unique: true });
+jarvisMemoryNoteSchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model("JarvisMemoryNote", jarvisMemoryNoteSchema);

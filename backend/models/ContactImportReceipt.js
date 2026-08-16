@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const contactImportReceiptSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -11,4 +12,5 @@ const contactImportReceiptSchema = new mongoose.Schema({
 contactImportReceiptSchema.index({ workspaceId: 1, createdAt: -1 });
 contactImportReceiptSchema.index({ workspaceId: 1, importBatchId: 1 }, { unique: true });
 
+contactImportReceiptSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("ContactImportReceipt", contactImportReceiptSchema);

@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const intentSignalSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -46,4 +47,5 @@ const intentSignalSchema = new mongoose.Schema({
 intentSignalSchema.index({ workspaceId: 1, source: 1, sourceId: 1 }, { unique: true });
 intentSignalSchema.index({ workspaceId: 1, status: 1, score: -1, publishedAt: -1 });
 
+intentSignalSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("IntentSignal", intentSignalSchema);

@@ -4,6 +4,7 @@
  */
 
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const syncHistorySchema = new mongoose.Schema(
   {
@@ -11,7 +12,6 @@ const syncHistorySchema = new mongoose.Schema(
     syncId: {
       type: String,
       required: true,
-      unique: true,
       index: true,
     },
     startTime: {
@@ -78,5 +78,7 @@ const syncHistorySchema = new mongoose.Schema(
 // Index for finding recent syncs
 syncHistorySchema.index({ createdAt: -1 });
 syncHistorySchema.index({ status: 1, createdAt: -1 });
+syncHistorySchema.index({ workspaceId: 1, syncId: 1 }, { unique: true });
+syncHistorySchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model("MondaySyncHistory", syncHistorySchema);

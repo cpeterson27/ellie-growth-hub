@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const audienceSchema = new mongoose.Schema(
   {
@@ -155,4 +156,5 @@ audienceSchema.index(
   { partialFilterExpression: { status: "active" } },
 );
 
+audienceSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("Audience", audienceSchema);

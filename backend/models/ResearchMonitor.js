@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const researchMonitorSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -45,4 +46,5 @@ const researchMonitorSchema = new mongoose.Schema({
 researchMonitorSchema.index({ workspaceId: 1, enabled: 1, nextRunAt: 1 });
 researchMonitorSchema.index({ enabled: 1, runRequestedAt: 1, leaseExpiresAt: 1 });
 
+researchMonitorSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("ResearchMonitor", researchMonitorSchema);

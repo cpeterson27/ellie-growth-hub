@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 
 const campaignSchema = new mongoose.Schema(
@@ -178,6 +179,7 @@ const campaignSchema = new mongoose.Schema(
 );
 
 
+campaignSchema.plugin(workspacePlugin);
 module.exports = mongoose.model(
  "Campaign",
  campaignSchema

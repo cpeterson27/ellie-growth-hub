@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const discoveryRunSchema = new mongoose.Schema(
   {
@@ -298,6 +299,7 @@ discoveryRunSchema.index({
 });
 
 
+discoveryRunSchema.plugin(workspacePlugin);
 module.exports = mongoose.model(
   "DiscoveryRun",
   discoveryRunSchema

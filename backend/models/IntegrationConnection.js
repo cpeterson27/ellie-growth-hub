@@ -4,6 +4,7 @@
  */
 
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const IntegrationConnectionSchema = new mongoose.Schema(
   {
@@ -14,7 +15,6 @@ const IntegrationConnectionSchema = new mongoose.Schema(
     provider: {
       type: String,
       required: true,
-      unique: true,
       enum: [
         "resend",
         "eventbrite",
@@ -179,6 +179,8 @@ const IntegrationConnectionSchema = new mongoose.Schema(
 
 // Index for common queries
 IntegrationConnectionSchema.index({ status: 1, provider: 1 });
+IntegrationConnectionSchema.index({ workspaceId: 1, provider: 1 }, { unique: true });
+IntegrationConnectionSchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model(
   "IntegrationConnection",

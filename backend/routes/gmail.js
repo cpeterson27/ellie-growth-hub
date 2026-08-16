@@ -5,6 +5,8 @@ const Campaign = require("../models/Campaign");
 const Contact = require("../models/Contact");
 const gmail = require("../services/gmailOAuthService");
 const { classifyReply, draftReply } = require("../services/replyIntelligence");
+const WorkspaceMembership = require("../models/WorkspaceMembership");
+const { runWithWorkspace } = require("../tenancy/workspaceContext");
 const router = express.Router();
 
 router.get("/status", async (_req, res) => {
@@ -12,19 +14,22 @@ router.get("/status", async (_req, res) => {
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.get("/oauth/start", (_req, res) => {
-  try { res.json({ authorizationUrl: gmail.authorizationUrl() }); }
+router.get("/oauth/start", (req, res) => {
+  try { res.json({ authorizationUrl: gmail.authorizationUrl(req.auth.workspaceId, req.auth.user._id) }); }
   catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 router.get("/oauth/callback", async (req, res) => {
   const frontend = String(process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
   try {
-    if (!gmail.verifyState(req.query.state)) throw new Error("Google connection request expired or is invalid");
+    const state = gmail.verifyState(req.query.state);
+    if (!state) throw new Error("Google connection request expired or is invalid");
+    const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", role: { $in: ["owner", "admin"] } });
+    if (!membership) throw new Error("Workspace permission is no longer available");
     if (!req.query.code) throw new Error(req.query.error || "Google did not return an authorization code");
     const tokens = await gmail.exchangeCode(req.query.code);
     const profile = await gmail.googleProfile(tokens.access_token);
-    await gmail.saveConnection(tokens, profile);
+    await runWithWorkspace(state.workspaceId, () => gmail.saveConnection(tokens, profile));
     res.redirect(`${frontend}/integrations?gmail=connected`);
   } catch (error) {
     res.redirect(`${frontend}/integrations?gmail=error&message=${encodeURIComponent(error.message)}`);

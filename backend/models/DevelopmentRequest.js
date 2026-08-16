@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const developmentRequestSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 140 },
@@ -20,4 +21,5 @@ const developmentRequestSchema = new mongoose.Schema({
   rejectedAt: { type: Date, default: null },
 }, { timestamps: true, collection: "development_requests" });
 
+developmentRequestSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("DevelopmentRequest", developmentRequestSchema);

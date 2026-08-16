@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const workspaceConfigSchema = new mongoose.Schema({
-  key: { type: String, default: "primary", unique: true, index: true },
+  key: { type: String, default: "primary", index: true },
   workspaceName: { type: String, default: "Growth Operator", trim: true, maxlength: 120 },
   legalBusinessName: { type: String, default: "Ellie's Coaching", trim: true, maxlength: 160 },
   postalAddress: { type: String, default: "", trim: true, maxlength: 300 },
@@ -45,4 +46,6 @@ const workspaceConfigSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+workspaceConfigSchema.plugin(workspacePlugin);
+workspaceConfigSchema.index({ workspaceId: 1, key: 1 }, { unique: true });
 module.exports = mongoose.model("WorkspaceConfig", workspaceConfigSchema);

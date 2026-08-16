@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 /**
  * MarketingCampaign Schema
@@ -141,5 +142,6 @@ marketingCampaignSchema.index({ scheduledFor: 1, status: 1 });
 
 // Soft delete for archival
 marketingCampaignSchema.index({ status: 1, createdAt: -1 });
+marketingCampaignSchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model("MarketingCampaign", marketingCampaignSchema);

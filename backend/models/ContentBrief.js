@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const contentBriefSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
@@ -11,4 +12,5 @@ const contentBriefSchema = new mongoose.Schema({
   status: { type: String, enum: ["draft", "approved", "archived"], default: "draft" },
 }, { timestamps: true, collection: "content_briefs" });
 
+contentBriefSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("ContentBrief", contentBriefSchema);

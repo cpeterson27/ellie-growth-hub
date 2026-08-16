@@ -4,6 +4,7 @@
  */
 
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const GrowthOpportunitySchema = new mongoose.Schema(
   {
@@ -164,5 +165,6 @@ const GrowthOpportunitySchema = new mongoose.Schema(
 GrowthOpportunitySchema.index({ growthOperatorId: 1, status: 1 });
 GrowthOpportunitySchema.index({ organizationId: 1, audienceId: 1 });
 GrowthOpportunitySchema.index({ opportunityType: 1, status: 1 });
+GrowthOpportunitySchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model("GrowthOpportunity", GrowthOpportunitySchema);

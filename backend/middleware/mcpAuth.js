@@ -1,6 +1,7 @@
 const crypto = require("node:crypto");
 const McpAccessToken = require("../models/McpAccessToken");
 const OAuthCredential = require("../models/OAuthCredential");
+const { runWithWorkspace } = require("../tenancy/workspaceContext");
 
 async function requireMcpAuth(req, res, next) {
   try {
@@ -14,7 +15,7 @@ async function requireMcpAuth(req, res, next) {
     if (!token) return res.status(401).set("WWW-Authenticate", `Bearer realm="ellie-mcp", resource_metadata="${metadataUrl}"`).json({ error: "MCP access token is invalid or expired" });
     req.mcpAuth = { tokenId: token._id, workspaceId: token.workspaceId, userId: token.userId, scopes: token.scopes };
     if ("lastUsedAt" in token) { token.lastUsedAt = new Date(); token.save().catch(() => {}); }
-    next();
+    runWithWorkspace(req.mcpAuth.workspaceId, next);
   } catch (error) { next(error); }
 }
 

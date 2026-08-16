@@ -7,6 +7,7 @@ const MonitorActivity = require("../models/MonitorActivity");
 const InAppNotification = require("../models/InAppNotification");
 const { collectMonitorSignals, isCommunityPartnerMonitor, isInvestorProfileMonitor } = require("./intentSourceService");
 const { researchPublicWebsite } = require("./publicWebsiteResearchService");
+const { runWithWorkspace } = require("../tenancy/workspaceContext");
 
 const RUNNER_INTERVAL_MS = Math.max(15000, Number(process.env.RESEARCH_WORKER_POLL_MS) || 60000);
 const LEASE_MS = Math.max(120000, Number(process.env.RESEARCH_WORKER_LEASE_MS) || 20 * 60000);
@@ -277,8 +278,10 @@ async function runDueResearchMonitors() {
   try {
     const now = new Date();
     await ResearchMonitor.updateMany({ lastRunStatus: "running", leaseExpiresAt: { $lte: now } }, { $set: { lastRunStatus: "failed", lastRunMessage: "A previous worker stopped unexpectedly; the run was safely released for retry.", nextRunAt: now, leaseOwner: "", leaseExpiresAt: null } });
-    const due = await ResearchMonitor.find({ enabled: true, $and: [{ $or: [{ runRequestedAt: { $lte: now } }, { nextRunAt: { $lte: now } }] }, { $or: [{ leaseExpiresAt: null }, { leaseExpiresAt: { $lte: now } }] }] }).sort({ runRequestedAt: 1, nextRunAt: 1 }).limit(10).select("_id");
-    for (const monitor of due) await runResearchMonitor(monitor._id);
+    const due = await ResearchMonitor.find({ enabled: true, $and: [{ $or: [{ runRequestedAt: { $lte: now } }, { nextRunAt: { $lte: now } }] }, { $or: [{ leaseExpiresAt: null }, { leaseExpiresAt: { $lte: now } }] }] }).sort({ runRequestedAt: 1, nextRunAt: 1 }).limit(10).select("_id workspaceId");
+    for (const monitor of due) {
+      await runWithWorkspace(monitor.workspaceId, () => runResearchMonitor(monitor._id));
+    }
   } finally { polling = false; }
 }
 

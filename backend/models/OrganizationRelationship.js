@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const organizationRelationshipSchema = new mongoose.Schema(
   {
@@ -84,7 +85,7 @@ const organizationRelationshipSchema = new mongoose.Schema(
 
 // Lookup org's status in a specific audience
 organizationRelationshipSchema.index(
-  { organizationId: 1, audienceId: 1 },
+  { workspaceId: 1, organizationId: 1, audienceId: 1 },
   { unique: true },
 );
 
@@ -96,6 +97,7 @@ organizationRelationshipSchema.index({ organizationId: 1, status: 1 });
 
 // Find recently changed relationships for an audience
 organizationRelationshipSchema.index({ audienceId: 1, lastChangedAt: -1 });
+organizationRelationshipSchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model(
   "OrganizationRelationship",

@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 
 const outreachSchema = new mongoose.Schema(
@@ -237,6 +238,7 @@ const outreachSchema = new mongoose.Schema(
 // Same campaign + same email
 outreachSchema.index(
   {
+    workspaceId: 1,
     campaignId: 1,
     contactEmail: 1,
   },
@@ -278,6 +280,7 @@ outreachSchema.index({
 
 
 
+outreachSchema.plugin(workspacePlugin);
 module.exports = mongoose.model(
   "Outreach",
   outreachSchema

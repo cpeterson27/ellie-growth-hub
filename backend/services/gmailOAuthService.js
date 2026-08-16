@@ -22,22 +22,23 @@ function stateSecret() {
   return required("INTEGRATION_CREDENTIAL_ENCRYPTION_KEY");
 }
 
-function createState() {
-  const payload = Buffer.from(JSON.stringify({ createdAt: Date.now(), nonce: crypto.randomBytes(16).toString("hex") })).toString("base64url");
+function createState(workspaceId, userId) {
+  if (!workspaceId || !userId) throw new Error("A signed-in workspace owner is required");
+  const payload = Buffer.from(JSON.stringify({ workspaceId: String(workspaceId), userId: String(userId), createdAt: Date.now(), nonce: crypto.randomBytes(16).toString("hex") })).toString("base64url");
   const signature = crypto.createHmac("sha256", stateSecret()).update(payload).digest("base64url");
   return `${payload}.${signature}`;
 }
 
 function verifyState(state) {
   const [payload, signature] = String(state || "").split(".");
-  if (!payload || !signature) return false;
+  if (!payload || !signature) return null;
   const expected = crypto.createHmac("sha256", stateSecret()).update(payload).digest("base64url");
-  if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return false;
+  if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
   const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-  return Date.now() - Number(parsed.createdAt) < 10 * 60 * 1000;
+  return Date.now() - Number(parsed.createdAt) < 10 * 60 * 1000 && parsed.workspaceId && parsed.userId ? parsed : null;
 }
 
-function authorizationUrl() {
+function authorizationUrl(workspaceId, userId) {
   const params = new URLSearchParams({
     client_id: required("GOOGLE_CLIENT_ID"),
     redirect_uri: required("GOOGLE_REDIRECT_URI"),
@@ -46,7 +47,7 @@ function authorizationUrl() {
     prompt: "consent",
     include_granted_scopes: "true",
     scope: scopes.join(" "),
-    state: createState(),
+    state: createState(workspaceId, userId),
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }

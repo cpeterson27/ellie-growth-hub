@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const eventSchema = new mongoose.Schema(
   {
@@ -241,4 +242,5 @@ const eventSchema = new mongoose.Schema(
   }
 );
 
+eventSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("Event", eventSchema);

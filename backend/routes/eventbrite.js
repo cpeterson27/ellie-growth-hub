@@ -3,6 +3,8 @@ const crypto = require("crypto");
 const axios = require("axios");
 const Event = require("../models/Event");
 const IntegrationConnection = require("../models/IntegrationConnection");
+const WorkspaceMembership = require("../models/WorkspaceMembership");
+const { runWithWorkspace } = require("../tenancy/workspaceContext");
 
 const { getEvent, getEvents } = require("../services/eventbrite");
 const eventbriteOAuthService = require("../services/eventbriteOAuthService");
@@ -316,7 +318,7 @@ router.get("/oauth/status", async (req, res) => {
 
 router.get("/oauth/start", async (req, res) => {
   try {
-    res.json({ authorizationUrl: eventbriteOAuthService.authorizationUrl() });
+    res.json({ authorizationUrl: eventbriteOAuthService.authorizationUrl(req.auth.workspaceId, req.auth.user._id) });
   } catch (error) {
     console.error("EVENTBRITE OAUTH START ERROR:", error.message);
     res.status(503).json({
@@ -329,10 +331,13 @@ router.get("/oauth/callback", async (req, res) => {
   const frontendUrl = String(process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
   try {
     if (req.query.error) throw new Error("authorization_denied");
-    if (!req.query.code || !eventbriteOAuthService.verifyState(req.query.state)) {
+    const state = eventbriteOAuthService.verifyState(req.query.state);
+    if (!req.query.code || !state) {
       throw new Error("invalid_oauth_response");
     }
-    await eventbriteOAuthService.exchangeCode(String(req.query.code));
+    const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", role: { $in: ["owner", "admin"] } });
+    if (!membership) throw new Error("workspace_permission_unavailable");
+    await runWithWorkspace(state.workspaceId, () => eventbriteOAuthService.exchangeCode(String(req.query.code)));
     res.redirect(`${frontendUrl}/events?eventbrite=connected`);
   } catch (error) {
     console.error("EVENTBRITE OAUTH CALLBACK ERROR:", error.response?.data || error.message);

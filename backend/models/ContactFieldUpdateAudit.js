@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const contactFieldUpdateAuditSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -15,4 +16,5 @@ const contactFieldUpdateAuditSchema = new mongoose.Schema({
 
 contactFieldUpdateAuditSchema.index({ workspaceId: 1, createdAt: -1 });
 
+contactFieldUpdateAuditSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("ContactFieldUpdateAudit", contactFieldUpdateAuditSchema);

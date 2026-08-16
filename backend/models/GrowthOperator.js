@@ -4,6 +4,7 @@
  */
 
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const GrowthOperatorSchema = new mongoose.Schema(
   {
@@ -100,5 +101,6 @@ const GrowthOperatorSchema = new mongoose.Schema(
 // Indexes
 GrowthOperatorSchema.index({ audienceId: 1, status: 1 });
 GrowthOperatorSchema.index({ createdAt: -1 });
+GrowthOperatorSchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model("GrowthOperator", GrowthOperatorSchema);

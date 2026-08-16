@@ -4,6 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "tenant:audit": "node scripts/migrate-workspace-ownership.js",
+    "tenant:migrate": "node scripts/migrate-workspace-ownership.js --apply",
+    "tenant:indexes:audit": "node scripts/migrate-tenant-indexes.js",
+    "tenant:indexes:migrate": "node scripts/migrate-tenant-indexes.js --apply",
+    "test:tenant-isolation": "node test-workspace-isolation.js",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "start:worker": "node worker.js",

@@ -20,5 +20,8 @@ build/
 npm-debug.log*
 *.log
 
+# Contains production record IDs used for tenant migration rollback.
+backend/migration-reports/
+
 # Mac files
 .DS_Store

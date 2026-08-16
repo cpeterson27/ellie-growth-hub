@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const socialConnectionSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -29,4 +30,5 @@ const socialConnectionSchema = new mongoose.Schema({
 
 socialConnectionSchema.index({ workspaceId: 1, provider: 1 }, { unique: true });
 
+socialConnectionSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("SocialConnection", socialConnectionSchema);

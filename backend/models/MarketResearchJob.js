@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const marketResearchJobSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -22,4 +23,5 @@ const marketResearchJobSchema = new mongoose.Schema({
 
 marketResearchJobSchema.index({ workspaceId: 1, createdAt: -1 });
 
+marketResearchJobSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("MarketResearchJob", marketResearchJobSchema);

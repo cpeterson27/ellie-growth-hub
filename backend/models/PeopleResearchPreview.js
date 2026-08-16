@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const previewPersonSchema = new mongoose.Schema({
   firstName: { type: String, default: "", trim: true },
@@ -39,4 +40,5 @@ const peopleResearchPreviewSchema = new mongoose.Schema({
 peopleResearchPreviewSchema.index({ workspaceId: 1, fingerprint: 1 }, { unique: true });
 peopleResearchPreviewSchema.index({ workspaceId: 1, updatedAt: -1 });
 
+peopleResearchPreviewSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("PeopleResearchPreview", peopleResearchPreviewSchema);

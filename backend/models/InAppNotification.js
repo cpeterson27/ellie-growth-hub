@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const inAppNotificationSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -12,4 +13,5 @@ const inAppNotificationSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 inAppNotificationSchema.index({ workspaceId: 1, readAt: 1, createdAt: -1 });
+inAppNotificationSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("InAppNotification", inAppNotificationSchema);

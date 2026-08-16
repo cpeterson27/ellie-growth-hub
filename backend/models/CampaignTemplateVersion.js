@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const campaignTemplateVersionSchema = new mongoose.Schema(
   {
@@ -19,6 +20,7 @@ const campaignTemplateVersionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-campaignTemplateVersionSchema.index({ campaignId: 1, version: 1 }, { unique: true });
+campaignTemplateVersionSchema.index({ workspaceId: 1, campaignId: 1, version: 1 }, { unique: true });
+campaignTemplateVersionSchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model("CampaignTemplateVersion", campaignTemplateVersionSchema);

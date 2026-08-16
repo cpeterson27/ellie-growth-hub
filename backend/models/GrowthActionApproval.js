@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const growthActionApprovalSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
@@ -13,4 +14,5 @@ const growthActionApprovalSchema = new mongoose.Schema({
 
 growthActionApprovalSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+growthActionApprovalSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("GrowthActionApproval", growthActionApprovalSchema);

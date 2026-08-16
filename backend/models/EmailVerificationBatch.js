@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const emailVerificationResultSchema = new mongoose.Schema(
   {
@@ -17,7 +18,7 @@ const emailVerificationResultSchema = new mongoose.Schema(
 const emailVerificationBatchSchema = new mongoose.Schema(
   {
     provider: { type: String, default: "emailable" },
-    providerBatchId: { type: String, required: true, unique: true, index: true },
+    providerBatchId: { type: String, required: true, index: true },
     emailFingerprint: { type: String, required: true, index: true },
     emails: { type: [String], default: [] },
     processed: { type: Number, default: 0 },
@@ -34,4 +35,6 @@ const emailVerificationBatchSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+emailVerificationBatchSchema.plugin(workspacePlugin);
+emailVerificationBatchSchema.index({ workspaceId: 1, providerBatchId: 1 }, { unique: true });
 module.exports = mongoose.model("EmailVerificationBatch", emailVerificationBatchSchema);
