@@ -22,6 +22,18 @@ export const fetchOAuthConnections = () =>
 export const revokeOAuthConnection = (clientId) =>
   api.delete(`/oauth/connections/${encodeURIComponent(clientId)}`).then((res) => res.data);
 
+export const fetchSocialConnection = (provider) =>
+  api.get(`/social/${provider}/oauth/status`).then((res) => res.data);
+
+export const beginSocialConnection = (provider) =>
+  api.get(`/social/${provider}/oauth/start`).then((res) => res.data);
+
+export const disconnectSocialConnection = (provider) =>
+  api.post(`/social/${provider}/oauth/disconnect`).then((res) => res.data);
+
+export const selectSocialAssets = (provider, assetIds) =>
+  api.patch(`/social/${provider}/assets`, { assetIds }).then((res) => res.data);
+
 api.interceptors.request.use((config) => {
   const csrfToken = sessionStorage.getItem("ellie-csrf-token");
   const sessionToken = sessionStorage.getItem("ellie-session-token");

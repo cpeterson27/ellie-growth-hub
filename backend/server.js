@@ -30,6 +30,7 @@ const businessIndexRouter = require("./routes/businessIndex");
 const mcpAccessRouter = require("./routes/mcpAccess");
 const mcpRouter = require("./routes/mcp");
 const oauthRouter = require("./routes/oauth");
+const socialRouter = require("./routes/social");
 const gptActionsRouter = require("./routes/gptActions");
 const { requireAuth } = require("./middleware/auth");
 const { startResearchMonitorRunner } = require("./services/researchMonitorService");
@@ -126,7 +127,8 @@ connectDatabase(mongoUri)
         req.path === "/eventbrite/webhook" ||
         req.path === "/eventbrite/oauth/callback" ||
         req.path === "/gmail/oauth/callback";
-      return publicRequest ? next() : requireAuth(req, res, next);
+      const publicSocialCallback = /^\/social\/(?:linkedin|meta)\/oauth\/callback$/.test(req.path);
+      return publicRequest || publicSocialCallback ? next() : requireAuth(req, res, next);
     });
 
     app.use("/api/campaigns", campaignsRouter);
@@ -152,6 +154,7 @@ connectDatabase(mongoUri)
     app.use("/api/unsubscribe", unsubscribeRouter);
     app.use("/api/business-index", businessIndexRouter);
     app.use("/api/mcp-access-tokens", mcpAccessRouter);
+    app.use("/api/social", socialRouter);
 
     app.get("/api/health", (req, res) => {
       res.json({

@@ -55,9 +55,62 @@ redirect URI. Each customer's authorization must be:
 8. revocable by the customer, including provider-side token revocation when
    supported.
 
-Provider-specific connect buttons must remain disabled and labeled planned until
-the provider application is approved, the real API calls exist, token refresh is
-tested, and workspace isolation is enforced for all integration records.
+Provider-specific connect buttons remain disabled until their application
+credentials are configured. Once configured, the connection flow stores each
+workspace's authorization in the dedicated `SocialConnection` collection and
+never uses shared customer tokens from environment variables.
+
+## Implemented social OAuth lifecycle
+
+Growth Operator now provides these workspace-scoped routes for `linkedin` and
+`meta`:
+
+- `GET /api/social/:provider/oauth/status`
+- `GET /api/social/:provider/oauth/start`
+- `GET /api/social/:provider/oauth/callback`
+- `PATCH /api/social/:provider/assets`
+- `POST /api/social/:provider/oauth/disconnect`
+
+Starting, selecting assets, and disconnecting require an owner or administrator.
+The callback uses a signed ten-minute state value tied to the initiating user,
+workspace, and provider. Completion rechecks that the initiating user still has
+an active owner/admin membership. Tokens and Meta Page tokens are encrypted with
+AES-256-GCM. The API returns connection metadata and asset names but never token
+material.
+
+LinkedIn verifies the member using OpenID Connect and, when a supported LinkedIn
+API version and approved Community Management access are configured, requests
+the organizations the member administers. Meta verifies the member, retrieves
+authorized Facebook Pages, and discovers connected Instagram business accounts.
+The customer explicitly selects which returned assets Growth Operator may use.
+
+The first production release intentionally limits this work to secure connection
+and asset selection. Publishing, lead-form synchronization, comments, analytics,
+and ads must each be added as separately reviewed capabilities after the relevant
+provider permissions are approved. The UI must not claim those operations are
+active before real provider calls and tests exist.
+
+## Provider application setup
+
+LinkedIn production environment values:
+
+- `LINKEDIN_CLIENT_ID`
+- `LINKEDIN_CLIENT_SECRET`
+- `LINKEDIN_REDIRECT_URI` (exact production HTTPS callback)
+- `LINKEDIN_OAUTH_SCOPES` (only approved scopes)
+- `LINKEDIN_API_VERSION` (a currently supported Marketing API version)
+
+Meta production environment values:
+
+- `META_APP_ID`
+- `META_APP_SECRET`
+- `META_REDIRECT_URI` (exact production HTTPS callback)
+- `META_GRAPH_API_VERSION` (the version selected for the reviewed app)
+- `META_OAUTH_SCOPES` (only approved scopes)
+
+Both providers also require `INTEGRATION_CREDENTIAL_ENCRYPTION_KEY`. Never rotate
+that key without a credential migration because existing encrypted connections
+would become unreadable.
 
 ## Current connection status
 
@@ -67,9 +120,12 @@ tested, and workspace isolation is enforced for all integration records.
 - **CSV**: active vendor-neutral contact import.
 - **Meetup**: public community discovery only; no key is required. Authenticated
   Meetup Pro management is not implemented.
-- **LinkedIn**: customer OAuth is planned. It is not a people-search connection.
-- **Facebook and Instagram**: customer OAuth is planned. It is not a private
-  group-member connection.
+- **LinkedIn**: workspace-scoped customer OAuth and organization selection are
+  implemented but remain unavailable until the LinkedIn developer application,
+  approved scopes, API version, and production callback are configured.
+- **Facebook and Instagram**: workspace-scoped Meta OAuth and Page/business-account
+  selection are implemented but remain unavailable until the Meta developer
+  application, approved scopes, Graph API version, and callback are configured.
 - **X**: not an active publishing or lead-discovery integration.
 
 The legacy social adapters must fail closed. They must never return invented post

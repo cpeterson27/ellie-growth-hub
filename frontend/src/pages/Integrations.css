@@ -111,6 +111,11 @@
 .integration-provider-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .integration-provider-card .integration-capabilities{border-top:1px solid #e3e0d9;font-size:.75rem;margin-top:auto;padding-top:12px}
 .integration-limitation { background: #fff8e8; border: 1px solid #ead8a9; border-radius: 10px; color: #6f5b2c; font-size: .78rem; line-height: 1.45; padding: 10px 12px; }
+.social-asset-picker { border-top: 1px solid var(--border); display: grid; gap: 8px; margin-top: 14px; padding-top: 14px; }
+.social-asset-picker > strong { color: #173f37; font-size: .82rem; }
+.social-asset-picker label { align-items: flex-start; background: #f8f8f4; border: 1px solid #e5e3dc; border-radius: 10px; cursor: pointer; display: flex; gap: 9px; padding: 10px; }
+.social-asset-picker label span { display: grid; font-size: .82rem; font-weight: 750; gap: 2px; }
+.social-asset-picker label small,.social-asset-picker p { color: var(--text-muted); font-size: .72rem; font-weight: 500; line-height: 1.4; margin: 0; }
 
 .eventbrite-setup-grid {
   display: grid;

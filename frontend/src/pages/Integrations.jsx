@@ -10,6 +10,10 @@ import {
   fetchGmailConnection,
   beginGmailConnection,
   disconnectGmail,
+  fetchSocialConnection,
+  beginSocialConnection,
+  disconnectSocialConnection,
+  selectSocialAssets,
 } from "../services/api.js";
 import "./Integrations.css";
 
@@ -53,24 +57,34 @@ export default function Integrations() {
   const [eventbriteWebhook, setEventbriteWebhook] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const provider = params.get("social");
+    const status = params.get("status");
+    return provider && status && status !== "connected" ? params.get("message") || `${provider} connection did not complete.` : "";
+  });
   const [gmail, setGmail] = useState(null);
+  const [socialConnections, setSocialConnections] = useState({ linkedin: null, meta: null });
+  const [socialBusy, setSocialBusy] = useState("");
 
   const loadProviders = async () => {
     try {
       setLoading(true);
-      const [response, connection, webhook, eventData, gmailConnection] = await Promise.all([
+      const [response, connection, webhook, eventData, gmailConnection, linkedin, meta] = await Promise.all([
         fetchIntegrationHub(),
         fetchEventbriteConnection().catch(() => null),
         fetchEventbriteWebhookStatus().catch(() => null),
         fetchEvents().catch(() => []),
         fetchGmailConnection().catch(() => null),
+        fetchSocialConnection("linkedin").catch(() => null),
+        fetchSocialConnection("meta").catch(() => null),
       ]);
       setProviders(response.data?.providers || []);
       setEventbriteConnection(connection);
       setEventbriteWebhook(webhook);
       setEvents(Array.isArray(eventData) ? eventData : []);
       setGmail(gmailConnection);
+      setSocialConnections({ linkedin, meta });
       setError("");
     } catch (err) {
       setError(err.response?.data?.error || "Unable to load integrations");
@@ -97,6 +111,44 @@ export default function Integrations() {
     const initialLoad = window.setTimeout(loadProviders, 0);
     return () => window.clearTimeout(initialLoad);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const provider = params.get("social");
+    const status = params.get("status");
+    if (!provider || !status) return;
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
+  const connectSocial = async (provider) => {
+    try {
+      setSocialBusy(provider);
+      const response = await beginSocialConnection(provider);
+      window.location.assign(response.authorizationUrl);
+    } catch (err) {
+      setError(err.response?.data?.error || `${provider} developer application setup is incomplete.`);
+      setSocialBusy("");
+    }
+  };
+
+  const disconnectSocial = async (provider) => {
+    try {
+      setSocialBusy(provider);
+      await disconnectSocialConnection(provider);
+      await loadProviders();
+    } finally { setSocialBusy(""); }
+  };
+
+  const toggleSocialAsset = async (provider, assetId) => {
+    const connection = socialConnections[provider];
+    const selected = new Set(connection?.selectedAssetIds || []);
+    if (selected.has(assetId)) selected.delete(assetId); else selected.add(assetId);
+    try {
+      setSocialBusy(`${provider}:${assetId}`);
+      const response = await selectSocialAssets(provider, [...selected]);
+      setSocialConnections((current) => ({ ...current, [provider]: response.connection }));
+    } finally { setSocialBusy(""); }
+  };
 
   const latestEventbriteSync = events
     .map((event) => event.eventbriteLogistics?.lastSyncedAt)
@@ -160,7 +212,9 @@ export default function Integrations() {
         <section className="integration-provider-grid">
           {providers.filter((provider) => provider.id !== "resend").map((provider) => {
             const isEventbrite = provider.id === "eventbrite";
-            const status = isEventbrite && eventbriteReady ? "connected" : provider.status;
+            const socialProvider = provider.id === "facebook" ? "meta" : provider.id === "linkedin" ? "linkedin" : "";
+            const socialConnection = socialProvider ? socialConnections[socialProvider] : null;
+            const status = socialProvider ? (socialConnection?.connected ? "connected" : socialConnection?.configured ? "configuration_required" : "planned") : isEventbrite && eventbriteReady ? "connected" : provider.status;
             return (
               <article className="crm-connection-card integration-provider-card" key={provider.id}>
                 <div><span className={`integration-status integration-status--${status}`}>{statusLabels[status] || status}</span><h2>{provider.name}</h2></div>
@@ -174,12 +228,17 @@ export default function Integrations() {
                     <Button variant="outline" onClick={() => navigate("/contacts")}>Import contacts</Button>
                   ) : provider.status === "public_only" ? (
                     <Button variant="outline" onClick={() => navigate("/discovery?tab=monitoring")}>Open public discovery</Button>
+                  ) : socialProvider && socialConnection?.connected ? (
+                    <><Button variant="outline" onClick={() => disconnectSocial(socialProvider)} loading={socialBusy === socialProvider}>Disconnect</Button></>
+                  ) : socialProvider && socialConnection?.configured ? (
+                    <Button onClick={() => connectSocial(socialProvider)} loading={socialBusy === socialProvider}>Connect {provider.name}</Button>
                   ) : provider.status === "planned" ? (
-                    <button className="integration-disabled-action" disabled>Customer OAuth coming later</button>
+                    <button className="integration-disabled-action" disabled>Add provider app credentials first</button>
                   ) : (
                     <Button variant="outline" disabled>Details coming soon</Button>
                   )}
                 </div>
+                {socialProvider && socialConnection?.connected ? <div className="social-asset-picker"><strong>Authorized business assets</strong>{socialConnection.assets?.length ? socialConnection.assets.map((asset) => <label key={`${asset.type}:${asset.id}`}><input type="checkbox" checked={(socialConnection.selectedAssetIds || []).includes(asset.id)} disabled={Boolean(socialBusy)} onChange={() => toggleSocialAsset(socialProvider, asset.id)} /><span>{asset.name}<small>{asset.type.replaceAll("_", " ")}{asset.username ? ` · @${asset.username}` : ""}</small></span></label>) : <p>No manageable Pages or organizations were returned. Confirm the signed-in user is an administrator and that the provider approved the required scopes.</p>}</div> : null}
               </article>
             );
           })}
