@@ -48,6 +48,9 @@ includesAll(companyCanonicalization, [
   "findOneAndUpdate", "$setOnInsert", "Contact.updateMany", "apply = false",
 ], "Contact company canonicalization");
 
+const organizationModel = source("models/Organization.js");
+includesAll(organizationModel, ["default: undefined", "legacy sparse unique index"], "Domain-less company persistence");
+
 const organizationRoutes = source("routes/organizationRelationships.js");
 includesAll(organizationRoutes, ['router.post("/canonicalize-contacts"', "req.body?.apply === true"], "Company canonicalization API");
 

@@ -26,7 +26,9 @@ const organizationSchema = new mongoose.Schema(
     domain: {
       type: String,
       required: false,
-      default: null,
+      // Leave unknown domains absent. The legacy sparse unique index permits
+      // many missing values but only one explicit null value.
+      default: undefined,
       lowercase: true,
       trim: true,
     },
