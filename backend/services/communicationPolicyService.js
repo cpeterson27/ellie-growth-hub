@@ -1,5 +1,5 @@
 function normalizePhone(value) {
-  const raw = String(value || "").trim();
+  const raw = String(value || "").trim().replace(/^whatsapp:/i, "");
   const normalized = raw.startsWith("+") ? `+${raw.slice(1).replace(/\D/g, "")}` : raw.replace(/\D/g, "");
   return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized : "";
 }

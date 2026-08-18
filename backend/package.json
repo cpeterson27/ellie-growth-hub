@@ -11,6 +11,7 @@
     "test:tenant-isolation": "node test-workspace-isolation.js",
     "test:crm-core": "node test-crm-core.js",
     "test:communications-core": "node test-communications-core.js",
+    "test:social-conversations": "node test-social-conversations.js",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "start:worker": "node worker.js",

@@ -71,6 +71,18 @@ router.post("/messages/send", async (req, res) => {
   } catch (error) { res.status(error.code === "COMMUNICATION_BLOCKED" ? 409 : 400).json({ success: false, error: error.message, code: error.code || "PROVIDER_ERROR" }); }
 });
 
+router.post("/whatsapp/send", async (req, res) => {
+  if (req.body?.approved !== true) return res.status(400).json({ success: false, error: "Explicit send approval is required" });
+  const sender = await MessagingSender.findById(req.body?.senderId).lean();
+  if (!sender?.capabilities?.whatsapp) return res.status(400).json({ success: false, error: "A WhatsApp-enabled sender is required" });
+  try {
+    const result = await twilioConversationAdapter.sendWhatsApp({ sender, to: req.body.to, body: req.body.body, contentSid: req.body.contentSid, contentVariables: req.body.contentVariables, purpose: req.body.purpose || "transactional", timezone: req.body.timezone, statusCallback: callbackUrl("message-status"), threadId: req.body.threadId });
+    const to = normalizePhone(req.body.to);
+    const saved = await ingestProviderMessage({ thread: { channel: "whatsapp", provider: "twilio", providerThreadId: `whatsapp:${to}:${sender.phoneNumber}`, participants: [{ kind: "user", role: "from", address: sender.phoneNumber }, { kind: "external", role: "to", address: to }], contactIds: req.body.contactId ? [req.body.contactId] : [], organizationId: req.body.organizationId || null }, message: { providerMessageId: result.sid, direction: "outbound", body: String(req.body.body || `[Template ${req.body.contentSid}]`), sender: { address: sender.phoneNumber }, recipients: [{ address: to, role: "to" }], deliveryStatus: "queued", contactId: req.body.contactId || null, metadata: { contentSid: req.body.contentSid || "", template: Boolean(req.body.contentSid) } } });
+    res.status(201).json({ success: true, data: saved.message, providerStatus: result.status });
+  } catch (error) { res.status(error.code === "COMMUNICATION_BLOCKED" ? 409 : 400).json({ success: false, error: error.message, code: error.code || "PROVIDER_ERROR" }); }
+});
+
 router.get("/calls", async (_req, res) => res.json({ success: true, data: await CallRecord.find({}).populate("contactId", "name phone").sort({ createdAt: -1 }).limit(500).lean() }));
 
 router.post("/calls", async (req, res) => {

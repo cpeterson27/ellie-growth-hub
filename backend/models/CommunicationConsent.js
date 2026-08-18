@@ -4,7 +4,7 @@ const workspacePlugin = require("../tenancy/workspacePlugin");
 const communicationConsentSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
   contactId: { type: mongoose.Schema.Types.ObjectId, ref: "Contact", default: null, index: true },
-  channel: { type: String, enum: ["sms", "mms", "voice"], required: true, index: true },
+  channel: { type: String, enum: ["sms", "mms", "voice", "whatsapp"], required: true, index: true },
   address: { type: String, required: true, trim: true, index: true },
   purpose: { type: String, enum: ["transactional", "marketing", "all"], default: "all" },
   status: { type: String, enum: ["unknown", "opted_in", "opted_out"], default: "unknown", index: true },

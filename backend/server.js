@@ -36,6 +36,8 @@ const activitiesRouter = require("./routes/activities");
 const opportunitiesRouter = require("./routes/opportunities");
 const conversationsRouter = require("./routes/conversations");
 const telephonyRouter = require("./routes/telephony");
+const chatRouter = require("./routes/chat");
+const socialMessagingRouter = require("./routes/socialMessaging");
 const { requireAuth } = require("./middleware/auth");
 const { startResearchMonitorRunner } = require("./services/researchMonitorService");
 
@@ -48,17 +50,19 @@ const allowedOrigins = (process.env.FRONTEND_URL || "")
 if (process.env.NODE_ENV !== "production") {
   allowedOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
 }
-app.use(cors({
+const workspaceCors = cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error("Origin is not allowed"));
   },
   credentials: true,
-}));
+});
+const publicChatCors = cors({ origin: true, credentials: false });
+app.use((req, res, next) => req.path.startsWith("/api/chat/widget/") ? publicChatCors(req, res, next) : workspaceCors(req, res, next));
 app.use(express.json({
   limit: "12mb",
   verify(req, _res, buffer) {
-    if (req.originalUrl === "/api/webhooks/resend") {
+    if (req.originalUrl === "/api/webhooks/resend" || req.originalUrl === "/api/webhooks/meta") {
       req.rawBody = buffer.toString("utf8");
     }
   },
@@ -128,6 +132,8 @@ connectDatabase(mongoUri)
         req.path.startsWith("/unsubscribe/") ||
         req.path === "/webhooks/resend" ||
         req.path.startsWith("/webhooks/twilio/") ||
+        req.path === "/webhooks/meta" ||
+        req.path.startsWith("/chat/widget/") ||
         req.path === "/jarvis/memory/sync" ||
         req.path === "/eventbrite/webhook" ||
         req.path === "/eventbrite/oauth/callback" ||
@@ -146,6 +152,8 @@ connectDatabase(mongoUri)
     app.use("/api/opportunities", opportunitiesRouter);
     app.use("/api/conversations", conversationsRouter);
     app.use("/api/telephony", telephonyRouter);
+    app.use("/api/chat", chatRouter);
+    app.use("/api/social-messaging", socialMessagingRouter);
     app.use("/api/audience", audienceRouter);
     app.use("/api/organizations", organizationRelationshipsRouter);
     app.use("/api/integrations", integrationsRouter);

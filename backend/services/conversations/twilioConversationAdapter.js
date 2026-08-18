@@ -39,6 +39,17 @@ class TwilioConversationAdapter extends ConversationChannelAdapter {
     mediaUrls.slice(0, 10).forEach((url, index) => { payload[`MediaUrl${index}`] = url; });
     return twilioRequest("/Messages.json", { method: "POST", body: payload });
   }
+  async sendWhatsApp({ sender, to, body, contentSid, contentVariables = {}, purpose = "transactional", timezone, statusCallback, threadId }) {
+    const policy = await evaluateOutboundCommunication({ channel: "whatsapp", address: to, purpose, sender, timezone });
+    if (!policy.allowed) { const error = new Error(policy.reasons.join("; ")); error.code = "COMMUNICATION_BLOCKED"; throw error; }
+    const thread = threadId ? await ConversationThread.findById(threadId).lean() : null;
+    const customerWindowOpen = thread?.lastInboundAt && Date.now() - new Date(thread.lastInboundAt).getTime() <= 24 * 60 * 60 * 1000;
+    if (!customerWindowOpen && !contentSid) throw new Error("An approved WhatsApp template is required outside the 24-hour customer service window");
+    const payload = { To: `whatsapp:${policy.address}`, From: `whatsapp:${sender.phoneNumber}`, StatusCallback: statusCallback };
+    if (contentSid) { payload.ContentSid = contentSid; payload.ContentVariables = JSON.stringify(contentVariables || {}); }
+    else payload.Body = String(body || "").trim();
+    return twilioRequest("/Messages.json", { method: "POST", body: payload });
+  }
   async placeCall({ sender, to, twimlUrl, statusCallback, recordingStatusCallback, record = false }) {
     if (!normalizePhone(to) || !twimlUrl) throw new Error("A valid destination and TwiML URL are required");
     if (record && sender.recordingPolicy?.mode !== "consent_required") throw new Error("Recording is disabled by workspace policy");
@@ -48,7 +59,7 @@ class TwilioConversationAdapter extends ConversationChannelAdapter {
   async purchaseNumber() { throw new Error("Number purchasing requires a separate explicit billing confirmation workflow"); }
   async ingestInbound(payload, sender) {
     const from = normalizePhone(payload.From); const to = normalizePhone(payload.To);
-    const channel = Number(payload.NumMedia || 0) > 0 ? "mms" : "sms";
+    const channel = /^whatsapp:/i.test(String(payload.From || "")) ? "whatsapp" : Number(payload.NumMedia || 0) > 0 ? "mms" : "sms";
     const contact = await Contact.findOne({ $or: ["phone", "mobilePhone", "workDirectPhone", "homePhone", "corporatePhone", "otherPhone"].map((field) => ({ [field]: from })), status: { $ne: "archived" } }).select("_id organizationId").lean();
     return ingestProviderMessage({ thread: { channel, provider: "twilio", providerThreadId: `${channel}:${from}:${to}`, contactIds: contact ? [contact._id] : [], organizationId: contact?.organizationId || null, participants: [{ kind: contact ? "contact" : "external", role: "from", address: from, contactId: contact?._id || null }, { kind: "user", role: "to", address: to }] }, message: { providerMessageId: payload.MessageSid, direction: "inbound", body: payload.Body || "", sender: { address: from }, recipients: [{ address: to, role: "to" }], attachments: Array.from({ length: Math.min(10, Number(payload.NumMedia || 0)) }, (_, index) => ({ url: payload[`MediaUrl${index}`] || "", contentType: payload[`MediaContentType${index}`] || "" })), deliveryStatus: "received", contactId: contact?._id || null, metadata: { optOutType: payload.OptOutType || "", messagingServiceSid: payload.MessagingServiceSid || "", senderId: sender?._id || null } } });
   }

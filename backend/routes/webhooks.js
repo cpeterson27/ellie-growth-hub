@@ -14,8 +14,29 @@ const MessagingSender = require("../models/MessagingSender");
 const { normalizePhone } = require("../services/communicationPolicyService");
 const { twilioConversationAdapter, validateTwilioSignature } = require("../services/conversations/twilioConversationAdapter");
 const { runWithWorkspace } = require("../tenancy/workspaceContext");
+const { connectionForAsset, ingestMetaMessage, validateMetaSignature } = require("../services/conversations/metaMessagingAdapter");
 
 const router = express.Router();
+
+router.get("/meta", (req, res) => {
+  const verifyToken = String(process.env.META_WEBHOOK_VERIFY_TOKEN || "").trim();
+  if (verifyToken && req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === verifyToken) return res.status(200).send(String(req.query["hub.challenge"] || ""));
+  return res.status(403).send("Verification failed");
+});
+
+router.post("/meta", async (req, res) => {
+  if (!validateMetaSignature(req.rawBody || JSON.stringify(req.body), req.get("x-hub-signature-256"))) return res.status(403).json({ error: "Invalid Meta signature" });
+  try {
+    for (const entry of req.body?.entry || []) {
+      const connection = await connectionForAsset(entry.id);
+      if (!connection?.workspaceId) continue;
+      await runWithWorkspace(connection.workspaceId, async () => {
+        for (const event of entry.messaging || []) await ingestMetaMessage({ connection, assetId: entry.id, event });
+      });
+    }
+    res.json({ received: true });
+  } catch (error) { console.error("META MESSAGING WEBHOOK ERROR:", error); res.status(500).json({ error: "Webhook failed" }); }
+});
 
 function twilioWebhookUrl(req) { return `${String(process.env.PUBLIC_BACKEND_URL || "").replace(/\/$/, "")}${req.originalUrl}`; }
 function validTwilioRequest(req) { return validateTwilioSignature(twilioWebhookUrl(req), req.body || {}, String(req.get("x-twilio-signature") || "")); }
@@ -31,10 +52,11 @@ router.post("/twilio/message-inbound", async (req, res) => {
   try {
     await runWithWorkspace(sender.workspaceId, async () => {
       const from = normalizePhone(req.body.From);
+      const consentChannel = /^whatsapp:/i.test(String(req.body.From || "")) ? "whatsapp" : "sms";
       const optOutType = String(req.body.OptOutType || "").toUpperCase();
       if (from && ["STOP", "START"].includes(optOutType)) {
         const optedOut = optOutType === "STOP";
-        await CommunicationConsent.findOneAndUpdate({ channel: "sms", address: from, purpose: "all" }, { $set: { status: optedOut ? "opted_out" : "opted_in", source: "provider", proof: `Twilio Advanced Opt-Out ${optOutType}`, keyword: String(req.body.Body || "").slice(0, 80), consentedAt: optedOut ? null : new Date(), revokedAt: optedOut ? new Date() : null, metadata: { optOutType } } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+        await CommunicationConsent.findOneAndUpdate({ channel: consentChannel, address: from, purpose: "all" }, { $set: { status: optedOut ? "opted_out" : "opted_in", source: "provider", proof: `Twilio Advanced Opt-Out ${optOutType}`, keyword: String(req.body.Body || "").slice(0, 80), consentedAt: optedOut ? null : new Date(), revokedAt: optedOut ? new Date() : null, metadata: { optOutType } } }, { upsert: true, new: true, setDefaultsOnInsert: true });
       }
       await twilioConversationAdapter.ingestInbound(req.body, sender);
     });

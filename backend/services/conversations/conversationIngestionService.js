@@ -29,6 +29,7 @@ async function ingestProviderMessage({ thread, message }) {
     contactIds: thread.contactIds || [],
     organizationId: thread.organizationId || null,
     opportunityId: thread.opportunityId || null,
+    metadata: thread.metadata || {},
     lastMessageAt: occurredAt,
     ...(message.direction === "inbound" ? { lastInboundAt: occurredAt } : { lastOutboundAt: occurredAt }),
   };

@@ -7,7 +7,7 @@ const messagingSenderSchema = new mongoose.Schema({
   phoneNumber: { type: String, required: true, trim: true, index: true },
   providerNumberId: { type: String, default: "", trim: true },
   messagingServiceId: { type: String, default: "", trim: true },
-  capabilities: { sms: { type: Boolean, default: false }, mms: { type: Boolean, default: false }, voice: { type: Boolean, default: false } },
+  capabilities: { sms: { type: Boolean, default: false }, mms: { type: Boolean, default: false }, voice: { type: Boolean, default: false }, whatsapp: { type: Boolean, default: false } },
   status: { type: String, enum: ["pending", "active", "paused", "released"], default: "pending" },
   a2p: { status: { type: String, enum: ["not_required", "unregistered", "pending", "approved", "rejected"], default: "unregistered" }, brandId: { type: String, default: "" }, campaignId: { type: String, default: "" }, useCase: { type: String, default: "" } },
   quietHours: { enabled: { type: Boolean, default: true }, startHour: { type: Number, default: 21, min: 0, max: 23 }, endHour: { type: Number, default: 8, min: 0, max: 23 }, fallbackTimezone: { type: String, default: "America/Los_Angeles" } },

@@ -56,7 +56,7 @@ includesAll(conversationMessageModel, [
 
 const conversationMailboxModel = source("models/ConversationMailbox.js");
 includesAll(conversationMailboxModel, [
-  'collection: "conversation_mailboxes"', 'enum: ["gmail", "microsoft", "imap"]', "shared", "assignmentMode",
+  'collection: "conversation_mailboxes"', '"gmail", "microsoft", "imap", "website_chat", "whatsapp", "facebook", "instagram", "linkedin_manual"', "shared", "assignmentMode",
   "defaultAssignee", "signature", "trackingPreferences", "templates", "lastSyncedAt", "workspacePlugin",
 ], "Shared conversation mailbox model");
 

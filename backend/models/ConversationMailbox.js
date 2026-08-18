@@ -3,7 +3,7 @@ const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const conversationMailboxSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
-  provider: { type: String, enum: ["gmail", "microsoft", "imap"], required: true, index: true },
+  provider: { type: String, enum: ["gmail", "microsoft", "imap", "website_chat", "whatsapp", "facebook", "instagram", "linkedin_manual"], required: true, index: true },
   providerAccountId: { type: String, default: "", trim: true },
   name: { type: String, required: true, trim: true, maxlength: 160 },
   address: { type: String, required: true, trim: true, lowercase: true },
