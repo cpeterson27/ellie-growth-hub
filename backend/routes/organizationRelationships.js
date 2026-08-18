@@ -5,8 +5,21 @@ const Audience = require("../models/Audience");
 const OrganizationRelationship = require("../models/OrganizationRelationship");
 const Contact = require("../models/Contact");
 const CrmActivity = require("../models/CrmActivity");
+const { canonicalizeContactCompanies } = require("../services/companyCanonicalizationService");
 
 const router = express.Router();
+
+// Preview by default. Applying only creates canonical company accounts and
+// links existing contacts; it never invokes discovery, enrichment, or AI.
+router.post("/canonicalize-contacts", async (req, res) => {
+  try {
+    const data = await canonicalizeContactCompanies({ apply: req.body?.apply === true });
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error("POST /canonicalize-contacts error:", error);
+    res.status(500).json({ success: false, error: "Failed to build companies from CRM contacts" });
+  }
+});
 
 // CRM company index. Discovery owns finding organizations; this endpoint makes
 // those same records usable as durable company accounts in the CRM.

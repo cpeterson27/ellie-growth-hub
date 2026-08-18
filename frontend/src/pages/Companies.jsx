@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import ActivityTimeline from "../components/ActivityTimeline.jsx";
 import { Drawer, PageHeader, StatusBadge, Tabs, Toolbar } from "../components/WorkspaceUI.jsx";
-import { fetchCompanies, fetchCompany } from "../services/api.js";
+import { canonicalizeContactCompanies, fetchCompanies, fetchCompany } from "../services/api.js";
 import "./Companies.css";
 
 const companyViews = [
@@ -38,6 +38,8 @@ export default function Companies() {
   const [detail, setDetail] = useState(null);
   const [detailTab, setDetailTab] = useState("overview");
   const [detailLoading, setDetailLoading] = useState(Boolean(routeCompanyId));
+  const [canonicalization, setCanonicalization] = useState(null);
+  const [canonicalizing, setCanonicalizing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -81,6 +83,19 @@ export default function Companies() {
   };
   const closeCompany = () => { setDetail(null); navigate("/crm/companies"); };
   const organization = detail?.organization;
+  const buildFromContacts = async (apply = false) => {
+    setCanonicalizing(true);
+    setError("");
+    try {
+      const result = await canonicalizeContactCompanies(apply);
+      setCanonicalization(result.data);
+      if (apply) setPage((value) => value);
+    } catch {
+      setError("Unable to build companies from CRM contacts.");
+    } finally {
+      setCanonicalizing(false);
+    }
+  };
 
   return <div className="page-dashboard companies-page">
     <PageHeader
@@ -99,6 +114,7 @@ export default function Companies() {
     />
 
     {error ? <p className="form-error" role="alert">{error}</p> : null}
+    {canonicalization ? <section className="company-import-preview" aria-live="polite"><div><strong>{canonicalization.apply ? `${canonicalization.companiesCreated} companies created` : `${canonicalization.companiesToCreate} companies ready to create`}</strong><p>{canonicalization.apply ? `${canonicalization.contactsLinked} contacts linked. No enrichment or AI credits were used.` : `${canonicalization.eligibleContacts} unlinked contacts grouped into ${canonicalization.companyGroups} exact company-name matches. Existing companies will be reused.`}</p></div>{canonicalization.apply ? <Button variant="outline" onClick={() => window.location.reload()}>View companies</Button> : <Button loading={canonicalizing} disabled={!canonicalization.companyGroups} onClick={() => buildFromContacts(true)}>Create and link companies</Button>}</section> : null}
     {loading ? <div className="table-state">Loading companies…</div> : companies.length ? <div className="company-table-wrap">
       <table className="company-table">
         <thead><tr><th>Company</th><th>Industry and location</th><th>Relationship</th><th>Priority</th><th>Audience fit</th><th>Contacts</th><th>Last updated</th></tr></thead>
@@ -112,7 +128,7 @@ export default function Companies() {
           <td>{company.updatedAt ? new Date(company.updatedAt).toLocaleDateString() : "—"}</td>
         </tr>)}</tbody>
       </table>
-    </div> : <section className="company-empty"><h2>No companies match this view</h2><p>Adjust the filters or discover evidence-backed organizations.</p><Button onClick={() => navigate("/discovery/companies")}>Open Company Discovery</Button></section>}
+    </div> : <section className="company-empty"><h2>No companies match this view</h2><p>Build account records from company names already in your CRM, or discover new evidence-backed organizations.</p><div><Button loading={canonicalizing} variant="outline" onClick={() => buildFromContacts(false)}>Preview companies from contacts</Button><Button onClick={() => navigate("/discovery/companies")}>Open Company Discovery</Button></div></section>}
 
     {pagination.pages > 1 ? <nav className="company-pagination" aria-label="Company pages"><Button variant="outline" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</Button><span>Page {pagination.page} of {pagination.pages}</span><Button variant="outline" disabled={page >= pagination.pages} onClick={() => setPage((value) => value + 1)}>Next</Button></nav> : null}
 

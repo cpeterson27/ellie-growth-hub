@@ -303,6 +303,9 @@ export const fetchCompanies = (params = {}) =>
 export const fetchCompany = (companyId) =>
   api.get(`/organizations/${companyId}`).then((res) => res.data);
 
+export const canonicalizeContactCompanies = (apply = false) =>
+  api.post("/organizations/canonicalize-contacts", { apply }).then((res) => res.data);
+
 export const fetchCrmActivities = (params = {}) =>
   api.get("/activities", { params }).then((res) => res.data);
 

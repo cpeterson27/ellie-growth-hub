@@ -42,4 +42,25 @@ includesAll(opportunityRoutes, [
 const server = source("server.js");
 includesAll(server, ['app.use("/api/activities", activitiesRouter)', 'app.use("/api/opportunities", opportunitiesRouter)'], "Authenticated API mounting");
 
+const companyCanonicalization = source("services/companyCanonicalizationService.js");
+includesAll(companyCanonicalization, [
+  "organizationId: null", "normalizedName", "companiesToCreate", "contactsLinked",
+  "findOneAndUpdate", "$setOnInsert", "Contact.updateMany", "apply = false",
+], "Contact company canonicalization");
+
+const organizationRoutes = source("routes/organizationRelationships.js");
+includesAll(organizationRoutes, ['router.post("/canonicalize-contacts"', "req.body?.apply === true"], "Company canonicalization API");
+
+const { companyKey, normalizeCompanyName, profileFromContacts } = require("./services/companyCanonicalizationService");
+assert.equal(normalizeCompanyName("  Ellie   AI  "), "Ellie AI");
+assert.equal(companyKey("ÉLLIE AI"), companyKey("éllie  ai"));
+assert.deepEqual(
+  profileFromContacts("Acme", [{ industry: "Real Estate", companyCity: "Austin", companyState: "TX" }]),
+  {
+    name: "Acme", normalizedName: "acme", source: "legacy", website: "", industry: "Real Estate",
+    location: "Austin, TX", linkedinUrl: "", phone: "", employeeCount: null,
+    externalSources: { crmCompanyText: true },
+  },
+);
+
 console.log("CRM core dependency-free contracts passed: activities, tasks, stages, opportunities, tenancy, and API mounting.");

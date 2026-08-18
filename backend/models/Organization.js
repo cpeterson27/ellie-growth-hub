@@ -14,6 +14,15 @@ const organizationSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Stable workspace-local key used to connect legacy contact company text
+    // without merging distinct companies through fuzzy matching.
+    normalizedName: {
+      type: String,
+      default: "",
+      lowercase: true,
+      trim: true,
+    },
+
     domain: {
       type: String,
       required: false,
@@ -213,6 +222,10 @@ const organizationSchema = new mongoose.Schema(
 // Domain dedup — sparse so that domain-less orgs (manual, Meetup, etc.)
 // do not collide on null. Only one record allowed per unique domain value.
 organizationSchema.index({ domain: 1 }, { unique: true, sparse: true });
+organizationSchema.index(
+  { workspaceId: 1, normalizedName: 1 },
+  { unique: true, partialFilterExpression: { normalizedName: { $type: "string", $gt: "" } } },
+);
 
 
 // Audience filtering — Growth Operator queries orgs by tier for outreach targeting.
