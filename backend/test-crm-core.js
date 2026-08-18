@@ -42,6 +42,35 @@ includesAll(opportunityRoutes, [
 const server = source("server.js");
 includesAll(server, ['app.use("/api/activities", activitiesRouter)', 'app.use("/api/opportunities", opportunitiesRouter)'], "Authenticated API mounting");
 
+const conversationThreadModel = source("models/ConversationThread.js");
+includesAll(conversationThreadModel, [
+  'collection: "conversation_threads"', "providerThreadId", "participants", "assignedTo", "snoozedUntil",
+  "firstResponseDueAt", "nextResponseDueAt", "breachedAt", "attachments", "draft", "workspacePlugin",
+], "Conversation thread model");
+
+const conversationMessageModel = source("models/ConversationMessage.js");
+includesAll(conversationMessageModel, [
+  'collection: "conversation_messages"', "threadId", "providerMessageId", 'enum: ["inbound", "outbound", "internal"]',
+  'enum: ["message", "note", "status", "assignment", "system"]', "attachments", "deliveryStatus", "workspacePlugin",
+], "Conversation message model");
+
+const conversationRoutes = source("routes/conversations.js");
+includesAll(conversationRoutes, [
+  'router.get("/"', 'router.get("/:id"', 'router.patch("/:id"', 'router.put("/:id/draft"', 'router.post("/:id/notes"',
+  'req.body.status === "snoozed"', "markRead", 'direction: "internal"',
+], "Conversation architecture API");
+
+const channelAdapters = source("services/conversations/channelAdapters.js");
+includesAll(channelAdapters, ["ConversationChannelAdapter", "syncThreads", "fetchThread", "sendMessage", "saveDraft", "registerConversationAdapter"], "Conversation channel adapter contract");
+
+const conversationIngestion = source("services/conversations/conversationIngestionService.js");
+includesAll(conversationIngestion, [
+  "ingestProviderMessage", "providerThreadId", "providerMessageId", "existingMessage", "$setOnInsert",
+  'message.direction === "inbound"', "unreadCount", "lastInboundAt", "lastOutboundAt",
+], "Idempotent conversation ingestion");
+
+includesAll(server, ['app.use("/api/conversations", conversationsRouter)'], "Authenticated conversation API mounting");
+
 const companyCanonicalization = source("services/companyCanonicalizationService.js");
 includesAll(companyCanonicalization, [
   "organizationId: null", "normalizedName", "companiesToCreate", "contactsLinked",
