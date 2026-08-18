@@ -6,8 +6,83 @@ const Contact = require("../models/Contact");
 const EmailEvent = require("../models/EmailEvent");
 const EmailSuppression = require("../models/EmailSuppression");
 const { classifyReply, draftReply } = require("../services/replyIntelligence");
+const CallRecord = require("../models/CallRecord");
+const CommunicationConsent = require("../models/CommunicationConsent");
+const ConversationMessage = require("../models/ConversationMessage");
+const MessageDeliveryEvent = require("../models/MessageDeliveryEvent");
+const MessagingSender = require("../models/MessagingSender");
+const { normalizePhone } = require("../services/communicationPolicyService");
+const { twilioConversationAdapter, validateTwilioSignature } = require("../services/conversations/twilioConversationAdapter");
+const { runWithWorkspace } = require("../tenancy/workspaceContext");
 
 const router = express.Router();
+
+function twilioWebhookUrl(req) { return `${String(process.env.PUBLIC_BACKEND_URL || "").replace(/\/$/, "")}${req.originalUrl}`; }
+function validTwilioRequest(req) { return validateTwilioSignature(twilioWebhookUrl(req), req.body || {}, String(req.get("x-twilio-signature") || "")); }
+async function twilioSender(req) {
+  const numbers = [req.body?.To, req.body?.From, req.body?.Called, req.body?.Caller].map(normalizePhone).filter(Boolean);
+  return numbers.length ? MessagingSender.findOne({ phoneNumber: { $in: numbers } }).lean() : null;
+}
+
+router.post("/twilio/message-inbound", async (req, res) => {
+  if (!validTwilioRequest(req)) return res.status(403).type("text/xml").send("<Response></Response>");
+  const sender = await twilioSender(req);
+  if (!sender?.workspaceId) return res.status(404).type("text/xml").send("<Response></Response>");
+  try {
+    await runWithWorkspace(sender.workspaceId, async () => {
+      const from = normalizePhone(req.body.From);
+      const optOutType = String(req.body.OptOutType || "").toUpperCase();
+      if (from && ["STOP", "START"].includes(optOutType)) {
+        const optedOut = optOutType === "STOP";
+        await CommunicationConsent.findOneAndUpdate({ channel: "sms", address: from, purpose: "all" }, { $set: { status: optedOut ? "opted_out" : "opted_in", source: "provider", proof: `Twilio Advanced Opt-Out ${optOutType}`, keyword: String(req.body.Body || "").slice(0, 80), consentedAt: optedOut ? null : new Date(), revokedAt: optedOut ? new Date() : null, metadata: { optOutType } } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+      }
+      await twilioConversationAdapter.ingestInbound(req.body, sender);
+    });
+    return res.type("text/xml").send("<Response></Response>");
+  } catch (error) { console.error("TWILIO INBOUND ERROR:", error); return res.status(500).type("text/xml").send("<Response></Response>"); }
+});
+
+router.post("/twilio/message-status", async (req, res) => {
+  if (!validTwilioRequest(req)) return res.status(403).json({ error: "Invalid Twilio signature" });
+  const sender = await twilioSender(req);
+  if (!sender?.workspaceId) return res.status(404).json({ error: "Sending number not found" });
+  await runWithWorkspace(sender.workspaceId, async () => {
+    const providerMessageId = String(req.body.MessageSid || "");
+    const status = String(req.body.MessageStatus || "unknown").toLowerCase();
+    const message = await ConversationMessage.findOne({ provider: "twilio", providerMessageId });
+    const deliveryStatus = { accepted: "queued", scheduled: "queued", queued: "queued", sending: "queued", sent: "sent", delivered: "delivered", read: "read", undelivered: "failed", failed: "failed" }[status] || "queued";
+    if (message) { message.deliveryStatus = deliveryStatus; if (deliveryStatus === "delivered") message.deliveredAt = new Date(); if (deliveryStatus === "read") message.readAt = new Date(); await message.save(); }
+    try { await MessageDeliveryEvent.create({ messageId: message?._id || null, provider: "twilio", providerMessageId, status, errorCode: String(req.body.ErrorCode || ""), errorMessage: String(req.body.ErrorMessage || ""), metadata: { channelPrefix: req.body.ChannelPrefix || "" } }); } catch (error) { if (error?.code !== 11000) throw error; }
+  });
+  res.json({ received: true });
+});
+
+router.post("/twilio/call-status", async (req, res) => {
+  if (!validTwilioRequest(req)) return res.status(403).json({ error: "Invalid Twilio signature" });
+  const sender = await twilioSender(req);
+  if (!sender?.workspaceId) return res.status(404).json({ error: "Sending number not found" });
+  await runWithWorkspace(sender.workspaceId, async () => {
+    const status = String(req.body.CallStatus || "queued").replaceAll("-", "_");
+    const update = { status, durationSeconds: Number(req.body.CallDuration || 0) };
+    if (["ringing", "in_progress"].includes(status)) update.startedAt = new Date();
+    if (status === "in_progress") update.answeredAt = new Date();
+    if (["completed", "busy", "no_answer", "failed", "canceled"].includes(status)) update.endedAt = new Date();
+    await CallRecord.updateOne({ provider: "twilio", providerCallId: req.body.CallSid }, { $set: update });
+  });
+  res.json({ received: true });
+});
+
+router.post("/twilio/recording-status", async (req, res) => {
+  if (!validTwilioRequest(req)) return res.status(403).json({ error: "Invalid Twilio signature" });
+  const sender = await twilioSender(req);
+  if (!sender?.workspaceId) return res.status(404).json({ error: "Sending number not found" });
+  await runWithWorkspace(sender.workspaceId, async () => {
+    const rawStatus = String(req.body.RecordingStatus || "processing");
+    const status = rawStatus === "completed" ? "completed" : rawStatus === "absent" ? "failed" : "processing";
+    await CallRecord.updateOne({ provider: "twilio", providerCallId: req.body.CallSid }, { $set: { "recording.status": status, "recording.providerRecordingId": String(req.body.RecordingSid || ""), "recording.url": status === "completed" ? String(req.body.RecordingUrl || "") : "", "recording.durationSeconds": Number(req.body.RecordingDuration || 0) } });
+  });
+  res.json({ received: true });
+});
 
 function verifyResendEvent(req) {
   const webhookSecret = String(process.env.RESEND_WEBHOOK_SECRET || "").trim();

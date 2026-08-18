@@ -74,6 +74,18 @@ const providers = [
     limitation: "Meta login will manage assets the customer authorizes; it will not expose private groups or member lists.",
   },
   {
+    id: "twilio",
+    name: "Twilio",
+    category: "communication",
+    description: "Consent-aware SMS, MMS, and voice",
+    capabilities: ["sendSms", "sendMms", "placeCall", "deliveryEvents", "callRecordingCallbacks"],
+    environmentKeys: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "PUBLIC_BACKEND_URL"],
+    availability: "configuration_required",
+    connectionMethod: "platform_managed",
+    leadDiscovery: false,
+    limitation: "Number purchase and A2P registration require separate explicit billing and compliance approval.",
+  },
+  {
     id: "stripe",
     name: "Stripe",
     category: "payments",

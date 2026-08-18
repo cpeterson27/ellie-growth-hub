@@ -35,6 +35,7 @@ const gptActionsRouter = require("./routes/gptActions");
 const activitiesRouter = require("./routes/activities");
 const opportunitiesRouter = require("./routes/opportunities");
 const conversationsRouter = require("./routes/conversations");
+const telephonyRouter = require("./routes/telephony");
 const { requireAuth } = require("./middleware/auth");
 const { startResearchMonitorRunner } = require("./services/researchMonitorService");
 
@@ -126,6 +127,7 @@ connectDatabase(mongoUri)
         req.path === "/health" ||
         req.path.startsWith("/unsubscribe/") ||
         req.path === "/webhooks/resend" ||
+        req.path.startsWith("/webhooks/twilio/") ||
         req.path === "/jarvis/memory/sync" ||
         req.path === "/eventbrite/webhook" ||
         req.path === "/eventbrite/oauth/callback" ||
@@ -143,6 +145,7 @@ connectDatabase(mongoUri)
     app.use("/api/activities", activitiesRouter);
     app.use("/api/opportunities", opportunitiesRouter);
     app.use("/api/conversations", conversationsRouter);
+    app.use("/api/telephony", telephonyRouter);
     app.use("/api/audience", audienceRouter);
     app.use("/api/organizations", organizationRelationshipsRouter);
     app.use("/api/integrations", integrationsRouter);

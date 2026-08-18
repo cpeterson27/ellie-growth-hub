@@ -25,6 +25,7 @@ const IntegrationConnectionSchema = new mongoose.Schema(
         "x",
         "monday",
         "gmail",
+        "twilio",
         "hubspot",
         "salesforce"
       ],
