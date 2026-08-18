@@ -2,6 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const ConversationThread = require("../models/ConversationThread");
 const ConversationMessage = require("../models/ConversationMessage");
+const ConversationMailbox = require("../models/ConversationMailbox");
 
 const router = express.Router();
 const statuses = new Set(["open", "pending", "snoozed", "closed", "spam"]);
@@ -9,6 +10,44 @@ const priorities = new Set(["low", "normal", "high", "urgent"]);
 
 function validId(value) { return mongoose.Types.ObjectId.isValid(String(value || "")); }
 function userId(req) { return req.auth?.user?._id || null; }
+
+router.get("/mailboxes", async (_req, res) => {
+  try {
+    const data = await ConversationMailbox.find({}).populate("defaultAssignee", "name email").sort({ createdAt: 1 }).lean();
+    res.json({ success: true, data });
+  } catch {
+    res.status(500).json({ success: false, error: "Failed to load shared mailboxes" });
+  }
+});
+
+router.patch("/mailboxes/:id", async (req, res) => {
+  try {
+    if (!validId(req.params.id)) return res.status(404).json({ success: false, error: "Mailbox not found" });
+    const update = {};
+    if (req.body.name !== undefined) update.name = String(req.body.name).trim().slice(0, 160);
+    if (req.body.shared !== undefined) update.shared = req.body.shared === true;
+    if (req.body.assignmentMode !== undefined) {
+      if (!["manual", "round_robin", "owner"].includes(req.body.assignmentMode)) return res.status(400).json({ success: false, error: "Invalid assignment mode" });
+      update.assignmentMode = req.body.assignmentMode;
+    }
+    if (req.body.defaultAssignee !== undefined) {
+      if (req.body.defaultAssignee && !validId(req.body.defaultAssignee)) return res.status(400).json({ success: false, error: "Invalid default assignee" });
+      update.defaultAssignee = req.body.defaultAssignee || null;
+    }
+    if (req.body.signature !== undefined) update.signature = { name: String(req.body.signature?.name || "").slice(0, 160), text: String(req.body.signature?.text || "").slice(0, 10000), html: String(req.body.signature?.html || "").slice(0, 50000) };
+    if (req.body.trackingPreferences !== undefined) update.trackingPreferences = { opens: req.body.trackingPreferences?.opens === true, clicks: req.body.trackingPreferences?.clicks === true };
+    if (req.body.templates !== undefined) {
+      if (!Array.isArray(req.body.templates) || req.body.templates.length > 100) return res.status(400).json({ success: false, error: "Templates must be a list of at most 100 items" });
+      update.templates = req.body.templates.map((item) => ({ name: String(item.name || "").trim().slice(0, 120), subject: String(item.subject || "").slice(0, 500), body: String(item.body || "").slice(0, 50000) })).filter((item) => item.name && item.body);
+    }
+    if (!Object.keys(update).length) return res.status(400).json({ success: false, error: "No supported mailbox changes supplied" });
+    const data = await ConversationMailbox.findByIdAndUpdate(req.params.id, { $set: update }, { new: true }).lean();
+    if (!data) return res.status(404).json({ success: false, error: "Mailbox not found" });
+    res.json({ success: true, data });
+  } catch {
+    res.status(500).json({ success: false, error: "Failed to update shared mailbox" });
+  }
+});
 
 router.get("/", async (req, res) => {
   try {

@@ -7,6 +7,8 @@ const gmail = require("../services/gmailOAuthService");
 const { classifyReply, draftReply } = require("../services/replyIntelligence");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const { runWithWorkspace } = require("../tenancy/workspaceContext");
+const ConversationThread = require("../models/ConversationThread");
+const { gmailConversationAdapter, syncGmailThread } = require("../services/conversations/gmailConversationAdapter");
 const router = express.Router();
 
 router.get("/status", async (_req, res) => {
@@ -49,15 +51,39 @@ router.get("/threads", async (req, res) => {
   catch (error) { res.status(400).json({ error: error.message }); }
 });
 
+router.post("/sync", async (req, res) => {
+  try {
+    const query = String(req.body?.query || "in:inbox").slice(0, 500);
+    const limit = Math.min(50, Math.max(1, Number.parseInt(req.body?.limit, 10) || 20));
+    const result = await gmailConversationAdapter.syncThreads({ query, limit });
+    res.json({ success: true, synced: result.synced, failed: result.failed, nextPageToken: result.nextPageToken || null });
+  } catch (error) { res.status(400).json({ error: error.message }); }
+});
+
 router.get("/threads/:threadId", async (req, res) => {
-  try { res.json(await gmail.getThread(req.params.threadId)); }
+  try {
+    const [thread, canonical] = await Promise.all([
+      gmail.getThread(req.params.threadId),
+      ConversationThread.findOne({ provider: "gmail", providerThreadId: req.params.threadId }).select("_id draft assignedTo status priority mailboxId").lean(),
+    ]);
+    res.json({ ...thread, canonicalThreadId: canonical?._id || null, workspace: canonical || null });
+  }
   catch (error) { res.status(400).json({ error: error.message }); }
 });
 
 router.post("/threads/:threadId/action", async (req, res) => {
   try {
     await gmail.modifyThread(req.params.threadId, req.body?.action);
-    res.json({ success: true });
+    const canonicalUpdate = {
+      archive: { status: "closed" }, trash: { status: "closed" }, untrash: { status: "open" },
+      read: { unreadCount: 0 }, unread: { unreadCount: 1 },
+    }[req.body?.action];
+    let syncWarning = "";
+    if (canonicalUpdate) {
+      try { await ConversationThread.updateOne({ provider: "gmail", providerThreadId: req.params.threadId }, { $set: canonicalUpdate }); }
+      catch { syncWarning = "Gmail updated, but the CRM mirror will retry on the next sync"; }
+    }
+    res.json({ success: true, syncWarning });
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
@@ -85,7 +111,16 @@ router.post("/trash/delete-selected", async (req, res) => {
 router.post("/send", async (req, res) => {
   try {
     const result = await gmail.sendMessage(req.body || {});
-    res.json({ success: true, messageId: result.id, threadId: result.threadId });
+    let canonicalThreadId = null;
+    let syncWarning = "";
+    if (result.threadId) {
+      try {
+        const synced = await syncGmailThread(result.threadId);
+        canonicalThreadId = synced.canonicalThread?._id || null;
+        if (canonicalThreadId) await ConversationThread.updateOne({ _id: canonicalThreadId }, { $set: { "draft.body": "", "draft.subject": "", "draft.attachments": [], "draft.updatedAt": new Date() } });
+      } catch { syncWarning = "Message sent; the CRM copy will appear after the next sync"; }
+    }
+    res.json({ success: true, messageId: result.id, threadId: result.threadId, canonicalThreadId, syncWarning });
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 

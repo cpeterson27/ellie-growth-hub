@@ -23,6 +23,7 @@ const conversationThreadSchema = new mongoose.Schema({
   channel: { type: String, enum: ["email", "sms", "mms", "phone", "chat", "whatsapp", "facebook", "instagram", "linkedin", "manual"], required: true, index: true },
   provider: { type: String, default: "", trim: true, lowercase: true },
   providerThreadId: { type: String, default: "", trim: true },
+  mailboxId: { type: mongoose.Schema.Types.ObjectId, ref: "ConversationMailbox", default: null, index: true },
   subject: { type: String, default: "", trim: true, maxlength: 500 },
   preview: { type: String, default: "", trim: true, maxlength: 1000 },
   participants: { type: [participantSchema], default: [] },

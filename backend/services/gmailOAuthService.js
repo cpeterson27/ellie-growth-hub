@@ -161,6 +161,23 @@ function header(message, name) {
   return message.payload?.headers?.find((item) => item.name.toLowerCase() === name.toLowerCase())?.value || "";
 }
 
+function emailAddress(value = "") {
+  return String(value).match(/<([^>]+)>/)?.[1]?.trim().toLowerCase()
+    || String(value).match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0]?.toLowerCase()
+    || "";
+}
+
+function displayName(value = "") {
+  const raw = String(value).trim();
+  return raw.includes("<") ? raw.slice(0, raw.indexOf("<")).replace(/^"|"$/g, "").trim() : emailAddress(raw);
+}
+
+function attachmentMetadata(part = {}, result = []) {
+  if (part.filename) result.push({ name: part.filename, contentType: part.mimeType || "", size: Number(part.body?.size || 0), providerId: part.body?.attachmentId || "" });
+  for (const child of part.parts || []) attachmentMetadata(child, result);
+  return result;
+}
+
 function decodeBody(data = "") {
   if (!data) return "";
   try { return Buffer.from(data, "base64url").toString("utf8"); }
@@ -196,12 +213,16 @@ async function getThread(threadId) {
       threadId: message.threadId,
       from: header(message, "From"),
       to: header(message, "To"),
+      cc: header(message, "Cc"),
+      bcc: header(message, "Bcc"),
       subject: header(message, "Subject") || "(no subject)",
       date: header(message, "Date"),
       messageId: header(message, "Message-ID"),
       labels: message.labelIds || [],
       body: messageBody(message.payload),
       snippet: message.snippet || "",
+      internalDate: message.internalDate ? new Date(Number(message.internalDate)).toISOString() : null,
+      attachments: attachmentMetadata(message.payload),
     })),
   };
 }
@@ -258,4 +279,4 @@ async function sendMessage({ to, subject, body, threadId = null, inReplyTo = "" 
   return gmailRequest("/messages/send", { method: "POST", body: JSON.stringify({ raw, ...(threadId ? { threadId } : {}) }) });
 }
 
-module.exports = { authorizationUrl, deleteThreads, emptyTrash, exchangeCode, getThread, googleProfile, listThreads, modifyThread, saveConnection, sendMessage, status, verifyState };
+module.exports = { authorizationUrl, deleteThreads, displayName, emailAddress, emptyTrash, exchangeCode, getThread, googleProfile, listThreads, modifyThread, saveConnection, sendMessage, status, verifyState };

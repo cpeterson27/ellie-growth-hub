@@ -204,6 +204,9 @@ export const fetchGmailThreads = (q = "in:inbox") =>
 export const fetchGmailThread = (threadId) =>
   api.get(`/gmail/threads/${threadId}`).then((res) => res.data);
 
+export const syncGmailConversations = (query = "in:inbox", limit = 20) =>
+  api.post("/gmail/sync", { query, limit }).then((res) => res.data);
+
 export const updateGmailThread = (threadId, action) =>
   api.post(`/gmail/threads/${threadId}/action`, { action }).then((res) => res.data);
 
@@ -305,6 +308,15 @@ export const fetchCompany = (companyId) =>
 
 export const canonicalizeContactCompanies = (apply = false) =>
   api.post("/organizations/canonicalize-contacts", { apply }).then((res) => res.data);
+
+export const fetchConversationMailboxes = () =>
+  api.get("/conversations/mailboxes").then((res) => res.data);
+
+export const updateConversationMailbox = (mailboxId, payload) =>
+  api.patch(`/conversations/mailboxes/${mailboxId}`, payload).then((res) => res.data);
+
+export const saveConversationDraft = (threadId, payload) =>
+  api.put(`/conversations/${threadId}/draft`, payload).then((res) => res.data);
 
 export const fetchCrmActivities = (params = {}) =>
   api.get("/activities", { params }).then((res) => res.data);

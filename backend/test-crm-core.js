@@ -54,10 +54,16 @@ includesAll(conversationMessageModel, [
   'enum: ["message", "note", "status", "assignment", "system"]', "attachments", "deliveryStatus", "workspacePlugin",
 ], "Conversation message model");
 
+const conversationMailboxModel = source("models/ConversationMailbox.js");
+includesAll(conversationMailboxModel, [
+  'collection: "conversation_mailboxes"', 'enum: ["gmail", "microsoft", "imap"]', "shared", "assignmentMode",
+  "defaultAssignee", "signature", "trackingPreferences", "templates", "lastSyncedAt", "workspacePlugin",
+], "Shared conversation mailbox model");
+
 const conversationRoutes = source("routes/conversations.js");
 includesAll(conversationRoutes, [
   'router.get("/"', 'router.get("/:id"', 'router.patch("/:id"', 'router.put("/:id/draft"', 'router.post("/:id/notes"',
-  'req.body.status === "snoozed"', "markRead", 'direction: "internal"',
+  'router.get("/mailboxes"', 'router.patch("/mailboxes/:id"', 'req.body.status === "snoozed"', "markRead", 'direction: "internal"',
 ], "Conversation architecture API");
 
 const channelAdapters = source("services/conversations/channelAdapters.js");
@@ -68,6 +74,18 @@ includesAll(conversationIngestion, [
   "ingestProviderMessage", "providerThreadId", "providerMessageId", "existingMessage", "$setOnInsert",
   'message.direction === "inbound"', "unreadCount", "lastInboundAt", "lastOutboundAt",
 ], "Idempotent conversation ingestion");
+
+const gmailConversationAdapter = source("services/conversations/gmailConversationAdapter.js");
+includesAll(gmailConversationAdapter, [
+  "GmailConversationAdapter", "syncGmailThread", "ensureMailbox", "matchContacts", "ingestProviderMessage",
+  'super("email", "gmail")', "gmailLabels", "mailboxAddress",
+], "Gmail canonical conversation adapter");
+
+const gmailRoutes = source("routes/gmail.js");
+includesAll(gmailRoutes, [
+  'router.post("/sync"', "gmailConversationAdapter.syncThreads", "canonicalThreadId", "syncGmailThread",
+  "ConversationThread.updateOne",
+], "Gmail canonical synchronization API");
 
 includesAll(server, ['app.use("/api/conversations", conversationsRouter)'], "Authenticated conversation API mounting");
 

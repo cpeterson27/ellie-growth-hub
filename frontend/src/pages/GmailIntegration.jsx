@@ -14,6 +14,8 @@ import {
   fetchGmailThreads,
   fetchOutreachEmailHistory,
   sendGmailMessage,
+  saveConversationDraft,
+  syncGmailConversations,
   updateGmailThread,
 } from "../services/api.js";
 import "./Integrations.css";
@@ -46,6 +48,8 @@ export default function GmailIntegration() {
   const [reply, setReply] = useState("");
   const [followUp, setFollowUp] = useState("");
   const [sending, setSending] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [draftState, setDraftState] = useState("");
   const [emptyingTrash, setEmptyingTrash] = useState(false);
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [selectedThreadIds, setSelectedThreadIds] = useState([]);
@@ -91,10 +95,34 @@ export default function GmailIntegration() {
       setLoading(true);
       const detail = await fetchGmailThread(thread.id);
       setSelectedThread(detail);
-      setReply("");
+      setReply(detail.workspace?.draft?.body || "");
+      setDraftState(detail.workspace?.draft?.body ? "Saved workspace draft" : "");
       if (thread.labels?.includes("UNREAD")) await updateGmailThread(thread.id, "read");
     } catch (err) { setError(err.response?.data?.error || "Unable to open this conversation."); }
     finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    const canonicalThreadId = selectedThread?.canonicalThreadId;
+    if (!canonicalThreadId) return undefined;
+    const timer = window.setTimeout(async () => {
+      try {
+        setDraftState("Saving draft…");
+        await saveConversationDraft(canonicalThreadId, { subject: selectedThread.messages?.[0]?.subject || "", body: reply, attachments: [] });
+        setDraftState("Draft saved");
+      } catch { setDraftState("Draft could not be saved"); }
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [reply, selectedThread?.canonicalThreadId, selectedThread?.messages]);
+
+  const syncMailbox = async () => {
+    try {
+      setSyncing(true);
+      const result = await syncGmailConversations(query, 20);
+      setNotice(`${result.synced || 0} Gmail conversation${result.synced === 1 ? "" : "s"} synchronized with the CRM.${result.failed ? ` ${result.failed} will retry on the next sync.` : ""}`);
+      await load();
+    } catch (err) { setError(err.response?.data?.error || "Unable to synchronize Gmail conversations."); }
+    finally { setSyncing(false); }
   };
 
   const actOnThread = async (action) => {
@@ -148,13 +176,14 @@ export default function GmailIntegration() {
     const recipient = emailAddress(latest?.from);
     try {
       setSending(true);
-      await sendGmailMessage({
+      const result = await sendGmailMessage({
         to: recipient,
         subject: /^re:/i.test(latest?.subject || "") ? latest.subject : `Re: ${latest?.subject || ""}`,
         body: reply,
         threadId: selectedThread.id,
         inReplyTo: latest?.messageId || "",
       });
+      if (result.syncWarning) setNotice(result.syncWarning);
       setReply("");
       setSelectedThread(await fetchGmailThread(selectedThread.id));
     } catch (err) { setError(err.response?.data?.error || "Unable to send this reply."); }
@@ -165,11 +194,12 @@ export default function GmailIntegration() {
     const recipient = emailAddress(search) || selectedOutreach?.contactEmail;
     try {
       setSending(true);
-      await sendGmailMessage({
+      const result = await sendGmailMessage({
         to: recipient,
         subject: /^re:/i.test(selectedOutreach?.subject || "") ? selectedOutreach.subject : `Re: ${selectedOutreach?.subject || "Following up"}`,
         body: followUp,
       });
+      if (result.syncWarning) setNotice(result.syncWarning);
       setFollowUp("");
       setSelectedOutreach(null);
       await load();
@@ -185,7 +215,7 @@ export default function GmailIntegration() {
   return <div className="page-dashboard inbox-page inbox-page--compact">
     <div className="page-header">
       <div><p className="page-eyebrow">Correspondence desk</p><h1 className="page-title">Conversations</h1><p className="page-subtitle">One place to see what was sent, what came back, and what needs your response.</p></div>
-      <div className="crm-header-actions"><Button variant="outline" onClick={load}><FiRefreshCw /> Refresh</Button><Button variant="outline" onClick={() => navigate("/integrations")}>Connection settings</Button></div>
+      <div className="crm-header-actions"><Button variant="outline" loading={syncing} onClick={syncMailbox}><FiRefreshCw /> Sync to CRM</Button><Button variant="outline" onClick={() => navigate("/integrations")}>Connection settings</Button></div>
     </div>
     {error ? <p className="form-error">{error}</p> : null}
     {notice ? <p className="inbox-success-notice">{notice}</p> : null}
@@ -220,7 +250,7 @@ export default function GmailIntegration() {
           <header><Button variant="ghost" size="sm" onClick={() => setSelectedThread(null)}><FiArrowLeft /> Back</Button><div><Button variant="outline" size="sm" onClick={() => actOnThread("archive")}><FiArchive /> Archive</Button><Button variant="outline" size="sm" onClick={() => actOnThread("trash")}><FiTrash2 /> Move to trash</Button></div></header>
           <h2>{selectedThread.messages?.[0]?.subject || "Conversation"}</h2>
           <div className="conversation-messages">{selectedThread.messages?.map((message) => <article key={message.id} className={message.labels?.includes("SENT") ? "is-sent" : ""}><div><strong>{message.labels?.includes("SENT") ? "You" : message.from}</strong><time>{message.date ? new Date(message.date).toLocaleString() : ""}</time></div><small>To: {message.to}</small><pre>{message.body || message.snippet}</pre></article>)}</div>
-          <section className="conversation-reply"><h3>Reply</h3><textarea rows="7" value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Write a reply…" /><Button loading={sending} disabled={!reply.trim()} onClick={sendReply}><FiSend /> Approve and send reply</Button></section>
+          <section className="conversation-reply"><h3>Reply</h3><textarea rows="7" value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Write a reply…" /><small>{selectedThread.canonicalThreadId ? draftState || "Drafts save to the shared CRM workspace." : "Sync this mailbox to enable shared drafts."} Nothing is sent until you approve.</small><Button loading={sending} disabled={!reply.trim()} onClick={sendReply}><FiSend /> Approve and send reply</Button></section>
         </div> : <>
           <div className="inbox-list-heading"><div><h2>{search ? `Correspondence with ${search}` : mailbox === "campaign" ? "Campaign sends" : mailbox[0].toUpperCase() + mailbox.slice(1)}</h2><p>{mailbox === "campaign" ? `${campaignPagination.total} campaign message${campaignPagination.total === 1 ? "" : "s"} · page ${campaignPagination.page} of ${campaignPagination.pages}` : search ? `${outreachHistory.length} campaign message${outreachHistory.length === 1 ? "" : "s"} · ${threads.length} Gmail repl${threads.length === 1 ? "y" : "ies"}` : `${threads.length} email thread${threads.length === 1 ? "" : "s"}`}</p></div>{mailbox === "trash" && !search && threads.length ? <Button className="empty-trash-button" variant="outline" size="sm" onClick={needsDeletePermission ? reconnect : () => setTrashConfirmOpen(true)}><FiTrash2 /> {needsDeletePermission ? "Approve empty trash" : "Empty trash"}</Button> : null}</div>
           {mailbox !== "campaign" && threads.length ? <div className="mailbox-toolbar">

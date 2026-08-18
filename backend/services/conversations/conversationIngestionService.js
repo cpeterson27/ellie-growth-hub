@@ -22,6 +22,7 @@ async function ingestProviderMessage({ thread, message }) {
     channel: thread.channel,
     provider: thread.provider,
     providerThreadId: thread.providerThreadId,
+    mailboxId: thread.mailboxId || null,
     subject: thread.subject || message.subject || "",
     preview: String(message.body || "").replace(/\s+/g, " ").trim().slice(0, 1000),
     participants: thread.participants || [],
