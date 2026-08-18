@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FiSearch, FiMenu, FiCpu, FiCamera, FiPlus } from "react-icons/fi";
+import { FiSearch, FiMenu, FiCpu, FiPlus, FiCheckCircle, FiBell, FiChevronDown } from "react-icons/fi";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import useInitiative from "../context/useInitiative.js";
 import { fetchWorkspaceConfig } from "../services/api.js";
@@ -10,20 +10,28 @@ export default function Navbar({ onMenuClick }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
+  const [createOpen, setCreateOpen] = useState(false);
+  const createRef = useRef(null);
   const { campaigns, selected, selectedId, setSelectedId } = useInitiative();
-  const pageKey = location.pathname.split("/")[1] || "dashboard";
+  const pageKey = location.pathname.split("/")[1] || "command-center";
   const pageMeta = {
+    "command-center": ["Command Center", "Today’s priorities and next best actions."],
     dashboard: ["Command center", "Today’s priorities, pipeline, and next best actions."],
     events: ["Events", "Plan, promote, and measure every event."],
     campaigns: ["Campaigns", "Build focused campaigns that move prospects."],
     discovery: ["Discovery", "Find and qualify the right organizations."],
-    contacts: ["Contacts", "Keep every relationship organized and actionable."],
+    crm: ["CRM", "Keep every relationship organized and actionable."],
+    opportunities: ["Opportunities", "Move qualified relationships through the revenue pipeline."],
+    tasks: ["Tasks", "Work the next actions that move relationships forward."],
+    contacts: ["CRM", "Keep every relationship organized and actionable."],
     outreach: ["Outreach", "Turn approved prospects into thoughtful conversations."],
+    conversations: ["Conversations", "Keep campaign replies and personal follow-up in one place."],
     inbox: ["Conversations", "Keep campaign replies and personal follow-up in one place."],
     marketing: ["Marketing", "Coordinate channels, content, and performance."],
     partners: ["Partners", "Grow through aligned operators and affiliates."],
     content: ["AI Content", "Create polished campaign assets with confidence."],
-    jarvis: ["Jarvis", "Your voice-first growth intelligence workspace."],
+    operators: ["AI Operators", "Prepare, review, and monitor AI-supported growth work."],
+    jarvis: ["AI Operators", "Prepare, review, and monitor AI-supported growth work."],
     "development-requests": ["Development requests", "Approve and hand software changes to Codex safely."],
     analytics: ["Analytics", "See what is working and where to focus next."],
     integrations: ["Integrations", "Connect the systems behind Growth Operator’s growth engine."],
@@ -40,6 +48,34 @@ export default function Navbar({ onMenuClick }) {
     fetchWorkspaceConfig().then((config) => setWorkspaceName(config.workspaceName)).catch(() => {});
     return () => window.removeEventListener("ellie-settings-changed", refresh);
   }, []);
+
+  useEffect(() => {
+    const handleShortcut = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        navigate("/crm/contacts?focus=search");
+      }
+      if (event.key === "Escape") setCreateOpen(false);
+    };
+    const closeOutside = (event) => {
+      if (!createRef.current?.contains(event.target)) setCreateOpen(false);
+    };
+    document.addEventListener("keydown", handleShortcut);
+    document.addEventListener("pointerdown", closeOutside);
+    return () => {
+      document.removeEventListener("keydown", handleShortcut);
+      document.removeEventListener("pointerdown", closeOutside);
+    };
+  }, [navigate]);
+
+  const createItems = [
+    ["Contact", "/crm/contacts?create=contact"],
+    ["Opportunity", "/opportunities?create=opportunity"],
+    ["Campaign", "/campaigns/new"],
+    ["Event", "/events?create=event"],
+    ["Audience", "/discovery?create=audience"],
+    ["Program campaign", "/campaigns?create=program"],
+  ];
 
 
   return (
@@ -72,18 +108,24 @@ export default function Navbar({ onMenuClick }) {
           </select>
           {selected ? <i className={selected.campaignKind === "program" ? "is-offer" : "is-event"} /> : null}
         </label>
-        <button className="navbar__new-program" type="button" onClick={() => navigate("/campaigns?create=program")} title="Create a program campaign"><FiPlus /><span>Program</span></button>
       </div>
 
       <div className="navbar__actions">
-        <button className="navbar__scan" type="button" onClick={() => navigate("/contacts?scan=business-card")}>
-          <FiCamera /><span>Scan card</span>
-        </button>
-        <button className="navbar__search" type="button" aria-label="Search contacts" onClick={() => navigate("/contacts")}>
+        <button className="navbar__search" type="button" aria-label="Search workspace" onClick={() => navigate("/crm/contacts?focus=search")}>
           <FiSearch /><span>Search workspace</span><kbd>⌘ K</kbd>
         </button>
-        <button className="navbar__jarvis" type="button" onClick={() => navigate("/jarvis")}>
-          <FiCpu /><span>Jarvis</span><i />
+        <button className="navbar__icon-action" type="button" aria-label="Open approvals" onClick={() => navigate("/campaigns/outreach")}><FiCheckCircle /></button>
+        <button className="navbar__icon-action" type="button" aria-label="Open notifications" onClick={() => navigate("/discovery?tab=monitoring")}><FiBell /></button>
+        <div className="navbar__create" ref={createRef}>
+          <button className="navbar__create-button" type="button" aria-expanded={createOpen} aria-haspopup="menu" onClick={() => setCreateOpen((value) => !value)}>
+            <FiPlus /><span>Create</span><FiChevronDown />
+          </button>
+          {createOpen ? <div className="navbar__create-menu" role="menu">
+            {createItems.map(([label, path]) => <button type="button" role="menuitem" key={label} onClick={() => { setCreateOpen(false); navigate(path); }}>{label}</button>)}
+          </div> : null}
+        </div>
+        <button className="navbar__jarvis" type="button" onClick={() => navigate("/operators/jarvis")}>
+          <FiCpu /><span>Ask Growth Operator</span><i />
         </button>
       </div>
     </header>

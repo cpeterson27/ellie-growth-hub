@@ -32,6 +32,8 @@ const mcpRouter = require("./routes/mcp");
 const oauthRouter = require("./routes/oauth");
 const socialRouter = require("./routes/social");
 const gptActionsRouter = require("./routes/gptActions");
+const activitiesRouter = require("./routes/activities");
+const opportunitiesRouter = require("./routes/opportunities");
 const { requireAuth } = require("./middleware/auth");
 const { startResearchMonitorRunner } = require("./services/researchMonitorService");
 
@@ -137,6 +139,8 @@ connectDatabase(mongoUri)
     app.use("/api/events", eventsRouter);
     app.use("/api/eventbrite", eventbriteRouter);
     app.use("/api/contacts", contactsRouter);
+    app.use("/api/activities", activitiesRouter);
+    app.use("/api/opportunities", opportunitiesRouter);
     app.use("/api/audience", audienceRouter);
     app.use("/api/organizations", organizationRelationshipsRouter);
     app.use("/api/integrations", integrationsRouter);

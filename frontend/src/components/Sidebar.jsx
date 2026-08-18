@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
 import {
   FiActivity,
+  FiBriefcase,
+  FiCalendar,
   FiFolder,
   FiUsers,
-  FiSend,
   FiMessageSquare,
   FiZap,
   FiBarChart2,
@@ -11,28 +12,36 @@ import {
   FiSettings,
   FiLink,
   FiCpu,
-  FiCheckCircle,
+  FiFileText,
+  FiList,
   FiLogOut,
 } from "react-icons/fi";
 import useAuth from "../context/useAuth.js";
 import "./Sidebar.css";
 
-const navItems = [
-  { label: "Dashboard", path: "/dashboard", icon: <FiActivity /> },
-  { label: "Events", path: "/events", icon: <FiFolder /> },
-  { label: "Campaigns", path: "/campaigns", icon: <FiZap /> },
-  { label: "Launch Campaign", path: "/launch", icon: <FiCheckCircle /> },
-  { label: "Discovery", path: "/discovery", icon: <FiTrendingUp /> },
-  { label: "Contacts", path: "/contacts", icon: <FiUsers /> },
-  { label: "Outreach", path: "/outreach", icon: <FiSend /> },
-  { label: "Conversations", path: "/inbox", icon: <FiMessageSquare /> },
-  { label: "Marketing", path: "/marketing", icon: <FiTrendingUp /> },
-  { label: "Partners", path: "/partners", icon: <FiUsers /> },
-  { label: "AI Content", path: "/content", icon: <FiZap /> },
-  { label: "Jarvis", path: "/jarvis", icon: <FiCpu /> },
-  { label: "Analytics", path: "/analytics", icon: <FiBarChart2 /> },
-  { label: "Integrations", path: "/integrations", icon: <FiLink /> },
-  { label: "Settings", path: "/settings", icon: <FiSettings /> },
+const navGroups = [
+  { label: "Operate", items: [
+    { label: "Command Center", path: "/command-center", icon: <FiActivity /> },
+    { label: "CRM", path: "/crm/contacts", icon: <FiUsers /> },
+    { label: "Opportunities", path: "/opportunities", icon: <FiBriefcase /> },
+    { label: "Conversations", path: "/conversations", icon: <FiMessageSquare /> },
+    { label: "Tasks", path: "/tasks", icon: <FiList /> },
+  ] },
+  { label: "Grow", items: [
+    { label: "Campaigns", path: "/campaigns", icon: <FiZap /> },
+    { label: "Discovery", path: "/discovery", icon: <FiTrendingUp /> },
+    { label: "Events", path: "/events", icon: <FiCalendar /> },
+    { label: "Content", path: "/content", icon: <FiFileText /> },
+    { label: "Partners", path: "/partners", icon: <FiFolder /> },
+  ] },
+  { label: "Understand", items: [
+    { label: "Analytics", path: "/analytics", icon: <FiBarChart2 /> },
+    { label: "AI Operators", path: "/operators/jarvis", icon: <FiCpu /> },
+  ] },
+  { label: "Configure", items: [
+    { label: "Integrations", path: "/integrations", icon: <FiLink /> },
+    { label: "Settings", path: "/settings/workspace", icon: <FiSettings /> },
+  ] },
 ];
 
 export default function Sidebar({ isOpen, isCollapsed, onClose }) {
@@ -47,19 +56,26 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
         </div>
       </div>
       <nav className="sidebar__nav" aria-label="Primary">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `sidebar__link ${isActive ? "sidebar__link--active" : ""}`
-            }
-            onClick={onClose}
-          >
-            <span className="sidebar__icon">{item.icon}</span>
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+        {navGroups.map((group) => <section className="sidebar__group" key={group.label} aria-label={group.label}>
+          <p className="sidebar__group-label">{group.label}</p>
+          {group.items.map((item) => item.planned ? (
+            <div className="sidebar__link sidebar__link--planned" key={item.label} aria-label={`${item.label}, planned`}>
+              <span className="sidebar__icon">{item.icon}</span>
+              <span>{item.label}</span>
+              <small>Planned</small>
+            </div>
+          ) : (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""}`}
+              onClick={onClose}
+            >
+              <span className="sidebar__icon">{item.icon}</span>
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </section>)}
       </nav>
       <div className="sidebar__footer">
         <button className="sidebar__logout" type="button" onClick={async () => { await logout(); window.location.assign("/"); }} title={`Sign out ${session?.user?.email || ""}`}>

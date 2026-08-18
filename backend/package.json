@@ -9,6 +9,7 @@
     "tenant:indexes:audit": "node scripts/migrate-tenant-indexes.js",
     "tenant:indexes:migrate": "node scripts/migrate-tenant-indexes.js --apply",
     "test:tenant-isolation": "node test-workspace-isolation.js",
+    "test:crm-core": "node test-crm-core.js",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "start:worker": "node worker.js",

@@ -291,8 +291,41 @@ export const fetchContacts = (params = {}) =>
     .get("/contacts", { params })
     .then((res) => res.data);
 
+export const fetchContact = (contactId) =>
+  api.get(`/contacts/${contactId}`).then((res) => res.data);
+
 export const fetchContactOverview = () =>
   api.get("/contacts/overview").then((res) => res.data);
+
+export const fetchCompanies = (params = {}) =>
+  api.get("/organizations", { params }).then((res) => res.data);
+
+export const fetchCompany = (companyId) =>
+  api.get(`/organizations/${companyId}`).then((res) => res.data);
+
+export const fetchCrmActivities = (params = {}) =>
+  api.get("/activities", { params }).then((res) => res.data);
+
+export const createCrmActivity = (payload) =>
+  api.post("/activities", payload).then((res) => res.data);
+
+export const fetchTasks = (completed = false) =>
+  api.get("/activities/tasks", { params: { completed } }).then((res) => res.data);
+
+export const completeTask = (origin, taskId) =>
+  api.patch(`/activities/tasks/${origin}/${taskId}/complete`).then((res) => res.data);
+
+export const fetchOpportunities = (params = {}) =>
+  api.get("/opportunities", { params }).then((res) => res.data);
+
+export const createOpportunity = (payload) =>
+  api.post("/opportunities", payload).then((res) => res.data);
+
+export const updateOpportunity = (opportunityId, payload) =>
+  api.patch(`/opportunities/${opportunityId}`, payload).then((res) => res.data);
+
+export const savePipelineStages = (stages) =>
+  api.put("/opportunities/stages", { stages }).then((res) => res.data);
 export const fetchConnectionPriorities = (campaignId) =>
   api.get("/contacts/priorities/ranked", { params: { campaignId } }).then((res) => res.data);
 

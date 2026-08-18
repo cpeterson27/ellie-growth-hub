@@ -13,6 +13,7 @@ const EmailVerificationBatch = require("../models/EmailVerificationBatch");
 const Contact = require("../models/Contact");
 const Campaign = require("../models/Campaign");
 const Outreach = require("../models/Outreach");
+const CrmActivity = require("../models/CrmActivity");
 const { applyResearchClassification } = require("../services/contactResearchService");
 const { assessEmail } = require("../services/emailRiskService");
 const { extractBusinessCard, extractDigitalBusinessCard } = require("../services/businessCardExtractionService");
@@ -133,12 +134,16 @@ router.get("/", async (req, res) => {
       qualifyContact,
       emailStatus,
       campaignId,
+      search,
+      contactMethod,
+      sortBy = "createdAt",
+      sortOrder = "desc",
     } = req.query;
 
     const query = status ? { status } : { status: { $ne: "archived" } };
     if (email) query.email = email;
     if (externalId) query.externalId = externalId;
-    if (source) query.source = source;
+    if (source) query.$or = [{ source }, { sourceProvider: source }, { sources: source }];
     if (organizationId && mongoose.Types.ObjectId.isValid(organizationId)) {
       query.organizationId = mongoose.Types.ObjectId(organizationId);
     }
@@ -148,12 +153,27 @@ router.get("/", async (req, res) => {
     if (qualifyContact !== undefined) query.qualifyContact = String(qualifyContact) === "true";
     if (emailStatus) query.emailStatus = emailStatus;
     if (campaignId && mongoose.Types.ObjectId.isValid(campaignId)) query.campaignIds = campaignId;
+    if (search) {
+      const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 120);
+      if (safeSearch) {
+        const searchConditions = ["name", "firstName", "lastName", "email", "company", "title", "notes"].map((field) => ({ [field]: { $regex: safeSearch, $options: "i" } }));
+        query.$and = [...(query.$and || []), { $or: searchConditions }];
+      }
+    }
+    if (contactMethod === "email") query.email = { $exists: true, $nin: [null, ""] };
+    if (contactMethod === "linkedin") query.linkedin = { $exists: true, $nin: [null, ""] };
+    if (contactMethod === "both") query.$and = [...(query.$and || []), { email: { $exists: true, $nin: [null, ""] } }, { linkedin: { $exists: true, $nin: [null, ""] } }];
+    if (contactMethod === "none") query.$and = [...(query.$and || []), { $or: [{ email: { $in: [null, ""] } }, { email: { $exists: false } }] }, { $or: [{ linkedin: { $in: [null, ""] } }, { linkedin: { $exists: false } }] }];
+
+    const allowedSorts = new Set(["createdAt", "updatedAt", "name", "company", "lastContacted"]);
+    const resolvedSort = allowedSorts.has(sortBy) ? sortBy : "createdAt";
+    const resolvedDirection = sortOrder === "asc" ? 1 : -1;
 
     const total = await Contact.countDocuments(query);
     const contacts = await Contact.find(query)
       .limit(Math.min(parseInt(limit) || 50, 500))
       .skip(parseInt(skip) || 0)
-      .sort({ createdAt: -1 });
+      .sort({ [resolvedSort]: resolvedDirection, _id: resolvedDirection });
 
     res.json({
       success: true,
@@ -505,7 +525,12 @@ router.patch("/:id", async (req, res) => {
         .json({ success: false, message: "Invalid contact ID" });
     }
 
+    const before = await Contact.findById(req.params.id).select("status stage organizationId").lean();
     const contact = await contactService.updateContact(req.params.id, req.body);
+    const changes = ["status", "stage"]
+      .filter((field) => req.body[field] !== undefined && String(before?.[field] || "") !== String(contact[field] || ""))
+      .map((field) => `${field}: ${before?.[field] || "not set"} → ${contact[field] || "not set"}`);
+    if (changes.length) await CrmActivity.create({ contactId: contact._id, organizationId: contact.organizationId || null, type: "status_change", title: "Contact relationship updated", body: changes.join("\n"), source: "crm", createdBy: req.auth?.userId || null });
     res.json({ success: true, data: contact, message: "Contact updated" });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });

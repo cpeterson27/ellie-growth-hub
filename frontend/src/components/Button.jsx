@@ -7,6 +7,7 @@ export default function Button({
   size = 'md',
   disabled = false,
   loading = false,
+  block = false,
   onClick,
   className = '',
   ...props
@@ -20,6 +21,7 @@ export default function Button({
         `btn--${size}`,
         className,
         loading ? 'btn--loading' : '',
+        block ? 'btn--block' : '',
       ]
         .filter(Boolean)
         .join(' ')}

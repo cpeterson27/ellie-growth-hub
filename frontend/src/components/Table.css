@@ -12,20 +12,24 @@
 .table th,
 .table td {
   text-align: left;
-  padding: 1rem 1rem;
+  padding: var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
 .table th {
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .table td {
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
 }
+
+.table__interactive-row { cursor: pointer; transition: background-color var(--transition-fast); }
+.table__interactive-row:hover { background: var(--color-surface-subtle); }
+.table__interactive-row:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-focus) 35%, transparent); outline-offset: -3px; }
 
 .table tr:last-child td {
   border-bottom: none;

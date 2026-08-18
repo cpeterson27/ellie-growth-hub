@@ -3,8 +3,87 @@ const mongoose = require("mongoose");
 const Organization = require("../models/Organization");
 const Audience = require("../models/Audience");
 const OrganizationRelationship = require("../models/OrganizationRelationship");
+const Contact = require("../models/Contact");
+const CrmActivity = require("../models/CrmActivity");
 
 const router = express.Router();
+
+// CRM company index. Discovery owns finding organizations; this endpoint makes
+// those same records usable as durable company accounts in the CRM.
+router.get("/", async (req, res) => {
+  try {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(10, Number.parseInt(req.query.limit, 10) || 25));
+    const search = String(req.query.search || "").trim().slice(0, 120);
+    const priorityTier = String(req.query.priorityTier || "");
+    const audienceTier = String(req.query.audienceTier || "");
+    const relationshipStatus = String(req.query.relationshipStatus || "");
+    const needsResearch = req.query.needsResearch === "true";
+    const query = {};
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      query.$or = ["name", "domain", "industry", "location", "description"].map((field) => ({ [field]: { $regex: escaped, $options: "i" } }));
+    }
+    if (["hot", "warm", "cold"].includes(priorityTier)) query.priorityTier = priorityTier;
+    if (["high", "medium", "low", "unscored"].includes(audienceTier)) query.audienceTier = audienceTier;
+    if (needsResearch) {
+      const missingProfile = ["domain", "industry", "location"].flatMap((field) => [
+        { [field]: { $exists: false } },
+        { [field]: "" },
+        { [field]: null },
+      ]);
+      query.$and = [...(query.$and || []), { $or: missingProfile }];
+    }
+    if (["customer", "partner", "qualified", "prospect"].includes(relationshipStatus)) {
+      const relationshipQuery = relationshipStatus === "prospect"
+        ? { $or: [{ status: "new" }, { relationshipType: "prospect" }] }
+        : { $or: [{ status: relationshipStatus }, { relationshipType: relationshipStatus }] };
+      const matchingRelationships = await OrganizationRelationship.find(relationshipQuery).distinct("organizationId");
+      query._id = { $in: matchingRelationships };
+    }
+
+    const [total, organizations] = await Promise.all([
+      Organization.countDocuments(query),
+      Organization.find(query).sort({ priorityScore: -1, updatedAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    ]);
+    const ids = organizations.map((item) => item._id);
+    const [contacts, relationships] = await Promise.all([
+      Contact.find({ organizationId: { $in: ids }, status: { $ne: "archived" } }).select("organizationId").lean(),
+      OrganizationRelationship.find({ organizationId: { $in: ids } }).select("organizationId status relationshipType lastChangedAt").lean(),
+    ]);
+    const contactCounts = contacts.reduce((map, item) => map.set(String(item.organizationId), (map.get(String(item.organizationId)) || 0) + 1), new Map());
+    const relationshipMap = relationships.reduce((map, item) => {
+      const key = String(item.organizationId);
+      const current = map.get(key);
+      if (!current || new Date(item.lastChangedAt || 0) > new Date(current.lastChangedAt || 0)) map.set(key, item);
+      return map;
+    }, new Map());
+
+    res.json({
+      success: true,
+      data: organizations.map((organization) => ({ ...organization, contactCount: contactCounts.get(String(organization._id)) || 0, relationship: relationshipMap.get(String(organization._id)) || null })),
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Failed to list companies" });
+  }
+});
+
+router.get("/:organizationId", async (req, res, next) => {
+  if (req.path.endsWith("/relationship")) return next();
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.organizationId)) return res.status(404).json({ success: false, error: "Company not found" });
+    const organization = await Organization.findById(req.params.organizationId).lean();
+    if (!organization) return res.status(404).json({ success: false, error: "Company not found" });
+    const [contacts, relationships] = await Promise.all([
+      Contact.find({ organizationId: organization._id, status: { $ne: "archived" } }).sort({ updatedAt: -1 }).lean(),
+      OrganizationRelationship.find({ organizationId: organization._id }).populate("audienceId", "name").sort({ lastChangedAt: -1 }).lean(),
+    ]);
+    res.json({ success: true, data: { organization, contacts, relationships } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Failed to load company" });
+  }
+});
 
 // ======================================
 // GET ORGANIZATION RELATIONSHIP
@@ -233,6 +312,14 @@ router.patch("/:organizationId/relationship", async (req, res) => {
     relationship.lastChangedAt = new Date();
 
     await relationship.save();
+    await CrmActivity.create({
+      organizationId: organization._id,
+      type: "status_change",
+      title: "Company relationship updated",
+      body: `${audience.name}: ${oldStatus} → ${status}${notes ? `\n${notes}` : ""}`,
+      source: "crm",
+      createdBy: req.auth?.userId || null,
+    });
 
     return res.json({
       success: true,

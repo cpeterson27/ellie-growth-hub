@@ -3,15 +3,15 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  min-height: 40px;
+  min-height: var(--control-height-md);
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 0.68rem 1rem;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease,
-    color 0.2s ease, border-color 0.2s ease;
+  transition: transform var(--transition-base), box-shadow var(--transition-base), background-color var(--transition-base),
+    color var(--transition-base), border-color var(--transition-base);
 }
 
 .btn:hover:not(:disabled) {
@@ -24,32 +24,32 @@
 }
 
 .btn--primary {
-  background: #1f5c50;
+  background: var(--color-brand);
   color: #fff;
   box-shadow: 0 8px 18px rgba(31, 92, 80, 0.18);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: #17483e;
+  background: var(--color-brand-hover);
 }
 
 .btn--secondary {
-  background: #e7efe9;
-  color: #17483e;
+  background: var(--color-brand-soft);
+  color: var(--color-brand-hover);
 }
 
 .btn--secondary:hover:not(:disabled) {
-  background: #d7e5dc;
+  background: color-mix(in srgb, var(--color-brand-soft) 78%, var(--color-brand));
 }
 
 .btn--danger {
-  background: #fef0f0;
-  color: #c72f32;
-  border-color: #f3c1c3;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background: #f8d4d5;
+  background: color-mix(in srgb, var(--color-danger-soft) 76%, var(--color-danger));
 }
 
 .btn--outline {
@@ -59,7 +59,7 @@
 }
 
 .btn--outline:hover:not(:disabled) {
-  background: #f2f3ed;
+  background: var(--color-surface-subtle);
 }
 
 .btn--ghost {
@@ -68,21 +68,30 @@
 }
 
 .btn--ghost:hover:not(:disabled) {
-  background: rgba(91, 75, 255, 0.08);
+  background: var(--color-brand-soft);
 }
 
 .btn--sm {
-  min-height: 36px;
+  min-height: var(--control-height-sm);
   padding: 0.52rem 0.85rem;
-  font-size: 0.86rem;
+  font-size: var(--font-size-sm);
 }
 
 .btn--lg {
-  min-height: 46px;
+  min-height: var(--control-height-lg);
   padding: 0.85rem 1.3rem;
   font-size: 1rem;
 }
 
 .btn--loading {
   pointer-events: none;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .btn:hover:not(:disabled) { transform: none; }
 }

@@ -17,6 +17,9 @@ const Partners = lazy(() => import("./pages/Partners.jsx"));
 const Marketing = lazy(() => import("./pages/Marketing.jsx"));
 const Content = lazy(() => import("./pages/Content.jsx"));
 const Contacts = lazy(() => import("./pages/Contacts.jsx"));
+const Companies = lazy(() => import("./pages/Companies.jsx"));
+const Opportunities = lazy(() => import("./pages/Opportunities.jsx"));
+const Tasks = lazy(() => import("./pages/Tasks.jsx"));
 const Analytics = lazy(() => import("./pages/Analytics.jsx"));
 const Settings = lazy(() => import("./pages/Settings.jsx"));
 const Jarvis = lazy(() => import("./pages/Jarvis.jsx"));
@@ -40,30 +43,46 @@ function ProtectedApp() {
     <InitiativeProvider>
       <DashboardLayout>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/command-center" replace />} />
+          <Route path="/command-center" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/events" element={<Events />} />
           <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/campaigns/new" element={<CampaignLaunch />} />
+          <Route path="/campaigns/outreach" element={<Outreach />} />
           <Route path="/launch" element={<CampaignLaunch />} />
           <Route path="/campaigns/:id" element={<CampaignWorkspace />} />
+          <Route path="/campaigns/:id/overview" element={<CampaignWorkspace />} />
           <Route path="/marketing-campaigns/:id" element={<CampaignWorkspace />} />
           <Route path="/marketing" element={<Marketing />} />
           <Route path="/outreach" element={<Outreach />} />
+          <Route path="/crm/contacts" element={<Contacts />} />
+          <Route path="/crm/contacts/:id" element={<Contacts />} />
+          <Route path="/crm/companies" element={<Companies />} />
+          <Route path="/crm/companies/:id" element={<Companies />} />
+          <Route path="/opportunities" element={<Opportunities />} />
+          <Route path="/tasks" element={<Tasks />} />
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/discovery" element={<Discovery />} />
+          <Route path="/discovery/:workspace" element={<Discovery />} />
           <Route path="/partners" element={<Partners />} />
           <Route path="/content" element={<Content />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/workspace" element={<Settings />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/integrations/eventbrite" element={<EventbriteIntegration />} />
           <Route path="/contacts/fields" element={<CrmSetup />} />
-          <Route path="/integrations/crm" element={<Navigate to="/contacts/fields" replace />} />
+          <Route path="/settings/crm/fields" element={<CrmSetup />} />
+          <Route path="/integrations/crm" element={<Navigate to="/settings/crm/fields" replace />} />
           <Route path="/integrations/gmail" element={<GmailIntegration />} />
+          <Route path="/conversations" element={<GmailIntegration />} />
           <Route path="/inbox" element={<GmailIntegration />} />
+          <Route path="/operators/jarvis" element={<Jarvis />} />
+          <Route path="/operators/development-requests" element={<DevelopmentRequests />} />
           <Route path="/jarvis" element={<Jarvis />} />
           <Route path="/development-requests" element={<DevelopmentRequests />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/command-center" replace />} />
         </Routes>
       </DashboardLayout>
     </InitiativeProvider>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Papa from "papaparse";
 import { FiColumns, FiList, FiMoreHorizontal } from "react-icons/fi";
 import "./Contacts.css";
@@ -7,8 +7,10 @@ import "./ContactVerification.css";
 import "./ContactDashboard.css";
 
 import Button from "../components/Button.jsx";
+import ActivityTimeline from "../components/ActivityTimeline.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
+import { Drawer, PageHeader, StatusBadge, Tabs, Toolbar } from "../components/WorkspaceUI.jsx";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import {
   CONTACT_TEMPLATE_HEADERS,
@@ -17,7 +19,9 @@ import {
 } from "../utils/contactImport.js";
 import {
   fetchContacts,
+  fetchContact,
   fetchContactOverview,
+  fetchContactEmailHistory,
   fetchConnectionPriorities,
   fetchCampaigns,
   ingestContacts,
@@ -72,6 +76,29 @@ const recognizedImportHeaders = [
   "Qualify Contact",
   "Tags",
   "Notes",
+];
+
+const CRM_CONTACT_COLUMNS = [
+  { id: "contact", label: "Contact", locked: true },
+  { id: "company", label: "Company and title" },
+  { id: "stage", label: "Stage" },
+  { id: "email", label: "Email readiness" },
+  { id: "campaigns", label: "Campaigns" },
+  { id: "source", label: "Source" },
+  { id: "next", label: "Next action" },
+];
+
+const DEFAULT_CONTACT_COLUMNS = CRM_CONTACT_COLUMNS.map((column) => column.id);
+
+const CRM_SAVED_VIEWS = [
+  { id: "all", label: "All contacts" },
+  { id: "attention", label: "Needs attention" },
+  { id: "ready", label: "Ready to assign" },
+  { id: "assigned", label: "Campaign assigned" },
+  { id: "best-connections", label: "Best connections" },
+  { id: "linkedin-review", label: "LinkedIn outreach" },
+  { id: "unsubscribed", label: "Unsubscribed" },
+  { id: "archived", label: "Archived" },
 ];
 
 function contactNameParts(contact = {}) {
@@ -508,6 +535,7 @@ function contactWorkflowState(contact = {}) {
 
 export default function Contacts() {
   const navigate = useNavigate();
+  const { id: routeContactId } = useParams();
   const [searchParams] = useSearchParams();
   const { selectedId: initiativeId } = useInitiative();
   const workspaceSettings = getWorkspaceSettings();
@@ -545,6 +573,9 @@ export default function Contacts() {
   const [previewStats, setPreviewStats] = useState(null);
   const [duplicatePreview, setDuplicatePreview] = useState(null);
   const [detailContact, setDetailContact] = useState(null);
+  const [detailTab, setDetailTab] = useState("overview");
+  const [detailEmailHistory, setDetailEmailHistory] = useState([]);
+  const [detailHistoryLoading, setDetailHistoryLoading] = useState(false);
   const [editingContact, setEditingContact] = useState(null);
   const [contactEditMode, setContactEditMode] = useState("full");
   const [searchTerm, setSearchTerm] = useState(
@@ -575,7 +606,16 @@ export default function Contacts() {
   const [fieldUpdateSaving, setFieldUpdateSaving] = useState(false);
   const [fieldUpdateError, setFieldUpdateError] = useState("");
   const [unsubscribedContacts, setUnsubscribedContacts] = useState([]);
-  const [crmView, setCrmView] = useState(() => localStorage.getItem("growth-operator-crm-view") || "pipeline");
+  const [crmView, setCrmView] = useState(() => localStorage.getItem("growth-operator-crm-view") || "table");
+  const [columnMenuOpen, setColumnMenuOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("growth-operator-crm-columns") || "null");
+      return Array.isArray(saved) && saved.includes("contact") ? saved : DEFAULT_CONTACT_COLUMNS;
+    } catch {
+      return DEFAULT_CONTACT_COLUMNS;
+    }
+  });
   const [isCardCaptureOpen, setCardCaptureOpen] = useState(false);
   const [cardDraft, setCardDraft] = useState(manualContactDefaults);
   const [cardRaw, setCardRaw] = useState("");
@@ -592,14 +632,44 @@ export default function Contacts() {
   const cardFrameRef = useRef(null);
   const cardDeepLinkHandled = useRef(false);
   const loadContactsRef = useRef(null);
+  const loadConnectionPrioritiesRef = useRef(null);
   const pageSize = 15;
 
   function openContactDetail(contact) {
     setDetailContact(contact);
+    setDetailTab("overview");
+    setDetailEmailHistory([]);
     setLinkedinDraft(contact.linkedinOutreach?.draft || "");
     setLinkedinTone(contact.linkedinOutreach?.tone || "warm_direct");
     setLinkedinNotice("");
   }
+
+  useEffect(() => {
+    if (!routeContactId) return;
+    let active = true;
+    const routeContact = contacts.find((contact) => String(contact._id) === String(routeContactId));
+    if (routeContact) {
+      const openTimer = window.setTimeout(() => {
+        if (active && String(detailContact?._id) !== String(routeContact._id)) openContactDetail(routeContact);
+      }, 0);
+      return () => { active = false; window.clearTimeout(openTimer); };
+    }
+    fetchContact(routeContactId).then((result) => {
+      if (active && result.data) openContactDetail(result.data);
+    }).catch(() => { if (active) setError("Unable to open that contact record."); });
+    return () => { active = false; };
+  }, [routeContactId, contacts, detailContact?._id]);
+
+  useEffect(() => {
+    if (!detailContact?.email || detailTab !== "conversations") return;
+    let active = true;
+    const loadingTimer = window.setTimeout(() => { if (active) setDetailHistoryLoading(true); }, 0);
+    fetchContactEmailHistory(detailContact.email)
+      .then((result) => { if (active) setDetailEmailHistory(result.outreach || []); })
+      .catch(() => { if (active) setDetailEmailHistory([]); })
+      .finally(() => { if (active) setDetailHistoryLoading(false); });
+    return () => { active = false; window.clearTimeout(loadingTimer); };
+  }, [detailContact?.email, detailTab]);
 
   async function generateLinkedinDraft() {
     if (!detailContact?.linkedin) return;
@@ -933,6 +1003,18 @@ export default function Contacts() {
     localStorage.setItem("growth-operator-crm-view", view);
   }
 
+  function toggleContactColumn(columnId) {
+    const definition = CRM_CONTACT_COLUMNS.find((column) => column.id === columnId);
+    if (definition?.locked) return;
+    setVisibleColumns((current) => {
+      const next = current.includes(columnId)
+        ? current.filter((id) => id !== columnId)
+        : CRM_CONTACT_COLUMNS.filter((column) => current.includes(column.id) || column.id === columnId).map((column) => column.id);
+      localStorage.setItem("growth-operator-crm-columns", JSON.stringify(next));
+      return next;
+    });
+  }
+
   useEffect(
     () => () => {
       if (cardFrameRef.current) cancelAnimationFrame(cardFrameRef.current);
@@ -946,6 +1028,10 @@ export default function Contacts() {
       setLoading(true);
       const query = {
         limit: 500,
+        ...(searchTerm ? { search: searchTerm } : {}),
+        ...(campaignId ? { campaignId } : {}),
+        ...(sourceFilter ? { source: sourceFilter } : {}),
+        ...(contactMethodFilter ? { contactMethod: contactMethodFilter } : {}),
         ...(contactTab === "archived"
           ? { status: "archived" }
           : contactTab === "unsubscribed"
@@ -1035,6 +1121,7 @@ export default function Contacts() {
     }
   }
   useEffect(() => { loadContactsRef.current = loadContacts; });
+  useEffect(() => { loadConnectionPrioritiesRef.current = loadConnectionPriorities; });
 
   useEffect(() => {
     const refreshContacts = window.setTimeout(() => loadContactsRef.current?.(), 0);
@@ -1043,7 +1130,8 @@ export default function Contacts() {
 
   useEffect(() => {
     if (contactTab !== "best-connections") return;
-    loadConnectionPriorities(campaignId);
+    const priorityTimer = window.setTimeout(() => loadConnectionPrioritiesRef.current?.(campaignId), 0);
+    return () => window.clearTimeout(priorityTimer);
   }, [contactTab, campaignId]);
 
   useEffect(() => {
@@ -1734,15 +1822,14 @@ export default function Contacts() {
 
   return (
     <div className="page-dashboard contacts-page">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Contacts</h1>
-          <p className="page-subtitle">
-            See where every relationship came from, how you can reach them, and
-            what to do next.
-          </p>
-        </div>
-        <div className="crm-header-actions">
+      <PageHeader
+        eyebrow="CRM"
+        title="Contacts"
+        description="Every relationship, next action, and conversation in one working view."
+        actions={<div className="crm-header-actions">
+          <Button variant="outline" onClick={() => navigate("/crm/companies")}>
+            Companies
+          </Button>
           <Button
             onClick={() => {
               setCardDraft(manualContactDefaults);
@@ -1761,11 +1848,11 @@ export default function Contacts() {
               setContactFormOpen(true);
             }}
           >
-            + New Contact
+            Add contact
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate("/contacts/fields")}
+            onClick={() => navigate("/settings/crm/fields")}
           >
             Customize fields
           </Button>
@@ -1802,8 +1889,8 @@ export default function Contacts() {
           <Button variant="outline" onClick={() => navigate("/discovery")}>
             Discover New Prospects
           </Button>
-        </div>
-      </div>
+        </div>}
+      />
 
       <section className="crm-mode-banner" aria-label="CRM connection options">
         <div>
@@ -1983,6 +2070,10 @@ export default function Contacts() {
           </p>
         ) : null}
         <section className="crm-view-mode" aria-label="Choose contact workspace">
+          <button className={crmView === "table" ? "active" : ""} type="button" onClick={() => changeCrmView("table")}>
+            <FiMoreHorizontal aria-hidden="true" />
+            <span><strong>Relationship table</strong><small>Compare, filter, and open contact details</small></span>
+          </button>
           <button className={crmView === "pipeline" ? "active" : ""} type="button" onClick={() => changeCrmView("pipeline")}>
             <FiColumns aria-hidden="true" />
             <span><strong>Pipeline board</strong><small>Drag contacts between lifecycle stages</small></span>
@@ -1992,7 +2083,13 @@ export default function Contacts() {
             <span><strong>Relationship list</strong><small>Search, review, select, and update records</small></span>
           </button>
         </section>
-        <div className="crm-toolbar">
+        <Toolbar className="crm-toolbar" search={<input
+            className="select-input crm-contact-search"
+            aria-label="Search contacts"
+            placeholder="Search name, company, email, or title"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />} filters={<>
           <label>
             Campaign{" "}
             <select
@@ -2024,12 +2121,17 @@ export default function Contacts() {
               <option value="none">No direct contact method</option>
             </select>
           </label>
-          <input
-            className="select-input"
-            placeholder="Search contacts"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
+          </>} actions={<>
+          {crmView === "table" ? <div className="crm-column-menu-wrap">
+            <Button variant="outline" onClick={() => setColumnMenuOpen((open) => !open)} aria-expanded={columnMenuOpen}>Columns</Button>
+            {columnMenuOpen ? <div className="crm-column-menu">
+              <strong>Visible columns</strong>
+              {CRM_CONTACT_COLUMNS.map((column) => <label key={column.id}>
+                <input type="checkbox" checked={visibleColumns.includes(column.id)} disabled={column.locked} onChange={() => toggleContactColumn(column.id)} />
+                <span>{column.label}</span>
+              </label>)}
+            </div> : null}
+          </div> : null}
           {campaignId || searchTerm || sourceFilter || contactMethodFilter ? (
             <Button
               variant="outline"
@@ -2043,28 +2145,16 @@ export default function Contacts() {
               Clear filters
             </Button>
           ) : null}
-        </div>
-        <div className="crm-tabs crm-tabs--simple">
-          {[
-            ["all", "All contacts"],
-            ["attention", "Data quality review"],
-            ["ready", "Ready to assign"],
-            ["assigned", "Campaign assigned"],
-            ["best-connections", "Best connections"],
-            ["linkedin-review", "LinkedIn outreach"],
-            ...(importSummary?.importBatchId ? [["latest-import", `Latest import (${latestImportTotal})`]] : []),
-            ["unsubscribed", `Unsubscribed (${unsubscribedContacts.length})`],
-            ["archived", "Archived"],
-          ].map(([value, label]) => (
-            <button
-              key={value}
-              className={contactTab === value ? "active" : ""}
-              onClick={() => setContactTab(value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        </>} results={!loading ? `${contacts.length} contact${contacts.length === 1 ? "" : "s"}` : "Loading contacts"} />
+        <Tabs
+          label="Saved contact views"
+          activeId={contactTab}
+          onChange={setContactTab}
+          items={[
+            ...CRM_SAVED_VIEWS.map((view) => view.id === "unsubscribed" ? { ...view, count: unsubscribedContacts.length } : view),
+            ...(importSummary?.importBatchId ? [{ id: "latest-import", label: "Latest import", count: latestImportTotal }] : []),
+          ]}
+        />
         {contactTab === "best-connections" ? (
           <section className="best-connections-workspace">
             <header>
@@ -2313,6 +2403,32 @@ export default function Contacts() {
               Next
             </Button>
           </nav>
+        ) : null}
+        {contactTab !== "best-connections" && !loading && contacts.length && crmView === "table" ? (
+          <div className="crm-contact-table-wrap">
+            <table className="crm-contact-table">
+              <thead><tr>
+                <th className="crm-contact-table__select"><span className="sr-only">Select</span></th>
+                {CRM_CONTACT_COLUMNS.filter((column) => visibleColumns.includes(column.id)).map((column) => <th key={column.id}>{column.label}</th>)}
+              </tr></thead>
+              <tbody>
+                {contacts.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((contact) => {
+                  const workflow = contactWorkflowState(contact);
+                  const assignedCampaigns = (contact.campaignIds || []).map((id) => campaigns.find((campaign) => String(campaign._id) === String(id?._id || id))?.name || id?.name).filter(Boolean);
+                  return <tr key={contact._id} onClick={() => openContactDetail(contact)}>
+                    <td className="crm-contact-table__select"><input type="checkbox" aria-label={`Select ${contactDisplayName(contact)}`} checked={selectedContactIds.includes(String(contact._id))} onClick={(event) => event.stopPropagation()} onChange={(event) => setSelectedContactIds((current) => event.target.checked ? [...new Set([...current, String(contact._id)])] : current.filter((id) => id !== String(contact._id)))} /></td>
+                    {visibleColumns.includes("contact") ? <td className="crm-contact-table__identity"><button type="button" onClick={(event) => { event.stopPropagation(); openContactDetail(contact); }}><span>{contactDisplayName(contact).slice(0, 1).toUpperCase()}</span><span><strong>{contactDisplayName(contact)}</strong><small>{contact.email || contact.linkedin || "No direct contact method"}</small></span></button></td> : null}
+                    {visibleColumns.includes("company") ? <td><strong>{contact.company || "Company missing"}</strong><small>{contact.title || "Title missing"}</small></td> : null}
+                    {visibleColumns.includes("stage") ? <td><StatusBadge tone={workflow.key === "ready" || workflow.key === "assigned" ? "success" : workflow.key === "email" || workflow.key === "audience" ? "warning" : "draft"}>{crmStage(contact)}</StatusBadge></td> : null}
+                    {visibleColumns.includes("email") ? <td><StatusBadge tone={isUnsubscribed(contact) ? "danger" : contact.emailStatus === "verified" ? "success" : "warning"}>{isUnsubscribed(contact) ? "Unsubscribed" : contact.emailStatus === "verified" ? "Verified" : contact.emailStatus ? contact.emailStatus.replaceAll("_", " ") : "Needs review"}</StatusBadge></td> : null}
+                    {visibleColumns.includes("campaigns") ? <td>{assignedCampaigns.length ? <><strong>{assignedCampaigns[0]}</strong>{assignedCampaigns.length > 1 ? <small>+{assignedCampaigns.length - 1} more</small> : null}</> : <span className="crm-contact-table__muted">Unassigned</span>}</td> : null}
+                    {visibleColumns.includes("source") ? <td><span className={`contact-origin is-${contactSourceKey(contact)}`}>{contactSourceLabel(contact)}</span></td> : null}
+                    {visibleColumns.includes("next") ? <td><strong>{workflow.label}</strong><small>{workflow.detail}</small></td> : null}
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : null}
         {contactTab !== "best-connections" && !loading && contacts.length && crmView === "pipeline" ? (
           <section
@@ -3611,10 +3727,12 @@ export default function Contacts() {
           </p>
         ) : null}
       </Modal>
-      <Modal
+      <Drawer
         isOpen={Boolean(detailContact)}
-        onClose={() => setDetailContact(null)}
+        onClose={() => { setDetailContact(null); if (routeContactId) navigate("/crm/contacts"); }}
         title={detailContact ? contactDisplayName(detailContact) : "Contact"}
+        description={detailContact ? [detailContact.title, detailContact.company].filter(Boolean).join(" at ") : ""}
+        size="wide"
       >
         {detailContact ? (
           <div className="contact-detail">
@@ -3633,21 +3751,38 @@ export default function Contacts() {
                   </small>
                 </p>
               </div>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setContactEditMode("full");
-                  setEditingContact({
-                    ...detailContact,
-                    ...contactNameParts(detailContact),
-                  });
-                  setDetailContact(null);
-                }}
-              >
-                Edit contact
-              </Button>
+              <div className="contact-detail__actions">
+                {!routeContactId ? <Button variant="outline" size="sm" onClick={() => navigate(`/crm/contacts/${detailContact._id}`)}>Open full record</Button> : null}
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setContactEditMode("full");
+                    setEditingContact({ ...detailContact, ...contactNameParts(detailContact) });
+                    setDetailContact(null);
+                    if (routeContactId) navigate("/crm/contacts");
+                  }}
+                >Edit contact</Button>
+              </div>
             </div>
-            {isIntentContact(detailContact) ? (
+            <Tabs
+              label="Contact record sections"
+              activeId={detailTab}
+              onChange={setDetailTab}
+              items={[
+                { id: "overview", label: "Overview" },
+                { id: "activity", label: "Activity" },
+                { id: "conversations", label: "Conversations" },
+                { id: "campaigns", label: "Campaigns", count: detailContact.campaignIds?.length || 0 },
+                { id: "research", label: "Research" },
+                { id: "details", label: "Details" },
+              ]}
+            />
+            {detailTab === "overview" ? <section className="contact-overview-workspace">
+              <div><span>Next action</span><strong>{contactWorkflowState(detailContact).label}</strong><p>{contactWorkflowState(detailContact).detail}</p></div>
+              <div><span>Relationship</span><strong>{crmStage(detailContact)}</strong><p>{detailContact.company ? `${detailContact.title || "Contact"} at ${detailContact.company}` : "Company relationship needs review"}</p></div>
+              <div><span>Communication safety</span><strong>{isUnsubscribed(detailContact) ? "Do not email" : detailContact.emailStatus === "verified" ? "Verified email" : "Needs review"}</strong><p>{detailContact.emailPreferences?.marketingStatus === "subscribed" ? "Marketing permission recorded" : "Marketing permission not recorded"}</p></div>
+            </section> : null}
+            {detailTab === "overview" && isIntentContact(detailContact) ? (
               <section className="intent-contact-action-center">
                 <header>
                   <span>Deal to Close follow-up</span>
@@ -3677,7 +3812,7 @@ export default function Contacts() {
                 <p className="intent-contact-action-center__safety"><strong>No outreach has been sent.</strong> Missing fields are intentional until reliable public evidence is found.</p>
               </section>
             ) : null}
-            {isUnsubscribed(detailContact) ? (
+            {detailTab === "overview" && isUnsubscribed(detailContact) ? (
               <section className="contact-unsubscribe-alert" role="alert">
                 <span>Do not email</span>
                 <strong>This contact unsubscribed from campaign email.</strong>
@@ -3690,7 +3825,7 @@ export default function Contacts() {
                 </p>
               </section>
             ) : null}
-            {detailContact.linkedin ? (
+            {detailTab === "overview" && detailContact.linkedin ? (
               <section className="linkedin-outreach-card">
                 <header>
                   <div>
@@ -3742,7 +3877,24 @@ export default function Contacts() {
                 <p className="linkedin-outreach-card__safety"><strong>Supervised workflow:</strong> this opens the saved profile and copies your approved draft. It never logs into LinkedIn, pastes, clicks Send, or runs unattended.</p>
               </section>
             ) : null}
-            {contactDetailGroups.map(([group, fields]) => {
+            {detailTab === "activity" ? <ActivityTimeline contactId={detailContact._id} /> : null}
+            {detailTab === "conversations" ? <section className="contact-conversations">
+              <header><div><span>Email history</span><strong>{detailContact.email || "No contact email"}</strong></div><Button size="sm" variant="outline" onClick={() => navigate(`/conversations${detailContact.email ? `?search=${encodeURIComponent(detailContact.email)}` : ""}`)}>Open Conversations</Button></header>
+              {!detailContact.email ? <p>Add and verify an email address to match campaign and Gmail history.</p> : detailHistoryLoading ? <p>Loading conversations…</p> : detailEmailHistory.length ? detailEmailHistory.map((item) => <article key={item.id}><div><strong>{item.subject || item.campaignName}</strong><span>{item.campaignName}</span></div><StatusBadge tone={item.status === "replied" ? "success" : "info"}>{item.status || "prepared"}</StatusBadge><p>{item.replyText || item.body || "Message content is preserved in Outreach."}</p><small>{item.repliedAt || item.sentAt ? new Date(item.repliedAt || item.sentAt).toLocaleString() : "Not sent"}</small></article>) : <p>No campaign email history is recorded for this address.</p>}
+            </section> : null}
+            {detailTab === "research" ? <section className="contact-research-workspace">
+              <header><span>Evidence and completeness</span><StatusBadge tone={detailContact.researchStatus === "qualified" ? "success" : detailContact.researchStatus === "ready_for_review" ? "info" : "warning"}>{(detailContact.researchStatus || "needs_research").replaceAll("_", " ")}</StatusBadge></header>
+              <dl>
+                <div><dt>Source</dt><dd>{contactSourceLabel(detailContact)}</dd></div>
+                <div><dt>Last researched</dt><dd>{detailContact.lastResearchedAt ? new Date(detailContact.lastResearchedAt).toLocaleString() : "Not recorded"}</dd></div>
+                <div><dt>Missing fields</dt><dd>{detailContact.missingFields?.length ? detailContact.missingFields.join(", ") : "No required research fields listed"}</dd></div>
+                <div><dt>Public evidence</dt><dd>{detailContact.website ? <a href={detailContact.website} target="_blank" rel="noreferrer">Open source ↗</a> : "No public evidence URL recorded"}</dd></div>
+                <div><dt>Source records</dt><dd>{detailContact.sources?.length ? detailContact.sources.join(", ") : detailContact.sourceProvider || "Manual"}</dd></div>
+              </dl>
+              {detailContact.notes ? <div className="contact-research-notes"><strong>Research and relationship notes</strong><p>{detailContact.notes}</p></div> : null}
+              <Button variant="outline" onClick={() => navigate(`/operators/jarvis?prompt=${encodeURIComponent(`Research ${contactDisplayName(detailContact)} using public evidence. Do not guess missing identity or contact information.`)}`)}>Research with Growth Operator</Button>
+            </section> : null}
+            {detailTab === "details" ? contactDetailGroups.map(([group, fields]) => {
               const rows = fields.map(([field, label]) => [
                 field,
                 label,
@@ -3776,8 +3928,8 @@ export default function Contacts() {
                   </dl>
                 </section>
               );
-            })}
-            <section className="contact-detail__group">
+            }) : null}
+            {detailTab === "campaigns" ? <section className="contact-detail__group contact-campaign-workspace">
               <h3>Campaigns</h3>
               {detailContact.campaignIds?.length ? (
                 <ul className="contact-campaign-list">
@@ -3795,10 +3947,11 @@ export default function Contacts() {
               ) : (
                 <p>Not assigned to a campaign yet.</p>
               )}
-            </section>
+              <Button variant="outline" size="sm" onClick={() => { setDetailContact(null); setSelectedContactIds([String(detailContact._id)]); if (routeContactId) navigate("/crm/contacts"); }}>Manage campaign assignment</Button>
+            </section> : null}
           </div>
         ) : null}
-      </Modal>
+      </Drawer>
       <Modal
         isOpen={Boolean(editingContact)}
         onClose={() => setEditingContact(null)}
