@@ -40,8 +40,9 @@ const TestimonialsPage = lazy(() => import("./pages/PublicSite.jsx").then((modul
 const ContactPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.ContactPage })));
 const PublicProfilePage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.PublicProfilePage })));
 const PublicApplication = lazy(() => import("./pages/PublicApplication.jsx"));
-const PrivacyPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.PrivacyPage })));
-const TermsPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.TermsPage })));
+const PrivacyPage = lazy(() => import("./pages/PublicLegal.jsx").then((module) => ({ default: module.PrivacyPage })));
+const TermsPage = lazy(() => import("./pages/PublicLegal.jsx").then((module) => ({ default: module.TermsPage })));
+const DataDeletionPage = lazy(() => import("./pages/PublicLegal.jsx").then((module) => ({ default: module.DataDeletionPage })));
 const CoachPublicProfile = lazy(() => import("./pages/ProfileEditors.jsx").then((module) => ({ default: module.CoachProfileEditor })));
 const StudentProfileEditor = lazy(() => import("./pages/ProfileEditors.jsx").then((module) => ({ default: module.StudentProfileEditor })));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent.jsx"));
@@ -181,7 +182,8 @@ function App() {
             <Route path="/people/:slug" element={<PublicProfilePage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
-          <Route path="/apply" element={<PublicApplication />} />
+            <Route path="/data-deletion" element={<DataDeletionPage />} />
+            <Route path="/apply" element={<PublicApplication />} />
             <Route path="/ref/:code" element={<PublicApplication />} />
             <Route path="/profile/edit/:token" element={<StudentProfileEditor />} />
             <Route path="/login" element={<Login />} />
