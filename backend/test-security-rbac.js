@@ -120,7 +120,7 @@ async function main() {
   assert.strictEqual(result.res.statusCode, 403, "record middleware must deny unassigned coach records");
 
   const roleEnum = WorkspaceMembership.schema.path("role").enumValues;
-  for (const role of ["owner", "admin", "coach", "closer", "member", "viewer"]) assert(roleEnum.includes(role));
+  for (const role of ["owner", "admin", "coach", "closer", "ambassador", "member", "viewer"]) assert(roleEnum.includes(role));
   assert.strictEqual(IntegrationConnection.schema.path("credentials").options.select, false);
   assert.strictEqual(IntegrationConnection.schema.path("credentialsEncrypted").options.select, false);
 

@@ -81,12 +81,22 @@ export const approvePrivacyRequest = (id, values) =>
 
 export const changePassword = (values) =>
   api.patch("/auth/password", values).then((res) => res.data);
+export const uploadMyAvatar = (file) => api.post("/auth/profile/avatar", { file }).then((res) => res.data);
+export const removeMyAvatar = () => api.delete("/auth/profile/avatar").then((res) => res.data);
 
 export const fetchWorkspaceMembers = () =>
   api.get("/workspace/members").then((res) => res.data);
 
 export const createWorkspaceMember = (values) =>
   api.post("/workspace/members", values).then((res) => res.data);
+export const sendWorkspaceInvitation = (id, values = {}) =>
+  api.post(`/workspace/invitations/${id}/send`, values).then((res) => res.data);
+export const fetchInvitationTemplates = () =>
+  api.get("/workspace/invitation-templates").then((res) => res.data.templates);
+export const saveInvitationTemplate = (roleKey, values) =>
+  api.put(`/workspace/invitation-templates/${roleKey}`, values).then((res) => res.data.template);
+export const resetInvitationTemplate = (roleKey) =>
+  api.post(`/workspace/invitation-templates/${roleKey}/reset`).then((res) => res.data.template);
 export const updateWorkspaceMember = (id, values) =>
   api.patch(`/workspace/members/${id}`, values).then((res) => res.data);
 export const fetchWorkspaceCapabilities = () =>
@@ -127,8 +137,22 @@ export const fetchMyCoachProfile = () =>
   api.get("/coaching/coaches/me").then((res) => res.data.data);
 export const createCoachProfile = (values) =>
   api.post("/coaching/coaches", values).then((res) => res.data.data);
+export const onboardCoach = (values) =>
+  api.post("/coaching/coaches/onboard", values).then((res) => res.data.data);
 export const updateCoachProfile = (coachId, values) =>
   api.patch(`/coaching/coaches/${coachId}`, values).then((res) => res.data.data);
+export const fetchWorkspaceInvitation = (token) => api.get(`/auth/invitations/${encodeURIComponent(token)}`).then((res) => res.data);
+export const acceptWorkspaceInvitation = (token, values) => api.post(`/auth/invitations/${encodeURIComponent(token)}/accept`, values).then((res) => res.data);
+export const fetchMyAmbassadorProfile = () => api.get("/ambassadors/me").then((res) => res.data.data);
+export const fetchMyAmbassadorReferrals = () => api.get("/ambassadors/me/referrals").then((res) => res.data.data);
+export const fetchMyAmbassadorPayouts = () => api.get("/ambassadors/me/payouts").then((res) => res.data.data);
+export const fetchAmbassadors = () => api.get("/ambassadors").then((res) => res.data.data);
+export const fetchAmbassadorReferrals = (id) => api.get(`/ambassadors/${id}/referrals`).then((res) => res.data.data);
+export const fetchAmbassadorPayouts = (id) => api.get(`/ambassadors/${id}/payouts`).then((res) => res.data.data);
+export const updateAmbassadorStatus = (id, status) => api.patch(`/ambassadors/${id}/status`, { status }).then((res) => res.data.data);
+export const updateAmbassadorReferralState = (id, state) => api.patch(`/ambassadors/referrals/${id}/state`, { state }).then((res) => res.data.data);
+export const createAmbassadorPayout = (values) => api.post("/ambassadors/payouts", values).then((res) => res.data.data);
+export const updateAmbassadorPayoutStatus = (id, status, notes = "") => api.patch(`/ambassadors/payouts/${id}/status`, { status, notes }).then((res) => res.data.data);
 export const updateCoachStatus = (coachId, status) =>
   api.patch(`/coaching/coaches/${coachId}/status`, { status }).then((res) => res.data.data);
 

@@ -24,6 +24,7 @@ const contentRouter = require("./routes/content");
 const developmentRequestsRouter = require("./routes/developmentRequests");
 const gmailRouter = require("./routes/gmail");
 const workspaceRouter = require("./routes/workspace");
+const ambassadorsRouter = require("./routes/ambassadors");
 const unsubscribeRouter = require("./routes/unsubscribe");
 const authRouter = require("./routes/auth");
 const businessIndexRouter = require("./routes/businessIndex");
@@ -171,6 +172,7 @@ connectDatabase(mongoUri)
     app.use("/api/activities", activitiesRouter);
     app.use("/api/opportunities", opportunitiesRouter);
     app.use("/api/coaching", coachingRouter);
+    app.use("/api/ambassadors", ambassadorsRouter);
     app.use("/api/conversations", conversationsRouter);
     app.use("/api/telephony", telephonyRouter);
     app.use("/api/chat", chatRouter);

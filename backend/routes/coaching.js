@@ -31,6 +31,7 @@ const skoolIntegrationService = require("../services/skoolIntegrationService");
 const communicationSegmentService = require("../services/communicationSegmentService");
 const coachingCommunicationService = require("../services/coachingCommunicationService");
 const coachingSchedulingService = require("../services/coachingSchedulingService");
+const workspaceMemberService = require("../services/workspaceMemberService");
 const { authenticatedUserId, isAdminRole } = require("../authorization/accessPolicy");
 const { hasRole } = require("../authorization/capabilities");
 const { requireCapability } = require("../middleware/auth");
@@ -68,6 +69,7 @@ const defaultDependencies = {
   communicationSegmentService,
   coachingCommunicationService,
   coachingSchedulingService,
+  workspaceMemberService,
 };
 
 const CONTACT_FIELDS = "name firstName lastName email phone title company organizationId status tags";
@@ -276,7 +278,7 @@ function createCoachingRouter(overrides = {}) {
   }));
 
   router.get("/calendar/connections", requireAdmin, asyncRoute(async (req, res) => {
-    const coaches = await deps.CoachProfile.find({ workspaceId: req.auth.workspaceId }).populate("userId", "name email").sort({ displayName: 1 }).lean();
+    const coaches = await deps.CoachProfile.find({ workspaceId: req.auth.workspaceId }).populate("userId", "name email avatarUrl").sort({ displayName: 1 }).lean();
     const connections = await deps.IntegrationConnection.find({ workspaceId: req.auth.workspaceId, provider: "google_calendar", accountScope: "user" }).lean();
     const byCoach = new Map(connections.map((item) => [String(item.coachProfileId), item]));
     return res.json({ success: true, data: coaches.map((coach) => ({ coach, connection: deps.googleCalendarService.publicConnection(byCoach.get(String(coach._id))) })) });
@@ -295,7 +297,7 @@ function createCoachingRouter(overrides = {}) {
     const identity = await deps.zoomService.coachIdentity({ workspaceId: req.auth.workspaceId, userId: authenticatedUserId(req) }, deps); return res.json({ success: true, data: await deps.zoomService.disconnect(identity, deps) });
   }));
   router.get("/zoom/connections", requireAdmin, asyncRoute(async (req, res) => {
-    const coaches = await deps.CoachProfile.find({ workspaceId: req.auth.workspaceId }).populate("userId", "name email").sort({ displayName: 1 }).lean(); const connections = await deps.IntegrationConnection.find({ workspaceId: req.auth.workspaceId, provider: "zoom", accountScope: "user" }).lean(); const byCoach = new Map(connections.map((item) => [String(item.coachProfileId), item]));
+    const coaches = await deps.CoachProfile.find({ workspaceId: req.auth.workspaceId }).populate("userId", "name email avatarUrl").sort({ displayName: 1 }).lean(); const connections = await deps.IntegrationConnection.find({ workspaceId: req.auth.workspaceId, provider: "zoom", accountScope: "user" }).lean(); const byCoach = new Map(connections.map((item) => [String(item.coachProfileId), item]));
     return res.json({ success: true, data: coaches.map((coach) => ({ coach, connection: deps.zoomService.publicConnection(byCoach.get(String(coach._id))) })) });
   }));
 
@@ -342,13 +344,13 @@ function createCoachingRouter(overrides = {}) {
     const filter = { workspaceId: req.auth.workspaceId };
     if (!isAdminRole(req.auth.role)) filter.userId = authenticatedUserId(req);
     if (isAdminRole(req.auth.role) && req.query.status) filter.status = req.query.status;
-    const data = await deps.CoachProfile.find(filter).populate("userId", "name email status").sort({ displayName: 1, createdAt: 1 }).lean();
+    const data = await deps.CoachProfile.find(filter).populate("userId", "name email status avatarUrl").sort({ displayName: 1, createdAt: 1 }).lean();
     return res.json({ success: true, data });
   }));
 
   router.get("/coaches/me", asyncRoute(async (req, res) => {
     const data = await deps.CoachProfile.findOne({ workspaceId: req.auth.workspaceId, userId: authenticatedUserId(req) })
-      .populate("userId", "name email status").lean();
+      .populate("userId", "name email status avatarUrl").lean();
     return data ? res.json({ success: true, data }) : res.status(404).json({ success: false, error: "Coach profile not found", code: "COACH_NOT_FOUND" });
   }));
 
@@ -356,7 +358,7 @@ function createCoachingRouter(overrides = {}) {
     if (!validId(req.params.id)) return res.status(400).json({ success: false, error: "Invalid coach profile", code: "ID_INVALID" });
     const filter = { _id: req.params.id, workspaceId: req.auth.workspaceId };
     if (!isAdminRole(req.auth.role)) filter.userId = authenticatedUserId(req);
-    const data = await deps.CoachProfile.findOne(filter).populate("userId", "name email status").lean();
+    const data = await deps.CoachProfile.findOne(filter).populate("userId", "name email status avatarUrl").lean();
     return data ? res.json({ success: true, data }) : res.status(404).json({ success: false, error: "Coach profile not found", code: "COACH_NOT_FOUND" });
   }));
 
@@ -371,6 +373,22 @@ function createCoachingRouter(overrides = {}) {
         capacity: req.body.capacity,
       });
       return res.status(201).json({ success: true, data });
+    } catch (error) { return errorResponse(error, res); }
+  }));
+
+  router.post("/coaches/onboard", requireAdmin, asyncRoute(async (req, res) => {
+    try {
+      const data = await deps.workspaceMemberService.onboardCoach({
+        workspaceId: req.auth.workspaceId,
+        actorUserId: authenticatedUserId(req),
+        name: req.body?.name,
+        email: req.body?.email,
+        timezone: req.body?.timezone,
+        capacity: req.body?.capacity,
+        programIds: req.body?.programIds,
+      });
+      const lifecycle = data.membership.status === "invited" ? "invite_ready" : "coach_profile_active";
+      return res.status(data.alreadyActive ? 200 : 201).json({ success: true, data: { coachProfile: data.coachProfile, membershipStatus: data.membership.status, lifecycle, invitation: data.invitation ? { id: data.invitation._id, status: data.invitation.status, deliveryStatus: data.invitation.deliveryStatus, roleKey: data.invitation.roleKey, templateVersion: data.invitation.templateVersion, subject: data.invitation.subject, body: data.invitation.body, expiresAt: data.invitation.expiresAt } : null } });
     } catch (error) { return errorResponse(error, res); }
   }));
 
@@ -688,7 +706,7 @@ function createCoachingRouter(overrides = {}) {
   router.get("/referral-identities", asyncRoute(async (req, res) => {
     const filter = { workspaceId: req.auth.workspaceId };
     if (!isAdminRole(req.auth.role)) filter.userId = authenticatedUserId(req);
-    const data = await deps.CoachProfile.find(filter).populate("userId", "name email").sort({ displayName: 1 }).lean();
+    const data = await deps.CoachProfile.find(filter).populate("userId", "name email avatarUrl").sort({ displayName: 1 }).lean();
     return res.json({ success: true, data });
   }));
   router.patch("/coaches/:id/referral-identity", requireAdmin, asyncRoute(async (req, res) => { try { const data = await deps.referralCommissionService.setReferralIdentity({ workspaceId: req.auth.workspaceId, coachProfileId: req.params.id, referralCode: req.body?.referralCode, referralSlug: req.body?.referralSlug, actorUserId: authenticatedUserId(req) }); return res.json({ success: true, data }); } catch (error) { return errorResponse(error, res); } }));

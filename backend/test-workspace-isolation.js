@@ -2,6 +2,7 @@ const assert = require("assert");
 const Contact = require("./models/Contact");
 const User = require("./models/User");
 const { runWithWorkspace } = require("./tenancy/workspaceContext");
+const { scopeWorkspaceUpdate } = require("./tenancy/workspacePlugin");
 
 const workspaceId = "6a69491ceb8b0a51048bd0cd";
 const otherWorkspaceId = "6a69491ceb8b0a51048bd0ce";
@@ -12,6 +13,9 @@ async function runPre(_model, _operation, query) {
 }
 
 async function main() {
+  const upsert = scopeWorkspaceUpdate({ $setOnInsert: { workspaceId: otherWorkspaceId, name: "New" }, $set: { score: 75 } }, workspaceId);
+  assert.strictEqual(String(upsert.$setOnInsert.workspaceId), workspaceId, "upsert ownership must be normalized");
+  assert.strictEqual(upsert.$set.workspaceId, undefined, "workspaceId cannot be placed in both $set and $setOnInsert");
   assert.strictEqual(User.schema.path("workspaceId"), undefined, "global users must remain global");
   assert(Contact.schema.path("workspaceId"), "contacts must be workspace-owned");
 

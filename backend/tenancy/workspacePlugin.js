@@ -7,6 +7,19 @@ function enforcementEnabled() {
   return String(process.env.TENANT_QUERY_ENFORCEMENT || "enabled").toLowerCase() !== "disabled";
 }
 
+function scopeWorkspaceUpdate(update, workspaceId) {
+  if (!update) return update;
+  if (update.$set) {
+    // MongoDB rejects the same path in $set and $setOnInsert. Upserts commonly
+    // place immutable ownership in $setOnInsert, so normalize it there rather
+    // than creating a conflicting $set.workspaceId path.
+    if (update.$setOnInsert && Object.prototype.hasOwnProperty.call(update.$setOnInsert, "workspaceId")) update.$setOnInsert.workspaceId = workspaceId;
+    else update.$set.workspaceId = workspaceId;
+  } else if (update.$setOnInsert) update.$setOnInsert.workspaceId = workspaceId;
+  else if (!Object.keys(update).some((key) => key.startsWith("$"))) update.workspaceId = workspaceId;
+  return update;
+}
+
 function workspacePlugin(schema) {
   if (!schema.path("workspaceId")) {
     schema.add({
@@ -25,9 +38,7 @@ function workspacePlugin(schema) {
     this.where({ workspaceId });
     const update = this.getUpdate?.();
     if (!update) return;
-    if (update.$set) update.$set.workspaceId = workspaceId;
-    else if (!Object.keys(update).some((key) => key.startsWith("$"))) update.workspaceId = workspaceId;
-    this.setUpdate(update);
+    this.setUpdate(scopeWorkspaceUpdate(update, workspaceId));
   });
 
   schema.pre("aggregate", function scopeWorkspaceAggregate() {
@@ -51,3 +62,4 @@ function workspacePlugin(schema) {
 }
 
 module.exports = workspacePlugin;
+module.exports.scopeWorkspaceUpdate = scopeWorkspaceUpdate;

@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+const read = (file) => fs.readFileSync(path.join(dirname, file), "utf8");
+const app = read("src/App.jsx"), settings = read("src/pages/Settings.jsx"), templates = read("src/components/InvitationTemplates.jsx"), team = read("src/components/TeamAccess.jsx"), coaches = read("src/pages/CoachingAdmin.jsx");
+assert(app.includes('/settings/communications/invitations'));
+assert(settings.includes("InvitationTemplates"));
+for (const role of ["Coach", "Brand Ambassador", "Closer / Sales", "General Team Member"]) assert(templates.includes(role));
+for (const variable of ["firstName", "displayName", "role", "workspaceName", "inviteLink", "invitedBy"]) assert(templates.includes(variable));
+assert(team.includes("Create invite preview")); assert(team.includes("Send invitation")); assert(team.includes("Resend invitation"));
+assert(coaches.includes("Continue to invitation preview")); assert(coaches.includes("Preview coach invitation"));
+console.log("Invitation template, preview-before-send, resend, and coach workflow UI contracts passed.");

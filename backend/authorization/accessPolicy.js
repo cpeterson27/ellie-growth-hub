@@ -6,6 +6,7 @@ const ROLES = Object.freeze({
   ADMIN: "admin",
   COACH: "coach",
   CLOSER: "closer",
+  AMBASSADOR: "ambassador",
   MEMBER: "member",
   VIEWER: "viewer",
 });

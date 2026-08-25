@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true, select: false },
     status: { type: String, enum: ["active", "disabled"], default: "active", index: true },
     lastLoginAt: { type: Date, default: null },
+    avatarUrl: { type: String, default: "", maxlength: 2000 },
+    avatarPublicId: { type: String, default: "", maxlength: 500, select: false },
   },
   { timestamps: true },
 );

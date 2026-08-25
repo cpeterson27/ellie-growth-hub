@@ -42,11 +42,12 @@ function requireRecordAccess({ loadRecord, authorizedRecordIds, ownerField } = {
 function restrictNewRoleSurface(req, res, next) {
   if (!req.auth) return next();
   const roles = req.auth.roles || [req.auth.role];
-  const restricted = roles.every((role) => ["coach", "closer"].includes(role));
+  const restricted = roles.every((role) => ["coach", "closer", "ambassador"].includes(role));
   if (!restricted) return next();
   const allowed = [];
   if (hasAnyCapability(req.auth, ["coaching.view", "coaching.view_assigned"])) allowed.push("/coaching");
   if (hasAnyCapability(req.auth, ["sales.opportunities.view", "sales.opportunities.view_assigned"])) allowed.push("/opportunities");
+  if (hasAnyCapability(req.auth, ["ambassadors.view_own", "ambassadors.view"])) allowed.push("/ambassadors");
   if (!allowed.some((prefix) => req.path.startsWith(prefix))) return res.status(403).json({ error: "This area is not available for your assigned records", code: "RECORD_POLICY_REQUIRED" });
   return next();
 }

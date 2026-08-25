@@ -46,14 +46,16 @@ function scoreSignal(signal, monitor) {
     return { score: Math.min(100, prospectScore), reasons: prospectReasons, matched };
   }
   if (isCommunityPartnerMonitor(monitor)) {
-    let partnerScore = buyer.eligible ? 35 : 0;
+    let partnerScore = buyer.eligible ? 20 : 0;
     const partnerReasons = buyer.reasons.slice();
-    if (buyer.eligible && ["meetup_public", "configured_community", "community_directory"].includes(signal.source)) { partnerScore += 20; partnerReasons.push("Found on a direct public community page"); }
-    if (buyer.eligible && matched.length) { partnerScore += Math.min(15, matched.length * 3); partnerReasons.push(`Matched ${Math.min(matched.length, 5)} targeting rule${matched.length === 1 ? "" : "s"}`); }
-    if (/association|REIA|organizer|president|director|founder|host|admin|club|network|meetup/i.test(content)) { partnerScore += 15; partnerReasons.push("Shows community or leadership evidence"); }
-    if (Number(signal.raw?.memberCount) >= 500) { partnerScore += 10; partnerReasons.push(`${Number(signal.raw.memberCount).toLocaleString()} public members`); }
-    if (signal.raw?.recentActivity) { partnerScore += 10; partnerReasons.push("Shows recent or upcoming activity"); }
-    if (signal.organizationName) { partnerScore += 5; partnerReasons.push("Community organization name identified"); }
+    if (buyer.eligible && ["meetup_public", "configured_community", "community_directory"].includes(signal.source)) { partnerScore += 10; partnerReasons.push("Found on a direct public community page"); }
+    if (buyer.eligible && matched.length) { partnerScore += Math.min(12, matched.length * 3); partnerReasons.push(`Matched ${Math.min(matched.length, 4)} targeting rule${matched.length === 1 ? "" : "s"}`); }
+    if (/association|REIA|organizer|president|director|founder|host|admin|club|network|meetup/i.test(content)) { partnerScore += 12; partnerReasons.push("Shows community or leadership evidence"); }
+    if (Number(signal.raw?.memberCount) >= 500) { partnerScore += 8; partnerReasons.push(`${Number(signal.raw.memberCount).toLocaleString()} public members`); }
+    if (signal.raw?.recentActivity) { partnerScore += 8; partnerReasons.push("Shows recent or upcoming activity"); }
+    if (signal.organizationName) { partnerScore += 4; partnerReasons.push("Community organization name identified"); }
+    const restrictions = [...content.matchAll(/\b(?:no pitching|no promotions?|no selling|no products?\/?services?|no courses?|no solicitation)\b/gi)].map((match) => match[0].toLowerCase());
+    if (restrictions.length) { partnerScore = Math.max(0, partnerScore - 25); partnerReasons.push(`Promotion restrictions affect partnership fit: ${[...new Set(restrictions)].join(", ")}`); }
     if (excluded.length) { partnerScore = Math.max(0, partnerScore - 60); partnerReasons.push(`Excluded terms: ${excluded.join(", ")}`); }
     return { score: Math.min(100, partnerScore), reasons: partnerReasons, matched };
   }
@@ -230,12 +232,12 @@ async function runResearchMonitor(monitorId) {
   try {
     const collected = await collectMonitorSignals(monitor.toObject());
     const candidates = collected.groups.reduce((sum, group) => sum + group.signals.length, 0);
+    const uniqueSignals = [...new Map(collected.groups.flatMap((group) => group.signals).map((signal) => [String(signal.sourceUrl || `${signal.source}:${signal.sourceId}`).trim().toLowerCase().replace(/\/$/, ""), signal])).values()];
     await activity(monitor, runId, "sources_checked", `Checked ${collected.groups.length + collected.failures.length} sources.`, collected.groups.length + collected.failures.length);
     await activity(monitor, runId, "candidates_collected", `Collected ${candidates} public candidates.`, candidates);
-    let found = 0; let qualified = 0; let rejected = 0;
+    let found = 0; let rejected = 0;
     const websiteCandidates = [];
-    for (const group of collected.groups) {
-      for (const signal of group.signals) {
+    for (const signal of uniqueSignals) {
         const eligibility = signalEligibility(signal, monitor);
         if (!eligibility.eligible) { rejected += 1; continue; }
         const ranking = scoreSignal(signal, monitor);
@@ -252,10 +254,8 @@ async function runResearchMonitor(monitorId) {
           { upsert: true, new: true, setDefaultsOnInsert: true },
         );
         found += 1;
-        if (ranking.score >= 60) qualified += 1;
         if (["google_web", "bing_web", "duckduckgo"].includes(signal.source) && signal.organizationDomain && ranking.score >= 55) websiteCandidates.push({ signalId: saved._id, domain: signal.organizationDomain });
         if (ranking.score >= 75) await notify(monitor, "high_scoring_lead", "High-scoring lead found", `${saved.title || "A public signal"} scored ${ranking.score}.`, saved._id);
-      }
     }
     await activity(monitor, runId, "weak_matches_rejected", `Rejected ${rejected} weak or non-buyer matches.`, rejected);
     let websitesResearched = 0;
@@ -279,7 +279,7 @@ async function runResearchMonitor(monitorId) {
     const nextRunAt = new Date(Date.now() + monitor.intervalMinutes * 60000);
     const priorHealth = new Map((monitor.sourceHealth || []).map((item) => [item.source, item.toObject ? item.toObject() : item]));
     for (const group of collected.groups) priorHealth.set(group.source, { source: group.source, enabled: true, lastSuccessfulCheck: new Date(), lastErrorAt: priorHealth.get(group.source)?.lastErrorAt || null, lastError: "", resultsCollected: group.signals.length, state: group.signals.length ? "healthy" : "empty", nextScheduledAttempt: nextRunAt });
-    for (const failure of collected.failures) priorHealth.set(failure.source, { source: failure.source, enabled: true, lastSuccessfulCheck: priorHealth.get(failure.source)?.lastSuccessfulCheck || null, lastErrorAt: new Date(), lastError: failure.message, resultsCollected: priorHealth.get(failure.source)?.resultsCollected || 0, state: failure.state, nextScheduledAttempt: nextRunAt });
+    for (const failure of collected.failures) priorHealth.set(failure.source, { source: failure.source, enabled: true, lastSuccessfulCheck: priorHealth.get(failure.source)?.lastSuccessfulCheck || null, lastErrorAt: new Date(), lastError: failure.message, resultsCollected: priorHealth.get(failure.source)?.resultsCollected || 0, state: failure.state, nextScheduledAttempt: failure.retryAt && new Date(failure.retryAt) > nextRunAt ? new Date(failure.retryAt) : nextRunAt });
     monitor.lastRunStatus = collected.failures.length ? "partial" : "completed";
     monitor.lastRunMessage = `${found} ${resultLabel} passed the filters; ${rejected} weak matches rejected${collected.failures.length ? `; ${collected.failures.length} optional source retry(s)` : ""}.`;
     const activeSignalFilter = { workspaceId: monitor.workspaceId, monitorId: monitor._id, audienceEligible: { $ne: false }, status: { $ne: "dismissed" } };
@@ -288,6 +288,7 @@ async function runResearchMonitor(monitorId) {
       IntentSignal.countDocuments({ ...activeSignalFilter, score: { $gte: 60 } }),
     ]);
     monitor.totals.runs += 1; monitor.totals.signalsFound = activeSignalCount; monitor.totals.signalsQualified = activeQualifiedCount;
+    monitor.lastRunFunnel = { engineVersion: "acquisition-v2", candidatesFetched: candidates, uniqueEvidenceEvaluated: uniqueSignals.length, weakMatchesRejected: rejected, qualifiedOpportunities: found, sourceContributions: collected.groups.map((group) => ({ source: group.source, candidates: group.signals.length })), measuredAt: new Date() };
     monitor.nextRunAt = nextRunAt; monitor.sourceHealth = [...priorHealth.values()]; monitor.leaseOwner = ""; monitor.leaseExpiresAt = null;
     await monitor.save();
     await activity(monitor, runId, "run_completed", monitor.lastRunMessage, found);

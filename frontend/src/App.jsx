@@ -7,7 +7,7 @@ import { InitiativeProvider } from "./context/InitiativeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { WorkspaceThemeProvider } from "./context/WorkspaceThemeContext.jsx";
 import useAuth from "./context/useAuth.js";
-import { canManageCoaching, canUseCoachPortal, canUseSales, hasPermission, isCoachOnly } from "./utils/roleAccess.js";
+import { canManageCoaching, canUseCoachPortal, canUseSales, hasPermission, isAmbassadorOnly, isCoachOnly } from "./utils/roleAccess.js";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Events = lazy(() => import("./pages/Events.jsx"));
@@ -32,6 +32,7 @@ const DevelopmentRequests = lazy(() => import("./pages/DevelopmentRequests.jsx")
 const CrmSetup = lazy(() => import("./pages/CrmSetup.jsx"));
 const GmailIntegration = lazy(() => import("./pages/GmailIntegration.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
+const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation.jsx"));
 const PublicHome = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.PublicHome })));
 const AboutPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.AboutPage })));
 const ProgramsPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.ProgramsPage })));
@@ -65,6 +66,9 @@ const CoachReferrals = lazy(() => import("./pages/CoachPortal.jsx").then((module
 const CoachCommissions = lazy(() => import("./pages/CoachPortal.jsx").then((module) => ({ default: module.CoachCommissions })));
 const SocialAutomation = lazy(() => import("./pages/SocialAutomation.jsx"));
 const Automations = lazy(() => import("./pages/Automations.jsx"));
+const AmbassadorPortal = lazy(() => import("./pages/AmbassadorPortal.jsx"));
+const AmbassadorAdmin = lazy(() => import("./pages/AmbassadorAdmin.jsx"));
+const MyProfile = lazy(() => import("./pages/MyProfile.jsx"));
 
 const PageLoading = () => <div className="auth-loading">Opening Growth Operator…</div>;
 
@@ -72,6 +76,7 @@ function ProtectedApp() {
   const { loading, session } = useAuth();
   if (loading) return <div className="auth-loading">Opening your private workspace…</div>;
   if (!session) return <Navigate to="/login" replace />;
+  if (isAmbassadorOnly(session)) return <InitiativeProvider enabled={false}><DashboardLayout><Routes><Route path="/ambassador" element={<AmbassadorPortal />} /><Route path="/profile" element={<MyProfile />} /><Route path="*" element={<Navigate to="/ambassador" replace />} /></Routes></DashboardLayout></InitiativeProvider>;
   if (isCoachOnly(session)) return (
     <InitiativeProvider enabled={false}>
       <DashboardLayout>
@@ -84,6 +89,7 @@ function ProtectedApp() {
           <Route path="/coach/referrals" element={<CoachReferrals />} />
           <Route path="/coach/commissions" element={<CoachCommissions />} />
           <Route path="/coach/profile" element={<CoachPublicProfile />} />
+          <Route path="/profile" element={<MyProfile />} />
           <Route path="*" element={<Navigate to="/coach" replace />} />
         </Routes>
       </DashboardLayout>
@@ -122,8 +128,12 @@ function ProtectedApp() {
           <Route path="/content" element={<Content />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/profile" element={<MyProfile />} />
           <Route path="/settings/workspace" element={<Settings />} />
+          <Route path="/settings/team" element={<Settings />} />
+          <Route path="/settings/communications/invitations" element={<Settings />} />
           <Route path="/settings/privacy" element={<Settings />} />
+          <Route path="/ambassadors/manage" element={<AmbassadorAdmin />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/integrations/eventbrite" element={<EventbriteIntegration />} />
           <Route path="/contacts/fields" element={<CrmSetup />} />
@@ -188,6 +198,7 @@ function App() {
             <Route path="/ref/:code" element={<PublicApplication />} />
             <Route path="/profile/edit/:token" element={<StudentProfileEditor />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />
             <Route path="/oauth/consent" element={<OAuthConsent />} />
             <Route path="*" element={<ProtectedApp />} />
           </Routes>

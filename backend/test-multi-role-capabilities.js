@@ -17,7 +17,8 @@ assert(!effectivePermissions({ role: "admin", roles: ["admin"], permissionOverri
 const owner = effectivePermissions({ role: "owner", roles: ["owner"], permissionOverrides: { deny: ["team.manage", "workspace.manage"] } });
 assert(owner.includes("team.manage")); assert(owner.includes("workspace.manage"));
 assert.throws(() => validateMembershipChange({ currentRoles: ["owner"], requestedRoles: ["owner"], requestedStatus: "suspended", self: true, actorRoles: ["owner"] }), (error) => error.code === "OWNER_LOCKOUT_BLOCKED");
-assert.throws(() => validateMembershipChange({ currentRoles: ["owner"], requestedRoles: ["admin"], requestedStatus: "active", actorRoles: ["owner"] }), (error) => error.code === "OWNER_LOCKOUT_BLOCKED");
+assert.throws(() => validateMembershipChange({ currentRoles: ["owner"], requestedRoles: ["admin"], requestedStatus: "active", actorRoles: ["owner"], activeOwnerCount: 1 }), (error) => error.code === "OWNER_LOCKOUT_BLOCKED");
+assert.throws(() => validateMembershipChange({ currentRoles: ["admin"], requestedRoles: ["owner"], requestedStatus: "active", actorRoles: ["admin"], activeOwnerCount: 1 }), (error) => error.code === "OWNER_ESCALATION_BLOCKED");
 
 const auth = { user: { _id: "64b000000000000000000001" }, workspaceId: "64b000000000000000000002", role: "coach", roles: ["coach", "closer"], effectivePermissions: combined };
 assert.equal(String(salesOpportunityFilter({ auth }, {}).ownerId), auth.user._id);

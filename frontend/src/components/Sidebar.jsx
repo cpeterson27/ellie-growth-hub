@@ -18,10 +18,11 @@ import {
   FiDollarSign,
   FiClock,
   FiUserCheck,
+  FiUser,
 } from "react-icons/fi";
 import useAuth from "../context/useAuth.js";
 import useWorkspaceTheme from "../context/useWorkspaceTheme.js";
-import { canManageCoaching, canUseCoachPortal, hasAnyPermission, hasPermission, isCoachOnly } from "../utils/roleAccess.js";
+import { canManageCoaching, canUseCoachPortal, hasAnyPermission, hasPermission, isAmbassadorOnly, isCoachOnly } from "../utils/roleAccess.js";
 import "./Sidebar.css";
 
 const navGroups = [
@@ -47,6 +48,7 @@ const navGroups = [
     { label: "AI Operators", path: "/operators/jarvis", icon: <FiCpu />, permissions: ["jarvis.manage"] },
   ] },
   { label: "Configure", items: [
+    { label: "Brand Ambassadors", path: "/ambassadors/manage", icon: <FiLink />, permissions: ["ambassadors.view", "ambassadors.manage"] },
     { label: "Integrations", path: "/integrations", icon: <FiLink />, permissions: ["integrations.manage"] },
     { label: "Settings", path: "/settings/workspace", icon: <FiSettings />, permissions: ["workspace.manage", "team.view"] },
   ] },
@@ -65,14 +67,17 @@ const coachGroups = [
     { label: "My Referrals", path: "/coach/referrals", icon: <FiLink /> },
     { label: "My Commissions", path: "/coach/commissions", icon: <FiDollarSign /> },
     { label: "My Public Profile", path: "/coach/profile", icon: <FiUserCheck /> },
+    { label: "My Account", path: "/profile", icon: <FiUser /> },
   ] },
 ];
+const ambassadorGroups = [{ label: "Ambassador Portal", items: [{ label: "My Dashboard", path: "/ambassador", icon: <FiLink /> }, { label: "My Profile", path: "/profile", icon: <FiUser /> }] }];
 
 export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   const { logout, session } = useAuth();
   const { site } = useWorkspaceTheme();
   const coachOnly = isCoachOnly(session);
-  let groups = coachOnly ? coachGroups : canManageCoaching(session) ? [navGroups[0], coachingGroup, ...navGroups.slice(1)] : navGroups;
+  const ambassadorOnly = isAmbassadorOnly(session);
+  let groups = ambassadorOnly ? ambassadorGroups : coachOnly ? coachGroups : canManageCoaching(session) ? [navGroups[0], coachingGroup, ...navGroups.slice(1)] : navGroups;
   if (!coachOnly && canUseCoachPortal(session)) groups = [...groups, ...coachGroups];
   const visibleGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => !item.permissions || hasAnyPermission(session, item.permissions)) })).filter((group) => group.items.length);
   return (
@@ -111,7 +116,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
         <button className="sidebar__logout" type="button" onClick={async () => { await logout(); window.location.assign("/"); }} title={`Sign out ${session?.user?.email || ""}`}>
           <FiLogOut /><span>Sign out</span>
         </button>
-        <p>{coachOnly ? "Restricted coaching workspace." : hasPermission(session, "team.manage") ? "Workspace administration enabled." : "Private assigned workspace."}</p>
+        <p>{ambassadorOnly ? "Restricted ambassador workspace." : coachOnly ? "Restricted coaching workspace." : hasPermission(session, "team.manage") ? "Workspace administration enabled." : "Private assigned workspace."}</p>
       </div>
     </aside>
   );

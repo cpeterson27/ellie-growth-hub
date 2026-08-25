@@ -7,6 +7,8 @@ const WorkspaceMembership = require("../models/WorkspaceMembership");
 const { ACTIVE_ROLES } = require("../authorization/accessPolicy");
 const { normalizeRoles } = require("../authorization/capabilities");
 const { hashPassword, verifyPassword } = require("../utils/passwords");
+const workspaceMemberService = require("../services/workspaceMemberService");
+const imageAssetService = require("../services/imageAssetService");
 const {
   clearSessionCookie,
   createAuthContext,
@@ -19,9 +21,24 @@ const {
 const router = express.Router();
 const SESSION_DAYS = 14;
 
+router.get("/invitations/:token", async (req, res) => {
+  try {
+    const WorkspaceInvitation = require("../models/WorkspaceInvitation");
+    const invitation = await WorkspaceInvitation.findOne({ tokenHash: workspaceMemberService.invitationHash(req.params.token), status: "pending", expiresAt: { $gt: new Date() } }).select("name email expiresAt").lean();
+    return invitation ? res.json({ valid: true, name: invitation.name, email: invitation.email, expiresAt: invitation.expiresAt }) : res.status(404).json({ valid: false, error: "This invitation is invalid or has expired" });
+  } catch (_error) { return res.status(400).json({ valid: false, error: "Unable to verify invitation" }); }
+});
+
+router.post("/invitations/:token/accept", async (req, res) => {
+  try {
+    await workspaceMemberService.acceptInvitation({ token: req.params.token, password: req.body?.password, name: req.body?.name });
+    return res.json({ success: true });
+  } catch (error) { return res.status(400).json({ error: error.message || "Unable to accept invitation", code: error.code }); }
+});
+
 function publicSession(req) {
   return {
-    user: { id: req.auth.user._id, name: req.auth.user.name, email: req.auth.user.email },
+    user: { id: req.auth.user._id, name: req.auth.user.name, email: req.auth.user.email, avatarUrl: req.auth.user.avatarUrl || "" },
     workspace: {
       id: req.auth.workspace._id,
       name: req.auth.workspace.name,
@@ -78,6 +95,28 @@ router.post("/login", async (req, res) => {
 });
 
 router.get("/session", requireAuth, (req, res) => res.json(publicSession(req)));
+
+router.post("/profile/avatar", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.user._id).select("+avatarPublicId");
+    if (!user) return res.status(404).json({ error: "User profile not found" });
+    const previousPublicId = user.avatarPublicId;
+    const uploaded = await imageAssetService.uploadImage({ file: req.body?.file, folder: "growth-operator/profile-avatars", transformation: "c_fill,g_face,h_512,w_512,q_auto,f_auto" });
+    user.avatarUrl = uploaded.url; user.avatarPublicId = uploaded.publicId; await user.save();
+    if (previousPublicId && previousPublicId !== uploaded.publicId) imageAssetService.removeImage(previousPublicId).catch(() => {});
+    return res.status(201).json({ user: { id: user._id, name: user.name, email: user.email, avatarUrl: user.avatarUrl } });
+  } catch (error) { return res.status(error.status || 502).json({ error: error.message || "Profile photo upload failed", code: error.code }); }
+});
+
+router.delete("/profile/avatar", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.auth.user._id).select("+avatarPublicId");
+    if (!user) return res.status(404).json({ error: "User profile not found" });
+    const previousPublicId = user.avatarPublicId; user.avatarUrl = ""; user.avatarPublicId = ""; await user.save();
+    if (previousPublicId) imageAssetService.removeImage(previousPublicId).catch(() => {});
+    return res.json({ user: { id: user._id, name: user.name, email: user.email, avatarUrl: "" } });
+  } catch (error) { return res.status(error.status || 502).json({ error: error.message || "Unable to remove profile photo", code: error.code }); }
+});
 
 router.patch("/password", requireAuth, async (req, res) => {
   try {

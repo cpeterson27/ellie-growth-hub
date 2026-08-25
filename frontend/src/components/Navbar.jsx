@@ -6,6 +6,7 @@ import useInitiative from "../context/useInitiative.js";
 import useAuth from "../context/useAuth.js";
 import { fetchWorkspaceConfig } from "../services/api.js";
 import { isCoachOnly } from "../utils/roleAccess.js";
+import UserAvatar from "./UserAvatar.jsx";
 import "./Navbar.css";
 
 export default function Navbar({ onMenuClick }) {
@@ -133,7 +134,8 @@ export default function Navbar({ onMenuClick }) {
         <button className="navbar__jarvis" type="button" onClick={() => navigate("/operators/jarvis")}>
           <FiCpu /><span>Ask Growth Operator</span><i />
         </button>
-      </div> : <div className="navbar__actions"><span className="navbar__coach-context">Restricted coach workspace</span></div>}
+        <button className="navbar__profile" type="button" onClick={() => navigate("/profile")} aria-label="Open my profile"><UserAvatar user={session?.user} size="sm"/></button>
+      </div> : <div className="navbar__actions"><span className="navbar__coach-context">Restricted coach workspace</span><button className="navbar__profile" type="button" onClick={() => navigate("/profile")} aria-label="Open my profile"><UserAvatar user={session?.user} size="sm"/></button></div>}
     </header>
   );
 }

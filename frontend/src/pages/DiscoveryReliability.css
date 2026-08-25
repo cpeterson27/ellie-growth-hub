@@ -1,0 +1,13 @@
+.monitor-run-funnel {
+  background: #f7f4ed;
+  border: 1px solid #ded7c9;
+  border-radius: 12px;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 1rem;
+}
+.monitor-run-funnel > strong { grid-column: 1 / -1; }
+.monitor-run-funnel > span { color: #183f36; font-size: 1.2rem; font-weight: 850; }
+.monitor-run-funnel small { color: var(--text-muted); display: block; font-size: 0.68rem; font-weight: 650; line-height: 1.35; margin-top: 0.25rem; }
+@media (max-width: 760px) { .monitor-run-funnel { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

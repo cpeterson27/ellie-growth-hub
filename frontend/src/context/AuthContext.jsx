@@ -40,6 +40,7 @@ export function AuthProvider({ children }) {
         setSession(null);
       }
     },
+    updateSessionUser(user) { setSession((current) => current ? { ...current, user: { ...current.user, ...user } } : current); },
   }), [loading, session]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

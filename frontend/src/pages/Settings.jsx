@@ -7,6 +7,7 @@ import PublicSiteAdmin from "../components/PublicSiteAdmin.jsx";
 import ApplicationRouting from "../components/ApplicationRouting.jsx";
 import LaunchReadiness from "../components/LaunchReadiness.jsx";
 import PrivacyRequests from "../components/PrivacyRequests.jsx";
+import InvitationTemplates from "../components/InvitationTemplates.jsx";
 import useAuth from "../context/useAuth.js";
 import { changePassword, createMcpAccessToken, fetchCampaigns, fetchGmailConnection, fetchMcpAccessTokens, fetchOAuthConnections, fetchWorkspaceConfig, getGptActionsSchemaEndpoint, getMcpEndpoint, revokeMcpAccessToken, revokeOAuthConnection, updateWorkspaceConfig, uploadEventImage } from "../services/api.js";
 import { hasPermission } from "../utils/roleAccess.js";
@@ -17,7 +18,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
   const { session } = useAuth();
-  const [activeSection, setActiveSection] = useState(() => location.pathname.endsWith("/privacy") ? "privacy" : "profile");
+  const [activeSection, setActiveSection] = useState(() => location.pathname.includes("/communications/invitations") ? "invitations" : location.pathname.endsWith("/privacy") ? "privacy" : location.pathname.endsWith("/team") ? "team" : "profile");
   const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
   const [accountEmail, setAccountEmail] = useState("");
   const [legalBusinessName, setLegalBusinessName] = useState("");
@@ -171,7 +172,8 @@ export default function Settings() {
         <button className={activeSection === "login" ? "is-active" : ""} onClick={() => setActiveSection("login")}><FiLock /> Login & password</button>
         <button className={activeSection === "security" ? "is-active" : ""} onClick={() => setActiveSection("security")}><FiShield /> Security</button>
         <button className={activeSection === "ai" ? "is-active" : ""} onClick={() => setActiveSection("ai")}><FiCpu /> AI connections</button>
-        <button className={activeSection === "team" ? "is-active" : ""} onClick={() => setActiveSection("team")}><FiUsers /> Team access</button>
+        <button className={activeSection === "team" ? "is-active" : ""} onClick={() => { setActiveSection("team"); navigate("/settings/team"); }}><FiUsers /> Team & roles</button>
+        {hasPermission(session, "team.manage") ? <button className={activeSection === "invitations" ? "is-active" : ""} onClick={() => { setActiveSection("invitations"); navigate("/settings/communications/invitations"); }}><FiMail /> Communications · Invitation templates</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "public" ? "is-active" : ""} onClick={() => setActiveSection("public")}><FiImage /> Public website</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "applications" ? "is-active" : ""} onClick={() => setActiveSection("applications")}><FiBriefcase /> Application routing</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "readiness" ? "is-active" : ""} onClick={() => setActiveSection("readiness")}><FiCheck /> Launch readiness</button> : null}
@@ -248,7 +250,7 @@ export default function Settings() {
           {mcpTokens.length && !newMcpToken ? <p className="settings-token-warning"><strong>Lost an existing manual token?</strong> For security, it cannot be recovered. Revoke it below and create a replacement.</p> : null}
         </section>
         <section className="settings-section"><div className="settings-section__heading"><FiShield /><div><h3>Active connections</h3><p>Every tool call is workspace-scoped and recorded in Growth Operator's audit log.</p></div></div><div className="team-member-list">{oauthConnections.map((connection) => <div key={connection.id}><span><strong>{connection.name}</strong><small>OAuth connection · {connection.scopes.join(" · ")}</small></span><button className="settings-revoke" onClick={() => disconnectAiApp(connection.clientId)} aria-label={`Disconnect ${connection.name}`}><FiTrash2 /></button></div>)}{mcpTokens.map((token) => <div key={token._id || token.id}><span><strong>{token.name}</strong><small>{token.prefix}… · expires {new Date(token.expiresAt).toLocaleDateString()} · secret hidden after creation</small></span><button className="settings-revoke" onClick={() => revokeAi(token._id || token.id)} aria-label={`Revoke ${token.name}`}><FiTrash2 /></button></div>)}{!oauthConnections.length && !mcpTokens.length ? <p>No AI assistants connected yet.</p> : null}</div></section>
-      </div> : activeSection === "public" ? <PublicSiteAdmin /> : activeSection === "applications" ? <ApplicationRouting /> : activeSection === "readiness" ? <LaunchReadiness /> : activeSection === "privacy" ? <PrivacyRequests /> : <TeamAccess canManage={hasPermission(session, "team.manage")} />}
+      </div> : activeSection === "public" ? <PublicSiteAdmin /> : activeSection === "applications" ? <ApplicationRouting /> : activeSection === "readiness" ? <LaunchReadiness /> : activeSection === "privacy" ? <PrivacyRequests /> : activeSection === "invitations" ? <InvitationTemplates /> : <TeamAccess canManage={hasPermission(session, "team.manage")} actorRoles={session?.roles || [session?.role].filter(Boolean)} />}
     </section>
   </div>;
 }

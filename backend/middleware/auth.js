@@ -78,7 +78,7 @@ async function requireAuth(req, res, next) {
     const session = await AuthSession.findOne({
       tokenHash: tokenHash(token),
       expiresAt: { $gt: new Date() },
-    }).select("+tokenHash +csrfToken").populate("userId", "name email status");
+    }).select("+tokenHash +csrfToken").populate("userId", "name email status avatarUrl");
 
     if (!session || !session.userId || session.userId.status !== "active") {
       return res.status(401).json({ error: "Session expired", code: "SESSION_EXPIRED" });

@@ -60,6 +60,9 @@ function staticUxAndSourceChecks() {
   assert.ok(source.includes('monitor.monitorType === "buyer_intent"'));
   assert.ok(ui.includes("Public web / community discovery")); assert.ok(ui.includes("Connected social accounts are a separate OAuth capability"));
   assert.ok(ui.includes("Legacy Apollo-labeled research")); assert.ok(ui.includes("titles alone never qualify"));
+  assert.ok(ui.includes("Latest acquisition funnel")); assert.ok(ui.includes("legacy stored source count"));
+  assert.ok(ui.includes("no dedicated reliable BiggerPockets adapter") || ui.includes("has no dedicated reliable BiggerPockets adapter"));
+  assert.ok(ui.includes("Temporarily rate limited"));
 }
 
 Promise.resolve().then(studentQualificationChecks).then(sourceBoundaryChecks).then(dedupeChecks).then(staticUxAndSourceChecks)

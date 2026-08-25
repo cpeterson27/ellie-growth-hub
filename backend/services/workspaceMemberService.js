@@ -1,0 +1,170 @@
+const crypto = require("crypto");
+const User = require("../models/User");
+const Workspace = require("../models/Workspace");
+const WorkspaceMembership = require("../models/WorkspaceMembership");
+const WorkspaceInvitation = require("../models/WorkspaceInvitation");
+const CoachProfile = require("../models/CoachProfile");
+const CoachingProgram = require("../models/CoachingProgram");
+const AmbassadorProfile = require("../models/AmbassadorProfile");
+const integrationHub = require("./integrationHub");
+const invitationTemplateService = require("./invitationTemplateService");
+const { hashPassword } = require("../utils/passwords");
+const { legacyRoleFor, normalizeRoles } = require("../authorization/capabilities");
+
+const dependencies = { User, Workspace, WorkspaceMembership, WorkspaceInvitation, CoachProfile, CoachingProgram, AmbassadorProfile, integrationHub, invitationTemplateService };
+const INVITATION_DAYS = 7;
+
+function cleanEmail(value) { return String(value || "").trim().toLowerCase(); }
+function invitationHash(token) { return crypto.createHash("sha256").update(String(token || "")).digest("hex"); }
+function publicFrontendUrl() { return String(process.env.PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, ""); }
+
+async function findOrCreateUser({ name, email }, models) {
+  let user = await models.User.findOne({ email });
+  if (user) return { user, created: false };
+  try {
+    user = await models.User.create({ name, email, passwordHash: await hashPassword(crypto.randomBytes(32).toString("base64url")) });
+    return { user, created: true };
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    user = await models.User.findOne({ email });
+    if (!user) throw error;
+    return { user, created: false };
+  }
+}
+
+async function deliverInvitation({ invitation, token = crypto.randomBytes(32).toString("base64url"), workspaceName, invitedBy = "A workspace administrator" }, models) {
+  const acceptUrl = `${publicFrontendUrl()}/accept-invitation/${encodeURIComponent(token)}`;
+  const vars = { firstName: invitation.name.split(/\s+/)[0], displayName: invitation.name, role: invitation.roleKey === "ambassador" ? "Brand Ambassador" : invitation.roleKey === "closer" ? "Closer / Sales" : invitation.roleKey === "coach" ? "Coach" : invitation.roles[0] || "Team Member", workspaceName, inviteLink: acceptUrl, invitedBy };
+  const rendered = invitationTemplateService.render({ subject: invitation.subject, body: invitation.body }, vars);
+  invitation.tokenHash = invitationHash(token); invitation.expiresAt = new Date(Date.now() + INVITATION_DAYS * 86400000); invitation.renderedSubject = rendered.subject; invitation.renderedBody = rendered.body;
+  try {
+    await models.integrationHub.execute("resend", "sendEmail", {
+      from: process.env.EMAIL_FROM || "Growth Operator <onboarding@resend.dev>",
+      to: invitation.email,
+      subject: rendered.subject,
+      text: rendered.body,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6">${rendered.body.split("\n").map((line) => `<p>${line.replace(/[<>&"]/g, "")}</p>`).join("")}</div>`,
+    });
+    invitation.deliveryStatus = "sent";
+    invitation.status = "pending"; invitation.sentAt = new Date();
+    invitation.deliveryError = "";
+  } catch (error) {
+    invitation.deliveryStatus = "failed";
+    invitation.deliveryError = String(error?.message || "Invitation delivery failed").slice(0, 500);
+  }
+  invitation.deliveryHistory = invitation.deliveryHistory || [];
+  invitation.deliveryHistory.push({ sentAt: new Date(), status: invitation.deliveryStatus, templateVersion: invitation.templateVersion || 1, subject: rendered.subject, body: rendered.body, invitedBy: invitation.invitedBy });
+  await invitation.save();
+  return { deliveryStatus: invitation.deliveryStatus, ...(process.env.NODE_ENV === "production" ? {} : { acceptUrl }) };
+}
+
+async function inviteMember(input, models = dependencies) {
+  const email = cleanEmail(input.email), name = String(input.name || "").trim();
+  if (!email.includes("@") || name.length < 2) throw new Error("Enter a name and valid email");
+  const roles = [...new Set((input.roles || []).filter((role) => ["admin", "coach", "closer", "ambassador", "member", "viewer"].includes(role)))];
+  if (!roles.length) roles.push("member");
+  const { user } = await findOrCreateUser({ name, email }, models);
+  const existing = await models.WorkspaceMembership.findOne({ workspaceId: input.workspaceId, userId: user._id });
+  if (existing?.status === "active") {
+    const combinedRoles = [...new Set([...normalizeRoles(existing), ...roles])];
+    existing.roles = combinedRoles;
+    existing.role = legacyRoleFor(combinedRoles);
+    await existing.save();
+    return { user, membership: existing, invitation: null, alreadyActive: true };
+  }
+  const membership = await models.WorkspaceMembership.findOneAndUpdate(
+    { workspaceId: input.workspaceId, userId: user._id },
+    { $set: { role: legacyRoleFor(roles), roles, status: "invited" } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+  const token = crypto.randomBytes(32).toString("base64url");
+  const key = invitationTemplateService.roleKey(roles);
+  const template = input.invitationSubject && input.invitationBody ? { subject: input.invitationSubject, body: input.invitationBody, version: input.templateVersion || 1 } : models.invitationTemplateService ? await models.invitationTemplateService.get(input.workspaceId, key) : { ...invitationTemplateService.defaults[key], version: 1 };
+  const invitation = await models.WorkspaceInvitation.findOneAndUpdate(
+    { workspaceId: input.workspaceId, email },
+    { $set: { userId: user._id, name, roles, tokenHash: invitationHash(token), status: "ready", deliveryStatus: "pending", deliveryError: "", expiresAt: new Date(Date.now() + INVITATION_DAYS * 86400000), acceptedAt: null, sentAt: null, invitedBy: input.actorUserId, roleKey: key, templateVersion: template.version || 1, subject: template.subject, body: template.body, renderedSubject: "", renderedBody: "" } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+  let delivery = null;
+  if (input.deliverInvitation === true) {
+    const workspace = await models.Workspace.findById(input.workspaceId).select("name").lean();
+    delivery = await deliverInvitation({ invitation, token, workspaceName: workspace?.name || "Growth Operator" }, models);
+  }
+  return { user, membership, invitation, delivery, invitationToken: token, alreadyActive: false };
+}
+
+async function onboardCoach(input, models = dependencies) {
+  const requestedProgramIds = [...new Set((Array.isArray(input.programIds) ? input.programIds : []).map(String).filter(Boolean))];
+  const programs = requestedProgramIds.length ? await models.CoachingProgram.find({ workspaceId: input.workspaceId, _id: { $in: requestedProgramIds }, status: { $ne: "archived" } }).select("_id").lean() : [];
+  if (programs.length !== requestedProgramIds.length) { const error = new Error("Every coaching program must belong to this workspace"); error.code = "PROGRAM_WORKSPACE_MISMATCH"; throw error; }
+  const invited = await inviteMember({ ...input, roles: [...new Set([...(input.roles || []), "coach"])], deliverInvitation: false }, models);
+  const active = invited.membership.status === "active";
+  const update = {
+    displayName: String(input.name || invited.user.name || "").trim(),
+    timezone: String(input.timezone || "").trim(),
+    capacity: input.capacity == null || input.capacity === "" ? null : Math.max(0, Number(input.capacity) || 0),
+    status: active ? "active" : "inactive",
+    deactivatedAt: active ? null : new Date(),
+  };
+  const coachProfile = await models.CoachProfile.findOneAndUpdate(
+    { workspaceId: input.workspaceId, userId: invited.user._id }, { $set: update }, { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+  );
+  invited.membership.responsibilities = invited.membership.responsibilities || {};
+  invited.membership.responsibilities.programIds = programs.map((program) => program._id);
+  await invited.membership.save();
+  return { ...invited, coachProfile };
+}
+
+function referralCode(value) { return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70); }
+async function availableAmbassadorCode(input, models) {
+  const base = referralCode(input.referralCode || input.name) || `ambassador-${crypto.randomBytes(3).toString("hex")}`;
+  for (let index = 0; index < 20; index += 1) {
+    const candidate = index ? `${base}-${index + 1}` : base;
+    const [ambassador, coach] = await Promise.all([models.AmbassadorProfile.findOne({ workspaceId: input.workspaceId, $or: [{ referralCode: candidate }, { referralSlug: candidate }] }).lean(), models.CoachProfile.findOne({ workspaceId: input.workspaceId, $or: [{ referralCode: candidate }, { referralSlug: candidate }] }).lean()]);
+    if (!ambassador && !coach) return candidate;
+  }
+  throw new Error("Unable to create a unique referral code; enter a different code");
+}
+
+async function onboardAmbassador(input, models = dependencies) {
+  const invited = await inviteMember({ ...input, roles: [...new Set([...(input.roles || []), "ambassador"])], deliverInvitation: false }, models);
+  const existing = await models.AmbassadorProfile.findOne({ workspaceId: input.workspaceId, userId: invited.user._id });
+  const code = existing?.referralCode || await availableAmbassadorCode(input, models);
+  const active = invited.membership.status === "active";
+  const values = {
+    displayName: String(input.name || invited.user.name || "").trim(), status: active ? "active" : "invited", referralCode: code, referralSlug: code,
+    contactId: input.contactId || existing?.contactId || null, communityUrl: String(input.communityUrl || existing?.communityUrl || "").trim(),
+    startDate: input.startDate || existing?.startDate || new Date(), notes: String(input.notes || existing?.notes || "").trim(), deactivatedAt: active ? null : existing?.deactivatedAt || null,
+    commissionConfig: { mode: ["manual", "percent", "fixed"].includes(input.commissionConfig?.mode) ? input.commissionConfig.mode : existing?.commissionConfig?.mode || "manual", rateBps: Math.min(10000, Math.max(0, Number(input.commissionConfig?.rateBps ?? existing?.commissionConfig?.rateBps) || 0)), fixedAmountMinor: Math.max(0, Number(input.commissionConfig?.fixedAmountMinor ?? existing?.commissionConfig?.fixedAmountMinor) || 0), currency: String(input.commissionConfig?.currency || existing?.commissionConfig?.currency || "USD").toUpperCase().slice(0, 3) },
+  };
+  const ambassadorProfile = await models.AmbassadorProfile.findOneAndUpdate({ workspaceId: input.workspaceId, userId: invited.user._id }, { $set: values }, { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true });
+  return { ...invited, ambassadorProfile };
+}
+
+async function sendInvitation({ workspaceId, invitationId, subject, body }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.User.findById(invitation.invitedBy).select("name").lean()]); return deliverInvitation({ invitation, workspaceName: workspace?.name || "Growth Operator", invitedBy: inviter?.name || "A workspace administrator" }, models); }
+
+async function acceptInvitation({ token, password, name }, models = dependencies) {
+  const invitation = await models.WorkspaceInvitation.findOne({ tokenHash: invitationHash(token), status: "pending", expiresAt: { $gt: new Date() } }).select("+tokenHash +deliveryError");
+  if (!invitation) { const error = new Error("This invitation is invalid or has expired"); error.code = "INVITATION_INVALID"; throw error; }
+  const user = await models.User.findById(invitation.userId).select("+passwordHash");
+  const membership = await models.WorkspaceMembership.findOne({ workspaceId: invitation.workspaceId, userId: invitation.userId });
+  if (!user || !membership || membership.status !== "invited") { const error = new Error("This invitation is no longer available"); error.code = "INVITATION_INVALID"; throw error; }
+  user.passwordHash = await hashPassword(password);
+  user.name = String(name || invitation.name || user.name).trim();
+  user.status = "active";
+  await user.save();
+  membership.status = "active";
+  await membership.save();
+  if (normalizeRoles(membership).includes("coach")) await models.CoachProfile.findOneAndUpdate(
+    { workspaceId: invitation.workspaceId, userId: user._id }, { $set: { status: "active", deactivatedAt: null, displayName: user.name } }, { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+  if (normalizeRoles(membership).includes("ambassador")) await models.AmbassadorProfile.findOneAndUpdate(
+    { workspaceId: invitation.workspaceId, userId: user._id }, { $set: { status: "active", deactivatedAt: null, displayName: user.name } }, { upsert: false, new: true },
+  );
+  invitation.status = "accepted";
+  invitation.acceptedAt = new Date();
+  await invitation.save();
+  return { email: user.email, workspaceId: invitation.workspaceId };
+}
+
+module.exports = { acceptInvitation, cleanEmail, invitationHash, inviteMember, onboardAmbassador, onboardCoach, sendInvitation };

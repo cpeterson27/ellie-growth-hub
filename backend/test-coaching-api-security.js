@@ -175,6 +175,10 @@ async function main() {
     assert.equal(String(result.body.data._id), String(ids.profile));
     result = await request(`/coaches/${ids.otherProfile}`, "coach", ids.coach);
     assert.equal(result.status, 404, "coach must not retrieve another coach profile");
+    result = await request("/coaches/onboard", "coach", ids.coach, { method: "POST", body: JSON.stringify({ name: "Unauthorized", email: "unauthorized@example.test" }) });
+    assert.equal(result.status, 403, "coach must not onboard another coach");
+    result = await request("/coaches/onboard", "closer", ids.closer, { method: "POST", body: JSON.stringify({ name: "Unauthorized", email: "unauthorized@example.test" }) });
+    assert.equal(result.status, 403, "closer must not access coach onboarding");
 
     result = await request(`/enrollments/${ids.enrollment}`, "coach", ids.coach);
     assert.equal(result.status, 200, "coach must retrieve assigned enrollment");

@@ -5,8 +5,9 @@ const Contact = require("../models/Contact");
 const SalesOpportunity = require("../models/SalesOpportunity");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const CrmActivity = require("../models/CrmActivity");
+const ReferralAttribution = require("../models/ReferralAttribution");
 
-const dependencies = { CoachProfile, CoachingProgram, Enrollment, Contact, SalesOpportunity, WorkspaceMembership, CrmActivity };
+const dependencies = { CoachProfile, CoachingProgram, Enrollment, Contact, SalesOpportunity, WorkspaceMembership, CrmActivity, ReferralAttribution };
 
 function domainError(message, code) {
   const error = new Error(message);
@@ -57,7 +58,7 @@ async function createCoachProfile(input, models = dependencies) {
     workspaceId,
     userId: input.userId,
     status: "active",
-    role: { $in: ["owner", "admin", "coach"] },
+    $or: [{ role: { $in: ["owner", "admin", "coach"] } }, { roles: { $in: ["owner", "admin", "coach"] } }],
   }).lean();
   if (!membership) throw domainError("Coach user must be an active member of this workspace", "COACH_MEMBERSHIP_REQUIRED");
 
@@ -101,7 +102,7 @@ async function activateCoachProfile({ workspaceId, coachProfileId }, models = de
     workspaceId,
     userId: existing.userId,
     status: "active",
-    role: { $in: ["owner", "admin", "coach"] },
+    $or: [{ role: { $in: ["owner", "admin", "coach"] } }, { roles: { $in: ["owner", "admin", "coach"] } }],
   }).lean();
   if (!membership) throw domainError("Coach user must be an active member of this workspace", "COACH_MEMBERSHIP_REQUIRED");
   return models.CoachProfile.findOneAndUpdate(
@@ -204,6 +205,7 @@ async function createEnrollment(input, models = dependencies) {
     metadata: { enrollmentId: enrollment._id, coachingProgramId: program._id, sourceOpportunityId: opportunity?._id || null },
     createdBy: input.createdBy,
   });
+  if (models.ReferralAttribution?.updateOne) await models.ReferralAttribution.updateOne({ workspaceId, contactId: contact._id, promoterType: "ambassador" }, { $set: { enrollmentId: enrollment._id, state: enrollment.status === "active" ? "enrolled" : "qualified" } });
   return enrollment;
 }
 
@@ -238,6 +240,7 @@ async function transitionEnrollment(input, models = dependencies) {
     metadata: { enrollmentId: enrollment._id, status: input.status, currentStageKey: enrollment.currentStageKey },
     createdBy: input.createdBy,
   });
+  if (models.ReferralAttribution?.updateOne) await models.ReferralAttribution.updateOne({ workspaceId, contactId: enrollment.contactId, promoterType: "ambassador" }, { $set: { enrollmentId: enrollment._id, state: input.status === "cancelled" ? "cancelled" : input.status === "completed" ? "converted" : "enrolled" } });
   return enrollment;
 }
 

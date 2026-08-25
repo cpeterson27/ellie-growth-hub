@@ -1,11 +1,13 @@
 const express = require("express");
 const crypto = require("crypto");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
-const User = require("../models/User");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const CoachProfile = require("../models/CoachProfile");
-const { hashPassword } = require("../utils/passwords");
+const AmbassadorProfile = require("../models/AmbassadorProfile");
+const WorkspaceInvitation = require("../models/WorkspaceInvitation");
+const invitationTemplateService = require("../services/invitationTemplateService");
 const { requireCapability } = require("../middleware/auth");
+const workspaceMemberService = require("../services/workspaceMemberService");
 const launchReadinessService = require("../services/launchReadinessService");
 const { CAPABILITIES, OWNER_PROTECTED, ROLE_DEFAULTS, effectivePermissions, legacyRoleFor, normalizeRoles, validCapabilities, validateMembershipChange } = require("../authorization/capabilities");
 const router = express.Router();
@@ -71,50 +73,74 @@ router.patch("/", async (req, res) => {
   });
 });
 
-function memberResponse(membership, coachProfile = null) {
+function memberResponse(membership, coachProfile = null, ambassadorProfile = null, invitation = null) {
   const roles = normalizeRoles(membership);
   return {
     id: membership._id, userId: membership.userId?._id || membership.userId,
-    name: membership.userId?.name || "", email: membership.userId?.email || "", role: membership.role,
+    name: membership.userId?.name || "", email: membership.userId?.email || "", avatarUrl: membership.userId?.avatarUrl || "", role: membership.role,
     roles, status: membership.status, lastLoginAt: membership.userId?.lastLoginAt || null,
     permissionOverrides: membership.permissionOverrides || { allow: [], deny: [] },
     effectivePermissions: effectivePermissions(membership), responsibilities: membership.responsibilities || {},
     coachProfile: coachProfile ? { id: coachProfile._id, status: coachProfile.status, displayName: coachProfile.displayName } : null,
+    ambassadorProfile: ambassadorProfile ? { id: ambassadorProfile._id, status: ambassadorProfile.status, displayName: ambassadorProfile.displayName, referralCode: ambassadorProfile.referralCode } : null,
+    invitation: invitation ? { id: invitation._id, status: invitation.expiresAt < new Date() && !["accepted", "revoked"].includes(invitation.status) ? "expired" : invitation.status, deliveryStatus: invitation.deliveryStatus, roleKey: invitation.roleKey, subject: invitation.subject, body: invitation.body, sentAt: invitation.sentAt, expiresAt: invitation.expiresAt, acceptedAt: invitation.acceptedAt } : null,
+    lifecycle: membership.status === "invited" ? (invitation?.status === "pending" ? "pending_signup" : invitation?.status === "ready" ? "invite_ready" : "draft") : membership.status === "suspended" ? "disabled" : coachProfile?.status === "active" ? "coach_profile_active" : ambassadorProfile?.status === "active" ? "ambassador_profile_active" : "active",
   };
 }
 
-router.get("/capabilities", requireCapability("team.view", "team.manage"), (_req, res) => {
-  res.json({ capabilities: CAPABILITIES, roleDefaults: ROLE_DEFAULTS, ownerProtected: OWNER_PROTECTED });
+const invitationResponse = (invitation) => invitation ? ({
+  id: invitation._id, status: invitation.status, deliveryStatus: invitation.deliveryStatus,
+  roleKey: invitation.roleKey, templateVersion: invitation.templateVersion,
+  subject: invitation.subject, body: invitation.body, sentAt: invitation.sentAt,
+  expiresAt: invitation.expiresAt,
+}) : null;
+
+const ROLE_DESCRIPTIONS = Object.freeze({
+  owner: "Full workspace access, including team administration, workspace settings, integrations, security, CRM, coaching, communications, automation, and analytics.",
+  admin: "Full operational workspace access, including team administration and integrations; cannot grant, remove, or deactivate Owner access.",
+  coach: "Assigned coaching students, notes, handoffs, individual communications, own referrals and commissions, and own Calendar/Zoom connections.",
+  ambassador: "Self-service access to their own ambassador profile, referrals, conversion status, payout history, and explicitly configured community entry point.",
+  closer: "Assigned CRM contacts, applications, sales opportunities, and individual follow-up communications.",
+  member: "General CRM, opportunities, communications, campaigns, outreach, discovery, and analytics access.",
+  viewer: "Read-only CRM, opportunity, communications, and analytics access.",
 });
+
+router.get("/capabilities", requireCapability("team.view", "team.manage"), (_req, res) => {
+  res.json({ capabilities: CAPABILITIES, roleDefaults: ROLE_DEFAULTS, roleDescriptions: ROLE_DESCRIPTIONS, ownerProtected: OWNER_PROTECTED });
+});
+router.get("/invitation-templates", requireCapability("team.view", "team.manage"), async (req, res) => res.json({ templates: await invitationTemplateService.list(req.auth.workspaceId) }));
+router.put("/invitation-templates/:roleKey", requireCapability("team.manage"), async (req, res) => { try { res.json({ template: await invitationTemplateService.save({ workspaceId: req.auth.workspaceId, roleKey: req.params.roleKey, subject: req.body?.subject, body: req.body?.body, actorUserId: req.auth.user._id }) }); } catch (error) { res.status(400).json({ error: error.message }); } });
+router.post("/invitation-templates/:roleKey/reset", requireCapability("team.manage"), async (req, res) => { try { res.json({ template: await invitationTemplateService.reset({ workspaceId: req.auth.workspaceId, roleKey: req.params.roleKey }) }); } catch (error) { res.status(400).json({ error: error.message }); } });
 
 router.get("/members", requireCapability("team.view", "team.manage"), async (req, res) => {
   const memberships = await WorkspaceMembership.find({ workspaceId: req.auth.workspaceId })
-    .populate("userId", "name email status lastLoginAt")
+    .populate("userId", "name email status lastLoginAt avatarUrl")
     .sort({ createdAt: 1 });
   const profiles = await CoachProfile.find({ workspaceId: req.auth.workspaceId, userId: { $in: memberships.map((item) => item.userId?._id || item.userId) } }).lean();
+  const ambassadorProfiles = await AmbassadorProfile.find({ workspaceId: req.auth.workspaceId, userId: { $in: memberships.map((item) => item.userId?._id || item.userId) } }).lean();
+  const invitations = await WorkspaceInvitation.find({ workspaceId: req.auth.workspaceId, userId: { $in: memberships.map((item) => item.userId?._id || item.userId) } }).sort({ updatedAt: -1 }).lean();
   const profileByUser = new Map(profiles.map((item) => [String(item.userId), item]));
-  res.json({ members: memberships.map((membership) => memberResponse(membership, profileByUser.get(String(membership.userId?._id || membership.userId)))) });
+  const ambassadorByUser = new Map(ambassadorProfiles.map((item) => [String(item.userId), item]));
+  const invitationByUser = new Map(); for (const item of invitations) if (!invitationByUser.has(String(item.userId))) invitationByUser.set(String(item.userId), item);
+  res.json({ members: memberships.map((membership) => memberResponse(membership, profileByUser.get(String(membership.userId?._id || membership.userId)), ambassadorByUser.get(String(membership.userId?._id || membership.userId)), invitationByUser.get(String(membership.userId?._id || membership.userId)))) });
 });
+router.post("/invitations/:id/send", requireCapability("team.manage"), async (req, res) => { try { const delivery = await workspaceMemberService.sendInvitation({ workspaceId: req.auth.workspaceId, invitationId: req.params.id, subject: req.body?.subject, body: req.body?.body }); const invitation = await WorkspaceInvitation.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).lean(); res.json({ invitation: { id: invitation._id, status: invitation.status, deliveryStatus: delivery.deliveryStatus, sentAt: invitation.sentAt, expiresAt: invitation.expiresAt, subject: invitation.subject, body: invitation.body } }); } catch (error) { res.status(400).json({ error: error.message }); } });
 
 router.post("/members", requireCapability("team.manage"), async (req, res) => {
   try {
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    const name = String(req.body?.name || "").trim();
     const roles = [...new Set((Array.isArray(req.body?.roles) ? req.body.roles : [req.body?.role || "member"]).filter((role) => ROLE_DEFAULTS[role] && role !== "owner"))];
     if (!roles.length) roles.push("member");
-    const role = legacyRoleFor(roles);
-    if (!email.includes("@") || name.length < 2) return res.status(400).json({ error: "Enter a name and valid email" });
-    let user = await User.findOne({ email });
-    if (!user) {
-      user = await User.create({ name, email, passwordHash: await hashPassword(req.body?.temporaryPassword) });
+    if (roles.includes("ambassador")) {
+      const data = await workspaceMemberService.onboardAmbassador({ ...req.body, roles, workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id });
+      return res.status(data.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...data.membership.toObject(), userId: data.user }, null, data.ambassadorProfile, data.invitation), invitation: invitationResponse(data.invitation), alreadyActive: data.alreadyActive });
     }
-    const membership = await WorkspaceMembership.findOneAndUpdate(
-      { workspaceId: req.auth.workspaceId, userId: user._id },
-      { $set: { role, roles, status: "active" } },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
-    if (roles.includes("coach")) await CoachProfile.findOneAndUpdate({ workspaceId: req.auth.workspaceId, userId: user._id }, { $set: { displayName: user.name, status: "active", deactivatedAt: null } }, { upsert: true, new: true, setDefaultsOnInsert: true });
-    res.status(201).json({ member: memberResponse({ ...membership.toObject(), userId: user }) });
+    if (roles.includes("coach") && (req.body?.timezone !== undefined || req.body?.capacity !== undefined || req.body?.programIds !== undefined)) {
+      const data = await workspaceMemberService.onboardCoach({ ...req.body, roles, workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id });
+      return res.status(data.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...data.membership.toObject(), userId: data.user }, data.coachProfile, null, data.invitation), invitation: invitationResponse(data.invitation), alreadyActive: data.alreadyActive });
+    }
+    const result = await workspaceMemberService.inviteMember({ workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id, name: req.body?.name, email: req.body?.email, roles });
+    const profile = roles.includes("coach") ? await CoachProfile.findOne({ workspaceId: req.auth.workspaceId, userId: result.user._id }) : null;
+    res.status(result.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...result.membership.toObject(), userId: result.user }, profile, null, result.invitation), invitation: invitationResponse(result.invitation), alreadyActive: result.alreadyActive });
   } catch (error) {
     res.status(400).json({ error: error.code === 11000 ? "That email already belongs to an account" : error.message });
   }
@@ -122,12 +148,13 @@ router.post("/members", requireCapability("team.manage"), async (req, res) => {
 
 router.patch("/members/:id", requireCapability("team.manage"), async (req, res) => {
   try {
-    const membership = await WorkspaceMembership.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).populate("userId", "name email status lastLoginAt");
+    const membership = await WorkspaceMembership.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).populate("userId", "name email status lastLoginAt avatarUrl");
     if (!membership) return res.status(404).json({ error: "Team member not found" });
     const currentRoles = normalizeRoles(membership);
     const requestedRoles = req.body.roles === undefined ? currentRoles : [...new Set((Array.isArray(req.body.roles) ? req.body.roles : []).filter((role) => ROLE_DEFAULTS[role]))];
     const self = String(membership.userId?._id || membership.userId) === String(req.auth.user._id);
-    validateMembershipChange({ currentRoles, requestedRoles, requestedStatus: req.body.status, self, actorRoles: req.auth.roles });
+    const activeOwnerCount = await WorkspaceMembership.countDocuments({ workspaceId: req.auth.workspaceId, status: "active", $or: [{ role: "owner" }, { roles: "owner" }] });
+    validateMembershipChange({ currentRoles, requestedRoles, requestedStatus: req.body.status, self, actorRoles: req.auth.roles, activeOwnerCount });
     if (!requestedRoles.length) return res.status(400).json({ error: "At least one role is required" });
     const allow = validCapabilities(req.body.permissionOverrides?.allow ?? membership.permissionOverrides?.allow);
     let deny = validCapabilities(req.body.permissionOverrides?.deny ?? membership.permissionOverrides?.deny);
@@ -143,9 +170,13 @@ router.patch("/members/:id", requireCapability("team.manage"), async (req, res) 
     };
     await membership.save();
     let profile = await CoachProfile.findOne({ workspaceId: req.auth.workspaceId, userId: membership.userId._id });
+    let ambassadorProfile = await AmbassadorProfile.findOne({ workspaceId: req.auth.workspaceId, userId: membership.userId._id });
     if (requestedRoles.includes("coach")) profile = await CoachProfile.findOneAndUpdate({ workspaceId: req.auth.workspaceId, userId: membership.userId._id }, { $set: { displayName: profile?.displayName || membership.userId.name, status: "active", deactivatedAt: null } }, { upsert: true, new: true, setDefaultsOnInsert: true });
     else if (profile?.status === "active") { profile.status = "inactive"; profile.deactivatedAt = new Date(); await profile.save(); }
-    return res.json({ member: memberResponse(membership, profile) });
+    if (requestedRoles.includes("ambassador") && !ambassadorProfile) { const linked = await workspaceMemberService.onboardAmbassador({ workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id, name: membership.userId.name, email: membership.userId.email, roles: requestedRoles }); ambassadorProfile = linked.ambassadorProfile; }
+    else if (requestedRoles.includes("ambassador") && ambassadorProfile) { ambassadorProfile.status = membership.status === "active" ? "active" : ambassadorProfile.status; ambassadorProfile.deactivatedAt = null; await ambassadorProfile.save(); }
+    else if (ambassadorProfile?.status === "active") { ambassadorProfile.status = "inactive"; ambassadorProfile.deactivatedAt = new Date(); await ambassadorProfile.save(); }
+    return res.json({ member: memberResponse(membership, profile, ambassadorProfile) });
   } catch (error) { return res.status(400).json({ error: error.message || "Unable to update team access", code: error.code }); }
 });
 

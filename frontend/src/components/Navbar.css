@@ -105,6 +105,7 @@
 .navbar__create-menu { position: absolute; top: calc(100% + .55rem); right: 0; z-index: 50; display: grid; width: 13rem; padding: .4rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-lg); }
 .navbar__create-menu button { padding: .65rem .7rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); text-align: left; cursor: pointer; }
 .navbar__create-menu button:hover,.navbar__create-menu button:focus-visible { background: var(--color-surface-subtle); }
+.navbar__profile{background:transparent;border:0;border-radius:50%;cursor:pointer;padding:0}.navbar__profile:focus-visible{outline:3px solid rgba(31,92,80,.25);outline-offset:3px}
 @keyframes navbar-status { 50% { opacity: .35; transform: scale(.75); } }
 
 @media (max-width: 900px) {

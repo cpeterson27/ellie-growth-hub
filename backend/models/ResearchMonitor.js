@@ -41,6 +41,15 @@ const researchMonitorSchema = new mongoose.Schema({
     signalsFound: { type: Number, default: 0 },
     signalsQualified: { type: Number, default: 0 },
   },
+  lastRunFunnel: {
+    engineVersion: { type: String, default: "" },
+    candidatesFetched: { type: Number, default: 0 },
+    uniqueEvidenceEvaluated: { type: Number, default: 0 },
+    weakMatchesRejected: { type: Number, default: 0 },
+    qualifiedOpportunities: { type: Number, default: 0 },
+    sourceContributions: [{ source: String, candidates: Number }],
+    measuredAt: { type: Date, default: null },
+  },
 }, { timestamps: true });
 
 researchMonitorSchema.index({ workspaceId: 1, enabled: 1, nextRunAt: 1 });

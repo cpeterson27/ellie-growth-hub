@@ -4,6 +4,13 @@ const { fetchPublicPage, plainText, safeUrl } = require("./publicWebsiteResearch
 
 const USER_AGENT = "GrowthOperatorResearchBot/1.0 (+https://ellie-ai-backend.onrender.com/gpt-actions/privacy; support@elliescoaching.com)";
 const REQUEST_TIMEOUT = 20000;
+const REDDIT_CACHE_MS = Math.max(5 * 60000, Number(process.env.REDDIT_PUBLIC_CACHE_MS) || 15 * 60000);
+const REDDIT_MIN_REQUEST_GAP_MS = Math.max(1000, Number(process.env.REDDIT_PUBLIC_REQUEST_GAP_MS) || 3000);
+const REDDIT_DEFAULT_BACKOFF_MS = Math.max(5 * 60000, Number(process.env.REDDIT_PUBLIC_BACKOFF_MS) || 30 * 60000);
+const redditCache = new Map();
+const redditInFlight = new Map();
+let redditLastRequestAt = 0;
+let redditCooldownUntil = 0;
 
 const clean = (value) => String(value || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const decodeEntities = (value) => String(value || "")
@@ -54,6 +61,12 @@ function normalizeSignal(source, item = {}) {
     evidence: [{ label: item.evidenceLabel || source.replaceAll("_", " "), url: sourceUrl, observedAt: new Date() }],
     raw: item.raw || {},
   };
+}
+
+function explicitOrganizerCandidates(text) {
+  const names = [...String(text || "").matchAll(/\b(?:organized|hosted|led) by\s+([A-Z][\p{L}.'’ -]+?)(?=[,.|;]|\s+(?:and|for|with)\b|$)|\b(?:organizer|host)\s*:\s*([A-Z][\p{L}.'’ -]+?)(?=[,.|;]|$)/giu)]
+    .map((match) => clean(match[1] || match[2])).filter((name) => name.split(/\s+/).length >= 2 && name.length <= 100 && !/meetup|community|group|team/i.test(name));
+  return [...new Set(names)];
 }
 
 function extractXmlItems(xml) {
@@ -173,10 +186,43 @@ async function fetchFeed(url, source, label, limit) {
   })).filter(Boolean);
 }
 
-async function searchRedditRss(monitor, limit) {
-  const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(booleanQueryFor(monitor))}&sort=new&t=month`;
-  return fetchFeed(url, "reddit_rss", "Public Reddit search feed", limit);
+async function searchRedditRss(monitor, limit, operations = { fetchFeed }) {
+  const query = booleanQueryFor(monitor);
+  const key = query.toLowerCase();
+  const cached = redditCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.signals.slice(0, limit);
+  if (redditCooldownUntil > Date.now()) {
+    const error = new Error(`Reddit public RSS is waiting for retry after ${new Date(redditCooldownUntil).toISOString()}`);
+    error.response = { status: 429, headers: { "retry-after": Math.ceil((redditCooldownUntil - Date.now()) / 1000) } };
+    error.retryAt = new Date(redditCooldownUntil);
+    throw error;
+  }
+  if (redditInFlight.has(key)) return (await redditInFlight.get(key)).slice(0, limit);
+  const request = (async () => {
+    const waitMs = Math.max(0, REDDIT_MIN_REQUEST_GAP_MS - (Date.now() - redditLastRequestAt));
+    if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    redditLastRequestAt = Date.now();
+    const url = `https://www.reddit.com/search.rss?q=${encodeURIComponent(query)}&sort=new&t=month`;
+    try {
+      const signals = await operations.fetchFeed(url, "reddit_rss", "Public Reddit search feed", limit);
+      const unique = [...new Map(signals.map((signal) => [signal.sourceUrl || signal.sourceId, signal])).values()];
+      redditCache.set(key, { expiresAt: Date.now() + REDDIT_CACHE_MS, signals: unique });
+      return unique;
+    } catch (error) {
+      if (error.response?.status === 429) {
+        const retrySeconds = Number(error.response?.headers?.["retry-after"] || 0);
+        redditCooldownUntil = Date.now() + Math.max(REDDIT_DEFAULT_BACKOFF_MS, retrySeconds * 1000);
+        error.retryAt = new Date(redditCooldownUntil);
+      }
+      throw error;
+    }
+  })();
+  redditInFlight.set(key, request);
+  try { return (await request).slice(0, limit); }
+  finally { redditInFlight.delete(key); }
 }
+
+function resetRedditPublicState() { redditCache.clear(); redditInFlight.clear(); redditLastRequestAt = 0; redditCooldownUntil = 0; }
 
 async function searchBingWeb(monitor, limit) {
   const baseQuery = booleanQueryFor(monitor);
@@ -267,10 +313,13 @@ async function searchMeetupPublic(monitor, limit) {
     if (!/real estate|multifamily|apartment|landlord|property invest|REIA/i.test(`${title} ${excerpt}`)) return [];
     const memberCount = Number(html.match(/"memberships(?:\([^)]*\))?":\{"__typename":"MembershipConnection","totalCount":(\d+)/)?.[1] || 0);
     const recentActivity = /"status":"UPCOMING"|"dateTime":"2026-/i.test(html);
+    const organizerCandidates = explicitOrganizerCandidates(excerpt);
     return [normalizeSignal("meetup_public", {
       sourceId: result.value.url, sourceUrl: result.value.url, title, excerpt,
+      authorName: organizerCandidates.length === 1 ? organizerCandidates[0] : "",
+      authorUrl: organizerCandidates.length === 1 ? result.value.url : "",
       organizationName: title, organizationDomain: "meetup.com", evidenceLabel: "Public Meetup real-estate group",
-      raw: { discoveryMethod: "public_meetup_topic_directory", memberCount, recentActivity },
+      raw: { discoveryMethod: "public_meetup_topic_directory", memberCount, recentActivity, organizerCandidates },
     })].filter(Boolean);
   }).slice(0, limit);
 }
@@ -521,7 +570,14 @@ async function crawlConfiguredSite(startUrl, monitor, limit) {
 }
 
 async function searchConfiguredFeeds(monitor, limit) {
-  const urls = (monitor.feedUrls || []).filter(Boolean).slice(0, 30);
+  // BiggerPockets does not expose a dedicated feed consumed by this engine,
+  // and its forum pages may require access controls. Preserve stored URLs but
+  // do not crawl them directly; Bing remains the supported public index path.
+  const urls = (monitor.feedUrls || []).filter(Boolean).filter((url) => {
+    try { return !/(^|\.)biggerpockets\.com$/i.test(new URL(url).hostname); }
+    catch (_error) { return false; }
+  }).slice(0, 30);
+  if (!urls.length) return [];
   const groups = [];
   for (let index = 0; index < urls.length; index += 3) {
     groups.push(...await Promise.allSettled(urls.slice(index, index + 3).map((url) => crawlConfiguredSite(url, monitor, limit))));
@@ -607,9 +663,9 @@ async function collectMonitorSignals(monitor) {
       const status = item.reason?.response?.status;
       const providerMessage = item.reason?.response?.data?.error?.message || item.reason?.response?.data?.message;
       const message = String(providerMessage || item.reason?.message || status || "Source failed");
-      return { source, message, state: status === 429 ? "rate_limited" : status === 401 || status === 403 || /challenge|blocked|forbidden|403/i.test(message) ? "blocked" : "failed" };
+      return { source, message, state: status === 429 ? "rate_limited" : status === 401 || status === 403 || /challenge|blocked|forbidden|403/i.test(message) ? "blocked" : "failed", retryAt: item.reason?.retryAt || null };
     }),
   };
 }
 
-module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, extractXmlItems, isCommunityPartnerMonitor, isInvestorProfileMonitor, normalizeSignal, parseSecFormD, queryFor, searchMeetupPublic, termsFor };
+module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, explicitOrganizerCandidates, extractXmlItems, isCommunityPartnerMonitor, isInvestorProfileMonitor, normalizeSignal, parseSecFormD, queryFor, searchConfiguredFeeds, searchMeetupPublic, searchRedditRss, resetRedditPublicState, termsFor };
