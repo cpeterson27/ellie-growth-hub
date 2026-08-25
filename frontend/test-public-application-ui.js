@@ -20,7 +20,7 @@ assert(app.includes('path="/ref/:code" element={<PublicApplication />}'));
 for (const value of ["privacyTermsAccepted", "smsConsent", "marketingEmailConsent", "coachingProgramId", "trackedLinkToken", "referralCode", "idempotencyKey"]) assert(form.includes(value), `missing ${value}`);
 for (const value of ["Program application", "Apply to Join a Program", "Choose the program that fits your goals and tell us a little about where you are today.", 'className="application-hero__logo"', "/elliescoachinglogo.png"]) assert(form.includes(value), `missing application presentation: ${value}`);
 assert(!form.includes('className="public-kicker">Coaching application'));
-assert(site.includes('className="public-hero__media"><img'));
+assert(site.includes('className="public-hero__mark"'));
 assert(site.includes("/elliescoachinglogo.png"));
 assert(!site.includes("Learn. Operate. Grow."));
 assert(formCss.includes("@media(max-width:700px)"));
