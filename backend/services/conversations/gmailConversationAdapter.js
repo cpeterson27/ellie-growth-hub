@@ -5,6 +5,7 @@ const IntegrationConnection = require("../../models/IntegrationConnection");
 const gmail = require("../gmailOAuthService");
 const { ConversationChannelAdapter, registerConversationAdapter } = require("./channelAdapters");
 const { ingestProviderMessage } = require("./conversationIngestionService");
+const { detectIncoming } = require("../privacyRequestService");
 
 function participant(value, role, mailboxAddress) {
   const address = gmail.emailAddress(value);
@@ -59,6 +60,9 @@ async function syncGmailThread(threadId, suppliedThread = null) {
         metadata: { gmailMessageId: item.messageId || "", labels: item.labels || [] },
       },
     });
+    if (direction === "inbound") {
+      await detectIncoming({ workspaceId: mailbox.workspaceId, threadId: gmailThread.id, message: { providerMessageId: item.id, direction, subject: item.subject, body: item.body || item.snippet, sender: { name: gmail.displayName(item.from), address: from } } });
+    }
     canonicalThread = result.thread;
   }
 

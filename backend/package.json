@@ -22,6 +22,7 @@
     "test:multi-role-capabilities": "node test-multi-role-capabilities.js",
     "test:public-site-security": "node test-public-site-security.js",
     "test:public-application": "node test-public-application.js",
+    "test:privacy-requests": "node test-privacy-requests.js",
     "test:coaching-domain": "node test-coaching-domain.js",
     "test:coaching-api-security": "node test-coaching-api-security.js",
     "test:coaching-history": "node test-coaching-history.js",

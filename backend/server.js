@@ -31,6 +31,7 @@ const mcpAccessRouter = require("./routes/mcpAccess");
 const mcpRouter = require("./routes/mcp");
 const oauthRouter = require("./routes/oauth");
 const socialRouter = require("./routes/social");
+const privacyRequestsRouter = require("./routes/privacyRequests");
 const gptActionsRouter = require("./routes/gptActions");
 const activitiesRouter = require("./routes/activities");
 const opportunitiesRouter = require("./routes/opportunities");
@@ -193,6 +194,7 @@ connectDatabase(mongoUri)
     app.use("/api/business-index", businessIndexRouter);
     app.use("/api/mcp-access-tokens", mcpAccessRouter);
     app.use("/api/social", socialRouter);
+    app.use("/api/privacy-requests", privacyRequestsRouter);
 
     app.get("/api/health", (req, res) => {
       res.json({

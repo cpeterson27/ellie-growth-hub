@@ -123,6 +123,7 @@ function ProtectedApp() {
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/workspace" element={<Settings />} />
+          <Route path="/settings/privacy" element={<Settings />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/integrations/eventbrite" element={<EventbriteIntegration />} />
           <Route path="/contacts/fields" element={<CrmSetup />} />

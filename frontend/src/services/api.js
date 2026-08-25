@@ -64,6 +64,15 @@ export const fetchWorkspaceConfig = () =>
 export const updateWorkspaceConfig = (values) =>
   api.patch("/workspace", values).then((res) => res.data);
 
+export const fetchPrivacyRequests = () =>
+  api.get("/privacy-requests").then((res) => res.data.data);
+export const fetchPrivacyRequest = (id) =>
+  api.get(`/privacy-requests/${id}`).then((res) => res.data.data);
+export const updatePrivacyRequestStatus = (id, values) =>
+  api.patch(`/privacy-requests/${id}/status`, values).then((res) => res.data.data);
+export const approvePrivacyRequest = (id, values) =>
+  api.post(`/privacy-requests/${id}/approve`, values).then((res) => res.data.data);
+
 export const changePassword = (values) =>
   api.patch("/auth/password", values).then((res) => res.data);
 
