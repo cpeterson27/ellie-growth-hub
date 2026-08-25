@@ -5,8 +5,12 @@ const SalesOpportunity = require("../models/SalesOpportunity");
 const Contact = require("../models/Contact");
 const Organization = require("../models/Organization");
 const CrmActivity = require("../models/CrmActivity");
+const { authenticatedUserId, salesOpportunityFilter } = require("../authorization/accessPolicy");
+const referralCommissionService = require("../services/referralCommissionService");
+const { requireCapability } = require("../middleware/auth");
 
 const router = express.Router();
+router.use(requireCapability("sales.opportunities.view", "sales.opportunities.view_assigned"));
 const defaultStages = [
   { key: "new", label: "New opportunity", order: 0, probability: 10, color: "neutral" },
   { key: "qualified", label: "Qualified", order: 1, probability: 25, color: "info" },
@@ -30,7 +34,7 @@ router.get("/stages", async (_req, res) => {
   catch { return res.status(500).json({ success: false, error: "Failed to load pipeline stages" }); }
 });
 
-router.put("/stages", async (req, res) => {
+router.put("/stages", requireCapability("sales.opportunities.manage"), async (req, res) => {
   try {
     const stages = Array.isArray(req.body?.stages) ? req.body.stages.slice(0, 12) : [];
     if (stages.length < 2) return res.status(400).json({ success: false, error: "At least two stages are required" });
@@ -48,10 +52,10 @@ router.put("/stages", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const query = {};
+    const query = salesOpportunityFilter(req);
     const search = String(req.query.search || "").trim().slice(0, 120);
     if (search) query.name = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
-    if (req.query.owner === "mine" && req.auth?.userId) query.ownerId = req.auth.userId;
+    if (req.query.owner === "mine") query.ownerId = authenticatedUserId(req);
     const data = await SalesOpportunity.find(query).populate("organizationId", "name domain").populate("primaryContactId", "name email title").populate("campaignId", "name").populate("ownerId", "name email").sort({ updatedAt: -1 }).limit(500).lean();
     return res.json({ success: true, data, stages: await getStages() });
   } catch { return res.status(500).json({ success: false, error: "Failed to load opportunities" }); }
@@ -72,8 +76,8 @@ router.post("/", async (req, res) => {
       organizationId ||= contact.organizationId || null;
     }
     if (organizationId && !await Organization.exists({ _id: organizationId })) return res.status(404).json({ success: false, error: "Company not found" });
-    const opportunity = await SalesOpportunity.create({ name, stageKey: stage.key, organizationId, primaryContactId: req.body?.primaryContactId || null, campaignId: req.body?.campaignId || null, ownerId: req.auth?.userId || null, value: Math.max(0, Number(req.body?.value) || 0), probability: stage.probability, expectedCloseAt: req.body?.expectedCloseAt || null, nextAction: String(req.body?.nextAction || "").trim(), nextActionAt: req.body?.nextActionAt || null, notes: String(req.body?.notes || "").trim() });
-    await CrmActivity.create({ contactId: opportunity.primaryContactId, organizationId: opportunity.organizationId, campaignId: opportunity.campaignId, type: "status_change", title: "Opportunity created", body: `${opportunity.name} entered ${stage.label}.`, source: "crm", createdBy: req.auth?.userId || null, metadata: { opportunityId: opportunity._id, stageKey: stage.key, value: opportunity.value } });
+    const opportunity = await SalesOpportunity.create({ name, stageKey: stage.key, organizationId, primaryContactId: req.body?.primaryContactId || null, campaignId: req.body?.campaignId || null, ownerId: authenticatedUserId(req), value: Math.max(0, Number(req.body?.value) || 0), probability: stage.probability, expectedCloseAt: req.body?.expectedCloseAt || null, nextAction: String(req.body?.nextAction || "").trim(), nextActionAt: req.body?.nextActionAt || null, notes: String(req.body?.notes || "").trim() });
+    await CrmActivity.create({ contactId: opportunity.primaryContactId, organizationId: opportunity.organizationId, campaignId: opportunity.campaignId, type: "status_change", title: "Opportunity created", body: `${opportunity.name} entered ${stage.label}.`, source: "crm", createdBy: authenticatedUserId(req), metadata: { opportunityId: opportunity._id, stageKey: stage.key, value: opportunity.value } });
     return res.status(201).json({ success: true, data: opportunity });
   } catch (error) { return res.status(400).json({ success: false, error: error.message || "Failed to create opportunity" }); }
 });
@@ -81,7 +85,7 @@ router.post("/", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ success: false, error: "Invalid opportunity" });
-    const opportunity = await SalesOpportunity.findById(req.params.id);
+    const opportunity = await SalesOpportunity.findOne(salesOpportunityFilter(req, { _id: req.params.id }));
     if (!opportunity) return res.status(404).json({ success: false, error: "Opportunity not found" });
     const oldStage = opportunity.stageKey;
     const stages = await getStages();
@@ -102,8 +106,10 @@ router.patch("/:id", async (req, res) => {
     if (oldStage !== opportunity.stageKey) {
       const oldLabel = stages.find((item) => item.key === oldStage)?.label || oldStage;
       const newLabel = stages.find((item) => item.key === opportunity.stageKey)?.label || opportunity.stageKey;
-      await CrmActivity.create({ contactId: opportunity.primaryContactId, organizationId: opportunity.organizationId, campaignId: opportunity.campaignId, type: "status_change", title: "Opportunity stage changed", body: `${opportunity.name}: ${oldLabel} → ${newLabel}${opportunity.lostReason ? `\nReason: ${opportunity.lostReason}` : ""}`, source: "crm", createdBy: req.auth?.userId || null, metadata: { opportunityId: opportunity._id, from: oldStage, to: opportunity.stageKey, value: opportunity.value } });
+      const eventType = targetStage?.terminal === "won" ? "opportunity.closed_won" : targetStage?.terminal === "lost" ? "opportunity.closed_lost" : "opportunity.stage_changed";
+      await CrmActivity.create({ contactId: opportunity.primaryContactId, organizationId: opportunity.organizationId, campaignId: opportunity.campaignId, type: "status_change", title: "Opportunity stage changed", body: `${opportunity.name}: ${oldLabel} → ${newLabel}${opportunity.lostReason ? `\nReason: ${opportunity.lostReason}` : ""}`, source: "crm", createdBy: authenticatedUserId(req), metadata: { eventType, opportunityId: opportunity._id, from: oldStage, to: opportunity.stageKey, value: opportunity.value } });
     }
+    if (targetStage?.terminal === "won") await referralCommissionService.generateFromOpportunity({ workspaceId: req.auth.workspaceId, opportunity, actorUserId: authenticatedUserId(req) });
     return res.json({ success: true, data: opportunity });
   } catch (error) { return res.status(400).json({ success: false, error: error.message || "Failed to update opportunity" }); }
 });

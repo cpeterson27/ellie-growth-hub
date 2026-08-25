@@ -11,6 +11,7 @@ const eventbriteOAuthService = require("../services/eventbriteOAuthService");
 const eventbriteLogisticsService = require("../services/eventbriteLogisticsService");
 const eventbriteManagementService = require("../services/eventbriteManagementService");
 const { retrieveCompleteListing } = require("../services/eventbriteListingService");
+const { requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -241,7 +242,7 @@ router.get("/webhook/status", async (req, res) => {
   }
 });
 
-router.post("/webhook/configure", async (req, res) => {
+router.post("/webhook/configure", requireRole("owner", "admin"), async (req, res) => {
   try {
     if (!webhookToken()) {
       return res.status(409).json({
@@ -316,7 +317,7 @@ router.get("/oauth/status", async (req, res) => {
   }
 });
 
-router.get("/oauth/start", async (req, res) => {
+router.get("/oauth/start", requireRole("owner", "admin"), async (req, res) => {
   try {
     res.json({ authorizationUrl: eventbriteOAuthService.authorizationUrl(req.auth.workspaceId, req.auth.user._id) });
   } catch (error) {
@@ -335,7 +336,7 @@ router.get("/oauth/callback", async (req, res) => {
     if (!req.query.code || !state) {
       throw new Error("invalid_oauth_response");
     }
-    const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", role: { $in: ["owner", "admin"] } });
+    const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", $or: [{ role: { $in: ["owner", "admin"] } }, { roles: { $in: ["owner", "admin"] } }] });
     if (!membership) throw new Error("workspace_permission_unavailable");
     await runWithWorkspace(state.workspaceId, () => eventbriteOAuthService.exchangeCode(String(req.query.code)));
     res.redirect(`${frontendUrl}/events?eventbrite=connected`);
@@ -345,7 +346,7 @@ router.get("/oauth/callback", async (req, res) => {
   }
 });
 
-router.post("/oauth/disconnect", async (req, res) => {
+router.post("/oauth/disconnect", requireRole("owner", "admin"), async (req, res) => {
   try {
     res.json(await eventbriteOAuthService.disconnect());
   } catch (error) {
@@ -569,7 +570,7 @@ router.post("/sync-attendees", async (req, res) => {
  * POST /api/eventbrite/test-connection
  * Test Eventbrite API connection
  */
-router.post("/test-connection", async (req, res) => {
+router.post("/test-connection", requireRole("owner", "admin"), async (req, res) => {
   try {
     const result = await eventbriteSyncService.testConnection();
 

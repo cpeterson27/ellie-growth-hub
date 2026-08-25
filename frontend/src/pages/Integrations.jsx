@@ -14,6 +14,8 @@ import {
   beginSocialConnection,
   disconnectSocialConnection,
   selectSocialAssets,
+  fetchSkoolStatus,
+  configureSkool,
 } from "../services/api.js";
 import "./Integrations.css";
 
@@ -66,11 +68,13 @@ export default function Integrations() {
   const [gmail, setGmail] = useState(null);
   const [socialConnections, setSocialConnections] = useState({ linkedin: null, meta: null });
   const [socialBusy, setSocialBusy] = useState("");
+  const [skool, setSkool] = useState(null);
+  const [skoolForm, setSkoolForm] = useState({ mode: "manual", groupId: "", groupSlug: "", groupName: "", groupUrl: "", zapierHookUrl: "", adapterSecret: "" });
 
   const loadProviders = async () => {
     try {
       setLoading(true);
-      const [response, connection, webhook, eventData, gmailConnection, linkedin, meta] = await Promise.all([
+      const [response, connection, webhook, eventData, gmailConnection, linkedin, meta, skoolStatus] = await Promise.all([
         fetchIntegrationHub(),
         fetchEventbriteConnection().catch(() => null),
         fetchEventbriteWebhookStatus().catch(() => null),
@@ -78,6 +82,7 @@ export default function Integrations() {
         fetchGmailConnection().catch(() => null),
         fetchSocialConnection("linkedin").catch(() => null),
         fetchSocialConnection("meta").catch(() => null),
+        fetchSkoolStatus().catch(() => null),
       ]);
       setProviders(response.data?.providers || []);
       setEventbriteConnection(connection);
@@ -85,6 +90,8 @@ export default function Integrations() {
       setEvents(Array.isArray(eventData) ? eventData : []);
       setGmail(gmailConnection);
       setSocialConnections({ linkedin, meta });
+      setSkool(skoolStatus);
+      if (skoolStatus) setSkoolForm((current) => ({ ...current, mode: skoolStatus.mode || "manual", groupId: skoolStatus.groupId || "", groupSlug: skoolStatus.groupSlug || "", groupName: skoolStatus.groupName || "", groupUrl: skoolStatus.groupUrl || "" }));
       setError("");
     } catch (err) {
       setError(err.response?.data?.error || "Unable to load integrations");
@@ -161,6 +168,12 @@ export default function Integrations() {
       latestEventbriteSync,
   );
 
+  const saveSkool = async (event) => {
+    event.preventDefault();
+    try { const value = await configureSkool(skoolForm); setSkool(value); setSkoolForm((current) => ({ ...current, zapierHookUrl: "", adapterSecret: "" })); setError(""); }
+    catch (err) { setError(err.response?.data?.error || "Unable to save Skool setup."); }
+  };
+
   return (
     <div className="page-dashboard integrations-page">
       <div className="page-header">
@@ -208,6 +221,21 @@ export default function Integrations() {
 
       <h2 className="integration-section-title">Connected apps</h2>
       {error ? <p className="form-error">{error}</p> : null}
+      <section className="crm-connection-grid">
+        <article className="crm-connection-card">
+          <div><span className={`integration-status integration-status--${skool?.configured ? "connected" : "configuration_required"}`}>{skool?.configured ? "Configured (not live-tested)" : "Setup required"}</span><h2>Skool</h2></div>
+          <p>Map Coaching Programs to your Skool group and courses. Growth Operator uses canonical Contacts and Enrollments; it does not create a second student record.</p>
+          <form className="coaching-form" onSubmit={saveSkool}>
+            <label>Workflow mode<select value={skoolForm.mode} onChange={(event) => setSkoolForm({ ...skoolForm, mode: event.target.value })}><option value="manual">Manual</option><option value="zapier">Zapier adapter</option></select></label>
+            <label>Group name<input value={skoolForm.groupName} onChange={(event) => setSkoolForm({ ...skoolForm, groupName: event.target.value })} /></label>
+            <label>Group ID or slug<input required value={skoolForm.groupId || skoolForm.groupSlug} onChange={(event) => setSkoolForm({ ...skoolForm, groupId: event.target.value, groupSlug: "" })} /></label>
+            <label>Group URL<input type="url" value={skoolForm.groupUrl} onChange={(event) => setSkoolForm({ ...skoolForm, groupUrl: event.target.value })} /></label>
+            {skoolForm.mode === "zapier" ? <><label>Zapier catch-hook URL<input type="url" required={!skool?.configured} value={skoolForm.zapierHookUrl} onChange={(event) => setSkoolForm({ ...skoolForm, zapierHookUrl: event.target.value })} /></label><label>Adapter signing secret<input type="password" required={!skool?.configured} autoComplete="new-password" value={skoolForm.adapterSecret} onChange={(event) => setSkoolForm({ ...skoolForm, adapterSecret: event.target.value })} /></label></> : null}
+            <Button type="submit">Save Skool setup</Button>
+          </form>
+          <small>Skool does not document a general REST API. Automated access uses Skool’s official Zapier actions; revocation remains an honest manual step.</small>
+        </article>
+      </section>
       {loading ? <p>Loading integrations…</p> : (
         <section className="integration-provider-grid">
           {providers.filter((provider) => provider.id !== "resend").map((provider) => {

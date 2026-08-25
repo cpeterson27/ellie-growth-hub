@@ -6,8 +6,11 @@
 const express = require("express");
 const IntegrationConnection = require("../models/IntegrationConnection");
 const integrationRegistry = require("../services/integrations");
+const { requireCapability } = require("../middleware/auth");
+const { encryptCredentials } = require("../utils/credentialEncryption");
 
 const router = express.Router();
+router.use(requireCapability("integrations.manage"));
 
 const VALID_PROVIDERS = [
   "resend",
@@ -55,22 +58,28 @@ router.post("/connect", async (req, res) => {
 
     if (connection) {
       // Update existing connection
-      connection.credentials = credentials;
+      connection.credentialsEncrypted = encryptCredentials(credentials);
+      connection.credentials = undefined;
       connection.config = config || connection.config;
       connection.status = "configured";
       connection.lastError = null;
+      connection.credentialMigratedAt = new Date();
       connection.updatedAt = new Date();
     } else {
       // Create new connection
       connection = new IntegrationConnection({
         provider,
-        credentials,
+        credentialsEncrypted: encryptCredentials(credentials),
         config: config || {},
         status: "configured",
+        credentialMigratedAt: new Date(),
       });
     }
 
     await connection.save();
+    // Explicitly remove any legacy plaintext value, including fields excluded
+    // from the document by the schema's default projection.
+    await IntegrationConnection.updateOne({ _id: connection._id }, { $unset: { credentials: 1 } });
 
     // Return safe response (no credentials)
     return res.status(201).json({

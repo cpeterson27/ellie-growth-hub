@@ -221,6 +221,7 @@ class EventbriteAdapter extends BaseIntegration {
           externalId: attendee.id,
           tags: ["eventbrite"],
           status: "active",
+          eventParticipation: { provider: "eventbrite", eventId: String(attendee.event_id || attendee.event?.id || ""), attendeeId: String(attendee.id || ""), status: attendee.checked_in === true || String(attendee.status || "").toLowerCase().replace(" ", "_") === "checked_in" ? "attended" : "registered", checkedInAt: attendee.checked_in === true ? new Date() : null },
         };
       })
       .filter((contact) => contact.email && contact.email.trim().length > 0); // Remove invalid emails

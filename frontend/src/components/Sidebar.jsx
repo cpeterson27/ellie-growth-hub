@@ -15,48 +15,77 @@ import {
   FiFileText,
   FiList,
   FiLogOut,
+  FiDollarSign,
+  FiClock,
+  FiUserCheck,
 } from "react-icons/fi";
 import useAuth from "../context/useAuth.js";
+import useWorkspaceTheme from "../context/useWorkspaceTheme.js";
+import { canManageCoaching, canUseCoachPortal, hasAnyPermission, hasPermission, isCoachOnly } from "../utils/roleAccess.js";
 import "./Sidebar.css";
 
 const navGroups = [
   { label: "Operate", items: [
-    { label: "Command Center", path: "/command-center", icon: <FiActivity /> },
-    { label: "CRM", path: "/crm/contacts", icon: <FiUsers /> },
-    { label: "Opportunities", path: "/opportunities", icon: <FiBriefcase /> },
-    { label: "Conversations", path: "/conversations", icon: <FiMessageSquare /> },
-    { label: "Tasks", path: "/tasks", icon: <FiList /> },
+    { label: "Command Center", path: "/command-center", icon: <FiActivity />, permissions: ["crm.view", "analytics.view"] },
+    { label: "CRM", path: "/crm/contacts", icon: <FiUsers />, permissions: ["crm.view"] },
+    { label: "Opportunities", path: "/opportunities", icon: <FiBriefcase />, permissions: ["sales.opportunities.view", "sales.opportunities.view_assigned"] },
+    { label: "Conversations", path: "/conversations", icon: <FiMessageSquare />, permissions: ["communications.view"] },
+    { label: "Outreach", path: "/outreach", icon: <FiZap />, permissions: ["outreach.manage"] },
+    { label: "Tasks", path: "/tasks", icon: <FiList />, permissions: ["crm.manage", "crm.manage_assigned"] },
   ] },
   { label: "Grow", items: [
-    { label: "Campaigns", path: "/campaigns", icon: <FiZap /> },
-    { label: "Discovery", path: "/discovery", icon: <FiTrendingUp /> },
-    { label: "Events", path: "/events", icon: <FiCalendar /> },
-    { label: "Content", path: "/content", icon: <FiFileText /> },
-    { label: "Partners", path: "/partners", icon: <FiFolder /> },
+    { label: "Campaigns", path: "/campaigns", icon: <FiZap />, permissions: ["campaigns.manage"] },
+    { label: "Social Leads", path: "/social-automation", icon: <FiMessageSquare />, permissions: ["social.manage"] },
+    { label: "Automations", path: "/automations", icon: <FiZap />, permissions: ["automations.manage"] },
+    { label: "Discovery", path: "/discovery", icon: <FiTrendingUp />, permissions: ["discovery.manage"] },
+    { label: "Events", path: "/events", icon: <FiCalendar />, permissions: ["campaigns.manage"] },
+    { label: "Content", path: "/content", icon: <FiFileText />, permissions: ["campaigns.manage"] },
+    { label: "Partners", path: "/partners", icon: <FiFolder />, permissions: ["campaigns.manage"] },
   ] },
   { label: "Understand", items: [
-    { label: "Analytics", path: "/analytics", icon: <FiBarChart2 /> },
-    { label: "AI Operators", path: "/operators/jarvis", icon: <FiCpu /> },
+    { label: "Analytics", path: "/analytics", icon: <FiBarChart2 />, permissions: ["analytics.view"] },
+    { label: "AI Operators", path: "/operators/jarvis", icon: <FiCpu />, permissions: ["jarvis.manage"] },
   ] },
   { label: "Configure", items: [
-    { label: "Integrations", path: "/integrations", icon: <FiLink /> },
-    { label: "Settings", path: "/settings/workspace", icon: <FiSettings /> },
+    { label: "Integrations", path: "/integrations", icon: <FiLink />, permissions: ["integrations.manage"] },
+    { label: "Settings", path: "/settings/workspace", icon: <FiSettings />, permissions: ["workspace.manage", "team.view"] },
+  ] },
+];
+
+const coachingGroup = { label: "Coach", items: [
+  { label: "Coaching", path: "/coaching", icon: <FiUserCheck />, permissions: ["coaching.view"] },
+] };
+
+const coachGroups = [
+  { label: "Coach Portal", items: [
+    { label: "My Dashboard", path: "/coach", icon: <FiActivity /> },
+    { label: "My Students", path: "/coach/students", icon: <FiUsers /> },
+    { label: "Upcoming", path: "/coach/upcoming", icon: <FiClock /> },
+    { label: "My Schedule", path: "/coach/schedule", icon: <FiCalendar /> },
+    { label: "My Referrals", path: "/coach/referrals", icon: <FiLink /> },
+    { label: "My Commissions", path: "/coach/commissions", icon: <FiDollarSign /> },
+    { label: "My Public Profile", path: "/coach/profile", icon: <FiUserCheck /> },
   ] },
 ];
 
 export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   const { logout, session } = useAuth();
+  const { site } = useWorkspaceTheme();
+  const coachOnly = isCoachOnly(session);
+  let groups = coachOnly ? coachGroups : canManageCoaching(session) ? [navGroups[0], coachingGroup, ...navGroups.slice(1)] : navGroups;
+  if (!coachOnly && canUseCoachPortal(session)) groups = [...groups, ...coachGroups];
+  const visibleGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => !item.permissions || hasAnyPermission(session, item.permissions)) })).filter((group) => group.items.length);
   return (
     <aside className={`${isOpen ? "sidebar sidebar--open" : "sidebar"} ${isCollapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebar__brand">
-        <div className="sidebar__logo">G</div>
+        <div className="sidebar__logo">{site?.branding?.logoUrl?<img src={site.branding.logoUrl} alt=""/>:(site?.branding?.publicSiteName||"Growth Operator").slice(0,1)}</div>
         <div>
-          <p>Growth Operator</p>
-          <small>Growth intelligence</small>
+          <p>{site?.branding?.publicSiteName||"Growth Operator"}</p>
+          <small>Powered by Growth Operator</small>
         </div>
       </div>
       <nav className="sidebar__nav" aria-label="Primary">
-        {navGroups.map((group) => <section className="sidebar__group" key={group.label} aria-label={group.label}>
+        {visibleGroups.map((group) => <section className="sidebar__group" key={group.label} aria-label={group.label}>
           <p className="sidebar__group-label">{group.label}</p>
           {group.items.map((item) => item.planned ? (
             <div className="sidebar__link sidebar__link--planned" key={item.label} aria-label={`${item.label}, planned`}>
@@ -68,6 +97,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
             <NavLink
               key={item.path}
               to={item.path}
+              end={item.path === "/coach"}
               className={({ isActive }) => `sidebar__link ${isActive ? "sidebar__link--active" : ""}`}
               onClick={onClose}
             >
@@ -81,7 +111,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
         <button className="sidebar__logout" type="button" onClick={async () => { await logout(); window.location.assign("/"); }} title={`Sign out ${session?.user?.email || ""}`}>
           <FiLogOut /><span>Sign out</span>
         </button>
-        <p>Private growth operating system.</p>
+        <p>{coachOnly ? "Restricted coaching workspace." : hasPermission(session, "team.manage") ? "Workspace administration enabled." : "Private assigned workspace."}</p>
       </div>
     </aside>
   );

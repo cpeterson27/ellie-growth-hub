@@ -1,0 +1,17 @@
+import assert from "node:assert";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const admin = fs.readFileSync(path.join(directory, "src/pages/CoachingAdmin.jsx"), "utf8");
+const coach = fs.readFileSync(path.join(directory, "src/pages/CoachPortal.jsx"), "utf8");
+const history = fs.readFileSync(path.join(directory, "src/components/CoachingHistory.jsx"), "utf8");
+const app = fs.readFileSync(path.join(directory, "src/App.jsx"), "utf8");
+assert.match(admin, /export function CoachingCommunications/);
+assert.match(admin, /Marketing/); assert.match(admin, /Transactional/); assert.match(admin, /Preview audience/); assert.match(admin, /Approve & schedule/);
+assert.match(admin, /Set 24h \+ 1h reminders/);
+assert.match(app, /\/coaching\/communications/);
+assert.match(history, /Unified inbox history/);
+assert.match(coach, /Reminders:/);
+assert.doesNotMatch(coach, /Approve & schedule|Create communication draft|Preview audience/);
+console.log("Coaching communications owner/coach UI contracts passed");

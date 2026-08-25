@@ -143,3 +143,4 @@
 .navbar__menu:hover{transform:translateY(-1px) rotate(4deg);box-shadow:0 12px 28px rgba(15,55,46,.22)}
 .navbar__jarvis{border-radius:999px;background:linear-gradient(120deg,#173b32,#0e2923);box-shadow:0 8px 24px rgba(14,40,34,.14)}
 @media(max-width:900px){.navbar{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:.75rem;min-height:72px;padding:calc(env(safe-area-inset-top) + .55rem) .8rem .55rem}.navbar__left{display:contents}.navbar__context,.initiative-switcher,.navbar__search,.navbar__jarvis,.navbar__icon-action{display:none}.navbar__mobile-brand{display:grid;gap:2px}.navbar__actions{display:flex}.navbar__create-button{height:48px;border-radius:10px}}
+.navbar__coach-context{background:#eef4f1;border:1px solid #d2dfd9;color:#385a4e;font-size:.68rem;font-weight:800;letter-spacing:.04em;padding:.6rem .8rem;text-transform:uppercase}

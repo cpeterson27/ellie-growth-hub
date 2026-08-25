@@ -10,11 +10,12 @@ const CallRecord = require("../models/CallRecord");
 const CommunicationConsent = require("../models/CommunicationConsent");
 const ConversationMessage = require("../models/ConversationMessage");
 const MessageDeliveryEvent = require("../models/MessageDeliveryEvent");
+const CrmActivity = require("../models/CrmActivity");
 const MessagingSender = require("../models/MessagingSender");
 const { normalizePhone } = require("../services/communicationPolicyService");
 const { twilioConversationAdapter, validateTwilioSignature } = require("../services/conversations/twilioConversationAdapter");
 const { runWithWorkspace } = require("../tenancy/workspaceContext");
-const { connectionForAsset, ingestMetaMessage, validateMetaSignature } = require("../services/conversations/metaMessagingAdapter");
+const { connectionForAsset, ingestMetaComment, ingestMetaMessage, metaMessagingAdapter, validateMetaSignature } = require("../services/conversations/metaMessagingAdapter");
 
 const router = express.Router();
 
@@ -31,7 +32,18 @@ router.post("/meta", async (req, res) => {
       const connection = await connectionForAsset(entry.id);
       if (!connection?.workspaceId) continue;
       await runWithWorkspace(connection.workspaceId, async () => {
-        for (const event of entry.messaging || []) await ingestMetaMessage({ connection, assetId: entry.id, event });
+        for (const event of entry.messaging || []) {
+          const result = await ingestMetaMessage({ connection, assetId: entry.id, event });
+          if (result?.responseTemplate && result?.conversation?.thread) await metaMessagingAdapter.sendMessage({ channel: result.identity.provider, assetId: entry.id, recipientId: result.identity.providerUserId, body: result.responseTemplate, threadId: result.conversation.thread._id });
+        }
+        for (const change of entry.changes || []) {
+          if (["comments", "feed"].includes(change.field)) {
+            const result = await ingestMetaComment({ connection, assetId: entry.id, change });
+            const commentId = String(change?.value?.id || change?.value?.comment_id || "");
+            const rawTime = Number(change?.value?.created_time || 0);
+            if (result?.responseTemplate && ["instagram", "facebook"].includes(result.identity.provider) && commentId) await metaMessagingAdapter.sendCommentPrivateReply({ assetId: entry.id, commentId, body: result.responseTemplate, occurredAt: rawTime ? new Date(rawTime * (String(Math.trunc(rawTime)).length <= 10 ? 1000 : 1)) : new Date() });
+          }
+        }
       });
     }
     res.json({ received: true });
@@ -58,7 +70,8 @@ router.post("/twilio/message-inbound", async (req, res) => {
         const optedOut = optOutType === "STOP";
         await CommunicationConsent.findOneAndUpdate({ channel: consentChannel, address: from, purpose: "all" }, { $set: { status: optedOut ? "opted_out" : "opted_in", source: "provider", proof: `Twilio Advanced Opt-Out ${optOutType}`, keyword: String(req.body.Body || "").slice(0, 80), consentedAt: optedOut ? null : new Date(), revokedAt: optedOut ? new Date() : null, metadata: { optOutType } } }, { upsert: true, new: true, setDefaultsOnInsert: true });
       }
-      await twilioConversationAdapter.ingestInbound(req.body, sender);
+      const inbound = await twilioConversationAdapter.ingestInbound(req.body, sender);
+      if (inbound?.message?.contactId) await CrmActivity.create({ contactId: inbound.message.contactId, type: "system", direction: "inbound", title: "SMS reply received", source: "integration", metadata: { eventType: "sms.replied", conversationMessageId: inbound.message._id, providerMessageId: req.body.MessageSid } });
     });
     return res.type("text/xml").send("<Response></Response>");
   } catch (error) { console.error("TWILIO INBOUND ERROR:", error); return res.status(500).type("text/xml").send("<Response></Response>"); }
@@ -74,7 +87,8 @@ router.post("/twilio/message-status", async (req, res) => {
     const message = await ConversationMessage.findOne({ provider: "twilio", providerMessageId });
     const deliveryStatus = { accepted: "queued", scheduled: "queued", queued: "queued", sending: "queued", sent: "sent", delivered: "delivered", read: "read", undelivered: "failed", failed: "failed" }[status] || "queued";
     if (message) { message.deliveryStatus = deliveryStatus; if (deliveryStatus === "delivered") message.deliveredAt = new Date(); if (deliveryStatus === "read") message.readAt = new Date(); await message.save(); }
-    try { await MessageDeliveryEvent.create({ messageId: message?._id || null, provider: "twilio", providerMessageId, status, errorCode: String(req.body.ErrorCode || ""), errorMessage: String(req.body.ErrorMessage || ""), metadata: { channelPrefix: req.body.ChannelPrefix || "" } }); } catch (error) { if (error?.code !== 11000) throw error; }
+    let recorded = false; try { await MessageDeliveryEvent.create({ messageId: message?._id || null, provider: "twilio", providerMessageId, status, errorCode: String(req.body.ErrorCode || ""), errorMessage: String(req.body.ErrorMessage || ""), metadata: { channelPrefix: req.body.ChannelPrefix || "" } }); recorded = true; } catch (error) { if (error?.code !== 11000) throw error; }
+    if (recorded && message?.contactId && status === "delivered") await CrmActivity.create({ contactId: message.contactId, type: "system", title: "SMS delivered", source: "integration", metadata: { eventType: "sms.delivered", conversationMessageId: message._id, providerMessageId } });
   });
   res.json({ received: true });
 });
@@ -179,7 +193,14 @@ router.post("/resend", async (req, res) => {
     if (lifecycle && messageId) {
       const outreach = await Outreach.findOne({ messageId });
       const recorded = await recordProviderEvent(req, event, outreach);
-      if (!outreach) return res.json({ received: true, matched: false });
+      const canonicalMessage = await ConversationMessage.findOne({ provider: "resend", providerMessageId: messageId });
+      if (canonicalMessage?.workspaceId) await runWithWorkspace(canonicalMessage.workspaceId, async () => {
+        const canonicalStatus = event.type === "email.delivered" ? "delivered" : event.type === "email.opened" || event.type === "email.clicked" ? "read" : ["email.bounced", "email.complained", "email.failed", "email.suppressed"].includes(event.type) ? "failed" : canonicalMessage.deliveryStatus;
+        await ConversationMessage.updateOne({ _id: canonicalMessage._id }, { $set: { deliveryStatus: canonicalStatus, ...(canonicalStatus === "delivered" ? { deliveredAt: eventTime(event) } : {}), ...(canonicalStatus === "read" ? { readAt: eventTime(event) } : {}) } });
+        let canonicalRecorded = false; try { await MessageDeliveryEvent.create({ workspaceId: canonicalMessage.workspaceId, messageId: canonicalMessage._id, provider: "resend", providerMessageId: messageId, status: event.type, occurredAt: eventTime(event), metadata: { resendEventId: String(event.id || "") } }); canonicalRecorded = true; } catch (error) { if (error.code !== 11000) throw error; }
+        if (canonicalRecorded && ["email.delivered", "email.opened", "email.clicked", "email.bounced"].includes(event.type)) await CrmActivity.create({ contactId: canonicalMessage.contactId || null, type: "system", title: event.type.replace("email.", "Email "), source: "integration", occurredAt: eventTime(event), metadata: { eventType: event.type, conversationMessageId: canonicalMessage._id, providerMessageId: messageId } });
+      });
+      if (!outreach) return res.json({ received: true, matched: Boolean(canonicalMessage) });
 
       const occurredAt = eventTime(event);
       let firstOccurrence = false;

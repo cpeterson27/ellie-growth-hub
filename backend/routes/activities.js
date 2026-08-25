@@ -5,6 +5,7 @@ const Contact = require("../models/Contact");
 const Organization = require("../models/Organization");
 const Outreach = require("../models/Outreach");
 const SalesOpportunity = require("../models/SalesOpportunity");
+const { authenticatedUserId } = require("../authorization/accessPolicy");
 
 const router = express.Router();
 const activityTypes = new Set(["note", "call", "meeting", "task", "status_change", "email", "campaign", "research", "system"]);
@@ -53,7 +54,7 @@ router.patch("/tasks/:origin/:id/complete", async (req, res) => {
     opportunity.nextAction = "";
     opportunity.nextActionAt = null;
     await opportunity.save();
-    await CrmActivity.create({ contactId: opportunity.primaryContactId, organizationId: opportunity.organizationId, campaignId: opportunity.campaignId, type: "task", title: completedAction, body: `Completed for opportunity: ${opportunity.name}`, occurredAt: new Date(), completedAt: new Date(), source: "crm", createdBy: req.auth?.userId || null, metadata: { opportunityId: opportunity._id } });
+    await CrmActivity.create({ contactId: opportunity.primaryContactId, organizationId: opportunity.organizationId, campaignId: opportunity.campaignId, type: "task", title: completedAction, body: `Completed for opportunity: ${opportunity.name}`, occurredAt: new Date(), completedAt: new Date(), source: "crm", createdBy: authenticatedUserId(req), metadata: { opportunityId: opportunity._id } });
     return res.json({ success: true, data: opportunity });
   } catch {
     return res.status(500).json({ success: false, error: "Failed to complete task" });
@@ -136,7 +137,7 @@ router.post("/", async (req, res) => {
       occurredAt: req.body?.occurredAt || new Date(),
       dueAt: type === "task" ? (req.body?.dueAt || req.body?.occurredAt || new Date()) : null,
       source: "manual",
-      createdBy: req.auth?.userId || null,
+      createdBy: authenticatedUserId(req),
     });
     return res.status(201).json({ success: true, data: activity });
   } catch (error) {

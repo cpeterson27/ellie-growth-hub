@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchCampaigns } from "../services/api.js";
 import InitiativeContext from "./InitiativeContextValue.js";
 
-export function InitiativeProvider({ children }) {
+export function InitiativeProvider({ children, enabled = true }) {
   const [campaigns, setCampaigns] = useState([]);
   const [selectedId, setSelectedIdState] = useState(() => localStorage.getItem("ellie-initiative") || "all");
 
   useEffect(() => {
+    if (!enabled) return undefined;
     fetchCampaigns().then((items) => setCampaigns(Array.isArray(items) ? items.filter(Boolean) : [])).catch(() => setCampaigns([]));
-  }, []);
+    return undefined;
+  }, [enabled]);
 
   const setSelectedId = (value) => {
     setSelectedIdState(value);

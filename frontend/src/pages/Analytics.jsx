@@ -1,56 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { TicketSalesChart, RevenueBarChart } from "../components/Charts.jsx";
-import { fetchEvents, fetchOutreachAnalytics } from "../services/api.js";
+import { fetchGrowthAnalytics } from "../services/api.js";
 import "./Analytics.css";
 
-const revenueFor = (event) => Number(event.eventbriteLogistics?.grossRevenue || 0) || Number(event.ticketsSold || 0) * Number(event.ticketPrice || 0);
-const rate = (value, total) => total ? `${Math.round((value / total) * 100)}%` : "—";
+const label = (value) => String(value || "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const currency = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD" });
+function MetricTable({ title, rows, columns }) { return <DashboardCard title={title}><div className="analytics-table-wrap"><table className="analytics-table"><thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>{rows.length ? rows.map((row, index) => <tr key={row.key || row.source || row.campaign || row.coach || index}>{columns.map((column) => <td key={column.key}>{column.format ? column.format(row[column.key]) : row[column.key]}</td>)}</tr>) : <tr><td colSpan={columns.length}>No supported data yet.</td></tr>}</tbody></table></div></DashboardCard>; }
 
 export default function Analytics() {
-  const [events, setEvents] = useState([]);
-  const [outreach, setOutreach] = useState(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    Promise.all([fetchEvents(), fetchOutreachAnalytics()])
-      .then(([eventItems, outreachData]) => {
-        setEvents(Array.isArray(eventItems) ? eventItems : []);
-        setOutreach(outreachData);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-  const totals = useMemo(() => events.reduce((sum, event) => ({
-    tickets: sum.tickets + Number(event.ticketsSold || 0),
-    revenue: sum.revenue + revenueFor(event),
-  }), { tickets: 0, revenue: 0 }), [events]);
-  const email = outreach?.totals || {};
-  const ticketData = events.map((event) => ({
-    date: event.startDate ? new Date(event.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "TBD",
-    tickets: Number(event.ticketsSold || 0),
-  }));
-  const revenueData = events.map((event) => ({
-    campaign: event.name.length > 18 ? `${event.name.slice(0, 18)}…` : event.name,
-    revenue: revenueFor(event),
-  }));
-
-  return <div className="page-dashboard analytics-page">
-    <div className="page-header"><div><p className="page-eyebrow">Growth intelligence</p><h1 className="page-title">Analytics</h1><p className="page-subtitle">One view of campaign delivery, engagement, replies, registrations, and revenue.</p></div><span className={outreach?.webhook?.healthy ? "analytics-health is-healthy" : "analytics-health"}>{outreach?.webhook?.healthy ? `Tracking live · ${outreach.webhook.lastEventType}` : "Waiting for first tracked email event"}</span></div>
-    {loading ? <p>Loading analytics…</p> : <>
-      <section className="analytics-metrics">
-        <DashboardCard title="Accepted by Resend"><strong>{email.sent || 0}</strong><span>campaign emails</span></DashboardCard>
-        <DashboardCard title="Delivered"><strong>{email.delivered || 0}</strong><span>{rate(email.delivered, email.sent)} of accepted</span></DashboardCard>
-        <DashboardCard title="Opened"><strong>{email.opened || 0}</strong><span>{rate(email.opened, email.delivered)} of delivered</span></DashboardCard>
-        <DashboardCard title="Replied"><strong>{email.replied || 0}</strong><span>{rate(email.replied, email.delivered || email.sent)} response rate</span></DashboardCard>
-        <DashboardCard title="Bounced"><strong>{email.bounced || 0}</strong><span>{rate(email.bounced, email.sent)} bounce rate</span></DashboardCard>
-      </section>
-      <DashboardCard title="Campaign performance">
-        <div className="analytics-table-wrap"><table className="analytics-table"><thead><tr><th>Campaign</th><th>Sent</th><th>Delivered</th><th>Opened</th><th>Clicked</th><th>Replied</th><th>Bounced</th></tr></thead><tbody>{(outreach?.byCampaign || []).map((campaign) => <tr key={campaign.id}><td><strong>{campaign.name}</strong><small>{campaign.status}</small></td><td>{campaign.sent}</td><td>{campaign.delivered}</td><td>{campaign.opened}</td><td>{campaign.clicked}</td><td>{campaign.replied}</td><td>{campaign.bounced}</td></tr>)}</tbody></table></div>
-      </DashboardCard>
-      <section className="analytics-portfolio">
-        <DashboardCard title="Event portfolio"><h2>{totals.tickets} tickets</h2><p>${totals.revenue.toLocaleString()} gross revenue across {events.length} tracked event{events.length === 1 ? "" : "s"}.</p></DashboardCard>
-        <DashboardCard title="Data coverage"><h2>{events.filter((event) => event.integrations?.eventbrite?.eventId).length} synchronized</h2><p>Eventbrite-connected events can report orders, attendees, and check-ins.</p></DashboardCard>
-      </section>
-      <section className="analytics-charts"><TicketSalesChart data={ticketData} /><RevenueBarChart data={revenueData} /></section>
-    </>}
+  const [data, setData] = useState(null); const [error, setError] = useState("");
+  useEffect(() => { let active = true; fetchGrowthAnalytics().then((value) => { if (active) setData(value); }).catch(() => { if (active) setError("Growth analytics could not be loaded."); }); return () => { active = false; }; }, []);
+  if (!data) return <div className="page-dashboard analytics-page"><h1 className="page-title">Analytics</h1><p>{error || "Loading canonical Growth Operator analytics…"}</p></div>;
+  const won = data.funnel.stages.find((item) => item.key === "closed_won")?.value || 0;
+  return <div className="page-dashboard analytics-page"><div className="page-header"><div><p className="page-eyebrow">Growth intelligence</p><h1 className="page-title">Analytics</h1><p className="page-subtitle">Sales, marketing, coaching, revenue, communications, referrals, and social attribution from canonical records.</p></div><span className="analytics-health is-healthy">Canonical data · {new Date(data.generatedAt).toLocaleString()}</span></div>
+    <h2>Executive overview</h2><section className="analytics-metrics"><DashboardCard title="Tracked revenue"><strong>{currency(data.revenue.total)}</strong><span>closed won + add-ons</span></DashboardCard><DashboardCard title="Active students"><strong>{data.coaching.activeStudents}</strong><span>active enrollments</span></DashboardCard><DashboardCard title="Closed won"><strong>{won}</strong><span>{currency(data.revenue.closedWon)}</span></DashboardCard><DashboardCard title="Pending commission"><strong>{currency(data.referrals.pendingCommission)}</strong><span>immutable ledger</span></DashboardCard><DashboardCard title="Communication blocks"><strong>{data.communication.blocked}</strong><span>policy-visible jobs</span></DashboardCard></section>
+    <section className="analytics-section-grid"><MetricTable title="Sales funnel" rows={data.funnel.stages} columns={[{key:"key",label:"Stage",format:label},{key:"value",label:"Count"}]} /><MetricTable title="Conversion rates" rows={data.funnel.conversions.map((row)=>({...row,key:`${row.from}-${row.to}`}))} columns={[{key:"from",label:"From",format:label},{key:"to",label:"To",format:label},{key:"rate",label:"Rate",format:(value)=>`${value}%`}]} /></section>
+    <MetricTable title="Source attribution" rows={data.attribution.bySource} columns={[{key:"source",label:"Source",format:label},{key:"leads",label:"Leads"},{key:"applications",label:"Applications"},{key:"sales",label:"Sales"},{key:"revenue",label:"Revenue",format:currency},{key:"conversionRate",label:"Conversion",format:(value)=>`${value}%`}]} />
+    <section className="analytics-section-grid"><MetricTable title="Campaign/content revenue" rows={data.attribution.byCampaign} columns={[{key:"campaign",label:"Campaign / content"},{key:"sales",label:"Sales"},{key:"revenue",label:"Revenue",format:currency}]} /><MetricTable title="Coach referral revenue" rows={data.attribution.byCoachReferral} columns={[{key:"coach",label:"Coach"},{key:"revenue",label:"Revenue",format:currency}]} /></section>
+    <h2>Revenue</h2><section className="analytics-metrics"><DashboardCard title="Program revenue"><strong>{currency(data.revenue.programRevenue)}</strong></DashboardCard><DashboardCard title="Add-on revenue"><strong>{currency(data.revenue.addonRevenue)}</strong></DashboardCard><DashboardCard title="Referral-generated"><strong>{currency(data.revenue.referralGenerated)}</strong></DashboardCard><DashboardCard title="Commission expense"><strong>{currency(data.revenue.commissionExpense)}</strong></DashboardCard><DashboardCard title="Customer lifetime value"><strong>{currency(data.revenue.customerLifetimeValue)}</strong></DashboardCard></section>
+    <section className="analytics-section-grid"><MetricTable title="Students per coach" rows={data.coaching.studentsPerCoach} columns={[{key:"key",label:"Coach"},{key:"value",label:"Students"}]} /><MetricTable title="Program enrollments" rows={data.coaching.programEnrollments} columns={[{key:"key",label:"Program"},{key:"value",label:"Enrollments"}]} /></section>
+    <section className="analytics-metrics"><DashboardCard title="Upcoming assignments"><strong>{data.coaching.upcomingAssignments}</strong></DashboardCard><DashboardCard title="Completed assignments"><strong>{data.coaching.completedAssignments}</strong></DashboardCard><DashboardCard title="Handoffs"><strong>{data.coaching.handoffs}</strong></DashboardCard><DashboardCard title="Attended sessions"><strong>{data.coaching.attendance.attended}</strong></DashboardCard><DashboardCard title="No-shows"><strong>{data.coaching.attendance.noShows}</strong></DashboardCard></section>
+    <h2>Communications</h2><section className="analytics-metrics"><DashboardCard title="Emails sent"><strong>{data.communication.email.sent}</strong></DashboardCard><DashboardCard title="Email delivered"><strong>{data.communication.email.delivered}</strong></DashboardCard><DashboardCard title="Email opened"><strong>{data.communication.email.opened}</strong></DashboardCard><DashboardCard title="Email clicked"><strong>{data.communication.email.clicked}</strong></DashboardCard><DashboardCard title="Email bounced"><strong>{data.communication.email.bounced}</strong></DashboardCard><DashboardCard title="SMS sent"><strong>{data.communication.sms.sent}</strong></DashboardCard><DashboardCard title="SMS delivered"><strong>{data.communication.sms.delivered}</strong></DashboardCard><DashboardCard title="SMS replies"><strong>{data.communication.sms.replies}</strong></DashboardCard><DashboardCard title="Reminders sent"><strong>{data.communication.reminders.sent}</strong></DashboardCard></section>
+    <p className="analytics-disclaimer">Attribution includes only identifiable canonical Contacts and supported events. Anonymous views, likes, saves, and unsupported Skool course progress are excluded.</p>
   </div>;
 }

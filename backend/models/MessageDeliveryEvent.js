@@ -4,7 +4,7 @@ const workspacePlugin = require("../tenancy/workspacePlugin");
 const schema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
   messageId: { type: mongoose.Schema.Types.ObjectId, ref: "ConversationMessage", default: null, index: true },
-  provider: { type: String, enum: ["twilio"], default: "twilio" },
+  provider: { type: String, enum: ["twilio", "resend"], default: "twilio" },
   providerMessageId: { type: String, required: true, index: true },
   status: { type: String, required: true, index: true },
   occurredAt: { type: Date, default: Date.now },

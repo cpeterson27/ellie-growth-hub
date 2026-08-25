@@ -25,10 +25,34 @@ const IntegrationConnectionSchema = new mongoose.Schema(
         "x",
         "monday",
         "gmail",
+        "google_calendar",
+        "zoom",
+        "skool",
         "twilio",
         "hubspot",
         "salesforce"
       ],
+      index: true,
+    },
+
+    accountScope: {
+      type: String,
+      enum: ["workspace", "user"],
+      default: "workspace",
+      index: true,
+    },
+
+    ownerUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
+
+    coachProfileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CoachProfile",
+      default: null,
       index: true,
     },
 
@@ -180,7 +204,15 @@ const IntegrationConnectionSchema = new mongoose.Schema(
 
 // Index for common queries
 IntegrationConnectionSchema.index({ status: 1, provider: 1 });
-IntegrationConnectionSchema.index({ workspaceId: 1, provider: 1 }, { unique: true });
+IntegrationConnectionSchema.index(
+  { workspaceId: 1, provider: 1, accountScope: 1, ownerUserId: 1 },
+  { unique: true },
+);
+IntegrationConnectionSchema.pre("validate", function validateAccountScope(next) {
+  if (this.accountScope === "user" && (!this.ownerUserId || !this.coachProfileId)) return next(new Error("User-scoped connections require an owner and coach profile"));
+  if (this.accountScope === "workspace") { this.ownerUserId = null; this.coachProfileId = null; }
+  return next();
+});
 IntegrationConnectionSchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model(

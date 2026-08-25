@@ -19,8 +19,10 @@ const { ingestContacts } = require("../services/contactIngestionService");
 const { isJarvisWebResearchEnabled, normalizePublicPeople, researchAndStagePublicPeople } = require("../services/publicPeopleResearchService");
 const { applyContactFieldUpdate, availableContactFields, buildContactFieldUpdatePreview } = require("../services/contactFieldUpdateService");
 const { collectMonitorSignals } = require("../services/intentSourceService");
+const { requireCapability } = require("../middleware/auth");
 
 const router = express.Router();
+router.use(requireCapability("jarvis.manage"));
 const OPENAI_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"]);
 
 function requireJarvisOperator(req, res) {

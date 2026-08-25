@@ -4,9 +4,12 @@ const AuthSession = require("../models/AuthSession");
 const User = require("../models/User");
 require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
+const { ACTIVE_ROLES } = require("../authorization/accessPolicy");
+const { normalizeRoles } = require("../authorization/capabilities");
 const { hashPassword, verifyPassword } = require("../utils/passwords");
 const {
   clearSessionCookie,
+  createAuthContext,
   requireAuth,
   sessionCookie,
   sessionToken,
@@ -26,6 +29,9 @@ function publicSession(req) {
       billingStatus: req.auth.workspace.billingStatus,
     },
     role: req.auth.role,
+    roles: req.auth.roles,
+    effectivePermissions: req.auth.effectivePermissions,
+    membershipStatus: "active",
     csrfToken: req.auth.session.csrfToken,
   };
 }
@@ -44,6 +50,9 @@ router.post("/login", async (req, res) => {
     if (!membership?.workspaceId || membership.workspaceId.status !== "active") {
       return res.status(403).json({ error: "No active workspace is available for this account" });
     }
+    if (!normalizeRoles(membership).some((role) => ACTIVE_ROLES.includes(role))) {
+      return res.status(403).json({ error: "A valid workspace role is required", code: "ROLE_INVALID" });
+    }
 
     const token = crypto.randomBytes(32).toString("base64url");
     const csrfToken = crypto.randomBytes(32).toString("base64url");
@@ -60,7 +69,7 @@ router.post("/login", async (req, res) => {
     user.lastLoginAt = new Date();
     await user.save();
     res.setHeader("Set-Cookie", sessionCookie(token, expiresAt));
-    req.auth = { user, workspace: membership.workspaceId, role: membership.role, session };
+    req.auth = createAuthContext({ user, workspace: membership.workspaceId, membership, session });
     res.json({ ...publicSession(req), sessionToken: token });
   } catch (error) {
     console.error("LOGIN ERROR:", error);

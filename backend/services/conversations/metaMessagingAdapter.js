@@ -5,6 +5,7 @@ const SocialConnection = require("../../models/SocialConnection");
 const { decryptCredentials } = require("../../utils/credentialEncryption");
 const { ConversationChannelAdapter, registerConversationAdapter } = require("./channelAdapters");
 const { ingestProviderMessage } = require("./conversationIngestionService");
+const { ingestSocialEvent } = require("../socialLeadAutomationService");
 
 function validateMetaSignature(rawBody, signature) {
   const secret = String(process.env.META_APP_SECRET || "").trim();
@@ -27,7 +28,18 @@ async function ingestMetaMessage({ connection, assetId, event }) {
   if (!event?.message?.mid || event.message.is_echo) return null;
   const channel = assetChannel(connection, assetId);
   const senderId = String(event.sender?.id || ""); const recipientId = String(event.recipient?.id || assetId);
-  return ingestProviderMessage({ thread: { channel, provider: "meta", providerThreadId: `${channel}:${assetId}:${senderId}`, participants: [{ kind: "external", role: "from", address: senderId }, { kind: "user", role: "to", address: recipientId }], metadata: { assetId } }, message: { providerMessageId: event.message.mid, direction: "inbound", body: event.message.text || "", sender: { address: senderId }, recipients: [{ address: recipientId, role: "to" }], attachments: (event.message.attachments || []).map((item) => ({ contentType: item.type || "", url: item.payload?.url || "" })), deliveryStatus: "received", sentAt: event.timestamp ? new Date(Number(event.timestamp)) : new Date(), metadata: { assetId, quickReply: event.message.quick_reply?.payload || "" } } });
+  const storyReply = Boolean(event.message.reply_to?.story || event.message.attachments?.some((item) => item.type === "story_mention"));
+  return ingestSocialEvent({ provider: channel, providerEventId: event.message.mid, eventType: storyReply ? "story_reply" : "dm_received", triggerType: storyReply ? "story_reply" : "dm_keyword", assetId: String(assetId), providerUserId: senderId, providerThreadId: `${channel}:${assetId}:${senderId}`, messageId: event.message.mid, text: event.message.text || "", occurredAt: event.timestamp ? new Date(Number(event.timestamp)) : new Date(), sourceMetadata: { recipientId, quickReply: event.message.quick_reply?.payload || "" }, raw: event });
+}
+
+async function ingestMetaComment({ connection, assetId, change }) {
+  const value = change?.value || {};
+  const channel = assetChannel(connection, assetId);
+  const commentId = String(value.id || value.comment_id || value.commentId || "");
+  const from = value.from || value.sender || {};
+  const providerUserId = String(from.id || value.from_id || value.user_id || "");
+  if (!commentId || !providerUserId || !["instagram", "facebook"].includes(channel)) return null;
+  return ingestSocialEvent({ provider: channel, providerEventId: `comment:${commentId}`, eventType: "comment_received", triggerType: "comment_any", assetId: String(assetId), providerUserId, username: from.username || "", displayName: from.name || "", contentId: String(value.media?.id || value.media_id || value.post_id || value.post?.id || ""), text: value.text || value.message || "", occurredAt: value.created_time ? new Date(Number(value.created_time) * (String(value.created_time).length <= 10 ? 1000 : 1)) : new Date(), sourceMetadata: { commentId }, raw: change });
 }
 
 class MetaMessagingAdapter extends ConversationChannelAdapter {
@@ -50,7 +62,21 @@ class MetaMessagingAdapter extends ConversationChannelAdapter {
     const response = await axios.post(`https://graph.facebook.com/${version}/${assetId}/messages`, { recipient: { id: recipientId }, message: { text: String(body || "").trim() } }, { params: { access_token: token }, timeout: 15000 });
     return ingestProviderMessage({ thread: { channel, provider: "meta", providerThreadId: thread.providerThreadId, participants: thread.participants, contactIds: thread.contactIds, organizationId: thread.organizationId, metadata: { assetId } }, message: { providerMessageId: response.data?.message_id || `meta:${crypto.randomUUID()}`, direction: "outbound", body, sender: { address: String(assetId) }, recipients: [{ address: String(recipientId), role: "to" }], deliveryStatus: "sent", metadata: { assetId } } });
   }
+  async sendCommentPrivateReply({ assetId, commentId, body, occurredAt }) {
+    if (!commentId || !String(body || "").trim()) throw new Error("A comment and response are required");
+    if (occurredAt && Date.now() - new Date(occurredAt).getTime() > 7 * 24 * 60 * 60 * 1000) throw new Error("Instagram comment private replies must be sent within 7 days");
+    const connection = await connectionForAsset(assetId);
+    if (!connection) throw new Error("The Meta asset is not connected");
+    const credentials = decryptCredentials(connection.credentialsEncrypted);
+    const asset = connection.assets.find((item) => String(item.id) === String(assetId));
+    if (!["instagram_business", "facebook_page"].includes(asset?.type)) throw new Error("Private comment replies require a connected Meta professional asset");
+    const pageId = asset.type === "instagram_business" ? asset.parentId : asset.id;
+    const token = credentials.pageTokens?.[String(pageId)] || credentials.accessToken;
+    const version = String(process.env.META_GRAPH_API_VERSION || "").trim();
+    if (!token || !version) throw new Error("Meta messaging credentials are unavailable");
+    return axios.post(`https://graph.facebook.com/${version}/${assetId}/messages`, { recipient: { comment_id: commentId }, message: { text: String(body).trim() } }, { params: { access_token: token }, timeout: 15000 });
+  }
 }
 
 const metaMessagingAdapter = registerConversationAdapter(new MetaMessagingAdapter());
-module.exports = { MetaMessagingAdapter, assetChannel, connectionForAsset, ingestMetaMessage, metaMessagingAdapter, validateMetaSignature };
+module.exports = { MetaMessagingAdapter, assetChannel, connectionForAsset, ingestMetaComment, ingestMetaMessage, metaMessagingAdapter, validateMetaSignature };

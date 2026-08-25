@@ -29,7 +29,7 @@ function config(provider) {
     clientId: required("META_APP_ID"),
     clientSecret: required("META_APP_SECRET"),
     redirectUri: required("META_REDIRECT_URI"),
-    scopes: splitScopes(process.env.META_OAUTH_SCOPES || "pages_show_list pages_read_engagement"),
+    scopes: splitScopes(process.env.META_OAUTH_SCOPES || "pages_show_list pages_read_engagement pages_manage_metadata pages_manage_posts pages_messaging instagram_basic instagram_content_publish instagram_manage_messages instagram_manage_comments"),
     apiVersion: required("META_GRAPH_API_VERSION"),
   };
 }
@@ -137,7 +137,7 @@ async function exchangeMeta(code) {
 async function exchangeCode(provider, code, rawState) {
   const state = verifyState(rawState, provider);
   if (!state) throw new Error("Social connection request expired or is invalid");
-  const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", role: { $in: ["owner", "admin"] } });
+  const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", $or: [{ role: { $in: ["owner", "admin"] } }, { roles: { $in: ["owner", "admin"] } }] });
   if (!membership) throw new Error("The user who started this connection no longer has permission to complete it");
   const result = provider === "linkedin" ? await exchangeLinkedIn(code) : await exchangeMeta(code);
   const connection = await SocialConnection.findOneAndUpdate(

@@ -7,6 +7,18 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test:coaching-role-ui": "node test-coaching-role-ui.js",
+    "test:multi-role-access-ui": "node test-multi-role-access-ui.js",
+    "test:public-site-ui": "node test-public-site-ui.js",
+    "test:public-application-ui": "node test-public-application-ui.js",
+    "test:coaching-history-ui": "node test-coaching-history-ui.js",
+    "test:referrals-commissions-ui": "node test-referrals-commissions-ui.js",
+    "test:google-calendar-ui": "node test-google-calendar-ui.js",
+    "test:skool-ui": "node test-skool-ui.js",
+    "test:coaching-communications-ui": "node test-coaching-communications-ui.js",
+    "test:social-automation-ui": "node test-social-automation-ui.js",
+    "test:social-publishing-ui": "node test-social-publishing-ui.js",
+    "test:automation-analytics-ui": "node test-automation-analytics-ui.js",
     "preview": "vite preview"
   },
   "dependencies": {

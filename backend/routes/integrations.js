@@ -1,8 +1,10 @@
 const express = require("express");
 const integrationRegistry = require("../services/integrations");
 const integrationHub = require("../services/integrationHub");
+const { requireCapability } = require("../middleware/auth");
 
 const router = express.Router();
+router.use(requireCapability("integrations.manage"));
 
 /**
  * GET /api/integrations/hub

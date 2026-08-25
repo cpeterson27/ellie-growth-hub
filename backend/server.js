@@ -38,8 +38,17 @@ const conversationsRouter = require("./routes/conversations");
 const telephonyRouter = require("./routes/telephony");
 const chatRouter = require("./routes/chat");
 const socialMessagingRouter = require("./routes/socialMessaging");
+const socialAutomationRouter = require("./routes/socialAutomation");
+const automationsRouter = require("./routes/automations");
+const analyticsRouter = require("./routes/analytics");
+const coachingRouter = require("./routes/coaching");
+const publicSiteRouter = require("./routes/publicSite");
+const publicManagementRouter = require("./routes/publicManagement");
 const { requireAuth } = require("./middleware/auth");
+const { restrictNewRoleSurface } = require("./middleware/authorization");
 const { startResearchMonitorRunner } = require("./services/researchMonitorService");
+const { startCommunicationJobRunner } = require("./services/communicationJobRunner");
+const { startAutomationRunner } = require("./services/automationRunner");
 
 const app = express();
 
@@ -62,7 +71,7 @@ app.use((req, res, next) => req.path.startsWith("/api/chat/widget/") ? publicCha
 app.use(express.json({
   limit: "12mb",
   verify(req, _res, buffer) {
-    if (req.originalUrl === "/api/webhooks/resend" || req.originalUrl === "/api/webhooks/meta") {
+    if (req.originalUrl === "/api/webhooks/resend" || req.originalUrl === "/api/webhooks/meta" || req.originalUrl === "/api/coaching/zoom/webhook" || req.originalUrl === "/api/coaching/skool/adapter/events") {
       req.rawBody = buffer.toString("utf8");
     }
   },
@@ -129,20 +138,28 @@ connectDatabase(mongoUri)
     app.use("/api", (req, res, next) => {
       const publicRequest =
         req.path === "/health" ||
+        req.path.startsWith("/public/") ||
         req.path.startsWith("/unsubscribe/") ||
         req.path === "/webhooks/resend" ||
         req.path.startsWith("/webhooks/twilio/") ||
         req.path === "/webhooks/meta" ||
+        req.path.startsWith("/social-automation/t/") ||
         req.path.startsWith("/chat/widget/") ||
         req.path === "/jarvis/memory/sync" ||
         req.path === "/eventbrite/webhook" ||
         req.path === "/eventbrite/oauth/callback" ||
         req.path === "/gmail/oauth/callback";
+      const publicCoachingCalendarCallback = req.path === "/coaching/calendar/oauth/callback";
+      const publicCoachingZoomRoute = req.path === "/coaching/zoom/oauth/callback" || req.path === "/coaching/zoom/webhook";
+      const publicSkoolAdapterRoute = req.path === "/coaching/skool/adapter/events";
       const publicSocialCallback = /^\/social\/(?:linkedin|meta)\/oauth\/callback$/.test(req.path);
-      return publicRequest || publicSocialCallback ? next() : requireAuth(req, res, next);
+      return publicRequest || publicSocialCallback || publicCoachingCalendarCallback || publicCoachingZoomRoute || publicSkoolAdapterRoute ? next() : requireAuth(req, res, next);
     });
+    app.use("/api", restrictNewRoleSurface);
 
     app.use("/api/campaigns", campaignsRouter);
+    app.use("/api/public", publicSiteRouter);
+    app.use("/api/public-management", publicManagementRouter);
     app.use("/api/outreach", outreachRouter);
     app.use("/api/emails", emailsRouter);
     app.use("/api/events", eventsRouter);
@@ -150,10 +167,14 @@ connectDatabase(mongoUri)
     app.use("/api/contacts", contactsRouter);
     app.use("/api/activities", activitiesRouter);
     app.use("/api/opportunities", opportunitiesRouter);
+    app.use("/api/coaching", coachingRouter);
     app.use("/api/conversations", conversationsRouter);
     app.use("/api/telephony", telephonyRouter);
     app.use("/api/chat", chatRouter);
     app.use("/api/social-messaging", socialMessagingRouter);
+    app.use("/api/social-automation", socialAutomationRouter);
+    app.use("/api/automations", automationsRouter);
+    app.use("/api/analytics", analyticsRouter);
     app.use("/api/audience", audienceRouter);
     app.use("/api/organizations", organizationRelationshipsRouter);
     app.use("/api/integrations", integrationsRouter);
@@ -182,6 +203,8 @@ connectDatabase(mongoUri)
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       if (process.env.RESEARCH_WORKER_MODE !== "external") startResearchMonitorRunner();
+      startCommunicationJobRunner();
+      startAutomationRunner();
     });
 
     server.on("error", (error) => {

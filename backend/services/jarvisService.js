@@ -16,6 +16,7 @@ const marketingCampaignExecution = require("./marketingCampaignExecution");
 const llmService = require("./llmService");
 const jarvisMemoryService = require("./jarvisMemoryService");
 const jarvisProfileService = require("./jarvisProfileService");
+const growthAnalyticsService = require("./growthAnalyticsService");
 
 class JarvisService {
   /**
@@ -36,7 +37,9 @@ class JarvisService {
     let result = null;
 
     // Route to appropriate handler based on keywords
-    if (
+    if (/active students|commission|referred.*revenue|campaign.*sales|missed.*sessions|communications.*failing|social content|revenue|funnel/i.test(lowerMessage)) {
+      result = await this.handleGrowthAnalyticsQuery(message);
+    } else if (
       lowerMessage.includes("priority") ||
       lowerMessage.includes("priorities") ||
       lowerMessage.includes("focus") ||
@@ -100,6 +103,12 @@ class JarvisService {
     }
 
     return { ...result, activity, memorySources: memory.sources };
+  }
+
+  async handleGrowthAnalyticsQuery() {
+    const analytics = await growthAnalyticsService.getAnalytics();
+    const topReferral = analytics.attribution.byCoachReferral[0]; const topCampaign = analytics.attribution.byCampaign[0];
+    return { answer: `Growth Operator currently has ${analytics.coaching.activeStudents} active students, $${analytics.revenue.total.toLocaleString()} tracked revenue, and $${analytics.referrals.pendingCommission.toLocaleString()} pending commission.${topReferral ? ` ${topReferral.coach} leads coach-referral revenue at $${topReferral.revenue.toLocaleString()}.` : ""}${topCampaign ? ` The leading attributed campaign/content is ${topCampaign.campaign}.` : ""}`, data: analytics, actionsAvailable: [] };
   }
 
   /**

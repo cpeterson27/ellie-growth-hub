@@ -9,6 +9,8 @@ const salesOpportunitySchema = new mongoose.Schema({
   primaryContactId: { type: mongoose.Schema.Types.ObjectId, ref: "Contact", default: null, index: true },
   campaignId: { type: mongoose.Schema.Types.ObjectId, ref: "Campaign", default: null, index: true },
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
+  applicationId: { type: mongoose.Schema.Types.ObjectId, ref: "CoachingApplication", default: null, index: true },
+  coachingProgramId: { type: mongoose.Schema.Types.ObjectId, ref: "CoachingProgram", default: null, index: true },
   value: { type: Number, default: 0, min: 0 },
   currency: { type: String, default: "USD", uppercase: true, trim: true, maxlength: 3 },
   probability: { type: Number, default: 0, min: 0, max: 100 },

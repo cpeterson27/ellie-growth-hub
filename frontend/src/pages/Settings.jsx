@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiArrowUpRight, FiBriefcase, FiCheck, FiCopy, FiCpu, FiImage, FiLock, FiMail, FiShield, FiTrash2, FiUser, FiUsers } from "react-icons/fi";
 import Button from "../components/Button.jsx";
+import TeamAccess from "../components/TeamAccess.jsx";
+import PublicSiteAdmin from "../components/PublicSiteAdmin.jsx";
+import ApplicationRouting from "../components/ApplicationRouting.jsx";
+import LaunchReadiness from "../components/LaunchReadiness.jsx";
 import useAuth from "../context/useAuth.js";
-import { changePassword, createMcpAccessToken, createWorkspaceMember, fetchCampaigns, fetchGmailConnection, fetchMcpAccessTokens, fetchOAuthConnections, fetchWorkspaceConfig, fetchWorkspaceMembers, getGptActionsSchemaEndpoint, getMcpEndpoint, revokeMcpAccessToken, revokeOAuthConnection, updateWorkspaceConfig, uploadEventImage } from "../services/api.js";
+import { changePassword, createMcpAccessToken, fetchCampaigns, fetchGmailConnection, fetchMcpAccessTokens, fetchOAuthConnections, fetchWorkspaceConfig, getGptActionsSchemaEndpoint, getMcpEndpoint, revokeMcpAccessToken, revokeOAuthConnection, updateWorkspaceConfig, uploadEventImage } from "../services/api.js";
+import { hasPermission } from "../utils/roleAccess.js";
 import { getWorkspaceSettings, saveWorkspaceSettings } from "../utils/workspaceSettings.js";
 import "./Settings.css";
 
@@ -23,8 +28,6 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
-  const [members, setMembers] = useState([]);
-  const [newMember, setNewMember] = useState({ name: "", email: "", role: "member", temporaryPassword: "" });
   const [mcpTokens, setMcpTokens] = useState([]);
   const [newMcpToken, setNewMcpToken] = useState(null);
   const [mcpName, setMcpName] = useState("Growth Operator");
@@ -63,7 +66,6 @@ export default function Settings() {
     }).catch(() => {});
     fetchGmailConnection().then((connection) => setAccountEmail(connection.email || "")).catch(() => {});
     fetchCampaigns().then((items) => setCampaigns(items || [])).catch(() => {});
-    fetchWorkspaceMembers().then((data) => setMembers(data.members || [])).catch(() => {});
     fetchMcpAccessTokens().then((data) => setMcpTokens(data.data || [])).catch(() => {});
     fetchOAuthConnections().then((data) => setOauthConnections(data.connections || [])).catch(() => {});
   }, []);
@@ -100,17 +102,6 @@ export default function Settings() {
     finally { setSaving(false); }
   };
 
-  const addMember = async () => {
-    try {
-      setSaving(true);
-      const response = await createWorkspaceMember(newMember);
-      setMembers((items) => [...items.filter((item) => item.email !== response.member.email), response.member]);
-      setNewMember({ name: "", email: "", role: "member", temporaryPassword: "" });
-      setSaved(true);
-      setError("");
-    } catch (err) { setError(err.response?.data?.error || "Unable to add team member."); }
-    finally { setSaving(false); }
-  };
 
   const save = async () => {
     try {
@@ -179,6 +170,9 @@ export default function Settings() {
         <button className={activeSection === "security" ? "is-active" : ""} onClick={() => setActiveSection("security")}><FiShield /> Security</button>
         <button className={activeSection === "ai" ? "is-active" : ""} onClick={() => setActiveSection("ai")}><FiCpu /> AI connections</button>
         <button className={activeSection === "team" ? "is-active" : ""} onClick={() => setActiveSection("team")}><FiUsers /> Team access</button>
+        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "public" ? "is-active" : ""} onClick={() => setActiveSection("public")}><FiImage /> Public website</button> : null}
+        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "applications" ? "is-active" : ""} onClick={() => setActiveSection("applications")}><FiBriefcase /> Application routing</button> : null}
+        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "readiness" ? "is-active" : ""} onClick={() => setActiveSection("readiness")}><FiCheck /> Launch readiness</button> : null}
       </nav>
       {activeSection === "profile" ? <div className="account-settings-panel account-settings-panel--refined">
         <header><p className="page-eyebrow">Organization profile</p><h2>Identity and email brand</h2><p>Set the client-level identity once. Individual events and programs can use their own logo and campaign branding.</p></header>
@@ -232,7 +226,7 @@ export default function Settings() {
         <footer><Button type="submit" loading={saving} disabled={!passwords.currentPassword || passwords.newPassword.length < 12 || passwords.newPassword !== passwords.confirmPassword}>Update password</Button></footer>
       </form> : activeSection === "security" ? <div className="account-settings-panel account-settings-panel--refined">
         <header><p className="page-eyebrow">Security</p><h2>Account protection</h2><p>Review the security controls currently protecting this workspace.</p></header>
-        <section className="settings-section security-check-list"><p><FiShield /><span><strong>Secure server-side sessions</strong><small>Sessions expire automatically after 14 days.</small></span><em>Active</em></p><p><FiLock /><span><strong>Protected account changes</strong><small>Passwords are hashed and current-password verification is required.</small></span><em>Active</em></p><p><FiUsers /><span><strong>Role-based workspace access</strong><small>Your current role is {session?.role || "member"}.</small></span><em>Active</em></p></section>
+        <section className="settings-section security-check-list"><p><FiShield /><span><strong>Secure server-side sessions</strong><small>Sessions expire automatically after 14 days.</small></span><em>Active</em></p><p><FiLock /><span><strong>Protected account changes</strong><small>Passwords are hashed and current-password verification is required.</small></span><em>Active</em></p><p><FiUsers /><span><strong>Capability-based workspace access</strong><small>Your roles are {(session?.roles || [session?.role || "member"]).join(", ")}.</small></span><em>Active</em></p></section>
       </div> : activeSection === "ai" ? <div className="account-settings-panel account-settings-panel--refined">
         <header><p className="page-eyebrow">Growth Operator connections</p><h2>Connect Growth Operator to ChatGPT, Claude, Codex, or an MCP client</h2><p>Growth Operator receives controlled access to Growth Operator research and ranked lead lists. Email sending is not available through this connection.</p></header>
         <section className="settings-section">
@@ -251,17 +245,7 @@ export default function Settings() {
           {mcpTokens.length && !newMcpToken ? <p className="settings-token-warning"><strong>Lost an existing manual token?</strong> For security, it cannot be recovered. Revoke it below and create a replacement.</p> : null}
         </section>
         <section className="settings-section"><div className="settings-section__heading"><FiShield /><div><h3>Active connections</h3><p>Every tool call is workspace-scoped and recorded in Growth Operator's audit log.</p></div></div><div className="team-member-list">{oauthConnections.map((connection) => <div key={connection.id}><span><strong>{connection.name}</strong><small>OAuth connection · {connection.scopes.join(" · ")}</small></span><button className="settings-revoke" onClick={() => disconnectAiApp(connection.clientId)} aria-label={`Disconnect ${connection.name}`}><FiTrash2 /></button></div>)}{mcpTokens.map((token) => <div key={token._id || token.id}><span><strong>{token.name}</strong><small>{token.prefix}… · expires {new Date(token.expiresAt).toLocaleDateString()} · secret hidden after creation</small></span><button className="settings-revoke" onClick={() => revokeAi(token._id || token.id)} aria-label={`Revoke ${token.name}`}><FiTrash2 /></button></div>)}{!oauthConnections.length && !mcpTokens.length ? <p>No AI assistants connected yet.</p> : null}</div></section>
-      </div> : <form className="account-settings-panel account-settings-panel--refined" onSubmit={(event) => { event.preventDefault(); addMember(); }}>
-        <header><p className="page-eyebrow">Team access</p><h2>Workspace members</h2><p>Add a teammate with a temporary password, then send their login details securely.</p></header>
-        <section className="settings-section"><div className="team-member-list">{members.map((member) => <div key={member.id}><span><strong>{member.name}</strong><small>{member.email}</small></span><em>{member.role}</em></div>)}</div></section>
-        {["owner", "admin"].includes(session?.role) ? <section className="settings-section"><div className="settings-section__heading"><FiUsers /><div><h3>Add team member</h3><p>They can sign in immediately using the temporary password.</p></div></div><div className="account-profile-form account-profile-form--compact">
-          <label className="form-field"><span>Name</span><input value={newMember.name} onChange={(event) => setNewMember({ ...newMember, name: event.target.value })} /></label>
-          <label className="form-field"><span>Email</span><input type="email" value={newMember.email} onChange={(event) => setNewMember({ ...newMember, email: event.target.value })} /></label>
-          <label className="form-field"><span>Role</span><select value={newMember.role} onChange={(event) => setNewMember({ ...newMember, role: event.target.value })}><option value="admin">Admin</option><option value="member">Member</option><option value="viewer">Viewer</option></select></label>
-          <label className="form-field"><span>Temporary password</span><input type="password" value={newMember.temporaryPassword} onChange={(event) => setNewMember({ ...newMember, temporaryPassword: event.target.value })} /></label>
-        </div></section> : null}
-        {["owner", "admin"].includes(session?.role) ? <footer><Button type="submit" loading={saving} disabled={newMember.name.length < 2 || !newMember.email.includes("@") || newMember.temporaryPassword.length < 12}>Add team member</Button></footer> : null}
-      </form>}
+      </div> : activeSection === "public" ? <PublicSiteAdmin /> : activeSection === "applications" ? <ApplicationRouting /> : activeSection === "readiness" ? <LaunchReadiness /> : <TeamAccess canManage={hasPermission(session, "team.manage")} />}
     </section>
   </div>;
 }

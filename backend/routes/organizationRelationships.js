@@ -6,6 +6,7 @@ const OrganizationRelationship = require("../models/OrganizationRelationship");
 const Contact = require("../models/Contact");
 const CrmActivity = require("../models/CrmActivity");
 const { canonicalizeContactCompanies } = require("../services/companyCanonicalizationService");
+const { authenticatedUserId } = require("../authorization/accessPolicy");
 
 const router = express.Router();
 
@@ -331,7 +332,7 @@ router.patch("/:organizationId/relationship", async (req, res) => {
       title: "Company relationship updated",
       body: `${audience.name}: ${oldStatus} → ${status}${notes ? `\n${notes}` : ""}`,
       source: "crm",
-      createdBy: req.auth?.userId || null,
+      createdBy: authenticatedUserId(req),
     });
 
     return res.json({

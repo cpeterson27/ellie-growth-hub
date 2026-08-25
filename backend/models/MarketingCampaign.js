@@ -22,7 +22,7 @@ const marketingCampaignSchema = new mongoose.Schema(
     type: {
       type: String,
       required: [true, "Campaign type is required"],
-      enum: ["email", "social", "event"],
+      enum: ["email", "sms", "multi_channel", "social", "event"],
       index: true,
     },
 
@@ -38,7 +38,7 @@ const marketingCampaignSchema = new mongoose.Schema(
     audienceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Audience",
-      required: [true, "Campaign must be associated with an audience"],
+      required: false,
       index: true,
     },
 
@@ -63,6 +63,17 @@ const marketingCampaignSchema = new mongoose.Schema(
       // Common fields
       callToAction: String,
       callToActionUrl: String,
+      previewText: String,
+    },
+
+    communication: {
+      purpose: { type: String, enum: ["marketing", "transactional"], default: "marketing" },
+      topic: { type: String, enum: ["general", "event_invitations", "program_offers", "educational_newsletter"], default: "general" },
+      channels: { type: [String], enum: ["email", "sms"], default: ["email"] },
+      segment: { type: mongoose.Schema.Types.Mixed, default: {} },
+      approvalStatus: { type: String, enum: ["draft", "approved"], default: "draft" },
+      approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      approvedAt: { type: Date, default: null },
     },
 
     // Campaign metrics

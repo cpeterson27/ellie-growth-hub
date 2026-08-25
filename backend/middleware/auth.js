@@ -4,6 +4,8 @@ require("../models/User");
 require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const { runWithWorkspace } = require("../tenancy/workspaceContext");
+const { ACTIVE_ROLES } = require("../authorization/accessPolicy");
+const { effectivePermissions, hasCapability, normalizeRoles } = require("../authorization/capabilities");
 
 const COOKIE_NAME = "ellie_session";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -53,6 +55,21 @@ function clearSessionCookie() {
   ].filter(Boolean).join("; ");
 }
 
+function createAuthContext({ user, workspace, role, roles, membership, session }) {
+  const source = membership || { role, roles };
+  const normalizedRoles = normalizeRoles(source);
+  return {
+    user,
+    userId: user?._id || null,
+    workspace,
+    workspaceId: workspace?._id || null,
+    role: role || source.role || normalizedRoles[0],
+    roles: normalizedRoles,
+    effectivePermissions: effectivePermissions(source),
+    session,
+  };
+}
+
 async function requireAuth(req, res, next) {
   try {
     const token = sessionToken(req);
@@ -76,6 +93,9 @@ async function requireAuth(req, res, next) {
     if (!membership || !membership.workspaceId || membership.workspaceId.status !== "active") {
       return res.status(403).json({ error: "Workspace access is unavailable", code: "WORKSPACE_UNAVAILABLE" });
     }
+    if (!normalizeRoles(membership).some((role) => ACTIVE_ROLES.includes(role))) {
+      return res.status(403).json({ error: "A valid workspace role is required", code: "ROLE_INVALID" });
+    }
 
     if (!SAFE_METHODS.has(req.method)) {
       const supplied = String(req.headers["x-csrf-token"] || "");
@@ -86,13 +106,7 @@ async function requireAuth(req, res, next) {
       }
     }
 
-    req.auth = {
-      user: session.userId,
-      workspace: membership.workspaceId,
-      workspaceId: membership.workspaceId._id,
-      role: membership.role,
-      session,
-    };
+    req.auth = createAuthContext({ user: session.userId, workspace: membership.workspaceId, membership, session });
     session.lastSeenAt = new Date();
     session.save().catch(() => {});
     runWithWorkspace(req.auth.workspaceId, next);
@@ -102,16 +116,25 @@ async function requireAuth(req, res, next) {
 }
 
 function requireRole(...roles) {
-  return (req, res, next) => roles.includes(req.auth?.role)
+  const allowed = roles.filter((role) => ACTIVE_ROLES.includes(role));
+  return (req, res, next) => (req.auth?.roles || [req.auth?.role]).some((role) => allowed.includes(role))
     ? next()
-    : res.status(403).json({ error: "You do not have permission to perform this action" });
+    : res.status(403).json({ error: "You do not have permission to perform this action", code: "ROLE_FORBIDDEN" });
+}
+
+function requireCapability(...capabilities) {
+  return (req, res, next) => capabilities.some((capability) => hasCapability(req.auth, capability))
+    ? next()
+    : res.status(403).json({ error: "You do not have permission to perform this action", code: "CAPABILITY_FORBIDDEN" });
 }
 
 module.exports = {
   COOKIE_NAME,
   clearSessionCookie,
+  createAuthContext,
   parseCookies,
   requireAuth,
+  requireCapability,
   requireRole,
   sessionCookie,
   sessionToken,

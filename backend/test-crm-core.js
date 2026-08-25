@@ -30,7 +30,7 @@ includesAll(stageModel, ['collection: "pipeline_stages"', "key:", "label:", "ord
 const activityRoutes = source("routes/activities.js");
 includesAll(activityRoutes, [
   'router.get("/tasks"', 'router.patch("/tasks/:origin/:id/complete"', 'router.get("/"', 'router.post("/"',
-  'type: "task"', "completedAt", 'source: "manual"', "req.auth?.userId",
+  'type: "task"', "completedAt", 'source: "manual"', "authenticatedUserId(req)",
 ], "Activity API");
 
 const opportunityRoutes = source("routes/opportunities.js");

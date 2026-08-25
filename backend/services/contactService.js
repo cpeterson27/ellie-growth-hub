@@ -14,6 +14,7 @@
 
 const Contact = require("../models/Contact");
 const MarketingCampaign = require("../models/MarketingCampaign");
+const CrmActivity = require("../models/CrmActivity");
 const { applyResearchClassification } = require("./contactResearchService");
 
 const integrationContactFields = ["phone", "title", "industry", "city", "state", "country", "linkedin", "website", "stage", "notes"];
@@ -193,11 +194,22 @@ class ContactService {
 
       }
 
+      let participationChanged = false;
+      if (contactData.eventParticipation?.attendeeId) {
+        const participation = contactData.eventParticipation;
+        const existingIndex = (contact.eventParticipations || []).findIndex((item) => item.provider === participation.provider && item.attendeeId === participation.attendeeId);
+        participationChanged = existingIndex < 0 || contact.eventParticipations[existingIndex].status !== participation.status;
+        if (existingIndex >= 0) contact.eventParticipations[existingIndex] = participation;
+        else contact.eventParticipations.push(participation);
+      }
+
 
 
 
 
       await contact.save();
+
+      if (participationChanged) await CrmActivity.create({ contactId: contact._id, type: "system", title: contactData.eventParticipation.status === "attended" ? "Event attended" : "Event registered", source: "integration", metadata: { eventType: contactData.eventParticipation.status === "attended" ? "event.attended" : "event.registered", provider: "eventbrite", eventId: contactData.eventParticipation.eventId, attendeeId: contactData.eventParticipation.attendeeId } });
 
 
       return contact;
@@ -276,6 +288,8 @@ class ContactService {
         status:
           contactData.status || "active",
 
+        eventParticipations: contactData.eventParticipation ? [contactData.eventParticipation] : [],
+
         ...Object.fromEntries(integrationContactFields
           .filter((field) => contactData[field] !== undefined && contactData[field] !== "")
           .map((field) => [field, contactData[field]])),
@@ -283,6 +297,8 @@ class ContactService {
       });
 
 
+
+    if (contactData.eventParticipation?.attendeeId) await CrmActivity.create({ contactId: contact._id, type: "system", title: contactData.eventParticipation.status === "attended" ? "Event attended" : "Event registered", source: "integration", metadata: { eventType: contactData.eventParticipation.status === "attended" ? "event.attended" : "event.registered", provider: "eventbrite", eventId: contactData.eventParticipation.eventId, attendeeId: contactData.eventParticipation.attendeeId } });
 
     return contact;
 

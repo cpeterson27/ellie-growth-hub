@@ -19,6 +19,7 @@ const { assessEmail } = require("../services/emailRiskService");
 const { extractBusinessCard, extractDigitalBusinessCard } = require("../services/businessCardExtractionService");
 const { generateLinkedinDraft } = require("../services/linkedinOutreachService");
 const { getConnectionPriorities } = require("../services/campaignAudienceService");
+const { authenticatedUserId } = require("../authorization/accessPolicy");
 
 const router = express.Router();
 
@@ -83,6 +84,7 @@ router.post("/", async (req, res) => {
         .json({ success: false, message: "Email and source are required" });
     }
 
+    const existingContact = await Contact.findOne({ email: String(email).trim().toLowerCase() }).select("_id").lean();
     const contact = await contactService.upsertContact({
       name: name || `${firstName || ""} ${lastName || ""}`.trim(),
       firstName,
@@ -98,6 +100,7 @@ router.post("/", async (req, res) => {
       status: status || "active",
     });
 
+    if (!existingContact) await CrmActivity.create({ contactId: contact._id, type: "system", title: "Contact created", source: "crm", createdBy: authenticatedUserId(req), metadata: { eventType: "contact.created", source } });
     res
       .status(201)
       .json({
@@ -530,7 +533,7 @@ router.patch("/:id", async (req, res) => {
     const changes = ["status", "stage"]
       .filter((field) => req.body[field] !== undefined && String(before?.[field] || "") !== String(contact[field] || ""))
       .map((field) => `${field}: ${before?.[field] || "not set"} → ${contact[field] || "not set"}`);
-    if (changes.length) await CrmActivity.create({ contactId: contact._id, organizationId: contact.organizationId || null, type: "status_change", title: "Contact relationship updated", body: changes.join("\n"), source: "crm", createdBy: req.auth?.userId || null });
+    if (changes.length) await CrmActivity.create({ contactId: contact._id, organizationId: contact.organizationId || null, type: "status_change", title: "Contact relationship updated", body: changes.join("\n"), source: "crm", createdBy: authenticatedUserId(req) });
     res.json({ success: true, data: contact, message: "Contact updated" });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });

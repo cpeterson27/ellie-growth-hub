@@ -1,0 +1,89 @@
+const crypto = require("crypto");
+const IntegrationConnection = require("../models/IntegrationConnection");
+const CoachProfile = require("../models/CoachProfile");
+const CoachingSession = require("../models/CoachingSession");
+const WorkspaceMembership = require("../models/WorkspaceMembership");
+const ZoomWebhookEvent = require("../models/ZoomWebhookEvent");
+const CrmActivity = require("../models/CrmActivity");
+const { encryptCredentials, decryptCredentials } = require("../utils/credentialEncryption");
+const { runWithWorkspace } = require("../tenancy/workspaceContext");
+
+const PROVIDER = "zoom";
+const dependencies = { IntegrationConnection, CoachProfile, CoachingSession, WorkspaceMembership, ZoomWebhookEvent, CrmActivity };
+
+function zoomError(message, code) { const error = new Error(message); error.code = code; return error; }
+function required(name) { const value = String(process.env[name] || "").trim(); if (!value) throw zoomError(`${name} is not configured`, "ZOOM_CONFIG_MISSING"); return value; }
+function redirectUri() { return required("ZOOM_REDIRECT_URI"); }
+function stateSecret() { return required("INTEGRATION_CREDENTIAL_ENCRYPTION_KEY"); }
+function basicAuth() { return Buffer.from(`${required("ZOOM_CLIENT_ID")}:${required("ZOOM_CLIENT_SECRET")}`).toString("base64"); }
+
+function createState({ workspaceId, userId, coachProfileId }) {
+  if (!workspaceId || !userId || !coachProfileId) throw zoomError("A signed-in coach profile is required", "ZOOM_IDENTITY_REQUIRED");
+  const payload = Buffer.from(JSON.stringify({ workspaceId: String(workspaceId), userId: String(userId), coachProfileId: String(coachProfileId), createdAt: Date.now(), nonce: crypto.randomBytes(16).toString("hex") })).toString("base64url");
+  const signature = crypto.createHmac("sha256", stateSecret()).update(payload).digest("base64url"); return `${payload}.${signature}`;
+}
+
+function verifyState(value) {
+  try { const [payload, signature] = String(value || "").split("."); if (!payload || !signature) return null; const expected = crypto.createHmac("sha256", stateSecret()).update(payload).digest("base64url"); if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null; const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")); return Date.now() - Number(parsed.createdAt) < 10 * 60 * 1000 && parsed.workspaceId && parsed.userId && parsed.coachProfileId ? parsed : null; } catch { return null; }
+}
+
+function authorizationUrl(identity) {
+  return `https://zoom.us/oauth/authorize?${new URLSearchParams({ response_type: "code", client_id: required("ZOOM_CLIENT_ID"), redirect_uri: redirectUri(), state: createState(identity) })}`;
+}
+
+async function jsonRequest(url, options, fallback) { const response = await fetch(url, options); const data = response.status === 204 ? {} : await response.json(); if (!response.ok) throw zoomError(data.message || data.reason || fallback, "ZOOM_REQUEST_FAILED"); return data; }
+
+const zoomAdapter = {
+  async exchangeCode(code) { return jsonRequest(`https://zoom.us/oauth/token?${new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri() })}`, { method: "POST", headers: { Authorization: `Basic ${basicAuth()}` } }, "Zoom token exchange failed"); },
+  async refresh(refreshToken) { return jsonRequest(`https://zoom.us/oauth/token?${new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken })}`, { method: "POST", headers: { Authorization: `Basic ${basicAuth()}` } }, "Zoom token refresh failed"); },
+  async profile(accessToken) { return jsonRequest("https://api.zoom.us/v2/users/me", { headers: { Authorization: `Bearer ${accessToken}` } }, "Unable to read the connected Zoom account"); },
+  async request(accessToken, path, options = {}) { return jsonRequest(`https://api.zoom.us/v2${path}`, { ...options, headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", ...(options.headers || {}) } }, "Zoom request failed"); },
+};
+
+function connectionFilter({ workspaceId, userId, coachProfileId }) { return { workspaceId, provider: PROVIDER, accountScope: "user", ownerUserId: userId, coachProfileId }; }
+async function coachIdentity({ workspaceId, userId }, models = dependencies) { const coach = await models.CoachProfile.findOne({ workspaceId, userId, status: "active" }); if (!coach) throw zoomError("Active coach profile not found", "COACH_NOT_FOUND"); return { workspaceId, userId, coachProfileId: coach._id, coach }; }
+async function validateStateIdentity(state, models = dependencies) { const membership = await models.WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", $or: [{ role: "coach" }, { roles: "coach" }] }); const coach = await models.CoachProfile.findOne({ _id: state.coachProfileId, workspaceId: state.workspaceId, userId: state.userId, status: "active" }); if (!membership || !coach) throw zoomError("Coach access is no longer available", "ZOOM_IDENTITY_FORBIDDEN"); return { workspaceId: state.workspaceId, userId: state.userId, coachProfileId: state.coachProfileId, coach }; }
+
+function publicConnection(connection) { return { configured: Boolean(process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET && process.env.ZOOM_REDIRECT_URI && process.env.INTEGRATION_CREDENTIAL_ENCRYPTION_KEY), connected: connection?.status === "connected", connectionId: connection?._id || null, coachProfileId: connection?.coachProfileId || null, email: connection?.settings?.email || "", name: connection?.settings?.name || "", connectedAt: connection?.connectedAt || null }; }
+
+async function saveConnection(identity, tokens, profile, models = dependencies, cryptoOps = { encryptCredentials, decryptCredentials }) {
+  const filter = connectionFilter(identity); const existing = await models.IntegrationConnection.findOne(filter).select("+credentialsEncrypted"); const previous = existing?.credentialsEncrypted ? cryptoOps.decryptCredentials(existing.credentialsEncrypted) : {};
+  const credentialsEncrypted = cryptoOps.encryptCredentials({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token || previous.refreshToken });
+  const connection = await models.IntegrationConnection.findOneAndUpdate(filter, { $set: { ...filter, status: "connected", credentialsEncrypted, settings: { email: profile.email || "", name: [profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.display_name || profile.email || "" }, oauth: { scopes: String(tokens.scope || "").split(/[ ,]+/).filter(Boolean), expiresAt: new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000), providerAccountId: profile.account_id || "" }, connectedAt: new Date(), lastVerifiedAt: new Date(), lastError: null } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+  await models.CrmActivity.create({ workspaceId: identity.workspaceId, type: "system", title: "Zoom connected", body: `${identity.coach.displayName || "Coach"} connected a coach-owned Zoom account.`, source: "integration", createdBy: identity.userId, metadata: { eventType: "zoom.connected", coachProfileId: identity.coachProfileId, connectionId: connection._id } }); return connection;
+}
+async function ownStatus(identity, models = dependencies) { return publicConnection(await models.IntegrationConnection.findOne(connectionFilter(identity))); }
+async function disconnect(identity, models = dependencies) { const connection = await models.IntegrationConnection.findOneAndUpdate(connectionFilter(identity), { $set: { status: "disconnected", credentialsEncrypted: null, connectedAt: null, oauth: {} } }, { new: true }); if (connection) await models.CrmActivity.create({ workspaceId: identity.workspaceId, type: "system", title: "Zoom disconnected", body: `${identity.coach.displayName || "Coach"} disconnected their coach-owned Zoom account.`, source: "integration", createdBy: identity.userId, metadata: { eventType: "zoom.disconnected", coachProfileId: identity.coachProfileId, connectionId: connection._id } }); return publicConnection(connection); }
+
+async function accessToken(connection, adapter = zoomAdapter, cryptoOps = { encryptCredentials, decryptCredentials }) { const credentials = cryptoOps.decryptCredentials(connection.credentialsEncrypted); if (credentials.accessToken && new Date(connection.oauth?.expiresAt || 0).getTime() > Date.now() + 60000) return credentials.accessToken; if (!credentials.refreshToken) throw zoomError("Reconnect Zoom to grant offline access", "ZOOM_RECONNECT_REQUIRED"); const refreshed = await adapter.refresh(credentials.refreshToken); connection.credentialsEncrypted = cryptoOps.encryptCredentials({ ...credentials, accessToken: refreshed.access_token, refreshToken: refreshed.refresh_token || credentials.refreshToken }); connection.oauth.expiresAt = new Date(Date.now() + Number(refreshed.expires_in || 3600) * 1000); connection.lastVerifiedAt = new Date(); await connection.save(); return refreshed.access_token; }
+async function connectedConnection({ workspaceId, coachProfileId }, models = dependencies) { const connection = await models.IntegrationConnection.findOne({ workspaceId, provider: PROVIDER, accountScope: "user", coachProfileId, status: "connected" }).select("+credentialsEncrypted"); if (!connection?.credentialsEncrypted) throw zoomError("This coach must connect Zoom before a Zoom session can be scheduled", "ZOOM_NOT_CONNECTED"); return connection; }
+
+function meetingPayload(session, context = {}) { return { topic: `Coaching — ${context.contactName || "Student"}`, type: 2, start_time: new Date(session.startsAt).toISOString(), duration: Number(session.durationMinutes), timezone: session.timezone || "UTC", agenda: [context.programName ? `Program: ${context.programName}` : "Coaching session", context.stageKey ? `Stage: ${context.stageKey}` : ""].filter(Boolean).join("\n"), settings: { join_before_host: false, waiting_room: true, approval_type: 2 } }; }
+
+async function createMeeting({ workspaceId, session, context }, models = dependencies, adapter = zoomAdapter, cryptoOps) { const connection = await connectedConnection({ workspaceId, coachProfileId: session.coachProfileId }, models); const token = await accessToken(connection, adapter, cryptoOps); const meeting = await adapter.request(token, "/users/me/meetings", { method: "POST", body: JSON.stringify(meetingPayload(session, context)) }); session.videoMode = "zoom"; session.zoom = { connectionId: connection._id, meetingId: String(meeting.id || ""), joinUrl: meeting.join_url || "", hostUserId: meeting.host_id || connection.oauth?.providerAccountId || "", hostEmail: connection.settings?.email || "", status: "created", attendance: { state: "unknown", participantCount: 0, participants: [] } }; await session.save(); await models.CrmActivity.create({ workspaceId, contactId: session.contactId, type: "meeting", title: "Zoom meeting created", body: "Coach-owned Zoom meeting attached to coaching session.", source: "integration", createdBy: session.createdBy, metadata: { eventType: "coaching.zoom.meeting.created", coachingSessionId: session._id, coachProfileId: session.coachProfileId } }); return session; }
+
+async function updateMeeting({ workspaceId, session, context, updatedBy }, models = dependencies, adapter = zoomAdapter, cryptoOps) { if (session.videoMode !== "zoom" || !session.zoom?.meetingId) return session; const connection = await connectedConnection({ workspaceId, coachProfileId: session.coachProfileId }, models); if (String(connection._id) !== String(session.zoom.connectionId)) throw zoomError("The original coach Zoom connection is unavailable", "ZOOM_CONNECTION_MISMATCH"); const token = await accessToken(connection, adapter, cryptoOps); await adapter.request(token, `/meetings/${encodeURIComponent(session.zoom.meetingId)}`, { method: "PATCH", body: JSON.stringify(meetingPayload(session, context)) }); await models.CrmActivity.create({ workspaceId, contactId: session.contactId, type: "meeting", title: "Zoom meeting updated", body: "Zoom meeting schedule updated.", source: "integration", createdBy: updatedBy, metadata: { eventType: "coaching.zoom.meeting.updated", coachingSessionId: session._id, coachProfileId: session.coachProfileId } }); return session; }
+
+async function cancelMeeting({ workspaceId, session, updatedBy }, models = dependencies, adapter = zoomAdapter, cryptoOps) { if (session.videoMode !== "zoom" || !session.zoom?.meetingId || session.zoom.status === "cancelled") return session; const connection = await connectedConnection({ workspaceId, coachProfileId: session.coachProfileId }, models); if (String(connection._id) !== String(session.zoom.connectionId)) throw zoomError("The original coach Zoom connection is unavailable", "ZOOM_CONNECTION_MISMATCH"); const token = await accessToken(connection, adapter, cryptoOps); await adapter.request(token, `/meetings/${encodeURIComponent(session.zoom.meetingId)}`, { method: "DELETE" }); session.zoom.status = "cancelled"; await session.save(); await models.CrmActivity.create({ workspaceId, contactId: session.contactId, type: "meeting", title: "Zoom meeting cancelled", body: "Coach-owned Zoom meeting cancelled.", source: "integration", createdBy: updatedBy, metadata: { eventType: "coaching.zoom.meeting.cancelled", coachingSessionId: session._id, coachProfileId: session.coachProfileId } }); return session; }
+
+function verifyWebhook(rawBody, timestamp, signature, now = Date.now()) { const secret = String(process.env.ZOOM_WEBHOOK_SECRET_TOKEN || "").trim(); if (!secret || !timestamp || !signature || Math.abs(now - Number(timestamp) * 1000) > 5 * 60 * 1000) return false; const expected = `v0=${crypto.createHmac("sha256", secret).update(`v0:${timestamp}:${rawBody}`).digest("hex")}`; return signature.length === expected.length && crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected)); }
+function validationResponse(plainToken) { return { plainToken, encryptedToken: crypto.createHmac("sha256", required("ZOOM_WEBHOOK_SECRET_TOKEN")).update(String(plainToken || "")).digest("hex") }; }
+
+function eventIdentity(event) { return String(event.event_id || event.payload?.object?.uuid || `${event.event}:${event.payload?.object?.id}:${event.event_ts || ""}`); }
+async function processWebhook(event, models = dependencies) {
+  const object = event.payload?.object || {}; const accountId = String(event.payload?.account_id || object.account_id || ""); const meetingId = String(object.id || "");
+  if (!accountId || !meetingId) return { ignored: true };
+  const session = await models.CoachingSession.findOne({ "zoom.meetingId": meetingId }); if (!session?.workspaceId || !session.zoom?.connectionId) return { ignored: true };
+  const connection = await models.IntegrationConnection.findOne({ _id: session.zoom.connectionId, workspaceId: session.workspaceId, provider: PROVIDER, accountScope: "user", status: "connected", "oauth.providerAccountId": accountId }); if (!connection) return { ignored: true };
+  return runWithWorkspace(session.workspaceId, async () => {
+    const providerEventId = eventIdentity(event); try { await models.ZoomWebhookEvent.create({ workspaceId: session.workspaceId, providerEventId, eventType: event.event, coachingSessionId: session._id }); } catch (error) { if (error?.code === 11000) return { duplicate: true }; throw error; }
+    const occurredAt = new Date(Number(event.event_ts || Date.now())); const participant = object.participant || {};
+    if (event.event === "meeting.started") session.zoom.status = "started";
+    if (event.event === "meeting.ended") { session.zoom.status = "ended"; const attended = Number(session.zoom.attendance?.participantCount || 0) > 0; session.zoom.attendance.state = attended ? "attended" : "no_show"; await models.CrmActivity.create({ workspaceId: session.workspaceId, contactId: session.contactId, type: "meeting", title: attended ? "Coaching session attended" : "Coaching session no-show", body: attended ? "Zoom attendance confirmed." : "Zoom ended without a recorded participant join.", source: "integration", metadata: { eventType: attended ? "coaching.session.attended" : "coaching.session.no_show", coachingSessionId: session._id, coachProfileId: session.coachProfileId } }); }
+    if (event.event === "meeting.participant_joined") { const attendance = session.zoom.attendance; const participantId = String(participant.user_id || participant.id || participant.email || "unknown"); if (participantId !== String(session.zoom.hostUserId || "")) { if (!(attendance.participants || []).some((item) => item.participantId === participantId)) attendance.participants.push({ participantId, email: String(participant.email || "").toLowerCase(), name: String(participant.user_name || "").slice(0, 160), joinedAt: occurredAt, leftAt: null }); attendance.state = "attended"; attendance.participantCount = (attendance.participants || []).length; attendance.firstJoinedAt ||= occurredAt; } }
+    if (event.event === "meeting.participant_left") { const participantId = String(participant.user_id || participant.id || participant.email || "unknown"); if (participantId !== String(session.zoom.hostUserId || "")) { const found = (session.zoom.attendance.participants || []).find((item) => item.participantId === participantId); if (found) found.leftAt = occurredAt; session.zoom.attendance.lastLeftAt = occurredAt; } }
+    await session.save(); return { processed: true, sessionId: session._id };
+  });
+}
+
+module.exports = { PROVIDER, zoomAdapter, createState, verifyState, authorizationUrl, coachIdentity, validateStateIdentity, publicConnection, saveConnection, ownStatus, disconnect, connectedConnection, meetingPayload, createMeeting, updateMeeting, cancelMeeting, verifyWebhook, validationResponse, processWebhook, connectionFilter, _dependencies: dependencies };

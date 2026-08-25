@@ -9,6 +9,7 @@ const WorkspaceMembership = require("../models/WorkspaceMembership");
 const { runWithWorkspace } = require("../tenancy/workspaceContext");
 const ConversationThread = require("../models/ConversationThread");
 const { gmailConversationAdapter, syncGmailThread } = require("../services/conversations/gmailConversationAdapter");
+const { requireRole } = require("../middleware/auth");
 const router = express.Router();
 
 router.get("/status", async (_req, res) => {
@@ -16,7 +17,7 @@ router.get("/status", async (_req, res) => {
   catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.get("/oauth/start", (req, res) => {
+router.get("/oauth/start", requireRole("owner", "admin"), (req, res) => {
   try { res.json({ authorizationUrl: gmail.authorizationUrl(req.auth.workspaceId, req.auth.user._id) }); }
   catch (error) { res.status(400).json({ error: error.message }); }
 });
@@ -26,7 +27,7 @@ router.get("/oauth/callback", async (req, res) => {
   try {
     const state = gmail.verifyState(req.query.state);
     if (!state) throw new Error("Google connection request expired or is invalid");
-    const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", role: { $in: ["owner", "admin"] } });
+    const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", $or: [{ role: { $in: ["owner", "admin"] } }, { roles: { $in: ["owner", "admin"] } }] });
     if (!membership) throw new Error("Workspace permission is no longer available");
     if (!req.query.code) throw new Error(req.query.error || "Google did not return an authorization code");
     const tokens = await gmail.exchangeCode(req.query.code);
@@ -38,7 +39,7 @@ router.get("/oauth/callback", async (req, res) => {
   }
 });
 
-router.post("/disconnect", async (_req, res) => {
+router.post("/disconnect", requireRole("owner", "admin"), async (_req, res) => {
   await IntegrationConnection.findOneAndUpdate(
     { provider: "gmail" },
     { $set: { status: "disconnected", credentialsEncrypted: null, connectedAt: null, oauth: {} } },

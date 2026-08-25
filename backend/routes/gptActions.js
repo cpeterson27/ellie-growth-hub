@@ -27,8 +27,8 @@ const requireScope = (scope) => (req, res, next) => hasScope(req, scope) ? next(
 const confirmationExpiry = () => new Date(Date.now() + 15 * 60 * 1000);
 async function requireOperator(req, res, next) {
   const membership = await WorkspaceMembership.findOne({ workspaceId: req.mcpAuth.workspaceId, userId: req.mcpAuth.userId, status: "active" }).lean();
-  if (!membership || !["owner", "admin"].includes(membership.role)) return res.status(403).json({ error: "An Growth Operator owner or admin must perform this action." });
-  req.operatorRole = membership.role;
+  if (!membership || ![...(membership.roles || []), membership.role].some((role) => ["owner", "admin"].includes(role))) return res.status(403).json({ error: "A Growth Operator owner or admin must perform this action." });
+  req.operatorRole = membership.roles?.includes("owner") ? "owner" : membership.roles?.includes("admin") ? "admin" : membership.role;
   next();
 }
 async function approval(req, action, payload, summary, phrase) {

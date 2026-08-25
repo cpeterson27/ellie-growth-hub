@@ -247,6 +247,18 @@ const contactSchema = new mongoose.Schema(
         educationalNewsletter: { type: Boolean, default: false },
       },
     },
+    eventParticipations: [{
+      provider: { type: String, enum: ["eventbrite"], default: "eventbrite" },
+      eventId: { type: String, default: "", trim: true },
+      attendeeId: { type: String, default: "", trim: true },
+      status: { type: String, enum: ["registered", "attended", "cancelled"], default: "registered" },
+      checkedInAt: { type: Date, default: null },
+      updatedAt: { type: Date, default: Date.now },
+    }],
+    socialAttribution: {
+      first: { provider: { type: String, default: "" }, campaignId: { type: mongoose.Schema.Types.ObjectId, ref: "Campaign", default: null }, contentId: { type: String, default: "" }, contentBriefId: { type: mongoose.Schema.Types.ObjectId, ref: "ContentBrief", default: null }, automationId: { type: mongoose.Schema.Types.ObjectId, ref: "SocialAutomation", default: null }, occurredAt: { type: Date, default: null }, utm: { type: mongoose.Schema.Types.Mixed, default: {} } },
+      latest: { provider: { type: String, default: "" }, campaignId: { type: mongoose.Schema.Types.ObjectId, ref: "Campaign", default: null }, contentId: { type: String, default: "" }, contentBriefId: { type: mongoose.Schema.Types.ObjectId, ref: "ContentBrief", default: null }, automationId: { type: mongoose.Schema.Types.ObjectId, ref: "SocialAutomation", default: null }, occurredAt: { type: Date, default: null }, utm: { type: mongoose.Schema.Types.Mixed, default: {} } },
+    },
 
 
   },

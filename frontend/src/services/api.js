@@ -34,6 +34,22 @@ export const disconnectSocialConnection = (provider) =>
 export const selectSocialAssets = (provider, assetIds) =>
   api.patch(`/social/${provider}/assets`, { assetIds }).then((res) => res.data);
 
+export const fetchSocialAutomationOverview = () => api.get("/social-automation/overview").then((res) => res.data.data);
+export const fetchSocialAutomations = () => api.get("/social-automation/automations").then((res) => res.data.data);
+export const createSocialAutomation = (values) => api.post("/social-automation/automations", values).then((res) => res.data.data);
+export const updateSocialAutomation = (id, values) => api.patch(`/social-automation/automations/${id}`, values).then((res) => res.data.data);
+export const fetchSocialLeads = (params = {}) => api.get("/social-automation/leads", { params }).then((res) => res.data.data);
+export const createSocialTrackedLink = (values) => api.post("/social-automation/tracked-links", values).then((res) => res.data.data);
+export const fetchAutomationCatalog = () => api.get("/automations/catalog").then((res) => res.data.data);
+export const fetchAutomations = () => api.get("/automations").then((res) => res.data.data);
+export const createAutomation = (values) => api.post("/automations", values).then((res) => res.data.data);
+export const createAutomationFromTemplate = (key) => api.post(`/automations/from-template/${key}`).then((res) => res.data.data);
+export const updateAutomation = (id, values) => api.patch(`/automations/${id}`, values).then((res) => res.data.data);
+export const updateAutomationStatus = (id, status) => api.patch(`/automations/${id}/status`, { status }).then((res) => res.data.data);
+export const fetchAutomationExecutions = (params = {}) => api.get("/automations/executions/recent", { params }).then((res) => res.data.data);
+export const retryAutomationExecution = (id) => api.post(`/automations/executions/${id}/retry`).then((res) => res.data.data);
+export const fetchGrowthAnalytics = () => api.get("/analytics/growth").then((res) => res.data.data);
+
 api.interceptors.request.use((config) => {
   const csrfToken = sessionStorage.getItem("ellie-csrf-token");
   const sessionToken = sessionStorage.getItem("ellie-session-token");
@@ -56,6 +72,128 @@ export const fetchWorkspaceMembers = () =>
 
 export const createWorkspaceMember = (values) =>
   api.post("/workspace/members", values).then((res) => res.data);
+export const updateWorkspaceMember = (id, values) =>
+  api.patch(`/workspace/members/${id}`, values).then((res) => res.data);
+export const fetchWorkspaceCapabilities = () =>
+  api.get("/workspace/capabilities").then((res) => res.data);
+export const fetchLaunchReadiness = () => api.get("/workspace/readiness").then((res) => res.data.data);
+export const fetchPublicSite = () => api.get("/public/site").then((res) => res.data.data);
+export const fetchPublicProgram = (slug) => api.get(`/public/programs/${slug}`).then((res) => res.data.data);
+export const fetchPublicTestimonials = () => api.get("/public/testimonials").then((res) => res.data.data);
+export const submitPublicTestimonial = (values) => api.post("/public/testimonials", values).then((res) => res.data);
+export const fetchPublicProfile = (slug) => api.get(`/public/profiles/${slug}`).then((res) => res.data.data);
+export const fetchPublicApplication = () => api.get("/public/application").then((res) => res.data.data);
+export const submitPublicApplication = (values) => api.post("/public/application", values).then((res) => res.data);
+export const fetchStudentProfileEditor = (token) => api.get(`/public/profile-edit/${token}`).then((res) => res.data);
+export const updateStudentProfile = (token, values) => api.patch(`/public/profile-edit/${token}`, values).then((res) => res.data);
+export const fetchPublicManagementConfig = () => api.get("/public-management/config").then((res) => res.data.data);
+export const updatePublicManagementConfig = (values) => api.patch("/public-management/config", values).then((res) => res.data.data);
+export const fetchApplicationConfig = () => api.get("/public-management/application-config").then((res) => res.data.data);
+export const updateApplicationConfig = (values) => api.patch("/public-management/application-config", values).then((res) => res.data.data);
+export const fetchManagedApplications = (params = {}) => api.get("/public-management/applications", { params }).then((res) => res.data.data);
+export const fetchManagedTestimonials = () => api.get("/public-management/testimonials").then((res) => res.data.data);
+export const createManagedTestimonial = (values) => api.post("/public-management/testimonials", values).then((res) => res.data.data);
+export const updateManagedTestimonial = (id, values) => api.patch(`/public-management/testimonials/${id}`, values).then((res) => res.data.data);
+export const updateProgramPublicPresentation = (id, values) => api.patch(`/public-management/programs/${id}`, values).then((res) => res.data.data);
+export const fetchManagedProfiles = () => api.get("/public-management/profiles").then((res) => res.data.data);
+export const createManagedProfile = (values) => api.post("/public-management/profiles", values).then((res) => res.data.data);
+export const updateManagedProfile = (id, values) => api.patch(`/public-management/profiles/${id}`, values).then((res) => res.data.data);
+export const createStudentProfileEditToken = (id) => api.post(`/public-management/profiles/${id}/edit-token`).then((res) => res.data.data);
+export const fetchMyPublicProfile = () => api.get("/public-management/profile/me").then((res) => res.data.data);
+export const updateMyPublicProfile = (values) => api.put("/public-management/profile/me", values).then((res) => res.data.data);
+
+// ======================================
+// COACHING CRM
+// ======================================
+
+export const fetchCoaches = (params = {}) =>
+  api.get("/coaching/coaches", { params }).then((res) => res.data.data);
+export const fetchMyCoachProfile = () =>
+  api.get("/coaching/coaches/me").then((res) => res.data.data);
+export const createCoachProfile = (values) =>
+  api.post("/coaching/coaches", values).then((res) => res.data.data);
+export const updateCoachProfile = (coachId, values) =>
+  api.patch(`/coaching/coaches/${coachId}`, values).then((res) => res.data.data);
+export const updateCoachStatus = (coachId, status) =>
+  api.patch(`/coaching/coaches/${coachId}/status`, { status }).then((res) => res.data.data);
+
+export const fetchCoachingPrograms = (params = {}) =>
+  api.get("/coaching/programs", { params }).then((res) => res.data.data);
+export const createCoachingProgram = (values) =>
+  api.post("/coaching/programs", values).then((res) => res.data.data);
+export const updateCoachingProgram = (programId, values) =>
+  api.patch(`/coaching/programs/${programId}`, values).then((res) => res.data.data);
+export const archiveCoachingProgram = (programId) =>
+  api.post(`/coaching/programs/${programId}/archive`).then((res) => res.data.data);
+export const updateProgramSkoolMapping = (programId, values) =>
+  api.patch(`/coaching/programs/${programId}/skool-mapping`, values).then((res) => res.data.data);
+export const fetchSkoolStatus = () => api.get("/coaching/skool/status").then((res) => res.data.data);
+export const configureSkool = (values) => api.put("/coaching/skool/configure", values).then((res) => res.data.data);
+export const requestSkoolAccess = (enrollmentId, dispatch = true) => api.post(`/coaching/enrollments/${enrollmentId}/skool-access`, { dispatch }).then((res) => res.data.data);
+export const fetchSkoolAccessRequests = (params = {}) => api.get("/coaching/skool/access-requests", { params }).then((res) => res.data.data);
+export const retrySkoolAccess = (requestId) => api.post(`/coaching/skool/access-requests/${requestId}/retry`).then((res) => res.data.data);
+export const fetchSkoolPurchases = (params = {}) => api.get("/coaching/skool/purchases", { params }).then((res) => res.data.data);
+export const previewCommunicationSegment = (segment) => api.post("/coaching/communications/segments/preview", { segment }).then((res) => res.data.data);
+export const fetchCommunicationCampaigns = (params = {}) => api.get("/coaching/communications/campaigns", { params }).then((res) => res.data.data);
+export const createCommunicationCampaign = (values) => api.post("/coaching/communications/campaigns", values).then((res) => res.data.data);
+export const previewCommunicationCampaign = (campaignId) => api.get(`/coaching/communications/campaigns/${campaignId}/preview`).then((res) => res.data.data);
+export const scheduleCommunicationCampaign = (campaignId, scheduledFor) => api.post(`/coaching/communications/campaigns/${campaignId}/schedule`, { scheduledFor }).then((res) => res.data.data);
+export const fetchCommunicationJobs = (params = {}) => api.get("/coaching/communications/jobs", { params }).then((res) => res.data.data);
+export const scheduleSessionReminders = (sessionId, values) => api.post(`/coaching/sessions/${sessionId}/reminders`, values).then((res) => res.data.data);
+export const scheduleOnboardingCommunications = (enrollmentId, channels) => api.post(`/coaching/enrollments/${enrollmentId}/onboarding-communications`, { channels }).then((res) => res.data.data);
+
+export const fetchCoachingEnrollments = (params = {}) =>
+  api.get("/coaching/enrollments", { params }).then((res) => res.data.data);
+export const createCoachingEnrollment = (values) =>
+  api.post("/coaching/enrollments", values).then((res) => res.data.data);
+export const transitionCoachingEnrollment = (enrollmentId, values) =>
+  api.post(`/coaching/enrollments/${enrollmentId}/transition`, values).then((res) => res.data.data);
+
+export const fetchCoachAssignments = (params = {}) =>
+  api.get("/coaching/assignments", { params }).then((res) => res.data.data);
+export const createCoachAssignment = (values) =>
+  api.post("/coaching/assignments", values).then((res) => res.data.data);
+export const completeCoachAssignment = (assignmentId) =>
+  api.post(`/coaching/assignments/${assignmentId}/complete`).then((res) => res.data.data);
+export const transitionCoachAssignment = (assignmentId, values) =>
+  api.post(`/coaching/assignments/${assignmentId}/transition`, values).then((res) => res.data.data);
+export const fetchCoachingStudent = (contactId) =>
+  api.get(`/coaching/students/${contactId}`).then((res) => res.data.data);
+export const fetchCoachingNotes = (contactId, params = {}) =>
+  api.get(`/coaching/students/${contactId}/notes`, { params }).then((res) => res.data.data);
+export const createCoachingNote = (contactId, values) =>
+  api.post(`/coaching/students/${contactId}/notes`, values).then((res) => res.data.data);
+export const updateCoachingNote = (noteId, values) =>
+  api.patch(`/coaching/notes/${noteId}`, values).then((res) => res.data.data);
+export const fetchCoachingHandoffs = (contactId, params = {}) =>
+  api.get(`/coaching/students/${contactId}/handoffs`, { params }).then((res) => res.data.data);
+export const fetchAssignmentHandoff = (assignmentId) =>
+  api.get(`/coaching/assignments/${assignmentId}/handoff`).then((res) => res.data.data);
+export const saveAssignmentHandoff = (assignmentId, values) =>
+  api.post(`/coaching/assignments/${assignmentId}/handoff`, values).then((res) => res.data.data);
+export const fetchReferralIdentities = () => api.get("/coaching/referral-identities").then((res) => res.data.data);
+export const updateReferralIdentity = (coachId, values) => api.patch(`/coaching/coaches/${coachId}/referral-identity`, values).then((res) => res.data.data);
+export const fetchCoachingReferrals = (params = {}) => api.get("/coaching/referrals", { params }).then((res) => res.data.data);
+export const createCoachingReferral = (values) => api.post("/coaching/referrals", values).then((res) => res.data.data);
+export const fetchCommissionRules = () => api.get("/coaching/commission-rules").then((res) => res.data.data);
+export const saveCommissionRule = (values) => api.post("/coaching/commission-rules", values).then((res) => res.data.data);
+export const fetchCoachingCommissions = (params = {}) => api.get("/coaching/commissions", { params }).then((res) => res.data.data);
+export const updateCommissionStatus = (commissionId, values) => api.patch(`/coaching/commissions/${commissionId}/status`, values).then((res) => res.data.data);
+export const fetchCoachCalendarConnection = () => api.get("/coaching/calendar/connection").then((res) => res.data.data);
+export const beginCoachCalendarConnection = () => api.get("/coaching/calendar/oauth/start").then((res) => res.data.authorizationUrl);
+export const disconnectCoachCalendar = () => api.delete("/coaching/calendar/connection").then((res) => res.data.data);
+export const fetchCoachCalendars = () => api.get("/coaching/calendar/calendars").then((res) => res.data.data);
+export const selectCoachCalendar = (values) => api.patch("/coaching/calendar/selection", values).then((res) => res.data.data);
+export const fetchCoachCalendarConnections = () => api.get("/coaching/calendar/connections").then((res) => res.data.data);
+export const fetchCoachingSessions = (params = {}) => api.get("/coaching/sessions", { params }).then((res) => res.data.data);
+export const checkCoachAvailability = (values) => api.post("/coaching/sessions/availability", values).then((res) => res.data.data);
+export const createCoachingSession = (values) => api.post("/coaching/sessions", values).then((res) => res.data.data);
+export const rescheduleCoachingSession = (sessionId, values) => api.patch(`/coaching/sessions/${sessionId}/reschedule`, values).then((res) => res.data.data);
+export const cancelCoachingSession = (sessionId, values) => api.post(`/coaching/sessions/${sessionId}/cancel`, values).then((res) => res.data.data);
+export const fetchCoachZoomConnection = () => api.get("/coaching/zoom/connection").then((res) => res.data.data);
+export const beginCoachZoomConnection = () => api.get("/coaching/zoom/oauth/start").then((res) => res.data.authorizationUrl);
+export const disconnectCoachZoom = () => api.delete("/coaching/zoom/connection").then((res) => res.data.data);
+export const fetchCoachZoomConnections = () => api.get("/coaching/zoom/connections").then((res) => res.data.data);
 
 export const fetchDiscoveryTemplates = () =>
   api.get("/workspace/discovery-templates").then((res) => res.data);
@@ -496,6 +634,14 @@ export const linkExistingEventbriteAffiliate = (partnerId, data) => api.patch(`/
 export const fetchContentBriefs = (type) => api.get("/content", { params: type ? { type } : {} }).then((res) => res.data);
 export const createContentBrief = (data) => api.post("/content", data).then((res) => res.data);
 export const updateContentBrief = (id, data) => api.patch(`/content/${id}`, data).then((res) => res.data);
+export const fetchSocialPublishingCapabilities = () => api.get("/content/social/capabilities").then((res) => res.data.data);
+export const requestSocialApproval = (id) => api.post(`/content/${id}/request-approval`).then((res) => res.data.data);
+export const approveSocialContent = (id) => api.post(`/content/${id}/approve`).then((res) => res.data.data);
+export const rejectSocialContent = (id, reason) => api.post(`/content/${id}/reject`, { reason }).then((res) => res.data.data);
+export const scheduleSocialContent = (id, publishAt) => api.post(`/content/${id}/schedule`, { publishAt }).then((res) => res.data.data);
+export const cancelSocialContent = (id) => api.post(`/content/${id}/cancel`).then((res) => res.data.data);
+export const retrySocialContent = (id) => api.post(`/content/${id}/retry`).then((res) => res.data.data);
+export const duplicateSocialContent = (id) => api.post(`/content/${id}/duplicate`).then((res) => res.data.data);
 
 
 

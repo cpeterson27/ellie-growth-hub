@@ -3,7 +3,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { FiSearch, FiMenu, FiCpu, FiPlus, FiCheckCircle, FiBell, FiChevronDown } from "react-icons/fi";
 import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import useInitiative from "../context/useInitiative.js";
+import useAuth from "../context/useAuth.js";
 import { fetchWorkspaceConfig } from "../services/api.js";
+import { isCoachOnly } from "../utils/roleAccess.js";
 import "./Navbar.css";
 
 export default function Navbar({ onMenuClick }) {
@@ -13,6 +15,8 @@ export default function Navbar({ onMenuClick }) {
   const [createOpen, setCreateOpen] = useState(false);
   const createRef = useRef(null);
   const { campaigns, selected, selectedId, setSelectedId } = useInitiative();
+  const { session } = useAuth();
+  const isCoach = isCoachOnly(session);
   const pageKey = location.pathname.split("/")[1] || "command-center";
   const pageMeta = {
     "command-center": ["Command Center", "Today’s priorities and next best actions."],
@@ -36,6 +40,7 @@ export default function Navbar({ onMenuClick }) {
     analytics: ["Analytics", "See what is working and where to focus next."],
     integrations: ["Integrations", "Connect the systems behind Growth Operator’s growth engine."],
     settings: ["Settings", "Personalize the workspace and operating rules."],
+    coach: ["Coach Portal", "Your students, assignments, and upcoming coaching work."],
   }[pageKey] || ["Growth workspace", "Operate Growth Operator’s growth engine from one place."];
   const changeInitiative = (value) => {
     setSelectedId(value);
@@ -43,11 +48,12 @@ export default function Navbar({ onMenuClick }) {
   };
 
   useEffect(() => {
+    if (isCoach) return undefined;
     const refresh = () => setWorkspaceName(getWorkspaceSettings().workspaceName);
     window.addEventListener("ellie-settings-changed", refresh);
     fetchWorkspaceConfig().then((config) => setWorkspaceName(config.workspaceName)).catch(() => {});
     return () => window.removeEventListener("ellie-settings-changed", refresh);
-  }, []);
+  }, [isCoach]);
 
   useEffect(() => {
     const handleShortcut = (event) => {
@@ -95,7 +101,7 @@ export default function Navbar({ onMenuClick }) {
           <h1 className="navbar__title">{pageMeta[1]}</h1>
         </div>
         <div className="navbar__mobile-brand"><strong>Growth Operator</strong><span>{pageMeta[0]}</span></div>
-        <label className="initiative-switcher">
+        {!isCoach ? <label className="initiative-switcher">
           <span>Current campaign</span>
           <select value={selectedId} onChange={(event) => changeInitiative(event.target.value)}>
             <option value="all">All business activity</option>
@@ -107,10 +113,10 @@ export default function Navbar({ onMenuClick }) {
             </optgroup>
           </select>
           {selected ? <i className={selected.campaignKind === "program" ? "is-offer" : "is-event"} /> : null}
-        </label>
+        </label> : null}
       </div>
 
-      <div className="navbar__actions">
+      {!isCoach ? <div className="navbar__actions">
         <button className="navbar__search" type="button" aria-label="Search workspace" onClick={() => navigate("/crm/contacts?focus=search")}>
           <FiSearch /><span>Search workspace</span><kbd>⌘ K</kbd>
         </button>
@@ -127,7 +133,7 @@ export default function Navbar({ onMenuClick }) {
         <button className="navbar__jarvis" type="button" onClick={() => navigate("/operators/jarvis")}>
           <FiCpu /><span>Ask Growth Operator</span><i />
         </button>
-      </div>
+      </div> : <div className="navbar__actions"><span className="navbar__coach-context">Restricted coach workspace</span></div>}
     </header>
   );
 }
