@@ -16,6 +16,11 @@ import {
   selectSocialAssets,
   fetchSkoolStatus,
   configureSkool,
+  fetchMeetupStatus,
+  beginMeetupConnection,
+  disconnectMeetup,
+  fetchMeetupAssets,
+  selectMeetupGroups,
 } from "../services/api.js";
 import "./Integrations.css";
 
@@ -47,7 +52,7 @@ function providerSummary(provider, eventbriteReady) {
     return `${provider.description}. This is for each customer’s own authorized business assets—not for searching private people or exporting group members.`;
   }
   if (provider.id === "meetup") {
-    return "Public Meetup community discovery works without a key. Authenticated Meetup Pro management is not implemented and is not required for current research.";
+    return "Public Meetup discovery and an authorized Meetup Pro connection are separate. Discovery never implies Growth Operator can message a community.";
   }
   return provider.description;
 }
@@ -61,6 +66,7 @@ export default function Integrations() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("meetup") === "error") return "Meetup authorization did not complete.";
     const provider = params.get("social");
     const status = params.get("status");
     return provider && status && status !== "connected" ? params.get("message") || `${provider} connection did not complete.` : "";
@@ -69,12 +75,16 @@ export default function Integrations() {
   const [socialConnections, setSocialConnections] = useState({ linkedin: null, meta: null });
   const [socialBusy, setSocialBusy] = useState("");
   const [skool, setSkool] = useState(null);
+  const [meetup, setMeetup] = useState(null);
+  const [meetupAssets, setMeetupAssets] = useState({ network: null, groups: [], events: [] });
+  const [meetupNetwork, setMeetupNetwork] = useState("");
+  const [meetupBusy, setMeetupBusy] = useState(false);
   const [skoolForm, setSkoolForm] = useState({ mode: "manual", groupId: "", groupSlug: "", groupName: "", groupUrl: "", zapierHookUrl: "", adapterSecret: "" });
 
   const loadProviders = async () => {
     try {
       setLoading(true);
-      const [response, connection, webhook, eventData, gmailConnection, linkedin, meta, skoolStatus] = await Promise.all([
+      const [response, connection, webhook, eventData, gmailConnection, linkedin, meta, skoolStatus, meetupStatus] = await Promise.all([
         fetchIntegrationHub(),
         fetchEventbriteConnection().catch(() => null),
         fetchEventbriteWebhookStatus().catch(() => null),
@@ -83,6 +93,7 @@ export default function Integrations() {
         fetchSocialConnection("linkedin").catch(() => null),
         fetchSocialConnection("meta").catch(() => null),
         fetchSkoolStatus().catch(() => null),
+        fetchMeetupStatus().catch(() => null),
       ]);
       setProviders(response.data?.providers || []);
       setEventbriteConnection(connection);
@@ -91,6 +102,8 @@ export default function Integrations() {
       setGmail(gmailConnection);
       setSocialConnections({ linkedin, meta });
       setSkool(skoolStatus);
+      setMeetup(meetupStatus);
+      setMeetupNetwork(meetupStatus?.proNetworkUrlname || "");
       if (skoolStatus) setSkoolForm((current) => ({ ...current, mode: skoolStatus.mode || "manual", groupId: skoolStatus.groupId || "", groupSlug: skoolStatus.groupSlug || "", groupName: skoolStatus.groupName || "", groupUrl: skoolStatus.groupUrl || "" }));
       setError("");
     } catch (err) {
@@ -121,6 +134,7 @@ export default function Integrations() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.has("meetup")) window.history.replaceState({}, "", window.location.pathname);
     const provider = params.get("social");
     const status = params.get("status");
     if (!provider || !status) return;
@@ -174,6 +188,11 @@ export default function Integrations() {
     catch (err) { setError(err.response?.data?.error || "Unable to save Skool setup."); }
   };
 
+  const connectMeetup = async () => { try { setMeetupBusy(true); const response = await beginMeetupConnection(); window.location.assign(response.authorizationUrl); } catch (err) { setError(err.response?.data?.error || "Meetup OAuth app setup is incomplete."); setMeetupBusy(false); } };
+  const loadMeetupAssets = async () => { try { setMeetupBusy(true); const value = await fetchMeetupAssets(meetupNetwork); setMeetupAssets(value); setMeetup(await fetchMeetupStatus()); setError(""); } catch (err) { setError(err.response?.data?.error || "Unable to read that authorized Meetup Pro network."); } finally { setMeetupBusy(false); } };
+  const toggleMeetupGroup = async (urlname) => { const selected = new Set(meetup?.selectedGroupUrlnames || []); if (selected.has(urlname)) selected.delete(urlname); else selected.add(urlname); try { setMeetupBusy(true); setMeetup(await selectMeetupGroups([...selected])); } finally { setMeetupBusy(false); } };
+  const removeMeetup = async () => { try { setMeetupBusy(true); setMeetup(await disconnectMeetup()); setMeetupAssets({ network: null, groups: [], events: [] }); } finally { setMeetupBusy(false); } };
+
   return (
     <div className="page-dashboard integrations-page">
       <div className="page-header">
@@ -222,6 +241,21 @@ export default function Integrations() {
       <h2 className="integration-section-title">Connected apps</h2>
       {error ? <p className="form-error">{error}</p> : null}
       <section className="crm-connection-grid">
+        <article className="crm-connection-card meetup-connection-card">
+          <div><span className="integration-status integration-status--ready">Public discovery</span><h2>Public Meetup Discovery</h2></div>
+          <p>Find public communities and organizers for research. These results are public evidence only; Growth Operator cannot message or manage them.</p>
+          <Button variant="outline" onClick={() => navigate("/discovery?tab=monitoring")}>Open public discovery</Button>
+        </article>
+        <article className="crm-connection-card meetup-connection-card">
+          <div><span className={`integration-status integration-status--${meetup?.connected ? "connected" : "configuration_required"}`}>{meetup?.connected ? "Connected" : meetup?.configured ? "Ready to connect" : "App setup required"}</span><h2>Connected Meetup Pro</h2></div>
+          <p>{meetup?.connected ? `${meetup.accountName} is authorized. Only owned/managed network assets are available.` : "Connect through official Meetup OAuth. Growth Operator never receives or stores the Meetup password."}</p>
+          {meetup?.connected ? <>
+            <label>Pro network URL name<input value={meetupNetwork} onChange={(event) => setMeetupNetwork(event.target.value)} placeholder="network-urlname" /></label>
+            <div className="crm-connection-actions"><Button onClick={loadMeetupAssets} loading={meetupBusy}>Load authorized assets</Button><Button variant="outline" onClick={removeMeetup} disabled={meetupBusy}>Disconnect</Button></div>
+            {meetupAssets.groups.length ? <div className="social-asset-picker"><strong>Authorized groups</strong>{meetupAssets.groups.map((group) => <label key={group.id}><input type="checkbox" checked={(meetup?.selectedGroupUrlnames || []).includes(group.urlname)} disabled={meetupBusy} onChange={() => toggleMeetupGroup(group.urlname)} /><span>{group.name}<small>{group.memberships?.totalCount || 0} members · {group.urlname}</small></span></label>)}</div> : null}
+            <small>{meetupAssets.events.length ? `${meetupAssets.events.length} upcoming network event(s) visible.` : "Load a Pro network to verify groups and upcoming events."} {meetup.lastVerifiedAt ? `Authorization last verified ${new Date(meetup.lastVerifiedAt).toLocaleString()}. ` : ""}Outbound event changes always enter human approval; provider execution is disabled initially.</small>
+          </> : <div className="crm-connection-actions"><Button onClick={connectMeetup} loading={meetupBusy} disabled={!meetup?.configured}>Connect Meetup</Button></div>}
+        </article>
         <article className="crm-connection-card">
           <div><span className={`integration-status integration-status--${skool?.configured ? "connected" : "configuration_required"}`}>{skool?.configured ? "Configured (not live-tested)" : "Setup required"}</span><h2>Skool</h2></div>
           <p>Map Coaching Programs to your Skool group and courses. Growth Operator uses canonical Contacts and Enrollments; it does not create a second student record.</p>
@@ -238,7 +272,7 @@ export default function Integrations() {
       </section>
       {loading ? <p>Loading integrations…</p> : (
         <section className="integration-provider-grid">
-          {providers.filter((provider) => provider.id !== "resend").map((provider) => {
+          {providers.filter((provider) => !["resend", "meetup"].includes(provider.id)).map((provider) => {
             const isEventbrite = provider.id === "eventbrite";
             const socialProvider = provider.id === "facebook" ? "meta" : provider.id === "linkedin" ? "linkedin" : "";
             const socialConnection = socialProvider ? socialConnections[socialProvider] : null;

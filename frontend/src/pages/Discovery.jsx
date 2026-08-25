@@ -38,6 +38,7 @@ import {
   updateContact,
 } from "../services/api.js";
 import "./Discovery.css";
+import { draftFromMonitorPreset, sourcesFromMonitorPreset } from "../utils/researchMonitorPreset.js";
 import "./DiscoveryTargeting.css";
 import "./DiscoveryReview.css";
 import "./DiscoveryExperience.css";
@@ -325,8 +326,8 @@ export default function Discovery() {
   };
 
   const applyMonitorPreset = (preset) => {
-    setMonitorDraft((current) => ({ ...current, monitorType: preset.monitorType || "buyer_intent", name: preset.name, query: preset.query, keywords: (preset.intentCategories || []).flatMap((category) => category.phrases || []).join(", "), negativeKeywords: (preset.negativeKeywords || []).join(", "), feedUrls: (preset.feedUrls || []).join("\n"), intervalMinutes: preset.intervalMinutes || 30, intentCategories: preset.intentCategories || [] }));
-    setSelectedSources(monitorSources(preset.monitorType));
+    setMonitorDraft(draftFromMonitorPreset(preset));
+    setSelectedSources(sourcesFromMonitorPreset(preset, monitorSources(preset.monitorType)));
     setActiveTab("monitoring");
     setNotice(`${preset.name} preset loaded. Every phrase remains editable before you start it.`);
   };

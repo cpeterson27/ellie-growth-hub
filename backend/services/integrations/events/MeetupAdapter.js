@@ -8,18 +8,14 @@ const BaseIntegration = require("../BaseIntegration");
 class MeetupAdapter extends BaseIntegration {
   constructor(config = {}) {
     super("Meetup", "events", config);
-    this.baseUrl = "https://api.meetup.com";
     this.capabilities = [
-      "post_event",
-      "update_event",
-      "list_events",
-      "get_rsvps",
-      "send_message",
+      "public_discovery", "oauth", "read_network", "read_groups", "read_events",
+      "read_authorized_rsvps", "request_event_create", "request_event_update",
     ];
   }
 
   getVersion() {
-    return "2.0.0"; // Meetup API version
+    return "graphql-2025";
   }
 
   getCapabilities() {
@@ -31,20 +27,9 @@ class MeetupAdapter extends BaseIntegration {
    */
   async verify() {
     try {
-      if (!this.config.accessToken) {
-        throw new Error("Meetup access token not configured");
-      }
-
-      // In production:
-      // const response = await fetch(`${this.baseUrl}/members/self`, {
-      //   headers: { Authorization: `Bearer ${this.config.accessToken}` }
-      // });
-
-      this.authenticated = true;
-      this.clearError();
       return {
-        success: true,
-        message: "Meetup configured (not authenticated)",
+        success: false,
+        message: "Use the workspace-scoped official Meetup OAuth connection; this adapter never simulates authentication.",
       };
     } catch (error) {
       this.setError(error.message);
@@ -59,24 +44,7 @@ class MeetupAdapter extends BaseIntegration {
    */
   async postEvent(params) {
     try {
-      if (!this.config.accessToken) {
-        throw new Error("Meetup not configured");
-      }
-
-      const { groupId, name, description, startTime, endTime } = params;
-
-      if (!groupId || !name || !startTime || !endTime) {
-        throw new Error("Missing required event fields");
-      }
-
-      // Would call Meetup API here
-      return {
-        success: true,
-        eventId: `meetup_${Date.now()}`,
-        name,
-        url: `https://www.meetup.com/events/${Date.now()}`,
-        createdAt: new Date(),
-      };
+      throw new Error("Direct Meetup publishing is disabled. Create a human-approved Meetup action request.");
     } catch (error) {
       this.setError(error.message);
       throw error;
@@ -90,20 +58,7 @@ class MeetupAdapter extends BaseIntegration {
    */
   async listEvents(groupId) {
     try {
-      if (!this.config.accessToken) {
-        throw new Error("Meetup not configured");
-      }
-
-      if (!groupId) {
-        throw new Error("groupId is required");
-      }
-
-      // Would call Meetup API here
-      return {
-        success: true,
-        events: [],
-        total: 0,
-      };
+      throw new Error("Use the official Meetup GraphQL connection to list events.");
     } catch (error) {
       this.setError(error.message);
       throw error;

@@ -26,53 +26,7 @@ const { deduplicateSignals, requestResearchMonitorRun, runResearchMonitor, score
 const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEmailDraftService");
 const { researchAudienceForSignal } = require("../services/researchAudienceTemplates");
 const { researchPublicWebsite } = require("../services/publicWebsiteResearchService");
-
-const STUDENT_BUYER_PRESET = {
-  id: "ellie-multifamily-student-intent",
-  monitorType: "buyer_intent",
-  name: "Ellie multifamily student intent",
-  query: "Specific recent public discussions from adults who are learning multifamily investing, analyzing an early apartment deal, asking for underwriting help, or actively seeking multifamily mentorship, a course, class, or bootcamp.",
-  locations: ["United States"],
-  negativeKeywords: ["student assignment", "homework", "hypothetical", "job seeker", "hiring", "my course", "promo code", "video game"],
-  intentCategories: [
-    { name: "Early multifamily deal", phrases: ["my first multifamily deal", "first apartment acquisition", "underwriting my first deal", "analyzing my first apartment"] },
-    { name: "Deal analysis help", phrases: ["underwriting help", "calculate NOI", "cap rate question", "debt service question", "deal analysis help"] },
-    { name: "Learning request", phrases: ["looking for a multifamily mentor", "recommend a multifamily course", "multifamily class", "syndication bootcamp"] },
-    { name: "Execution questions", phrases: ["raising capital for my deal", "syndication question", "moving from single family to apartments"] },
-  ],
-  feedUrls: ["https://www.biggerpockets.com/forums"],
-  intervalMinutes: 30,
-};
-
-const COMMUNITY_PARTNER_PRESET = {
-  id: "real-estate-community-partners",
-  monitorType: "community_partner",
-  name: "Real Estate Community Partners - USA",
-  query: "Find U.S. organizers, founders, presidents, directors, group administrators, Meetup hosts, podcast hosts, newsletter publishers, and association leaders who operate active communities for multifamily investors, apartment owners, landlords, real estate entrepreneurs, syndicators, and commercial real estate professionals.",
-  locations: ["United States"],
-  negativeKeywords: ["student", "homework", "job seeker", "inactive", "unrelated", "crypto", "forex"],
-  intentCategories: [
-    { name: "Community leadership", phrases: ["REIA president", "meetup organizer", "community manager", "group administrator", "association director"] },
-    { name: "Relevant audiences", phrases: ["multifamily investors", "apartment owners", "landlord association", "real estate investing club", "syndication community"] },
-  ],
-  feedUrls: ["https://www.biggerpockets.com/forums", "https://www.creonline.com/forums/"],
-  intervalMinutes: 60,
-};
-
-const INVESTOR_PROSPECT_PRESET = {
-  id: "eventbootcamp-qualified-investor-prospects",
-  monitorType: "investor_profile",
-  name: "EventBootcamp qualified investor prospects",
-  query: "Find U.S. professionals, business owners, practice owners, executives, and self-described investors whose public profiles or public activity show a fit for EventBootcamp and multifamily or passive investing.",
-  locations: ["United States"],
-  negativeKeywords: ["wholesaler", "realtor", "real estate agent", "flipper", "bird dog", "student", "homework", "job seeker", "hiring", "crypto", "forex"],
-  intentCategories: [
-    { name: "Self-described investor fit", phrases: ["accredited investor", "limited partner", "LP investor", "passive investor", "multifamily investor", "syndication investor"] },
-    { name: "Professional fit", phrases: ["Managing Partner", "Founder", "Tech Founder", "Physician", "Orthodontist", "Dentist", "Software Architect", "Vice President", "VP", "Director", "Practice Owner", "Business Owner"] },
-  ],
-  feedUrls: [],
-  intervalMinutes: 30,
-};
+const { RESEARCH_MONITOR_PRESETS } = require("../services/researchMonitorPresets");
 
 const router = express.Router();
 const MONITOR_SOURCE_DEFAULTS = {
@@ -112,7 +66,7 @@ router.get("/research/monitors", async (req, res) => {
   return res.json({ success: true, monitors });
 });
 
-router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: [STUDENT_BUYER_PRESET, INVESTOR_PROSPECT_PRESET, COMMUNITY_PARTNER_PRESET] }));
+router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: RESEARCH_MONITOR_PRESETS }));
 
 router.post("/research/monitors", async (req, res) => {
   try {

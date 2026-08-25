@@ -45,6 +45,7 @@ const analyticsRouter = require("./routes/analytics");
 const coachingRouter = require("./routes/coaching");
 const publicSiteRouter = require("./routes/publicSite");
 const publicManagementRouter = require("./routes/publicManagement");
+const meetupRouter = require("./routes/meetup");
 const { requireAuth } = require("./middleware/auth");
 const { restrictNewRoleSurface } = require("./middleware/authorization");
 const { startResearchMonitorRunner } = require("./services/researchMonitorService");
@@ -150,11 +151,12 @@ connectDatabase(mongoUri)
         req.path === "/eventbrite/webhook" ||
         req.path === "/eventbrite/oauth/callback" ||
         req.path === "/gmail/oauth/callback";
+      const publicMeetupCallback = req.path === "/meetup/oauth/callback";
       const publicCoachingCalendarCallback = req.path === "/coaching/calendar/oauth/callback";
       const publicCoachingZoomRoute = req.path === "/coaching/zoom/oauth/callback" || req.path === "/coaching/zoom/webhook";
       const publicSkoolAdapterRoute = req.path === "/coaching/skool/adapter/events";
       const publicSocialCallback = /^\/social\/(?:linkedin|meta)\/oauth\/callback$/.test(req.path);
-      return publicRequest || publicSocialCallback || publicCoachingCalendarCallback || publicCoachingZoomRoute || publicSkoolAdapterRoute ? next() : requireAuth(req, res, next);
+      return publicRequest || publicMeetupCallback || publicSocialCallback || publicCoachingCalendarCallback || publicCoachingZoomRoute || publicSkoolAdapterRoute ? next() : requireAuth(req, res, next);
     });
     app.use("/api", restrictNewRoleSurface);
 
@@ -179,6 +181,7 @@ connectDatabase(mongoUri)
     app.use("/api/audience", audienceRouter);
     app.use("/api/organizations", organizationRelationshipsRouter);
     app.use("/api/integrations", integrationsRouter);
+    app.use("/api/meetup", meetupRouter);
     app.use("/api/integration-connections", integrationConnectionsRouter);
     app.use("/api/marketing-campaigns", marketingCampaignsRouter);
     app.use("/api/growth-operators", growthOperatorsRouter);

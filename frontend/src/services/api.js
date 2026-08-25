@@ -34,6 +34,12 @@ export const disconnectSocialConnection = (provider) =>
 export const selectSocialAssets = (provider, assetIds) =>
   api.patch(`/social/${provider}/assets`, { assetIds }).then((res) => res.data);
 
+export const fetchMeetupStatus = () => api.get("/meetup/status").then((res) => res.data.data);
+export const beginMeetupConnection = () => api.get("/meetup/oauth/start").then((res) => res.data);
+export const disconnectMeetup = () => api.post("/meetup/disconnect").then((res) => res.data.data);
+export const fetchMeetupAssets = (network) => api.get("/meetup/assets", { params: network ? { network } : {} }).then((res) => res.data.data);
+export const selectMeetupGroups = (groupUrlnames) => api.patch("/meetup/assets", { groupUrlnames }).then((res) => res.data.data);
+
 export const fetchSocialAutomationOverview = () => api.get("/social-automation/overview").then((res) => res.data.data);
 export const fetchSocialAutomations = () => api.get("/social-automation/automations").then((res) => res.data.data);
 export const createSocialAutomation = (values) => api.post("/social-automation/automations", values).then((res) => res.data.data);

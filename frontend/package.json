@@ -17,6 +17,7 @@
     "test:skool-ui": "node test-skool-ui.js",
     "test:coaching-communications-ui": "node test-coaching-communications-ui.js",
     "test:social-automation-ui": "node test-social-automation-ui.js",
+    "test:monitor-presets-ui": "node test-monitor-presets-ui.js",
     "test:social-publishing-ui": "node test-social-publishing-ui.js",
     "test:automation-analytics-ui": "node test-automation-analytics-ui.js",
     "preview": "vite preview"
