@@ -27,6 +27,9 @@
 - Identity tasks suppress unrelated organization summaries, generic campaign actions, and content-save buttons. Their responsive layout stacks below 1,100px so the transcript and results remain visible without fullscreen; Personalize opens as an explicit editable panel with a close control.
 - Monitor totals and per-source counts are labeled as raw processed items—not leads. Live Leads remains the only deduplicated human-review queue. Notifications now open the relevant Leads or Monitoring destination and can be permanently cleared without changing monitoring or lead data.
 - Evidence-backed OpenAI and no-credit fallback research summaries are recorded through the existing opt-in Jarvis memory bridge when it is connected. Raw scraped pages and unsupported identity guesses are not written as facts.
+- Reddit Live Leads can generate two editable, manually copied drafts: a helpful public reply without promotional links and a private invitation containing both Eventbrite and Meetup links from an existing event campaign. Growth Operator never posts or messages Reddit automatically.
+- Jarvis identity research now uses the full page instead of reserving half the screen for its visualizer. Voice settings expose Automatic, Browser-only, and OpenAI-only modes plus the device's installed English browser voices; the selected browser voice requires no API credits.
+- Exact-account research includes a direct Google query link. Automated Google ingestion is available through the official Programmable Search JSON API when `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID` are configured; Growth Operator does not scrape Google result pages.
 
 ## Product decisions
 
