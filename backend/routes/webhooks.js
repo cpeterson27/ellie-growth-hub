@@ -34,20 +34,20 @@ router.post("/meta", async (req, res) => {
       await runWithWorkspace(connection.workspaceId, async () => {
         for (const event of entry.messaging || []) {
           const result = await ingestMetaMessage({ connection, assetId: entry.id, event });
-          if (result?.responseTemplate && result?.conversation?.thread) await metaMessagingAdapter.sendMessage({ channel: result.identity.provider, assetId: entry.id, recipientId: result.identity.providerUserId, body: result.responseTemplate, threadId: result.conversation.thread._id });
+          if (process.env.META_AUTOMATIC_REPLIES_ENABLED === "true" && result?.responseTemplate && result?.conversation?.thread) await metaMessagingAdapter.sendMessage({ channel: result.identity.provider, assetId: entry.id, recipientId: result.identity.providerUserId, body: result.responseTemplate, threadId: result.conversation.thread._id });
         }
         for (const change of entry.changes || []) {
           if (["comments", "feed"].includes(change.field)) {
             const result = await ingestMetaComment({ connection, assetId: entry.id, change });
             const commentId = String(change?.value?.id || change?.value?.comment_id || "");
             const rawTime = Number(change?.value?.created_time || 0);
-            if (result?.responseTemplate && ["instagram", "facebook"].includes(result.identity.provider) && commentId) await metaMessagingAdapter.sendCommentPrivateReply({ assetId: entry.id, commentId, body: result.responseTemplate, occurredAt: rawTime ? new Date(rawTime * (String(Math.trunc(rawTime)).length <= 10 ? 1000 : 1)) : new Date() });
+            if (process.env.META_AUTOMATIC_REPLIES_ENABLED === "true" && result?.responseTemplate && ["instagram", "facebook"].includes(result.identity.provider) && commentId) await metaMessagingAdapter.sendCommentPrivateReply({ assetId: entry.id, commentId, body: result.responseTemplate, occurredAt: rawTime ? new Date(rawTime * (String(Math.trunc(rawTime)).length <= 10 ? 1000 : 1)) : new Date() });
           }
         }
       });
     }
     res.json({ received: true });
-  } catch (error) { console.error("META MESSAGING WEBHOOK ERROR:", error); res.status(500).json({ error: "Webhook failed" }); }
+  } catch (error) { console.error("META MESSAGING WEBHOOK ERROR:", String(error?.message || "Webhook processing failed").slice(0, 300)); res.status(500).json({ error: "Webhook failed" }); }
 });
 
 function twilioWebhookUrl(req) { return `${String(process.env.PUBLIC_BACKEND_URL || "").replace(/\/$/, "")}${req.originalUrl}`; }

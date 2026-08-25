@@ -16,6 +16,12 @@ function splitScopes(value) {
   return String(value || "").split(/[\s,]+/).map((item) => item.trim()).filter(Boolean);
 }
 
+function safeProviderError(error, fallback = "Meta authorization could not be verified") {
+  const status = Number(error?.response?.status || error?.status || 0);
+  const providerCode = String(error?.response?.data?.error?.code || "").replace(/[^0-9A-Za-z_.-]/g, "").slice(0, 40);
+  return [fallback, status ? `HTTP ${status}` : "", providerCode ? `provider code ${providerCode}` : ""].filter(Boolean).join(" · ");
+}
+
 function config(provider) {
   if (!PROVIDERS.has(provider)) throw new Error("Unsupported social provider");
   if (provider === "linkedin") return {
@@ -29,7 +35,7 @@ function config(provider) {
     clientId: required("META_APP_ID"),
     clientSecret: required("META_APP_SECRET"),
     redirectUri: required("META_REDIRECT_URI"),
-    scopes: splitScopes(process.env.META_OAUTH_SCOPES || "pages_show_list pages_read_engagement pages_manage_metadata pages_manage_posts pages_messaging instagram_basic instagram_content_publish instagram_manage_messages instagram_manage_comments"),
+    scopes: splitScopes(process.env.META_OAUTH_SCOPES || "pages_show_list pages_read_engagement pages_manage_metadata pages_messaging instagram_basic instagram_manage_messages instagram_manage_comments"),
     apiVersion: required("META_GRAPH_API_VERSION"),
   };
 }
@@ -105,19 +111,40 @@ async function exchangeLinkedIn(code) {
   };
 }
 
-async function exchangeMeta(code) {
+async function metaPermissions(accessToken, providerConfig, http = axios) {
+  const response = await http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me/permissions`, { params: { access_token: accessToken }, timeout: 15000 });
+  const rows = response.data?.data || [];
+  return {
+    granted: rows.filter((row) => row.status === "granted").map((row) => String(row.permission)),
+    declined: rows.filter((row) => row.status !== "granted").map((row) => String(row.permission)),
+  };
+}
+
+async function verifyMetaToken(accessToken, providerConfig, http = axios) {
+  const appToken = `${providerConfig.clientId}|${providerConfig.clientSecret}`;
+  const response = await http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/debug_token`, { params: { input_token: accessToken, access_token: appToken }, timeout: 15000 });
+  const data = response.data?.data || {};
+  if (!data.is_valid || String(data.app_id || "") !== String(providerConfig.clientId)) throw new Error("Meta returned an invalid authorization for this application");
+  return { valid: true, userId: String(data.user_id || ""), dataAccessExpiresAt: data.data_access_expires_at ? new Date(Number(data.data_access_expires_at) * 1000) : null, verifiedAt: new Date() };
+}
+
+async function exchangeMeta(code, http = axios) {
   const providerConfig = config("meta");
-  const tokenResponse = await axios.get(`https://graph.facebook.com/${providerConfig.apiVersion}/oauth/access_token`, { params: { client_id: providerConfig.clientId, client_secret: providerConfig.clientSecret, redirect_uri: providerConfig.redirectUri, code }, timeout: 15000 });
+  const tokenResponse = await http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/oauth/access_token`, { params: { client_id: providerConfig.clientId, client_secret: providerConfig.clientSecret, redirect_uri: providerConfig.redirectUri, code }, timeout: 15000 });
   const shortToken = tokenResponse.data?.access_token;
   if (!shortToken) throw new Error("Meta did not return an access token");
   let accessToken = shortToken;
   try {
-    const longLived = await axios.get(`https://graph.facebook.com/${providerConfig.apiVersion}/oauth/access_token`, { params: { grant_type: "fb_exchange_token", client_id: providerConfig.clientId, client_secret: providerConfig.clientSecret, fb_exchange_token: shortToken }, timeout: 15000 });
+    const longLived = await http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/oauth/access_token`, { params: { grant_type: "fb_exchange_token", client_id: providerConfig.clientId, client_secret: providerConfig.clientSecret, fb_exchange_token: shortToken }, timeout: 15000 });
     accessToken = longLived.data?.access_token || shortToken;
     if (longLived.data?.expires_in) tokenResponse.data.expires_in = longLived.data.expires_in;
   } catch { /* A short-lived token remains valid for initial setup. */ }
-  const profileResponse = await axios.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me`, { params: { fields: "id,name", access_token: accessToken }, timeout: 15000 });
-  const pagesResponse = await axios.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me/accounts`, { params: { fields: "id,name,access_token,tasks,instagram_business_account{id,username,name}", access_token: accessToken }, timeout: 15000 });
+  const [authorization, permissions, profileResponse, pagesResponse] = await Promise.all([
+    verifyMetaToken(accessToken, providerConfig, http),
+    metaPermissions(accessToken, providerConfig, http),
+    http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me`, { params: { fields: "id,name", access_token: accessToken }, timeout: 15000 }),
+    http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me/accounts`, { params: { fields: "id,name,access_token,tasks,instagram_business_account{id,username,name}", access_token: accessToken }, timeout: 15000 }),
+  ]);
   const pageTokens = {};
   const assets = [];
   for (const page of pagesResponse.data?.data || []) {
@@ -127,7 +154,9 @@ async function exchangeMeta(code) {
   }
   return {
     credentials: { accessToken, pageTokens },
-    scopes: providerConfig.scopes,
+    scopes: permissions.granted,
+    declinedScopes: permissions.declined,
+    authorization,
     expiresAt: tokenResponse.data?.expires_in ? new Date(Date.now() + Number(tokenResponse.data.expires_in) * 1000) : null,
     account: { id: String(profileResponse.data?.id || ""), name: profileResponse.data?.name || "Meta account", email: "" },
     assets,
@@ -142,7 +171,7 @@ async function exchangeCode(provider, code, rawState) {
   const result = provider === "linkedin" ? await exchangeLinkedIn(code) : await exchangeMeta(code);
   const connection = await SocialConnection.findOneAndUpdate(
     { workspaceId: state.workspaceId, provider },
-    { $set: { status: "connected", credentialsEncrypted: encryptCredentials(result.credentials), scopes: result.scopes, expiresAt: result.expiresAt, providerAccount: result.account, assets: result.assets, selectedAssetIds: [], connectedByUserId: state.userId, connectedAt: new Date(), lastVerifiedAt: new Date(), lastError: "" } },
+    { $set: { status: "connected", credentialsEncrypted: encryptCredentials(result.credentials), scopes: result.scopes, declinedScopes: result.declinedScopes || [], authorization: result.authorization || { valid: true, verifiedAt: new Date() }, expiresAt: result.expiresAt, providerAccount: result.account, assets: result.assets, selectedAssetIds: [], webhookSubscriptions: [], connectedByUserId: state.userId, connectedAt: new Date(), lastVerifiedAt: new Date(), lastError: "" } },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
   return connection;
@@ -155,10 +184,13 @@ function publicConnection(connection, provider) {
     connected: connection?.status === "connected",
     status: connection?.status || "disconnected",
     scopes: connection?.scopes || [],
+    declinedScopes: connection?.declinedScopes || [],
+    authorization: connection?.authorization || null,
     expiresAt: connection?.expiresAt || null,
     account: connection?.providerAccount || null,
     assets: connection?.assets || [],
     selectedAssetIds: connection?.selectedAssetIds || [],
+    webhookSubscriptions: connection?.webhookSubscriptions || [],
     connectedAt: connection?.connectedAt || null,
     lastVerifiedAt: connection?.lastVerifiedAt || null,
     lastError: connection?.lastError || "",
@@ -175,13 +207,53 @@ async function status(workspaceId, provider) {
   return publicConnection(connection, provider);
 }
 
-async function selectAssets(workspaceId, provider, assetIds) {
-  const connection = await SocialConnection.findOne({ workspaceId, provider });
+function subscriptionFields(asset) {
+  return asset.type === "instagram_business" ? ["comments", "messages"] : asset.type === "facebook_page" ? ["feed", "messages", "messaging_postbacks"] : [];
+}
+
+async function provisionMetaSubscriptions(connection, selected, http = axios) {
+  const providerConfig = config("meta");
+  const credentials = decryptCredentials(connection.credentialsEncrypted);
+  const results = [];
+  for (const assetId of selected) {
+    const asset = connection.assets.find((item) => String(item.id) === assetId);
+    const fields = subscriptionFields(asset || {});
+    if (!fields.length) continue;
+    const pageId = asset.type === "instagram_business" ? String(asset.parentId) : String(asset.id);
+    const token = credentials.pageTokens?.[pageId];
+    if (!token) { results.push({ assetId, parentPageId: pageId, fields, status: "failed", error: "A Page authorization token is unavailable" }); continue; }
+    try {
+      await http.post(`https://graph.facebook.com/${providerConfig.apiVersion}/${asset.id}/subscribed_apps`, null, { params: { subscribed_fields: fields.join(","), access_token: token }, timeout: 15000 });
+      const health = await http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/${asset.id}/subscribed_apps`, { params: { access_token: token }, timeout: 15000 });
+      const subscribed = (health.data?.data || []).some((row) => String(row.id || "") === String(providerConfig.clientId) && fields.every((field) => (row.subscribed_fields || []).includes(field)));
+      results.push({ assetId, parentPageId: pageId, fields, status: subscribed ? "subscribed" : "not_subscribed", verifiedAt: new Date(), error: subscribed ? "" : "Meta did not confirm all requested webhook fields" });
+    } catch (error) { results.push({ assetId, parentPageId: pageId, fields, status: "failed", verifiedAt: new Date(), error: safeProviderError(error, "Webhook subscription failed") }); }
+  }
+  return results;
+}
+
+async function removeMetaSubscriptions(connection, removed, http = axios) {
+  const providerConfig = config("meta");
+  const credentials = decryptCredentials(connection.credentialsEncrypted);
+  for (const assetId of removed) {
+    const asset = connection.assets.find((item) => String(item.id) === assetId);
+    const pageId = asset?.type === "instagram_business" ? String(asset.parentId) : String(asset?.id || "");
+    const token = credentials.pageTokens?.[pageId];
+    if (!asset || !token) continue;
+    try { await http.delete(`https://graph.facebook.com/${providerConfig.apiVersion}/${asset.id}/subscribed_apps`, { params: { access_token: token }, timeout: 15000 }); }
+    catch { /* App-side deselection still blocks processing if provider cleanup is unavailable. */ }
+  }
+}
+
+async function selectAssets(workspaceId, provider, assetIds, http = axios) {
+  const connection = await SocialConnection.findOne({ workspaceId, provider }).select("+credentialsEncrypted");
   if (!connection || connection.status !== "connected") throw new Error(`${provider} is not connected`);
   const allowed = new Set(connection.assets.map((asset) => String(asset.id)));
   const selected = [...new Set((assetIds || []).map(String))];
   if (selected.some((id) => !allowed.has(id))) throw new Error("Choose only assets returned by the connected provider");
+  const removed = (connection.selectedAssetIds || []).map(String).filter((id) => !selected.includes(id));
   connection.selectedAssetIds = selected;
+  if (provider === "meta") { await removeMetaSubscriptions(connection, removed, http); connection.webhookSubscriptions = await provisionMetaSubscriptions(connection, selected, http); }
   await connection.save();
   return publicConnection(connection.toObject(), provider);
 }
@@ -197,8 +269,8 @@ async function disconnect(workspaceId, provider) {
       }
     } catch { /* Local disconnect must still complete if provider revocation fails. */ }
   }
-  await SocialConnection.findOneAndUpdate({ workspaceId, provider }, { $set: { status: "disconnected", assets: [], selectedAssetIds: [], scopes: [], providerAccount: {}, connectedAt: null, lastVerifiedAt: null, lastError: "" }, $unset: { credentialsEncrypted: 1, expiresAt: 1 } });
+  await SocialConnection.findOneAndUpdate({ workspaceId, provider }, { $set: { status: "disconnected", assets: [], selectedAssetIds: [], webhookSubscriptions: [], scopes: [], declinedScopes: [], authorization: { valid: false }, providerAccount: {}, connectedAt: null, lastVerifiedAt: null, lastError: "" }, $unset: { credentialsEncrypted: 1, expiresAt: 1 } });
   return status(workspaceId, provider);
 }
 
-module.exports = { authorizationUrl, configured, disconnect, exchangeCode, selectAssets, status, verifyState };
+module.exports = { authorizationUrl, configured, disconnect, exchangeCode, exchangeMeta, metaPermissions, provisionMetaSubscriptions, removeMetaSubscriptions, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };

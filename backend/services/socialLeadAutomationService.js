@@ -43,8 +43,16 @@ async function resolveIdentity(event, deps = models) {
   if (!contact) {
     const name = clean(event.displayName || event.username || `${event.provider} contact`, 180);
     contact = await deps.Contact.create({ name, firstName: name, sources: [`social:${event.provider}`], sourceProvider: `social:${event.provider}`, type: "lead", status: "active", tags: ["social-lead"] });
-    identity = await deps.SocialIdentity.create({ contactId: contact._id, ...identityFilter, username: clean(event.username), displayName: clean(event.displayName), providerThreadId: clean(event.providerThreadId, 1000), sourceMetadata: event.sourceMetadata || {}, lastActivityAt: event.occurredAt || new Date() });
-    created = true;
+    try {
+      identity = await deps.SocialIdentity.create({ contactId: contact._id, ...identityFilter, username: clean(event.username), displayName: clean(event.displayName), providerThreadId: clean(event.providerThreadId, 1000), sourceMetadata: event.sourceMetadata || {}, lastActivityAt: event.occurredAt || new Date() });
+      created = true;
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      if (deps.Contact.deleteOne) await deps.Contact.deleteOne({ _id: contact._id });
+      identity = await deps.SocialIdentity.findOne(identityFilter);
+      contact = identity ? await deps.Contact.findById(identity.contactId) : null;
+      if (!identity || !contact) throw new Error("Social identity could not be resolved after concurrent creation");
+    }
   } else {
     identity.username = clean(event.username) || identity.username;
     identity.displayName = clean(event.displayName) || identity.displayName;
@@ -123,4 +131,4 @@ async function createTrackedLink(values, actorUserId, deps = models) {
   return link;
 }
 
-module.exports = { SUPPORTED_TRIGGERS, allowedDestination, containsKeyword, createTrackedLink, ingestSocialEvent, normalizedKeywords };
+module.exports = { SUPPORTED_TRIGGERS, allowedDestination, containsKeyword, createTrackedLink, ingestSocialEvent, normalizedKeywords, resolveIdentity };

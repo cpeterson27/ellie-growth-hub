@@ -46,8 +46,9 @@ router.get("/:provider/oauth/callback", async (req, res) => {
     await socialOAuth.exchangeCode(id, String(req.query.code), String(req.query.state));
     return res.redirect(frontendRedirect({ social: id, status: "connected" }));
   } catch (error) {
-    console.error(`[social oauth] ${id} callback failed:`, error.response?.data || error.message);
-    return res.redirect(frontendRedirect({ social: id, status: "failed", message: error.message || "Connection failed" }));
+    const safeError = socialOAuth.safeProviderError(error, "Social connection failed");
+    console.error(`[social oauth] ${id} callback failed: ${safeError}`);
+    return res.redirect(frontendRedirect({ social: id, status: "failed", message: safeError }));
   }
 });
 

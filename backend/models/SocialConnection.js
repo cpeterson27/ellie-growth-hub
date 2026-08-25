@@ -7,6 +7,13 @@ const socialConnectionSchema = new mongoose.Schema({
   status: { type: String, enum: ["connected", "expired", "failed", "disconnected"], default: "connected", index: true },
   credentialsEncrypted: { type: mongoose.Schema.Types.Mixed, required: false, select: false },
   scopes: { type: [String], default: [] },
+  declinedScopes: { type: [String], default: [] },
+  authorization: {
+    valid: { type: Boolean, default: false },
+    userId: { type: String, default: "" },
+    dataAccessExpiresAt: { type: Date, default: null },
+    verifiedAt: { type: Date, default: null },
+  },
   expiresAt: { type: Date, default: null },
   providerAccount: {
     id: { type: String, default: "" },
@@ -22,6 +29,14 @@ const socialConnectionSchema = new mongoose.Schema({
     permissions: { type: [String], default: [] },
   }],
   selectedAssetIds: { type: [String], default: [] },
+  webhookSubscriptions: [{
+    assetId: { type: String, required: true },
+    parentPageId: { type: String, default: "" },
+    fields: { type: [String], default: [] },
+    status: { type: String, enum: ["subscribed", "failed", "not_subscribed"], default: "not_subscribed" },
+    verifiedAt: { type: Date, default: null },
+    error: { type: String, default: "" },
+  }],
   connectedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   connectedAt: { type: Date, default: Date.now },
   lastVerifiedAt: { type: Date, default: null },
