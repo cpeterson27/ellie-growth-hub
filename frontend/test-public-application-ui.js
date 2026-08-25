@@ -1,1 +1,34 @@
-import assert from"node:assert/strict";import fs from"node:fs";import path from"node:path";import{fileURLToPath}from"node:url";const root=path.dirname(fileURLToPath(import.meta.url)),source=file=>fs.readFileSync(path.join(root,"src",file),"utf8"),app=source("App.jsx"),form=source("pages/PublicApplication.jsx"),css=source("pages/PublicApplication.css"),siteCss=source("pages/PublicSite.css"),theme=source("context/WorkspaceThemeContext.jsx"),sidebar=source("components/Sidebar.jsx");assert(fs.existsSync(path.join(root,"public","elliescoachinglogo.png")));assert(app.includes('path="/apply" element={<PublicApplication />}'));assert(app.includes('path="/ref/:code" element={<PublicApplication />}'));for(const value of["privacyTermsAccepted","smsConsent","marketingEmailConsent","coachingProgramId","trackedLinkToken","referralCode","idempotencyKey"])assert(form.includes(value),`missing ${value}`);assert(css.includes("@media(max-width:700px)"));assert(siteCss.includes(".public-brand img"));assert(theme.includes("site?.branding"));assert(sidebar.includes("site?.branding?.logoUrl"));console.log("Actual Ellie logo asset, workspace-derived public/internal logo, responsive application, consent and referral/UTM UI contracts passed.");
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.dirname(fileURLToPath(import.meta.url));
+const source = (file) => fs.readFileSync(path.join(root, "src", file), "utf8");
+const app = source("App.jsx");
+const form = source("pages/PublicApplication.jsx");
+const formCss = source("pages/PublicApplication.css");
+const site = source("pages/PublicSite.jsx");
+const heroCss = source("pages/PublicHeroLogo.css");
+const siteCss = source("pages/PublicSite.css");
+const theme = source("context/WorkspaceThemeContext.jsx");
+const sidebar = source("components/Sidebar.jsx");
+
+assert(fs.existsSync(path.join(root, "public", "elliescoachinglogo.png")));
+assert(app.includes('path="/apply" element={<PublicApplication />}'));
+assert(app.includes('path="/ref/:code" element={<PublicApplication />}'));
+for (const value of ["privacyTermsAccepted", "smsConsent", "marketingEmailConsent", "coachingProgramId", "trackedLinkToken", "referralCode", "idempotencyKey"]) assert(form.includes(value), `missing ${value}`);
+for (const value of ["Program application", "Apply to Join a Program", "Choose the program that fits your goals and tell us a little about where you are today.", 'className="application-hero__logo"', "/elliescoachinglogo.png"]) assert(form.includes(value), `missing application presentation: ${value}`);
+assert(!form.includes('className="public-kicker">Coaching application'));
+assert(site.includes('className="public-hero__media"><img'));
+assert(site.includes("/elliescoachinglogo.png"));
+assert(!site.includes("Learn. Operate. Grow."));
+assert(formCss.includes("@media(max-width:700px)"));
+assert(formCss.includes("overflow-x:hidden"));
+assert(formCss.includes("object-fit:contain"));
+assert(heroCss.includes("object-fit:contain"));
+assert(heroCss.includes("@media(max-width:520px)"));
+assert(siteCss.includes(".public-brand img"));
+assert(theme.includes("site?.branding"));
+assert(sidebar.includes("site?.branding?.logoUrl"));
+console.log("Program-application copy, actual Ellie hero logos, workspace override, responsive stacking and overflow contracts passed.");
