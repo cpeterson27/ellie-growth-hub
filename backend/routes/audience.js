@@ -22,23 +22,23 @@ const { previewOrganizationImport, importOrganizations } = require("../services/
 const { compileMarketQuestion } = require("../services/marketResearchService");
 const { sourceStatus } = require("../services/businessDataSourceService");
 const { runMarketResearchJob } = require("../services/externalMarketResearchService");
-const { requestResearchMonitorRun, runResearchMonitor, scoreSignal, signalEligibility } = require("../services/researchMonitorService");
+const { deduplicateSignals, requestResearchMonitorRun, runResearchMonitor, scoreSignal, signalEligibility } = require("../services/researchMonitorService");
 const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEmailDraftService");
 const { researchAudienceForSignal } = require("../services/researchAudienceTemplates");
 const { researchPublicWebsite } = require("../services/publicWebsiteResearchService");
 
-const AUGUST_22_PRESET = {
-  id: "august-22-nationwide-online-event",
+const STUDENT_BUYER_PRESET = {
+  id: "ellie-multifamily-student-intent",
   monitorType: "buyer_intent",
-  name: "August 22 nationwide online event",
-  query: "People across the United States showing current interest in starting, buying, growing, or systemizing a business or building wealth through real estate before the August 22 online event.",
+  name: "Ellie multifamily student intent",
+  query: "Specific recent public discussions from adults who are learning multifamily investing, analyzing an early apartment deal, asking for underwriting help, or actively seeking multifamily mentorship, a course, class, or bootcamp.",
   locations: ["United States"],
   negativeKeywords: ["student assignment", "homework", "hypothetical", "job seeker", "hiring", "my course", "promo code", "video game"],
   intentCategories: [
-    { name: "Career transition", phrases: ["leave my W-2", "quit my job", "replace my income", "become my own boss"] },
-    { name: "Business ownership", phrases: ["start a business", "buy a business", "first business", "entrepreneur community"] },
-    { name: "Growth and systems", phrases: ["scale my business", "need business systems", "stuck in my business", "looking for a business coach"] },
-    { name: "Real estate wealth", phrases: ["real estate investor", "multifamily investing", "grow my real estate portfolio", "start an investment company"] },
+    { name: "Early multifamily deal", phrases: ["my first multifamily deal", "first apartment acquisition", "underwriting my first deal", "analyzing my first apartment"] },
+    { name: "Deal analysis help", phrases: ["underwriting help", "calculate NOI", "cap rate question", "debt service question", "deal analysis help"] },
+    { name: "Learning request", phrases: ["looking for a multifamily mentor", "recommend a multifamily course", "multifamily class", "syndication bootcamp"] },
+    { name: "Execution questions", phrases: ["raising capital for my deal", "syndication question", "moving from single family to apartments"] },
   ],
   feedUrls: ["https://www.biggerpockets.com/forums"],
   intervalMinutes: 30,
@@ -75,29 +75,34 @@ const INVESTOR_PROSPECT_PRESET = {
 };
 
 const router = express.Router();
-const RECOMMENDED_MONITOR_SOURCES = ["linkedin_public", "facebook_public", "meetup_public", "community_directories", "bing_web", "reddit_rss"];
+const MONITOR_SOURCE_DEFAULTS = {
+  buyer_intent: ["bing_web", "reddit_rss"],
+  investor_profile: ["bing_web", "reddit_rss"],
+  community_partner: ["linkedin_public", "facebook_public", "meetup_public", "community_directories", "bing_web"],
+};
+const sourcesForMonitorType = (type) => [...(MONITOR_SOURCE_DEFAULTS[type] || MONITOR_SOURCE_DEFAULTS.buyer_intent)];
 
 router.get("/research/sources", (_req, res) => {
   return res.json({
     success: true,
     sources: [sourceStatus()],
     automaticSources: [
-      { id: "google_web", name: "Google Programmable Search (entire public web)", accountRequired: true, configured: Boolean(process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) },
-      { id: "bing_web", name: "Open web (Bing RSS)", accountRequired: false },
-      { id: "bing_news", name: "Bing News RSS", accountRequired: false },
-      { id: "linkedin_public", name: "Public LinkedIn groups indexed on the web", accountRequired: false, availability: "public_index_only" },
-      { id: "facebook_public", name: "Public Facebook groups indexed on the web", accountRequired: false, availability: "public_index_only" },
-      { id: "meetup_public", name: "Public Meetup real-estate groups", accountRequired: false },
-      { id: "community_directories", name: "Public REIA and real-estate club directories", accountRequired: false },
-      { id: "gdelt", name: "Worldwide news (GDELT)", accountRequired: false },
-      { id: "sec_form_d", name: "SEC Form D related people", accountRequired: false },
-      { id: "bluesky", name: "Public Bluesky posts", accountRequired: false },
-      { id: "hacker_news", name: "Hacker News discussions", accountRequired: false },
-      { id: "stack_exchange", name: "Stack Exchange questions", accountRequired: false },
-      { id: "reddit_rss", name: "Public Reddit search feeds", accountRequired: false, availability: "best_effort" },
-      { id: "duckduckgo", name: "Open-web discovery (DuckDuckGo)", accountRequired: false, availability: "best_effort" },
-      { id: "rss", name: "Public RSS and Atom feeds", accountRequired: false },
-      { id: "discourse", name: "Public Discourse communities", accountRequired: false },
+      { id: "google_web", name: "Google Programmable Search", signalClass: "D", intendedUses: ["company", "discussion"], accountRequired: true, configured: Boolean(process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) },
+      { id: "bing_web", name: "Open web (Bing RSS)", signalClass: "A/C", intendedUses: ["student_intent", "investor", "community", "company"], accountRequired: false },
+      { id: "bing_news", name: "Bing News RSS", signalClass: "B/C", intendedUses: ["company", "investor"], accountRequired: false },
+      { id: "linkedin_public", name: "Public LinkedIn group/page metadata", signalClass: "B", intendedUses: ["community"], accountRequired: false, availability: "public_index_only" },
+      { id: "facebook_public", name: "Public Facebook group/page metadata", signalClass: "B", intendedUses: ["community"], accountRequired: false, availability: "public_index_only" },
+      { id: "meetup_public", name: "Public Meetup group metadata", signalClass: "B", intendedUses: ["community"], accountRequired: false },
+      { id: "community_directories", name: "Public REIA and club directories", signalClass: "B", intendedUses: ["community"], accountRequired: false },
+      { id: "gdelt", name: "Worldwide news (GDELT)", signalClass: "C", intendedUses: ["company"], accountRequired: false },
+      { id: "sec_form_d", name: "SEC Form D filings — experimental, never student intent", signalClass: "B", intendedUses: ["disabled_experimental"], accountRequired: false },
+      { id: "bluesky", name: "Public Bluesky posts", signalClass: "C/D", intendedUses: ["discussion"], accountRequired: false },
+      { id: "hacker_news", name: "Hacker News discussions", signalClass: "A/C", intendedUses: ["discussion"], accountRequired: false },
+      { id: "stack_exchange", name: "Stack Exchange questions", signalClass: "A/C", intendedUses: ["discussion"], accountRequired: false },
+      { id: "reddit_rss", name: "Public Reddit discussions", signalClass: "A/C", intendedUses: ["student_intent", "investor"], accountRequired: false, availability: "best_effort" },
+      { id: "duckduckgo", name: "Open-web discovery (DuckDuckGo)", signalClass: "C", intendedUses: ["company", "discussion"], accountRequired: false, availability: "best_effort" },
+      { id: "rss", name: "Public RSS and Atom feeds — use a configured URL", signalClass: "D", intendedUses: ["configured_url_only"], accountRequired: false },
+      { id: "discourse", name: "Public Discourse — use a configured URL", signalClass: "D", intendedUses: ["configured_url_only"], accountRequired: false },
     ],
   });
 });
@@ -107,31 +112,34 @@ router.get("/research/monitors", async (req, res) => {
   return res.json({ success: true, monitors });
 });
 
-router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: [INVESTOR_PROSPECT_PRESET, AUGUST_22_PRESET, COMMUNITY_PARTNER_PRESET] }));
+router.get("/research/monitor-presets", (_req, res) => res.json({ success: true, presets: [STUDENT_BUYER_PRESET, INVESTOR_PROSPECT_PRESET, COMMUNITY_PARTNER_PRESET] }));
 
 router.post("/research/monitors", async (req, res) => {
   try {
     const query = String(req.body?.query || "").trim();
     if (query.length < 5) return res.status(400).json({ success: false, error: "Describe the intent or audience to monitor." });
     const allowedSources = new Set(["google_web", "bing_web", "bing_news", "linkedin_public", "facebook_public", "meetup_public", "community_directories", "gdelt", "sec_form_d", "bluesky", "hacker_news", "stack_exchange", "discourse", "rss", "reddit_rss", "duckduckgo"]);
+    const monitorType = ["buyer_intent", "community_partner", "investor_profile"].includes(req.body?.monitorType) ? req.body.monitorType : "buyer_intent";
     const requestedSources = Array.isArray(req.body?.sources) ? req.body.sources.filter((source) => allowedSources.has(source)) : [];
+    const safeSources = requestedSources.filter((source) => monitorType === "community_partner" || !["linkedin_public", "facebook_public", "meetup_public", "community_directories"].includes(source)).filter((source) => monitorType !== "buyer_intent" || source !== "sec_form_d");
+    const selectedSources = safeSources.length ? safeSources : sourcesForMonitorType(monitorType);
     const monitor = await ResearchMonitor.create({
       workspaceId: req.auth.workspaceId,
       userId: req.auth.user?._id || null,
       name: String(req.body?.name || query).trim().slice(0, 160),
-      monitorType: ["buyer_intent", "community_partner", "investor_profile"].includes(req.body?.monitorType) ? req.body.monitorType : "buyer_intent",
+      monitorType,
       query,
       keywords: (req.body?.keywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
       intentCategories: (req.body?.intentCategories || []).slice(0, 12).map((category) => ({ name: String(category.name || "Intent").trim().slice(0, 80), phrases: (category.phrases || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 30) })),
       negativeKeywords: (req.body?.negativeKeywords || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 50),
       locations: (req.body?.locations || []).map(String).map((value) => value.trim()).filter(Boolean).slice(0, 25),
-      sources: requestedSources.length ? requestedSources : RECOMMENDED_MONITOR_SOURCES,
+      sources: selectedSources,
       feedUrls: (req.body?.feedUrls || []).map(String).filter((url) => /^https:\/\//i.test(url)).slice(0, 30),
       intervalMinutes: Math.min(10080, Math.max(15, Number(req.body?.intervalMinutes) || 60)),
       maxResultsPerSource: Math.min(100, Math.max(5, Number(req.body?.maxResultsPerSource) || 25)),
       nextRunAt: new Date(),
       runRequestedAt: new Date(),
-      sourceHealth: (requestedSources.length ? requestedSources : RECOMMENDED_MONITOR_SOURCES).map((source) => ({ source, enabled: true, state: "never", nextScheduledAttempt: new Date() })),
+      sourceHealth: selectedSources.map((source) => ({ source, enabled: true, state: "never", nextScheduledAttempt: new Date() })),
     });
     // A new monitor always performs its first check immediately. The selected
     // interval controls subsequent checks, not the initial one.
@@ -145,8 +153,13 @@ router.post("/research/monitors", async (req, res) => {
 });
 
 router.patch("/research/monitors/:monitorId", async (req, res) => {
+  const existingMonitor = await ResearchMonitor.findOne({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId }).select("monitorType").lean();
+  if (!existingMonitor) return res.status(404).json({ success: false, error: "Monitor not found." });
   const allowed = ["name", "monitorType", "query", "keywords", "intentCategories", "negativeKeywords", "locations", "sources", "feedUrls", "enabled", "intervalMinutes", "maxResultsPerSource"];
   const update = Object.fromEntries(allowed.filter((key) => req.body?.[key] !== undefined).map((key) => [key, req.body[key]]));
+  const effectiveType = ["buyer_intent", "community_partner", "investor_profile"].includes(update.monitorType) ? update.monitorType : existingMonitor.monitorType;
+  if (Array.isArray(update.sources) && effectiveType !== "community_partner") update.sources = update.sources.filter((source) => !["linkedin_public", "facebook_public", "meetup_public", "community_directories"].includes(source));
+  if (Array.isArray(update.sources) && effectiveType === "buyer_intent") update.sources = update.sources.filter((source) => source !== "sec_form_d");
   if (update.enabled === true) update.nextRunAt = new Date();
   const monitor = await ResearchMonitor.findOneAndUpdate({ _id: req.params.monitorId, workspaceId: req.auth.workspaceId }, { $set: update }, { new: true, runValidators: true });
   if (!monitor) return res.status(404).json({ success: false, error: "Monitor not found." });
@@ -216,7 +229,7 @@ router.get("/research/signals", async (req, res) => {
   if (rejected.length) await Promise.all(rejected.map(({ signal, eligibility }) => IntentSignal.updateOne({ _id: signal._id }, { $set: { audienceEligible: false, audienceRejectionReason: eligibility.reason, status: "dismissed", classification: "irrelevant", classificationReason: eligibility.reason } })));
   const accepted = assessed.filter((item) => item.eligibility.eligible && (!item.ranking || item.ranking.score >= 45) && item.signal.audienceEligible !== false);
   if (accepted.length) await Promise.all(accepted.filter((item) => item.ranking && (item.signal.score !== item.ranking.score || JSON.stringify(item.signal.scoreReasons || []) !== JSON.stringify(item.ranking.reasons))).map(({ signal, ranking }) => IntentSignal.updateOne({ _id: signal._id }, { $set: { score: ranking.score, scoreReasons: ranking.reasons } })));
-  const acceptedSignals = accepted.map(({ signal, ranking }) => ranking ? { ...signal, score: ranking.score, scoreReasons: ranking.reasons } : signal);
+  const acceptedSignals = deduplicateSignals(accepted.map(({ signal, ranking }) => ranking ? { ...signal, score: ranking.score, scoreReasons: ranking.reasons } : signal));
   const drafts = await IntentEmailDraft.find({ workspaceId: req.auth.workspaceId, signalId: { $in: acceptedSignals.map((signal) => signal._id) } }).sort({ updatedAt: -1 }).lean();
   const draftsBySignal = new Map();
   drafts.forEach((draft) => { const key = String(draft.signalId); draftsBySignal.set(key, [...(draftsBySignal.get(key) || []), draft]); });
@@ -234,6 +247,7 @@ router.get("/research/signals", async (req, res) => {
       ...signal,
       opportunityType,
       monitorType: monitor?.monitorType || "",
+      monitorName: monitor?.name || "Unknown monitor",
       nextStep: opportunityNextStep(signal, opportunityType, crmContact, emailDrafts),
       emailDrafts,
       crmContact,

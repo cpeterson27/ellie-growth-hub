@@ -57,9 +57,11 @@ function scoreSignal(signal, monitor) {
     if (excluded.length) { partnerScore = Math.max(0, partnerScore - 60); partnerReasons.push(`Excluded terms: ${excluded.join(", ")}`); }
     return { score: Math.min(100, partnerScore), reasons: partnerReasons, matched };
   }
-  let score = buyer.eligible ? 40 : 0;
+  if (!buyer.eligible) return { score: 0, reasons: buyer.reasons.slice(), matched };
+  let score = buyer.eligible ? 55 : 0;
   const reasons = buyer.reasons.slice();
   if (buyer.eligible) score += Math.min(15, matched.length * 5);
+  if (/\b(?:first (?:multifamily |apartment |\d+[- ]unit )?(?:deal|acquisition)|underwrit(?:e|ing)|deal analysis|cap rate|\bnoi\b|debt service|multifamily mentor|multifamily (?:course|class|bootcamp|training)|raising capital)\b/i.test(content)) { score += 20; reasons.push("Shows a specific current multifamily learning or deal need"); }
   if (/\b(?:urgent|as soon as possible|this month|right now|ready to|actively looking)\b/.test(content)) { score += 15; reasons.push("Shows current urgency"); }
   if (/\b(?:my business|my company|our company|my portfolio|i own|founder|business owner)\b/.test(content)) { score += 15; reasons.push("Indicates an existing business or portfolio"); }
   if (signal.organizationDomain && signal.identityResolution?.status === "supported") { score += 10; reasons.push("Organization connection has public support"); }
@@ -83,11 +85,15 @@ function investorProfileAssessment(signal, monitor) {
   const basic = audienceEligibility(signal);
   if (!basic.eligible) return { ...basic, reasons: [basic.reason] };
   const text = `${signal.title || ""} ${signal.excerpt || ""} ${signal.organizationName || ""}`.toLowerCase();
+  if (signal.source === "sec_form_d") return { eligible: false, reason: "SEC Form D identifies filing participants, not a qualified Ellie investor prospect.", reasons: ["Filing-only identity excluded"] };
   const excluded = (monitor.negativeKeywords || []).map((value) => String(value).toLowerCase()).find((keyword) => keyword && text.includes(keyword));
   if (excluded) return { eligible: false, reason: `Excluded term: ${excluded}`, reasons: [`Excluded term: ${excluded}`] };
   const professionalFit = /\b(?:vice president|vp|director|physician|doctor|orthodontist|dentist|software architect|tech founder|founder|managing partner|partner|practice owner|business owner|executive)\b/i.test(text);
   const investorFit = /\b(?:accredited investor|limited partner|lp investor|passive investor|multifamily investor|syndication investor)\b/i.test(text);
-  if (!professionalFit && !investorFit) return { eligible: false, reason: "No target professional role or self-described investor evidence.", reasons: ["Missing professional or investor fit"] };
+  const multifamilyFit = /\b(?:multifamily|multi-family|apartment|syndication|commercial real estate)\b/i.test(text);
+  const genericInstitutional = /\b(?:venture capital|hedge fund|private equity|institutional fund|pooled investment fund|fund manager|securities offering)\b/i.test(text);
+  if (genericInstitutional && !multifamilyFit) return { eligible: false, reason: "Generic institutional finance is outside the Ellie audience.", reasons: ["Missing multifamily audience fit"] };
+  if (!multifamilyFit || (!professionalFit && !investorFit)) return { eligible: false, reason: "Qualified investor prospects require multifamily relevance plus supported professional or investor evidence.", reasons: ["Missing multifamily and investor fit"] };
   const reasons = [];
   if (professionalFit) reasons.push("Public evidence matches a target professional role");
   if (investorFit) reasons.push("Public evidence includes self-described investor language");
@@ -128,6 +134,14 @@ function buyerIntentAssessment(signal) {
   const basic = audienceEligibility(signal);
   if (!basic.eligible) return { ...basic, reasons: [basic.reason] };
   const text = `${signal.title || ""} ${signal.excerpt || ""}`.toLowerCase();
+  const communityMetadataSources = new Set(["linkedin_public", "facebook_public", "meetup_public", "community_directories", "configured_community"]);
+  if (signal.source === "sec_form_d") return { eligible: false, reason: "SEC Form D is filing evidence, not student buying intent.", reasons: ["Institutional filing excluded from student intent"] };
+  if (communityMetadataSources.has(signal.source)) return { eligible: false, reason: "Public community metadata belongs in Community Partner discovery, not individual student intent.", reasons: ["Community metadata is not an individual conversation"] };
+  if (/https?:\/\/(?:www\.)?(?:linkedin\.com\/groups|facebook\.com\/(?:groups|pages)|meetup\.com\/[^/]+\/?$)/i.test(String(signal.sourceUrl || ""))) return { eligible: false, reason: "An indexed community page is metadata, not an individual public discussion.", reasons: ["Indexed community metadata is not buyer intent"] };
+  const institutional = /\b(?:venture capital|hedge fund|private equity|institutional fund|pooled investment fund|fund manager|securities offering|form d|limited partnership fund)\b/i;
+  if (institutional.test(text)) return { eligible: false, reason: "Institutional finance or securities evidence is not Ellie student intent.", reasons: ["Institutional finance evidence excluded"] };
+  const multifamily = /\b(?:multifamily|multi-family|apartment(?:s| building| acquisition)?|commercial real estate|syndicat(?:ion|e)|cap rate|net operating income|noi|debt service|underwrit(?:e|ing)|first (?:deal|property)|\d+[- ]unit|raising capital for (?:a|my) deal)\b/i;
+  if (!multifamily.test(text)) return { eligible: false, reason: "No specific multifamily or apartment-investing relevance.", reasons: ["Missing multifamily relevance"] };
   const promotion = /\b(?:free (?:business )?(?:guide|kit|webinar|download|resource)|looking for feedback|feedback on (?:my|our)|i(?:'m| am) (?:building|launching|offering|creating)|my (?:course|program|service|newsletter)|we help|book a call|subscribe|sign up|join (?:us|my)|use my code|limited offer)\b/;
   if (promotion.test(text)) return { eligible: false, reason: "Promotional or creator-feedback content—not a buyer request.", reasons: ["Appears to be promoting or testing an offer"] };
   const informational = /\b(?:the best thing you could ever have|tips for (?:entrepreneurs|business owners)|entrepreneurs (?:should|must|need to)|here(?:'s| is) how|ultimate guide|top \d+|why every)\b/;
@@ -140,10 +154,29 @@ function buyerIntentAssessment(signal) {
     [/\b(?:i(?:'m| am)|we(?:'re| are)) (?:thinking about|considering|trying to|looking to|exploring)\b|\bthinking about (?:my|our|the) next move\b/, "Actively considering a next business or investment move"],
     [/\b(?:struggling (?:to|with)|stuck (?:in|with)|overwhelmed (?:by|with))\b/, "Describes a current business challenge"],
     [/\b(?:can anyone recommend|recommendations? for|seeking (?:a |an )?(?:coach|mentor|consultant|program|community|system|solution))\b/, "Requests a recommendation"],
+    [/\b(?:my first|our first|i(?:'m| am) (?:underwriting|analyzing)|we(?:'re| are) (?:underwriting|analyzing)|need help (?:with|calculating)|stuck (?:on|with)|looking for (?:a )?(?:multifamily )?(?:mentor|course|class|bootcamp|training))\b/, "Describes a current multifamily learning or deal-analysis need"],
   ];
   const reasons = intentPatterns.filter(([pattern]) => pattern.test(text)).map(([, reason]) => reason);
   if (!reasons.length) return { eligible: false, reason: "No clear first-person current need or buying request.", reasons: ["Keyword match without buyer behavior"] };
   return { eligible: true, reason: "", reasons };
+}
+
+function deduplicateSignals(signals = []) {
+  const rows = new Map();
+  for (const signal of signals) {
+    const authorUrl = String(signal.authorUrl || "").trim().toLowerCase().replace(/\/$/, "");
+    const supportedName = signal.identityResolution?.status === "supported" ? String(signal.authorName || "").trim().toLowerCase() : "";
+    const domain = String(signal.organizationDomain || "").trim().toLowerCase();
+    const key = authorUrl ? `author:${authorUrl}` : supportedName && domain ? `person:${supportedName}|${domain}` : `source:${signal.source}|${signal.sourceId}`;
+    const existing = rows.get(key);
+    if (!existing) { rows.set(key, { ...signal, evidence: [...(signal.evidence || [])], duplicateSignalIds: [signal._id] }); continue; }
+    existing.evidence = [...new Map([...(existing.evidence || []), ...(signal.evidence || [])].map((item) => [item.url, item])).values()];
+    existing.duplicateSignalIds.push(signal._id);
+    if ((signal.score || 0) > (existing.score || 0)) {
+      for (const field of ["title", "excerpt", "score", "scoreReasons", "source", "sourceId", "sourceUrl", "publishedAt", "monitorId", "classification", "classificationReason"]) existing[field] = signal[field];
+    }
+  }
+  return [...rows.values()];
 }
 
 async function classifySignal(signal) {
@@ -206,7 +239,7 @@ async function runResearchMonitor(monitorId) {
         const eligibility = signalEligibility(signal, monitor);
         if (!eligibility.eligible) { rejected += 1; continue; }
         const ranking = scoreSignal(signal, monitor);
-        if ((!isInvestorProfileMonitor(monitor) && !ranking.matched.length) || ranking.score < 45) { rejected += 1; continue; }
+        if ((isCommunityPartnerMonitor(monitor) && !ranking.matched.length) || ranking.score < 45) { rejected += 1; continue; }
         const classification = isInvestorProfileMonitor(monitor)
           ? { classification: "uncertain", method: "rules", reason: "Matched public professional or self-described investor evidence." }
           : isCommunityPartnerMonitor(monitor)
@@ -293,4 +326,4 @@ function startResearchMonitorRunner() {
   return timer;
 }
 
-module.exports = { audienceEligibility, buyerIntentAssessment, classifySignal, communityPartnerAssessment, investorProfileAssessment, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, signalEligibility, startResearchMonitorRunner, scoreSignal };
+module.exports = { audienceEligibility, buyerIntentAssessment, classifySignal, communityPartnerAssessment, deduplicateSignals, investorProfileAssessment, requestResearchMonitorRun, runResearchMonitor, runDueResearchMonitors, signalEligibility, startResearchMonitorRunner, scoreSignal };

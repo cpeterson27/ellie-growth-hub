@@ -582,7 +582,15 @@ const ADAPTERS = {
 
 async function collectMonitorSignals(monitor) {
   const limit = Math.min(100, Math.max(5, Number(monitor.maxResultsPerSource) || 25));
-  const selected = monitor.sources?.length ? [...monitor.sources] : ["bing_web", "bing_news", "sec_form_d", "hacker_news", "stack_exchange", "reddit_rss"];
+  const selected = monitor.sources?.length ? [...monitor.sources] : isCommunityPartnerMonitor(monitor) ? ["linkedin_public", "facebook_public", "meetup_public", "community_directories", "bing_web"] : ["bing_web", "reddit_rss"];
+  if (!isCommunityPartnerMonitor(monitor)) {
+    for (const source of ["linkedin_public", "facebook_public", "meetup_public", "community_directories"]) {
+      const index = selected.indexOf(source); if (index >= 0) selected.splice(index, 1);
+    }
+  }
+  if (monitor.monitorType === "buyer_intent") {
+    const index = selected.indexOf("sec_form_d"); if (index >= 0) selected.splice(index, 1);
+  }
   if (isCommunityPartnerMonitor(monitor) && !selected.includes("meetup_public")) selected.push("meetup_public");
   if (isCommunityPartnerMonitor(monitor) && !selected.includes("community_directories")) selected.push("community_directories");
   if (isCommunityPartnerMonitor(monitor) && !selected.includes("linkedin_public")) selected.push("linkedin_public");
