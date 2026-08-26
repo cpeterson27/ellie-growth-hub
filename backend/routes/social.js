@@ -1,6 +1,7 @@
 const express = require("express");
 const { requireRole } = require("../middleware/auth");
 const socialOAuth = require("../services/socialOAuthService");
+const metaDeauthorization = require("../services/metaDeauthorizationService");
 
 const router = express.Router();
 const PROVIDERS = new Set(require("../services/socialProviderConfig").SOCIAL_PROVIDERS);
@@ -18,6 +19,16 @@ function frontendRedirect(params) {
   const frontend = String(process.env.FRONTEND_URL || "http://localhost:5173").split(",")[0].trim().replace(/\/$/, "");
   return `${frontend}/integrations?${new URLSearchParams(params)}`;
 }
+
+router.post("/meta/deauthorize", async (req, res) => {
+  try {
+    await metaDeauthorization.deauthorize(req.body?.signed_request);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    const status = /not configured/i.test(error.message) ? 503 : 400;
+    return res.status(status).json({ error: status === 503 ? "Meta deauthorization is unavailable" : "Invalid signed_request" });
+  }
+});
 
 router.get("/:provider/oauth/status", async (req, res, next) => {
   try {

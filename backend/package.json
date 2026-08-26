@@ -19,6 +19,7 @@
     "test:social-conversations": "node test-social-conversations.js",
     "test:social-lead-automation": "node test-social-lead-automation.js",
     "test:meta-preconnection": "node test-meta-preconnection.js",
+    "test:meta-deauthorization": "node test-meta-deauthorization.js",
     "test:social-publishing": "node test-social-publishing.js",
     "test:automation-analytics": "node test-automation-analytics.js",
     "test:security-rbac": "node test-security-rbac.js",

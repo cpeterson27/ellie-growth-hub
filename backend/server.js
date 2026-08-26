@@ -156,7 +156,7 @@ connectDatabase(mongoUri)
       const publicCoachingCalendarCallback = req.path === "/coaching/calendar/oauth/callback";
       const publicCoachingZoomRoute = req.path === "/coaching/zoom/oauth/callback" || req.path === "/coaching/zoom/webhook";
       const publicSkoolAdapterRoute = req.path === "/coaching/skool/adapter/events";
-      const publicSocialCallback = /^\/social\/(?:linkedin|meta|instagram|x)\/oauth\/callback$/.test(req.path);
+      const publicSocialCallback = /^\/social\/(?:linkedin|meta|instagram|x)\/oauth\/callback$/.test(req.path) || req.path === "/social/meta/deauthorize";
       return publicRequest || publicMeetupCallback || publicSocialCallback || publicCoachingCalendarCallback || publicCoachingZoomRoute || publicSkoolAdapterRoute ? next() : requireAuth(req, res, next);
     });
     app.use("/api", restrictNewRoleSurface);
