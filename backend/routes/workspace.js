@@ -124,12 +124,13 @@ router.get("/members", requireCapability("team.view", "team.manage"), async (req
   const invitationByUser = new Map(); for (const item of invitations) if (!invitationByUser.has(String(item.userId))) invitationByUser.set(String(item.userId), item);
   res.json({ members: memberships.map((membership) => memberResponse(membership, profileByUser.get(String(membership.userId?._id || membership.userId)), ambassadorByUser.get(String(membership.userId?._id || membership.userId)), invitationByUser.get(String(membership.userId?._id || membership.userId)))) });
 });
-router.post("/invitations/:id/send", requireCapability("team.manage"), async (req, res) => { try { const delivery = await workspaceMemberService.sendInvitation({ workspaceId: req.auth.workspaceId, invitationId: req.params.id, subject: req.body?.subject, body: req.body?.body }); const invitation = await WorkspaceInvitation.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).lean(); res.json({ invitation: { id: invitation._id, status: invitation.status, deliveryStatus: delivery.deliveryStatus, sentAt: invitation.sentAt, expiresAt: invitation.expiresAt, subject: invitation.subject, body: invitation.body } }); } catch (error) { res.status(400).json({ error: error.message }); } });
+router.post("/invitations/:id/send", requireCapability("team.manage"), async (req, res) => { try { const delivery = await workspaceMemberService.sendInvitation({ workspaceId: req.auth.workspaceId, invitationId: req.params.id, actorUserId: req.auth.user._id, subject: req.body?.subject, body: req.body?.body }); const invitation = await WorkspaceInvitation.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).lean(); res.json({ invitation: { id: invitation._id, status: invitation.status, deliveryStatus: delivery.deliveryStatus, sentAt: invitation.sentAt, expiresAt: invitation.expiresAt, subject: invitation.subject, body: invitation.body } }); } catch (error) { res.status(400).json({ error: error.message }); } });
 
 router.post("/members", requireCapability("team.manage"), async (req, res) => {
   try {
-    const roles = [...new Set((Array.isArray(req.body?.roles) ? req.body.roles : [req.body?.role || "member"]).filter((role) => ROLE_DEFAULTS[role] && role !== "owner"))];
+    const roles = [...new Set((Array.isArray(req.body?.roles) ? req.body.roles : [req.body?.role || "member"]).filter((role) => ROLE_DEFAULTS[role]))];
     if (!roles.length) roles.push("member");
+    validateMembershipChange({ currentRoles: [], requestedRoles: roles, actorRoles: req.auth.roles || [req.auth.role].filter(Boolean) });
     if (roles.includes("ambassador")) {
       const data = await workspaceMemberService.onboardAmbassador({ ...req.body, roles, workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id });
       return res.status(data.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...data.membership.toObject(), userId: data.user }, null, data.ambassadorProfile, data.invitation), invitation: invitationResponse(data.invitation), alreadyActive: data.alreadyActive });

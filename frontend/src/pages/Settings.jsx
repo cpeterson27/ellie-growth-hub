@@ -172,7 +172,7 @@ export default function Settings() {
         <button className={activeSection === "login" ? "is-active" : ""} onClick={() => setActiveSection("login")}><FiLock /> Login & password</button>
         <button className={activeSection === "security" ? "is-active" : ""} onClick={() => setActiveSection("security")}><FiShield /> Security</button>
         <button className={activeSection === "ai" ? "is-active" : ""} onClick={() => setActiveSection("ai")}><FiCpu /> AI connections</button>
-        <button className={activeSection === "team" ? "is-active" : ""} onClick={() => { setActiveSection("team"); navigate("/settings/team"); }}><FiUsers /> Team & roles</button>
+        <button className={activeSection === "team" ? "is-active" : ""} onClick={() => { setActiveSection("team"); navigate("/settings/team"); }}><FiUsers /> Team & Access</button>
         {hasPermission(session, "team.manage") ? <button className={activeSection === "invitations" ? "is-active" : ""} onClick={() => { setActiveSection("invitations"); navigate("/settings/communications/invitations"); }}><FiMail /> Communications · Invitation templates</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "public" ? "is-active" : ""} onClick={() => setActiveSection("public")}><FiImage /> Public website</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "applications" ? "is-active" : ""} onClick={() => setActiveSection("applications")}><FiBriefcase /> Application routing</button> : null}

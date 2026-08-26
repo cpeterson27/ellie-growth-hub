@@ -15,6 +15,15 @@ const { legacyRoleFor, normalizeRoles } = require("../authorization/capabilities
 const dependencies = { User, Workspace, WorkspaceMembership, WorkspaceInvitation, CoachProfile, CoachingProgram, AmbassadorProfile, CrmActivity, integrationHub, invitationTemplateService };
 const INVITATION_DAYS = 7;
 
+async function requireOwnerActor(input, models) {
+  if (!input.workspaceId || !input.actorUserId) throw Object.assign(new Error("An authenticated workspace Owner is required"), { code: "OWNER_ESCALATION_BLOCKED" });
+  const actor = await models.WorkspaceMembership.findOne({ workspaceId: input.workspaceId, userId: input.actorUserId, status: "active" });
+  if (!actor || actor.status !== "active" || !normalizeRoles(actor).includes("owner")) {
+    const error = new Error("Only an active workspace Owner can grant or manage Owner invitations");
+    error.code = "OWNER_ESCALATION_BLOCKED"; throw error;
+  }
+}
+
 function cleanEmail(value) { return String(value || "").trim().toLowerCase(); }
 function invitationHash(token) { return crypto.createHash("sha256").update(String(token || "")).digest("hex"); }
 function publicFrontendUrl() { return String(process.env.PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, ""); }
@@ -63,10 +72,12 @@ async function deliverInvitation({ invitation, token = crypto.randomBytes(32).to
 async function inviteMember(input, models = dependencies) {
   const email = cleanEmail(input.email), name = String(input.name || "").trim();
   if (!email.includes("@") || name.length < 2) throw new Error("Enter a name and valid email");
-  const roles = [...new Set((input.roles || []).filter((role) => ["admin", "coach", "closer", "ambassador", "member", "viewer"].includes(role)))];
+  const roles = [...new Set((input.roles || []).filter((role) => ["owner", "admin", "coach", "closer", "ambassador", "member", "viewer"].includes(role)))];
   if (!roles.length) roles.push("member");
+  if (roles.includes("owner")) await requireOwnerActor(input, models);
   const { user } = await findOrCreateUser({ name, email }, models);
   const existing = await models.WorkspaceMembership.findOne({ workspaceId: input.workspaceId, userId: user._id });
+  if (existing && normalizeRoles(existing).includes("owner")) await requireOwnerActor(input, models);
   if (existing?.status === "active") {
     const combinedRoles = [...new Set([...normalizeRoles(existing), ...roles])];
     existing.roles = combinedRoles;
@@ -144,7 +155,7 @@ async function onboardAmbassador(input, models = dependencies) {
   return { ...invited, ambassadorProfile };
 }
 
-async function sendInvitation({ workspaceId, invitationId, subject, body }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.User.findById(invitation.invitedBy).select("name").lean()]); return deliverInvitation({ invitation, workspaceName: workspace?.name || "Growth Operator", invitedBy: inviter?.name || "A workspace administrator" }, models); }
+async function sendInvitation({ workspaceId, invitationId, subject, body, actorUserId }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (invitation.roles?.includes("owner")) await requireOwnerActor({ workspaceId, actorUserId }, models); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.User.findById(invitation.invitedBy).select("name").lean()]); return deliverInvitation({ invitation, workspaceName: workspace?.name || "Growth Operator", invitedBy: inviter?.name || "A workspace administrator" }, models); }
 
 async function acceptInvitation({ token, password, name }, models = dependencies) {
   const invitation = await models.WorkspaceInvitation.findOne({ tokenHash: invitationHash(token), status: "pending", expiresAt: { $gt: new Date() } }).select("+tokenHash +deliveryError");
