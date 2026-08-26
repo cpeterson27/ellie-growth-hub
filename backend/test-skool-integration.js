@@ -20,6 +20,16 @@ async function run() {
   assert.deepEqual(persisted.credentialsEncrypted, encrypted);
   assert.equal(JSON.stringify(persisted).includes("hooks.zapier.com"), false, "hook URL must not be in public settings");
 
+  const mappedProgram = { async save() { return this; } };
+  const mappingModels = { CoachingProgram: { async findOne() { return mappedProgram; } } };
+  await assert.rejects(() => service.saveProgramMapping({ workspaceId, coachingProgramId: "program-1", enabled: true, groupId: "" }, mappingModels), /Skool Group ID is required/);
+  await service.saveProgramMapping({ workspaceId, coachingProgramId: "program-1", enabled: true, groupId: "group-1", courseIds: ["course-1", "course-1"] }, mappingModels);
+  assert.equal(mappedProgram.skoolMapping.enabled, true);
+  assert.deepEqual(mappedProgram.skoolMapping.courseIds, ["course-1"]);
+  await service.saveProgramMapping({ workspaceId, coachingProgramId: "program-1", enabled: false }, mappingModels);
+  assert.equal(mappedProgram.skoolMapping.enabled, false);
+  assert.equal(mappedProgram.skoolMapping.groupId, "");
+
   const body = JSON.stringify({ providerEventId: "evt-1", eventType: "paid_member" });
   const signature = crypto.createHmac("sha256", "secret").update(body).digest("hex");
   assert.equal(service.verifyAdapter(body, "secret", signature), true);
