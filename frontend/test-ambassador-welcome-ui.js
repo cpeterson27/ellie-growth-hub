@@ -9,6 +9,7 @@ assert.match(sidebar, /Ambassador Welcome Posts/);
 for (const label of ["Template name", "Logo / brand asset URL", "Headline", "Subheadline", "Photo layout", "AI caption instructions", "Create Welcome Post"]) assert.match(settings, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 assert.match(settings, /never publishes or schedules anything/i);
 assert.match(settings, /UserAvatar/);
-assert.match(portal, /Edit profile/);
+assert.match(portal, /Edit My Profile/);
+assert.match(portal, /to="\/profile"/);
 assert.match(portal, /Profile .*complete/);
 console.log("Ambassador profile and welcome-template management UI checks passed.");

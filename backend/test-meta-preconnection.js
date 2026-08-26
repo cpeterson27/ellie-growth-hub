@@ -8,6 +8,7 @@ process.env.META_APP_ID = "meta-app-123";
 process.env.META_APP_SECRET = "provider-secret-never-log";
 process.env.META_REDIRECT_URI = "https://api.example.test/api/social/meta/oauth/callback";
 process.env.META_GRAPH_API_VERSION = "v23.0";
+process.env.FACEBOOK_LOGIN_CONFIG_ID = "123456789";
 
 const oauth = require("./services/socialOAuthService");
 const { encryptCredentials } = require("./utils/credentialEncryption");

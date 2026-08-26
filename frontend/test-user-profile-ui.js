@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const source = fs.readFileSync("src/pages/MyProfile.jsx", "utf8");
+for (const text of ["My Profile", "Personal information", "Professional information", "Contact & online presence", "Account information", "Edit Profile", "Save profile", "Cancel", "Loading your profile", "Saving…", "firstName", "lastName", "jobTitle", "company", "timezone", "linkedin", "facebook", "instagram", "website"]) assert(source.includes(text), text);
+assert(source.includes("fetchMyProfile()"));
+assert(source.includes("saveMyProfile(draft)"));
+assert(source.includes("setPhoto(null); setRemovePhoto(false)"));
+assert(source.includes("setDraft(null)"));
+assert(source.includes('role={notice.error ? "alert" : "status"}'));
+assert(!source.includes('change("email"'));
+const portal = fs.readFileSync("src/pages/AmbassadorPortal.jsx", "utf8");
+assert(portal.includes('to="/profile"'));
+assert(!portal.includes("updateMyAmbassadorProfile"), "one canonical edit experience");
+console.log("My Profile structure, protected email, save/cancel, staged photo, feedback, and Ambassador shared-profile navigation contracts passed.");

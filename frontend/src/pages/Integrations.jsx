@@ -72,7 +72,7 @@ export default function Integrations() {
     return provider && status && status !== "connected" ? params.get("message") || `${provider} connection did not complete.` : "";
   });
   const [gmail, setGmail] = useState(null);
-  const [socialConnections, setSocialConnections] = useState({ linkedin: null, meta: null });
+  const [socialConnections, setSocialConnections] = useState({ linkedin: null, meta: null, instagram: null });
   const [socialBusy, setSocialBusy] = useState("");
   const [skool, setSkool] = useState(null);
   const [meetup, setMeetup] = useState(null);
@@ -84,7 +84,7 @@ export default function Integrations() {
   const loadProviders = async () => {
     try {
       setLoading(true);
-      const [response, connection, webhook, eventData, gmailConnection, linkedin, meta, skoolStatus, meetupStatus] = await Promise.all([
+      const [response, connection, webhook, eventData, gmailConnection, linkedin, meta, skoolStatus, meetupStatus, instagram] = await Promise.all([
         fetchIntegrationHub(),
         fetchEventbriteConnection().catch(() => null),
         fetchEventbriteWebhookStatus().catch(() => null),
@@ -94,13 +94,14 @@ export default function Integrations() {
         fetchSocialConnection("meta").catch(() => null),
         fetchSkoolStatus().catch(() => null),
         fetchMeetupStatus().catch(() => null),
+        fetchSocialConnection("instagram").catch(() => null),
       ]);
       setProviders(response.data?.providers || []);
       setEventbriteConnection(connection);
       setEventbriteWebhook(webhook);
       setEvents(Array.isArray(eventData) ? eventData : []);
       setGmail(gmailConnection);
-      setSocialConnections({ linkedin, meta });
+      setSocialConnections({ linkedin, meta, instagram });
       setSkool(skoolStatus);
       setMeetup(meetupStatus);
       setMeetupNetwork(meetupStatus?.proNetworkUrlname || "");
@@ -274,7 +275,7 @@ export default function Integrations() {
         <section className="integration-provider-grid">
           {providers.filter((provider) => !["resend", "meetup"].includes(provider.id)).map((provider) => {
             const isEventbrite = provider.id === "eventbrite";
-            const socialProvider = provider.id === "facebook" ? "meta" : provider.id === "linkedin" ? "linkedin" : "";
+            const socialProvider = provider.id === "facebook" ? "meta" : ["linkedin", "instagram"].includes(provider.id) ? provider.id : "";
             const socialConnection = socialProvider ? socialConnections[socialProvider] : null;
             const status = socialProvider ? (socialConnection?.connected ? "connected" : socialConnection?.configured ? "configuration_required" : "planned") : isEventbrite && eventbriteReady ? "connected" : provider.status;
             return (

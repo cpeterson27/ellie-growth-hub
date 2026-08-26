@@ -96,6 +96,19 @@ router.post("/login", async (req, res) => {
 
 router.get("/session", requireAuth, (req, res) => res.json(publicSession(req)));
 
+router.get("/profile", requireAuth, async (req, res) => {
+  try { return res.json({ user: await require("../services/userProfileService").load(req.auth) }); }
+  catch (error) { return res.status(error.status || 500).json({ error: error.status ? error.message : "Unable to load profile" }); }
+});
+router.patch("/profile", requireAuth, async (req, res) => {
+  try {
+    const previous = await require("../services/userProfileService").load(req.auth);
+    const user = await require("../services/userProfileService").save(req.auth, req.body);
+    await require("../services/ambassadorProfileActivity").recordProfileUpdate({ workspaceId: req.auth.workspaceId, userId: req.auth.userId, previous, user });
+    return res.json({ user });
+  } catch (error) { return res.status(error.status || 500).json({ error: error.status ? error.message : "Unable to save profile" }); }
+});
+
 router.post("/profile/avatar", requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.auth.user._id).select("+avatarPublicId");

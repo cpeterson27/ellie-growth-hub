@@ -85,7 +85,7 @@ function resultId(value) { return value?._id || value?.id || value?.token || nul
 async function executeAction({ automation, execution, action, index, context }, models = deps) {
   if (action.type === "ambassador.profile_reminder") {
     const workspaceId = execution.workspaceId;
-    const profile = await require("../models/AmbassadorProfile").findOne({ workspaceId, userId: context.event.userId, status: "active" }).populate("userId", "avatarUrl").lean();
+    const profile = await require("../models/AmbassadorProfile").findOne({ workspaceId, userId: context.event.userId, status: "active" }).populate("userId", require("./userProfileService").selection).lean();
     if (!profile) return { status: "skipped" };
     const settings = await require("../models/WorkspaceConfig").findOne({ workspaceId, key: "primary" }).select("ambassadorOnboarding").lean();
     if (require("./ambassadorWelcomeService").completeness(profile, profile.userId, settings?.ambassadorOnboarding?.requiredFields).complete) return { status: "already_complete" };

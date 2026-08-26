@@ -88,6 +88,8 @@ export const approvePrivacyRequest = (id, values) =>
 export const changePassword = (values) =>
   api.patch("/auth/password", values).then((res) => res.data);
 export const uploadMyAvatar = (file) => api.post("/auth/profile/avatar", { file }).then((res) => res.data);
+export const fetchMyProfile = () => api.get("/auth/profile").then((res) => res.data);
+export const saveMyProfile = (profile) => api.patch("/auth/profile", profile).then((res) => res.data);
 export const removeMyAvatar = () => api.delete("/auth/profile/avatar").then((res) => res.data);
 
 export const fetchWorkspaceMembers = () =>

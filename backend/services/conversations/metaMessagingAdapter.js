@@ -46,7 +46,7 @@ class MetaMessagingAdapter extends ConversationChannelAdapter {
   constructor() { super("social", "meta"); }
   async status(connection) {
     const scopes = new Set(connection?.scopes || []);
-    return { connected: connection?.status === "connected", webhookConfigured: Boolean(String(process.env.META_WEBHOOK_VERIFY_TOKEN || "").trim()), facebookMessaging: scopes.has("pages_messaging"), instagramMessaging: scopes.has("instagram_manage_messages") || scopes.has("instagram_business_manage_messages"), selectedAssets: connection?.selectedAssetIds?.length || 0 };
+    return { connected: connection?.status === "connected", webhookConfigured: Boolean(String((connection?.provider === "instagram" ? process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN : process.env.META_WEBHOOK_VERIFY_TOKEN) || "").trim()), facebookMessaging: scopes.has("pages_messaging"), instagramMessaging: scopes.has("instagram_manage_messages") || scopes.has("instagram_business_manage_messages"), selectedAssets: connection?.selectedAssetIds?.length || 0 };
   }
   async sendMessage({ channel, assetId, recipientId, body, threadId, workspaceId, userId = null, senderType = "automation" }) {
     const connection = await connectionForAsset(assetId);
@@ -61,7 +61,7 @@ class MetaMessagingAdapter extends ConversationChannelAdapter {
     const asset = connection.assets.find((item) => String(item.id) === String(assetId));
     const pageId = asset?.type === "instagram_business" ? asset.parentId : assetId;
     const token = credentials.pageTokens?.[String(pageId)] || credentials.accessToken;
-    const version = String(process.env.META_GRAPH_API_VERSION || "").trim();
+    const version = require("../socialProviderConfig").graphVersion();
     if (!token || !version) throw new Error("Meta messaging credentials are unavailable");
     const response = await axios.post(`https://${connection.provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com"}/${version}/${assetId}/messages`, { recipient: { id: recipientId }, message: { text: String(body || "").trim() } }, { params: { access_token: token }, timeout: 15000 });
     return ingestProviderMessage({ thread: { channel, provider: "meta", providerThreadId: thread.providerThreadId, participants: thread.participants, contactIds: thread.contactIds, organizationId: thread.organizationId, metadata: { assetId } }, message: { providerMessageId: response.data?.message_id || `meta:${crypto.randomUUID()}`, direction: "outbound", body, createdBy: userId, sender: { address: String(assetId) }, recipients: [{ address: String(recipientId), role: "to" }], deliveryStatus: "sent", metadata: { assetId, senderType } } });
@@ -76,7 +76,7 @@ class MetaMessagingAdapter extends ConversationChannelAdapter {
     if (!["instagram_business", "facebook_page"].includes(asset?.type)) throw new Error("Private comment replies require a connected Meta professional asset");
     const pageId = asset.type === "instagram_business" ? asset.parentId : asset.id;
     const token = credentials.pageTokens?.[String(pageId)] || credentials.accessToken;
-    const version = String(process.env.META_GRAPH_API_VERSION || "").trim();
+    const version = require("../socialProviderConfig").graphVersion();
     if (!token || !version) throw new Error("Meta messaging credentials are unavailable");
     return axios.post(`https://${connection.provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com"}/${version}/${assetId}/messages`, { recipient: { comment_id: commentId }, message: { text: String(body).trim() } }, { params: { access_token: token }, timeout: 15000 });
   }

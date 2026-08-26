@@ -4,7 +4,8 @@ const SocialConnection = require("../models/SocialConnection");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const { encryptCredentials, decryptCredentials } = require("../utils/credentialEncryption");
 
-const PROVIDERS = new Set(["linkedin", "meta", "instagram", "x"]);
+const providerSettings = require("./socialProviderConfig");
+const PROVIDERS = new Set(providerSettings.SOCIAL_PROVIDERS);
 
 function required(name) {
   const value = String(process.env[name] || "").trim();
@@ -24,7 +25,7 @@ function safeProviderError(error, fallback = "Meta authorization could not be ve
 
 function config(provider) {
   if (!PROVIDERS.has(provider)) throw new Error("Unsupported social provider");
-  if (provider === "instagram") return { clientId: required("INSTAGRAM_APP_ID"), clientSecret: required("INSTAGRAM_APP_SECRET"), redirectUri: required("INSTAGRAM_REDIRECT_URI"), apiVersion: required("META_GRAPH_API_VERSION"), scopes: splitScopes(process.env.INSTAGRAM_OAUTH_SCOPES || "instagram_business_basic instagram_business_manage_comments instagram_business_manage_messages instagram_business_content_publish") };
+  if (provider === "instagram") return { clientId: required("INSTAGRAM_APP_ID"), clientSecret: required("INSTAGRAM_APP_SECRET"), redirectUri: providerSettings.redirect("INSTAGRAM_REDIRECT_URI"), apiVersion: providerSettings.graphVersion(), scopes: providerSettings.scopes("instagram", process.env.INSTAGRAM_OAUTH_SCOPES ?? "instagram_business_basic instagram_business_manage_comments instagram_business_manage_messages instagram_business_content_publish") };
   if (provider === "x") return { clientId: required("X_CLIENT_ID"), clientSecret: required("X_CLIENT_SECRET"), redirectUri: required("X_REDIRECT_URI"), scopes: splitScopes(process.env.X_OAUTH_SCOPES || "tweet.read tweet.write users.read offline.access") };
   if (provider === "linkedin") return {
     clientId: required("LINKEDIN_CLIENT_ID"),
@@ -36,9 +37,11 @@ function config(provider) {
   return {
     clientId: required("META_APP_ID"),
     clientSecret: required("META_APP_SECRET"),
-    redirectUri: required("META_REDIRECT_URI"),
-    scopes: splitScopes(process.env.META_OAUTH_SCOPES || "pages_show_list pages_read_engagement pages_manage_metadata pages_messaging instagram_basic instagram_manage_messages instagram_manage_comments"),
-    apiVersion: required("META_GRAPH_API_VERSION"),
+    redirectUri: providerSettings.redirect("META_REDIRECT_URI"),
+    configId: providerSettings.facebookConfigId(),
+    // Dashboard configuration controls Business Login permissions; scope is not sent.
+    scopes: process.env.META_OAUTH_SCOPES === undefined ? [] : providerSettings.scopes("meta", process.env.META_OAUTH_SCOPES),
+    apiVersion: providerSettings.graphVersion(),
   };
 }
 
@@ -56,13 +59,15 @@ function createState({ provider, workspaceId, userId }) {
 
 function verifyState(rawState, expectedProvider) {
   try {
-    const [payload, signature] = String(rawState || "").split(".");
+    const parts = String(rawState || "").split(".");
+    if (parts.length !== 2 || !PROVIDERS.has(expectedProvider)) return null;
+    const [payload, signature] = parts;
     if (!payload || !signature) return null;
     const expected = crypto.createHmac("sha256", stateKey()).update(payload).digest();
     const actual = Buffer.from(signature, "base64url");
     if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
     const state = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    if (state.provider !== expectedProvider || Number(state.expiresAt) <= Date.now() || !state.workspaceId || !state.userId) return null;
+    if (state.provider !== expectedProvider || !Number.isFinite(Number(state.expiresAt)) || Number(state.expiresAt) <= Date.now() || !state.workspaceId || !state.userId) return null;
     return state;
   } catch { return null; }
 }
@@ -92,7 +97,7 @@ function authorizationUrl(provider, auth) {
     return url.toString();
   }
   const url = new URL(`https://www.facebook.com/${providerConfig.apiVersion}/dialog/oauth`);
-  url.search = new URLSearchParams({ client_id: providerConfig.clientId, redirect_uri: providerConfig.redirectUri, state, response_type: "code", scope: providerConfig.scopes.join(",") }).toString();
+  url.search = new URLSearchParams({ client_id: providerConfig.clientId, redirect_uri: providerConfig.redirectUri, state, response_type: "code", override_default_response_type: "true", config_id: providerConfig.configId }).toString();
   return url.toString();
 }
 
@@ -160,6 +165,7 @@ async function exchangeMeta(code, http = axios) {
   ]);
   const pageTokens = {};
   const assets = [];
+  if (!authorization.userId || String(profileResponse.data?.id || "") !== authorization.userId) throw new Error("Facebook authorization identity mismatch");
   for (const page of pagesResponse.data?.data || []) {
     if (page.access_token) pageTokens[String(page.id)] = page.access_token;
     assets.push({ id: String(page.id), name: page.name || "Facebook Page", type: "facebook_page", permissions: page.tasks || [] });
@@ -177,6 +183,7 @@ async function exchangeMeta(code, http = axios) {
 }
 
 async function exchangeCode(provider, code, rawState) {
+  if (!PROVIDERS.has(provider)) throw new Error("Unsupported social provider");
   const state = verifyState(rawState, provider);
   if (!state) throw new Error("Social connection request expired or is invalid");
   const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", $or: [{ role: { $in: ["owner", "admin"] } }, { roles: { $in: ["owner", "admin"] } }] });

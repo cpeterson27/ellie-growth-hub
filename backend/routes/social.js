@@ -3,7 +3,7 @@ const { requireRole } = require("../middleware/auth");
 const socialOAuth = require("../services/socialOAuthService");
 
 const router = express.Router();
-const PROVIDERS = new Set(["linkedin", "meta", "instagram", "x"]);
+const PROVIDERS = new Set(require("../services/socialProviderConfig").SOCIAL_PROVIDERS);
 
 function provider(req, res) {
   const value = String(req.params.provider || "").toLowerCase();

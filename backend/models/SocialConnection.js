@@ -3,7 +3,7 @@ const workspacePlugin = require("../tenancy/workspacePlugin");
 
 const socialConnectionSchema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
-  provider: { type: String, enum: ["linkedin", "meta", "instagram", "x"], required: true },
+  provider: { type: String, enum: require("../services/socialProviderConfig").SOCIAL_PROVIDERS, required: true },
   status: { type: String, enum: ["connected", "expired", "failed", "disconnected"], default: "connected", index: true },
   credentialsEncrypted: { type: mongoose.Schema.Types.Mixed, required: false, select: false },
   scopes: { type: [String], default: [] },
