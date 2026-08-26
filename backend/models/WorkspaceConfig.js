@@ -52,6 +52,10 @@ const workspaceConfigSchema = new mongoose.Schema({
     type: [{ _id: false, key: { type: String, required: true }, label: { type: String, required: true }, type: { type: String, enum: ["text", "number", "date", "boolean"], default: "text" } }],
     default: [],
   },
+  contactLabels: {
+    type: [String],
+    default: [],
+  },
   ambassadorOnboarding: {
     requiredFields: { type: [String], enum: ["headshot", "bio", "instagram", "linkedin", "company", "website", "timezone"], default: ["headshot", "bio"] },
     welcomeDraftOnComplete: { type: Boolean, default: false },

@@ -51,6 +51,10 @@ export const selectMeetupGroups = (groupUrlnames) => api.patch("/meetup/assets",
 
 export const fetchSocialAutomationOverview = () => api.get("/social-automation/overview").then((res) => res.data.data);
 export const fetchSocialAutomations = () => api.get("/social-automation/automations").then((res) => res.data.data);
+export const fetchSocialContactLabels = () => api.get("/social-automation/contact-labels").then((res) => res.data.data);
+export const createSocialContactLabel = (label) => api.post("/social-automation/contact-labels", { label }).then((res) => res.data.data);
+export const fetchSocialAutomationPosts = (provider, assetId) => api.get("/social-automation/posts", { params: { provider, assetId } }).then((res) => res.data.data);
+export const fetchSocialAutomationContentBriefs = (provider, assetId) => api.get("/social-automation/content-briefs", { params: { provider, assetId } }).then((res) => res.data.data);
 export const createSocialAutomation = (values) => api.post("/social-automation/automations", values).then((res) => res.data.data);
 export const updateSocialAutomation = (id, values) => api.patch(`/social-automation/automations/${id}`, values).then((res) => res.data.data);
 export const fetchSocialLeads = (params = {}) => api.get("/social-automation/leads", { params }).then((res) => res.data.data);

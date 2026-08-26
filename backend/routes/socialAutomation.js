@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const { requireCapability } = require("../middleware/auth");
 const Contact = require("../models/Contact");
 const SocialAutomation = require("../models/SocialAutomation");
@@ -8,8 +9,10 @@ const SocialConnection = require("../models/SocialConnection");
 const TrackedLink = require("../models/TrackedLink");
 const CrmActivity = require("../models/CrmActivity");
 const Campaign = require("../models/Campaign");
+const WorkspaceConfig = require("../models/WorkspaceConfig");
+const ContentBrief = require("../models/ContentBrief");
 const { runWithWorkspace } = require("../tenancy/workspaceContext");
-const { SUPPORTED_TRIGGERS, createTrackedLink, normalizedKeywords } = require("../services/socialLeadAutomationService");
+const { SUPPORTED_TRIGGERS, createTrackedLink, normalizedKeywords, normalizedLabels } = require("../services/socialLeadAutomationService");
 
 const router = express.Router();
 const adminOnly = requireCapability("social.manage");
@@ -28,7 +31,38 @@ router.get("/overview", async (_req, res) => {
   res.json({ success: true, data: { capabilities: CAPABILITIES, supportedTriggers: SUPPORTED_TRIGGERS, manyChat: { required: false, reason: "Native Meta supports the Phase 7 DM, story reply, comment webhook, keyword, and permitted private-reply flows. Follow-to-DM remains unsupported and optional." }, connections, recentEvents, counts: { automations: automationCount, socialLeads: leadCount } } });
 });
 
-router.get("/automations", async (_req, res) => res.json({ success: true, data: await SocialAutomation.find({}).populate("campaignId", "name").sort({ updatedAt: -1 }).lean() }));
+router.get("/automations", async (_req, res) => res.json({ success: true, data: await SocialAutomation.find({}).populate("campaignId", "name").populate("contentBriefId", "title status").sort({ updatedAt: -1 }).lean() }));
+router.get("/contact-labels", async (req, res) => {
+  const config = await WorkspaceConfig.findOne({ workspaceId: req.auth.workspaceId, key: "primary" }).select("contactLabels").lean();
+  const labels = normalizedLabels(config?.contactLabels || []);
+  labels.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  res.json({ success: true, data: labels });
+});
+router.get("/posts", async (req, res) => {
+  try {
+    const data = await require("../services/metaRecentPostService").recentPosts({ workspaceId: req.auth.workspaceId, provider: String(req.query.provider || ""), assetId: String(req.query.assetId || "") });
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+router.get("/content-briefs", async (req, res) => {
+  const provider = String(req.query.provider || ""), assetId = String(req.query.assetId || "");
+  if (!["facebook", "instagram"].includes(provider) || !assetId) return res.status(400).json({ error: "Choose a connected account" });
+  const rows = await ContentBrief.find({ workspaceId: req.auth.workspaceId, type: "social", status: { $ne: "archived" }, social: { $exists: true }, "social.destinations": { $elemMatch: { provider, assetId } } }).select("title body status social.publications createdAt updatedAt").sort({ updatedAt: -1 }).limit(100).lean();
+  res.json({ success: true, data: rows.map((row) => { const publication = (row.social?.publications || []).find((item) => item.provider === provider && String(item.assetId) === assetId && item.status === "published"); return { id: row._id, title: row.title, text: String(row.body || "").slice(0, 500), status: row.status, updatedAt: row.updatedAt || row.createdAt, providerPostId: publication?.providerPostId || "" }; }) });
+});
+router.post("/contact-labels", async (req, res) => {
+  const label = normalizedLabels([req.body?.label])[0];
+  if (!label) return res.status(400).json({ error: "Enter a contact label" });
+  const config = await WorkspaceConfig.findOne({ workspaceId: req.auth.workspaceId, key: "primary" });
+  const labels = normalizedLabels([...(config?.contactLabels || []), label]);
+  const saved = config || new WorkspaceConfig({ workspaceId: req.auth.workspaceId, key: "primary" });
+  saved.contactLabels = labels;
+  await saved.save();
+  const canonical = labels.find((item) => item.toLocaleLowerCase() === label.toLocaleLowerCase());
+  res.status(config ? 200 : 201).json({ success: true, data: canonical });
+});
 router.get("/history", async (_req, res) => res.json({ success: true, data: await SocialProviderEvent.find({}).select("provider eventType occurredAt processingStatus reply.status reply.error contactId").populate("contactId", "name").sort({ occurredAt: -1 }).limit(50).lean() }));
 
 router.post("/automations", async (req, res) => {
@@ -41,7 +75,12 @@ router.post("/automations", async (req, res) => {
   if (!asset) return res.status(400).json({ error: "The selected Meta asset is not connected to this workspace" });
   if (req.body.campaignId && !await Campaign.exists({ _id: req.body.campaignId })) return res.status(400).json({ error: "Campaign is not in this workspace" });
   if (req.body.cta?.destination) { try { if (new URL(req.body.cta.destination).protocol !== "https:") throw new Error(); } catch { return res.status(400).json({ error: "CTA destination must be a valid HTTPS URL" }); } }
-  const record = await SocialAutomation.create({ name: req.body.name, provider, assetId: String(req.body.assetId), contentId: String(req.body.contentId || ""), triggerType, keywords: normalizedKeywords(req.body.keywords), responseTemplate: String(req.body.responseTemplate || ""), cta: req.body.cta || {}, campaignId: req.body.campaignId || null, tags: normalizedKeywords(req.body.tags), qualification: normalizedKeywords(req.body.qualification), enabled: req.body.enabled === true, createdBy: req.auth.userId, updatedBy: req.auth.userId });
+  let contentBrief = null;
+  if (req.body.contentBriefId && !mongoose.isValidObjectId(req.body.contentBriefId)) return res.status(400).json({ error: "Choose a valid Growth Operator post" });
+  if (req.body.contentBriefId) contentBrief = await ContentBrief.findOne({ _id: req.body.contentBriefId, workspaceId: req.auth.workspaceId, type: "social", "social.destinations": { $elemMatch: { provider, assetId: String(req.body.assetId) } } }).lean();
+  if (req.body.contentBriefId && !contentBrief) return res.status(400).json({ error: "Choose a Growth Operator post for this connected account" });
+  const publication = (contentBrief?.social?.publications || []).find((item) => item.provider === provider && String(item.assetId) === String(req.body.assetId) && item.status === "published");
+  const record = await SocialAutomation.create({ name: req.body.name, provider, assetId: String(req.body.assetId), contentId: contentBrief ? String(publication?.providerPostId || "") : String(req.body.contentId || ""), contentBriefId: contentBrief?._id || null, triggerType, keywords: normalizedKeywords(req.body.keywords), responseTemplate: String(req.body.responseTemplate || ""), cta: req.body.cta || {}, campaignId: req.body.campaignId || null, tags: normalizedLabels(req.body.tags), qualification: normalizedKeywords(req.body.qualification), enabled: req.body.enabled === true, createdBy: req.auth.userId, updatedBy: req.auth.userId });
   res.status(201).json({ success: true, data: record });
 });
 
@@ -51,8 +90,16 @@ router.patch("/automations/:id", async (req, res) => {
   if (req.body.campaignId && !await Campaign.exists({ _id: req.body.campaignId })) return res.status(400).json({ error: "Campaign is not in this workspace" });
   if (req.body.cta?.destination) { try { if (new URL(req.body.cta.destination).protocol !== "https:") throw new Error(); } catch { return res.status(400).json({ error: "CTA destination must be a valid HTTPS URL" }); } }
   for (const key of ["name", "contentId", "responseTemplate", "campaignId", "enabled"]) if (req.body[key] !== undefined) record[key] = req.body[key];
+  if (req.body.contentBriefId !== undefined) {
+    if (req.body.contentBriefId && !mongoose.isValidObjectId(req.body.contentBriefId)) return res.status(400).json({ error: "Choose a valid Growth Operator post" });
+    const contentBrief = req.body.contentBriefId ? await ContentBrief.findOne({ _id: req.body.contentBriefId, workspaceId: req.auth.workspaceId, type: "social", "social.destinations": { $elemMatch: { provider: record.provider, assetId: record.assetId } } }).lean() : null;
+    if (req.body.contentBriefId && !contentBrief) return res.status(400).json({ error: "Choose a Growth Operator post for this connected account" });
+    const publication = (contentBrief?.social?.publications || []).find((item) => item.provider === record.provider && String(item.assetId) === String(record.assetId) && item.status === "published");
+    record.contentBriefId = contentBrief?._id || null;
+    record.contentId = contentBrief ? String(publication?.providerPostId || "") : String(req.body.contentId || "");
+  }
   if (req.body.keywords) record.keywords = normalizedKeywords(req.body.keywords);
-  if (req.body.tags) record.tags = normalizedKeywords(req.body.tags);
+  if (req.body.tags) record.tags = normalizedLabels(req.body.tags);
   if (req.body.qualification) record.qualification = normalizedKeywords(req.body.qualification);
   if (req.body.cta) record.cta = req.body.cta;
   record.updatedBy = req.auth.userId;

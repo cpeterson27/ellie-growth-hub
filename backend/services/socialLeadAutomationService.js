@@ -20,6 +20,23 @@ const UNSUPPORTED_ENGAGEMENTS = new Set(["like", "view", "save", "share", "react
 
 function clean(value, max = 500) { return String(value || "").trim().slice(0, max); }
 function normalizedKeywords(values) { return [...new Set((values || []).map((v) => clean(v, 80).toLowerCase()).filter(Boolean))]; }
+function normalizedLabels(values) {
+  const labels = [], seen = new Set();
+  for (const value of values || []) {
+    const label = clean(value, 80), key = label.toLocaleLowerCase();
+    if (label && !seen.has(key)) { seen.add(key); labels.push(label); }
+  }
+  return labels;
+}
+function mergeLabels(existing, additions) {
+  const labels = [...(existing || [])];
+  const seen = new Set(labels.map((value) => clean(value, 80).toLocaleLowerCase()).filter(Boolean));
+  for (const label of normalizedLabels(additions)) {
+    const key = label.toLocaleLowerCase();
+    if (!seen.has(key)) { seen.add(key); labels.push(label); }
+  }
+  return labels;
+}
 function containsKeyword(text, keywords) { const value = clean(text, 5000).toLowerCase(); return keywords.some((keyword) => value.includes(keyword)); }
 function attributionFrom(event, automation) {
   return { provider: event.provider, campaignId: automation?.campaignId || event.campaignId || null, contentId: event.contentId || automation?.contentId || "", contentBriefId: event.contentBriefId || null, automationId: automation?._id || null, occurredAt: event.occurredAt || new Date(), utm: event.utm || {} };
@@ -82,7 +99,7 @@ async function matchingAutomation(event, deps = models) {
   if (!SUPPORTED_TRIGGERS[event.provider]?.includes(event.triggerType)) return null;
   const candidates = await deps.SocialAutomation.find({ provider: event.provider, assetId: event.assetId, enabled: true, $or: [{ contentId: event.contentId || "" }, { contentId: "" }] }).sort({ createdAt: 1 });
   candidates.sort((a, b) => Number(Boolean(b.contentId)) - Number(Boolean(a.contentId)) || Number(["comment_keyword", "dm_keyword"].includes(b.triggerType)) - Number(["comment_keyword", "dm_keyword"].includes(a.triggerType)));
-  return candidates.find((item) => {
+  return candidates.filter((item) => !item.contentBriefId || item.contentId).find((item) => {
     if (item.triggerType !== event.triggerType && !(event.triggerType === "comment_any" && item.triggerType === "comment_keyword") && !(event.triggerType === "dm_keyword" && item.triggerType === "dm_any")) return false;
     return !["comment_keyword", "dm_keyword"].includes(item.triggerType) || containsKeyword(event.text, item.keywords || []);
   }) || null;
@@ -94,7 +111,7 @@ async function applyAttribution(contact, event, automation) {
   contact.set("socialAttribution.latest", attribution);
   contact.sources = [...new Set([...(contact.sources || []), `social:${event.provider}`])];
   const tags = automation?.tags || [];
-  contact.tags = [...new Set([...(contact.tags || []), "social-lead", ...tags])];
+  contact.tags = mergeLabels(contact.tags, ["social-lead", ...tags]);
   if (automation?.qualification?.length) contact.additionalFields = { ...(contact.additionalFields || {}), socialIntent: [...new Set([...(contact.additionalFields?.socialIntent || []), ...automation.qualification])] };
   await contact.save();
 }
@@ -168,4 +185,4 @@ async function createTrackedLink(values, actorUserId, deps = models) {
   return link;
 }
 
-module.exports = { SUPPORTED_TRIGGERS, allowedDestination, containsKeyword, createTrackedLink, ingestSocialEvent, normalizedKeywords, resolveIdentity };
+module.exports = { SUPPORTED_TRIGGERS, allowedDestination, containsKeyword, createTrackedLink, ingestSocialEvent, matchingAutomation, mergeLabels, normalizedKeywords, normalizedLabels, resolveIdentity };
