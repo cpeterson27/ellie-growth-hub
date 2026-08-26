@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "meta:indexes:preflight": "node scripts/migrate-meta-interaction-indexes.js --preflight",
+    "meta:indexes:migrate": "node scripts/migrate-meta-interaction-indexes.js --apply",
+    "test:meta-indexes": "node test-meta-interaction-indexes.js",
     "tenant:audit": "node scripts/migrate-workspace-ownership.js",
     "tenant:migrate": "node scripts/migrate-workspace-ownership.js --apply",
     "tenant:indexes:audit": "node scripts/migrate-tenant-indexes.js",
