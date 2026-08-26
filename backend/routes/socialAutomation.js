@@ -36,7 +36,7 @@ router.post("/automations", async (req, res) => {
   if (!SUPPORTED_TRIGGERS[provider]?.includes(triggerType) || !["instagram", "facebook"].includes(provider)) return res.status(400).json({ error: "This provider trigger is not supported by the native connection", code: "TRIGGER_UNSUPPORTED" });
   if (!req.body?.assetId || !req.body?.name) return res.status(400).json({ error: "Name and connected asset are required" });
   if (["comment_keyword", "dm_keyword"].includes(triggerType) && !normalizedKeywords(req.body.keywords).length) return res.status(400).json({ error: "At least one keyword is required" });
-  const asset = await SocialConnection.findOne({ provider: "meta", status: "connected", selectedAssetIds: String(req.body.assetId) }).lean();
+  const asset = await SocialConnection.findOne({ provider: provider === "instagram" ? { $in: ["meta", "instagram"] } : "meta", status: "connected", selectedAssetIds: String(req.body.assetId), "assets": { $elemMatch: { id: String(req.body.assetId), type: provider === "instagram" ? "instagram_business" : "facebook_page" } } }).lean();
   if (!asset) return res.status(400).json({ error: "The selected Meta asset is not connected to this workspace" });
   if (req.body.campaignId && !await Campaign.exists({ _id: req.body.campaignId })) return res.status(400).json({ error: "Campaign is not in this workspace" });
   if (req.body.cta?.destination) { try { if (new URL(req.body.cta.destination).protocol !== "https:") throw new Error(); } catch { return res.status(400).json({ error: "CTA destination must be a valid HTTPS URL" }); } }

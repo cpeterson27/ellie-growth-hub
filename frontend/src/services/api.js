@@ -1,5 +1,11 @@
 import axios from "axios";
 
+export const fetchSocialWorkspace = (section) => api.get(`/social-workspace/${section}`).then(res => res.data);
+export const mutateSocialWorkspace = (section, values) => api.post(`/social-workspace/${section}`, values).then(res => res.data);
+export const fetchAmbassadorNotifications = () => api.get("/ambassadors/me/notifications").then(res => res.data);
+export const fetchAmbassadorContentTasks = () => api.get("/ambassadors/me/content-tasks").then(res => res.data);
+export const updateAmbassadorContentTask = (id, values) => api.patch(`/ambassadors/me/content-tasks/${id}`, values).then(res => res.data);
+
 const api = axios.create({
   baseURL:
     import.meta.env.VITE_API_BASE_URL ||
@@ -144,9 +150,13 @@ export const updateCoachProfile = (coachId, values) =>
 export const fetchWorkspaceInvitation = (token) => api.get(`/auth/invitations/${encodeURIComponent(token)}`).then((res) => res.data);
 export const acceptWorkspaceInvitation = (token, values) => api.post(`/auth/invitations/${encodeURIComponent(token)}/accept`, values).then((res) => res.data);
 export const fetchMyAmbassadorProfile = () => api.get("/ambassadors/me").then((res) => res.data.data);
+export const updateMyAmbassadorProfile = (values) => api.patch("/ambassadors/me", values).then((res) => res.data.data);
 export const fetchMyAmbassadorReferrals = () => api.get("/ambassadors/me/referrals").then((res) => res.data.data);
 export const fetchMyAmbassadorPayouts = () => api.get("/ambassadors/me/payouts").then((res) => res.data.data);
 export const fetchAmbassadors = () => api.get("/ambassadors").then((res) => res.data.data);
+export const fetchAmbassadorWelcomeTemplate = () => api.get("/ambassadors/welcome-template").then((res) => res.data.data);
+export const saveAmbassadorWelcomeTemplate = (values) => api.put("/ambassadors/welcome-template", values).then((res) => res.data.data);
+export const generateAmbassadorWelcomeContent = (id) => api.post(`/ambassadors/${id}/welcome-content`).then((res) => res.data.data);
 export const fetchAmbassadorReferrals = (id) => api.get(`/ambassadors/${id}/referrals`).then((res) => res.data.data);
 export const fetchAmbassadorPayouts = (id) => api.get(`/ambassadors/${id}/payouts`).then((res) => res.data.data);
 export const updateAmbassadorStatus = (id, status) => api.patch(`/ambassadors/${id}/status`, { status }).then((res) => res.data.data);

@@ -3,7 +3,7 @@ const { requireRole } = require("../middleware/auth");
 const socialOAuth = require("../services/socialOAuthService");
 
 const router = express.Router();
-const PROVIDERS = new Set(["linkedin", "meta"]);
+const PROVIDERS = new Set(["linkedin", "meta", "instagram", "x"]);
 
 function provider(req, res) {
   const value = String(req.params.provider || "").toLowerCase();
@@ -40,7 +40,7 @@ router.get("/:provider/oauth/start", requireRole("owner", "admin"), (req, res) =
 router.get("/:provider/oauth/callback", async (req, res) => {
   const id = provider(req, res);
   if (!id) return;
-  if (req.query.error) return res.redirect(frontendRedirect({ social: id, status: "denied", message: String(req.query.error_description || req.query.error) }));
+  if (req.query.error) return res.redirect(frontendRedirect({ social: id, status: "denied", message: "Authorization was declined or unavailable." }));
   if (!req.query.code || !req.query.state) return res.redirect(frontendRedirect({ social: id, status: "failed", message: "The provider did not return an authorization code." }));
   try {
     await socialOAuth.exchangeCode(id, String(req.query.code), String(req.query.state));

@@ -18,6 +18,15 @@ const schema = new mongoose.Schema({
   communityUrl: { type: String, default: "", trim: true, maxlength: 1000 },
   startDate: { type: Date, default: Date.now },
   notes: { type: String, default: "", trim: true, maxlength: 5000 },
+  bio: { type: String, default: "", trim: true, maxlength: 3000 },
+  publicLocation: { type: String, default: "", trim: true, maxlength: 200 },
+  company: { type: String, default: "", trim: true, maxlength: 240 },
+  phone: { type: String, default: "", trim: true, maxlength: 80 },
+  timezone: { type: String, default: "", trim: true, maxlength: 100 },
+  website: { type: String, default: "", trim: true, maxlength: 1000 },
+  socialProfiles: { instagram: { type: String, default: "", maxlength: 1000 }, facebook: { type: String, default: "", maxlength: 1000 }, linkedin: { type: String, default: "", maxlength: 1000 }, x: { type: String, default: "", maxlength: 1000 } },
+  notificationPreferences: { email: { type: Boolean, default: true }, inApp: { type: Boolean, default: true } },
+  welcomePost: { status: { type: String, enum: ["not_ready", "waiting_for_profile", "draft_generated", "ready_for_review", "scheduled", "published"], default: "waiting_for_profile" }, contentBriefId: { type: mongoose.Schema.Types.ObjectId, ref: "ContentBrief", default: null }, generatedAt: { type: Date, default: null }, publishedAt: { type: Date, default: null } },
   deactivatedAt: { type: Date, default: null },
 }, { timestamps: true, collection: "ambassador_profiles" });
 schema.index({ workspaceId: 1, userId: 1 }, { unique: true });

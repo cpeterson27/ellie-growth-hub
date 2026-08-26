@@ -19,17 +19,17 @@ const { connectionForAsset, ingestMetaComment, ingestMetaMessage, metaMessagingA
 
 const router = express.Router();
 
-router.get("/meta", (req, res) => {
-  const verifyToken = String(process.env.META_WEBHOOK_VERIFY_TOKEN || "").trim();
+router.get(["/meta", "/instagram"], (req, res) => {
+  const verifyToken = String((req.path === "/instagram" ? process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN : process.env.META_WEBHOOK_VERIFY_TOKEN) || "").trim();
   if (verifyToken && req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === verifyToken) return res.status(200).send(String(req.query["hub.challenge"] || ""));
   return res.status(403).send("Verification failed");
 });
 
-router.post("/meta", async (req, res) => {
-  if (!validateMetaSignature(req.rawBody || JSON.stringify(req.body), req.get("x-hub-signature-256"))) return res.status(403).json({ error: "Invalid Meta signature" });
+router.post(["/meta", "/instagram"], async (req, res) => {
+  if (!validateMetaSignature(req.rawBody, req.get("x-hub-signature-256"), req.path === "/instagram" ? "INSTAGRAM_APP_SECRET" : "META_APP_SECRET")) return res.status(403).json({ error: "Invalid Meta signature" });
   try {
     for (const entry of req.body?.entry || []) {
-      const connection = await connectionForAsset(entry.id);
+      const connection = await connectionForAsset(entry.id, req.path === "/instagram" ? "instagram" : "meta");
       if (!connection?.workspaceId) continue;
       await runWithWorkspace(connection.workspaceId, async () => {
         for (const event of entry.messaging || []) {
@@ -47,7 +47,7 @@ router.post("/meta", async (req, res) => {
       });
     }
     res.json({ received: true });
-  } catch (error) { console.error("META MESSAGING WEBHOOK ERROR:", String(error?.message || "Webhook processing failed").slice(0, 300)); res.status(500).json({ error: "Webhook failed" }); }
+  } catch (error) { console.error("META MESSAGING WEBHOOK ERROR:", "Provider event processing failed"); res.status(500).json({ error: "Webhook failed" }); }
 });
 
 function twilioWebhookUrl(req) { return `${String(process.env.PUBLIC_BACKEND_URL || "").replace(/\/$/, "")}${req.originalUrl}`; }

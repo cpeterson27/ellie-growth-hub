@@ -24,6 +24,8 @@
     "test:invitation-templates": "node test-invitation-templates.js",
     "test:user-avatar": "node test-user-avatar.js",
     "test:ambassador-onboarding": "node test-ambassador-onboarding.js",
+    "test:ambassador-welcome": "node test-ambassador-welcome.js",
+    "test:social-workspace": "node test-social-workspace.js",
     "test:public-site-security": "node test-public-site-security.js",
     "test:public-application": "node test-public-application.js",
     "test:privacy-requests": "node test-privacy-requests.js",

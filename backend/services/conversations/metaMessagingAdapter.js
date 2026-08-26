@@ -7,16 +7,16 @@ const { ConversationChannelAdapter, registerConversationAdapter } = require("./c
 const { ingestProviderMessage } = require("./conversationIngestionService");
 const { ingestSocialEvent } = require("../socialLeadAutomationService");
 
-function validateMetaSignature(rawBody, signature) {
-  const secret = String(process.env.META_APP_SECRET || "").trim();
+function validateMetaSignature(rawBody, signature, secretName = "META_APP_SECRET") {
+  const secret = String(process.env[secretName] || "").trim();
   const supplied = String(signature || "").replace(/^sha256=/, "");
   if (!secret || !rawBody || !/^[a-f0-9]{64}$/i.test(supplied)) return false;
   const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
   return crypto.timingSafeEqual(Buffer.from(supplied, "hex"), Buffer.from(expected, "hex"));
 }
 
-async function connectionForAsset(assetId) {
-  return SocialConnection.findOne({ provider: "meta", status: "connected", selectedAssetIds: String(assetId) }).select("+credentialsEncrypted");
+async function connectionForAsset(assetId, provider = null) {
+  return SocialConnection.findOne({ provider: provider || { $in: ["meta", "instagram"] }, status: "connected", selectedAssetIds: String(assetId) }).select("+credentialsEncrypted");
 }
 
 function assetChannel(connection, assetId) {
@@ -48,10 +48,14 @@ class MetaMessagingAdapter extends ConversationChannelAdapter {
     const scopes = new Set(connection?.scopes || []);
     return { connected: connection?.status === "connected", webhookConfigured: Boolean(String(process.env.META_WEBHOOK_VERIFY_TOKEN || "").trim()), facebookMessaging: scopes.has("pages_messaging"), instagramMessaging: scopes.has("instagram_manage_messages") || scopes.has("instagram_business_manage_messages"), selectedAssets: connection?.selectedAssetIds?.length || 0 };
   }
-  async sendMessage({ channel, assetId, recipientId, body, threadId }) {
+  async sendMessage({ channel, assetId, recipientId, body, threadId, workspaceId, userId = null, senderType = "automation" }) {
     const connection = await connectionForAsset(assetId);
     if (!connection || !connection.selectedAssetIds.includes(String(assetId))) throw new Error("The Meta asset is not connected and selected");
     const thread = threadId ? await ConversationThread.findById(threadId).lean() : null;
+    if (!thread || (workspaceId && String(thread.workspaceId) !== String(workspaceId)) || String(connection.workspaceId) !== String(thread.workspaceId)) throw new Error("Social conversation is not in this workspace");
+    if (thread.channel !== channel || String(thread.metadata?.assetId) !== String(assetId) || !thread.participants?.some(person => String(person.address) === String(recipientId) && person.kind === "contact")) throw new Error("Recipient and asset must match the existing social conversation");
+    if (!String(body || "").trim() || String(body).length > 2000) throw new Error("Reply must contain 1–2000 characters");
+    if (thread.metadata?.interactionType === "comment") throw new Error("Comments require a permitted comment/private-reply action, not a free-form DM");
     if (!thread?.lastInboundAt || Date.now() - new Date(thread.lastInboundAt).getTime() > 24 * 60 * 60 * 1000) throw new Error("Meta free-form replies require a customer message within the last 24 hours");
     const credentials = decryptCredentials(connection.credentialsEncrypted);
     const asset = connection.assets.find((item) => String(item.id) === String(assetId));
@@ -59,8 +63,8 @@ class MetaMessagingAdapter extends ConversationChannelAdapter {
     const token = credentials.pageTokens?.[String(pageId)] || credentials.accessToken;
     const version = String(process.env.META_GRAPH_API_VERSION || "").trim();
     if (!token || !version) throw new Error("Meta messaging credentials are unavailable");
-    const response = await axios.post(`https://graph.facebook.com/${version}/${assetId}/messages`, { recipient: { id: recipientId }, message: { text: String(body || "").trim() } }, { params: { access_token: token }, timeout: 15000 });
-    return ingestProviderMessage({ thread: { channel, provider: "meta", providerThreadId: thread.providerThreadId, participants: thread.participants, contactIds: thread.contactIds, organizationId: thread.organizationId, metadata: { assetId } }, message: { providerMessageId: response.data?.message_id || `meta:${crypto.randomUUID()}`, direction: "outbound", body, sender: { address: String(assetId) }, recipients: [{ address: String(recipientId), role: "to" }], deliveryStatus: "sent", metadata: { assetId } } });
+    const response = await axios.post(`https://${connection.provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com"}/${version}/${assetId}/messages`, { recipient: { id: recipientId }, message: { text: String(body || "").trim() } }, { params: { access_token: token }, timeout: 15000 });
+    return ingestProviderMessage({ thread: { channel, provider: "meta", providerThreadId: thread.providerThreadId, participants: thread.participants, contactIds: thread.contactIds, organizationId: thread.organizationId, metadata: { assetId } }, message: { providerMessageId: response.data?.message_id || `meta:${crypto.randomUUID()}`, direction: "outbound", body, createdBy: userId, sender: { address: String(assetId) }, recipients: [{ address: String(recipientId), role: "to" }], deliveryStatus: "sent", metadata: { assetId, senderType } } });
   }
   async sendCommentPrivateReply({ assetId, commentId, body, occurredAt }) {
     if (!commentId || !String(body || "").trim()) throw new Error("A comment and response are required");
@@ -74,7 +78,7 @@ class MetaMessagingAdapter extends ConversationChannelAdapter {
     const token = credentials.pageTokens?.[String(pageId)] || credentials.accessToken;
     const version = String(process.env.META_GRAPH_API_VERSION || "").trim();
     if (!token || !version) throw new Error("Meta messaging credentials are unavailable");
-    return axios.post(`https://graph.facebook.com/${version}/${assetId}/messages`, { recipient: { comment_id: commentId }, message: { text: String(body).trim() } }, { params: { access_token: token }, timeout: 15000 });
+    return axios.post(`https://${connection.provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com"}/${version}/${assetId}/messages`, { recipient: { comment_id: commentId }, message: { text: String(body).trim() } }, { params: { access_token: token }, timeout: 15000 });
   }
 }
 

@@ -74,7 +74,7 @@ app.use((req, res, next) => req.path.startsWith("/api/chat/widget/") ? publicCha
 app.use(express.json({
   limit: "12mb",
   verify(req, _res, buffer) {
-    if (req.originalUrl === "/api/webhooks/resend" || req.originalUrl === "/api/webhooks/meta" || req.originalUrl === "/api/coaching/zoom/webhook" || req.originalUrl === "/api/coaching/skool/adapter/events") {
+    if (req.originalUrl === "/api/webhooks/resend" || req.originalUrl === "/api/webhooks/meta" || req.originalUrl === "/api/webhooks/instagram" || req.originalUrl === "/api/coaching/zoom/webhook" || req.originalUrl === "/api/coaching/skool/adapter/events") {
       req.rawBody = buffer.toString("utf8");
     }
   },
@@ -145,7 +145,7 @@ connectDatabase(mongoUri)
         req.path.startsWith("/unsubscribe/") ||
         req.path === "/webhooks/resend" ||
         req.path.startsWith("/webhooks/twilio/") ||
-        req.path === "/webhooks/meta" ||
+        req.path === "/webhooks/meta" || req.path === "/webhooks/instagram" ||
         req.path.startsWith("/social-automation/t/") ||
         req.path.startsWith("/chat/widget/") ||
         req.path === "/jarvis/memory/sync" ||
@@ -156,7 +156,7 @@ connectDatabase(mongoUri)
       const publicCoachingCalendarCallback = req.path === "/coaching/calendar/oauth/callback";
       const publicCoachingZoomRoute = req.path === "/coaching/zoom/oauth/callback" || req.path === "/coaching/zoom/webhook";
       const publicSkoolAdapterRoute = req.path === "/coaching/skool/adapter/events";
-      const publicSocialCallback = /^\/social\/(?:linkedin|meta)\/oauth\/callback$/.test(req.path);
+      const publicSocialCallback = /^\/social\/(?:linkedin|meta|instagram|x)\/oauth\/callback$/.test(req.path);
       return publicRequest || publicMeetupCallback || publicSocialCallback || publicCoachingCalendarCallback || publicCoachingZoomRoute || publicSkoolAdapterRoute ? next() : requireAuth(req, res, next);
     });
     app.use("/api", restrictNewRoleSurface);
@@ -176,6 +176,7 @@ connectDatabase(mongoUri)
     app.use("/api/conversations", conversationsRouter);
     app.use("/api/telephony", telephonyRouter);
     app.use("/api/chat", chatRouter);
+    app.use("/api/social-workspace", require("./routes/socialWorkspace"));
     app.use("/api/social-messaging", socialMessagingRouter);
     app.use("/api/social-automation", socialAutomationRouter);
     app.use("/api/automations", automationsRouter);

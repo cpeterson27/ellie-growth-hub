@@ -30,8 +30,15 @@ async function uploadImage({ file, folder, transformation = "" }, http = axios) 
   const upload = await http.post(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, body, { maxBodyLength: 7 * 1024 * 1024 });
   return { url: upload.data.secure_url, publicId: upload.data.public_id, width: upload.data.width, height: upload.data.height };
 }
+async function uploadGeneratedSvg({ svg, folder }, http = axios) {
+  const value = String(svg || ""); if (!value.startsWith("<svg") || Buffer.byteLength(value) > 14 * 1024 * 1024) throw Object.assign(new Error("Generated graphic is invalid"), { code: "GENERATED_IMAGE_INVALID", status: 400 });
+  const { cloudName, apiKey, apiSecret } = credentials(); const timestamp = Math.floor(Date.now() / 1000); const signed = { folder, timestamp, format: "png" };
+  const body = new FormData(); body.append("format", "png"); body.append("file", `data:image/svg+xml;base64,${Buffer.from(value).toString("base64")}`); body.append("api_key", apiKey); body.append("timestamp", String(timestamp)); body.append("folder", folder); body.append("signature", signature(signed, apiSecret));
+  const upload = await http.post(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, body, { maxBodyLength: 20 * 1024 * 1024 });
+  return { url: upload.data.secure_url, publicId: upload.data.public_id, width: upload.data.width, height: upload.data.height };
+}
 async function removeImage(publicId, http = axios) {
   if (!publicId) return { removed: false }; const { cloudName, apiKey, apiSecret } = credentials(); const timestamp = Math.floor(Date.now() / 1000); const body = new URLSearchParams({ public_id: publicId, timestamp: String(timestamp), api_key: apiKey, signature: signature({ public_id: publicId, timestamp }, apiSecret) });
   await http.post(`https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`, body, { headers: { "Content-Type": "application/x-www-form-urlencoded" } }); return { removed: true };
 }
-module.exports = { ALLOWED_TYPES, MAX_IMAGE_BYTES, credentials, removeImage, uploadImage, validateDataImage };
+module.exports = { ALLOWED_TYPES, MAX_IMAGE_BYTES, credentials, removeImage, uploadGeneratedSvg, uploadImage, validateDataImage };

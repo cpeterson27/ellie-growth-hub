@@ -59,6 +59,7 @@ async function ingestProviderMessage({ thread, message }) {
     sentAt: message.direction === "outbound" ? occurredAt : null,
     receivedAt: message.direction === "inbound" ? occurredAt : null,
     contactId: message.contactId || null,
+    createdBy: message.createdBy || null,
     metadata: message.metadata || {},
   });
   return { thread: savedThread, message: savedMessage.toObject(), created: true };

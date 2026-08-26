@@ -103,6 +103,7 @@ router.post("/profile/avatar", requireAuth, async (req, res) => {
     const previousPublicId = user.avatarPublicId;
     const uploaded = await imageAssetService.uploadImage({ file: req.body?.file, folder: "growth-operator/profile-avatars", transformation: "c_fill,g_face,h_512,w_512,q_auto,f_auto" });
     user.avatarUrl = uploaded.url; user.avatarPublicId = uploaded.publicId; await user.save();
+    await require("../services/ambassadorProfileActivity").recordHeadshot({ workspaceId: req.auth.workspaceId, user });
     if (previousPublicId && previousPublicId !== uploaded.publicId) imageAssetService.removeImage(previousPublicId).catch(() => {});
     return res.status(201).json({ user: { id: user._id, name: user.name, email: user.email, avatarUrl: user.avatarUrl } });
   } catch (error) { return res.status(error.status || 502).json({ error: error.message || "Profile photo upload failed", code: error.code }); }

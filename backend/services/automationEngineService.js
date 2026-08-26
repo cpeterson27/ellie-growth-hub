@@ -29,10 +29,11 @@ const TRIGGERS = Object.freeze([
   "coaching.session.scheduled", "coaching.session.rescheduled", "coaching.session.cancelled", "coaching.session.attended", "coaching.session.no_show",
   "coaching.referral.attributed", "coaching.commission.created", "coaching.commission.approved", "coaching.commission.paid",
   "skool.access.requested", "skool.member.joined", "skool.addon.purchased", "email.delivered", "email.opened", "email.clicked", "email.bounced", "sms.delivered", "sms.replied",
+  "team.invitation.sent", "team.invitation.failed", "team.invitation.accepted", "ambassador.added", "ambassador.profile.completed", "ambassador.profile.updated", "ambassador.content.assigned", "ambassador.content.viewed", "ambassador.content.in_progress", "ambassador.content.completed", "ambassador.content.declined", "ambassador.welcome.generated", "social.content.approve", "social.content.schedule", "social.content.published", "social.content.failed",
   "event.registered", "event.attended", "social.dm.received", "social.comment.received", "social.keyword.matched", "social.story.reply", "social.lead.created", "social.link.clicked",
 ]);
-const CONDITION_FIELDS = Object.freeze(["contact.status", "contact.stage", "contact.source", "contact.marketingConsent", "contact.smsConsent", "contact.tags", "contact.qualification", "contact.applicationCompleted", "contact.callBooked", "opportunity.stage", "enrollment.status", "enrollment.programId", "enrollment.skoolStatus", "assignment.coachProfileId", "session.status", "session.attendance", "event.provider", "event.campaignId", "event.occurredAt", "referral.present"]);
-const ACTIONS = Object.freeze(["contact.add_tag", "contact.remove_tag", "contact.update_status", "task.create", "opportunity.assign_closer", "communication.email", "communication.sms", "enrollment.create", "enrollment.activate", "coach.assign", "communication.onboarding", "communication.session_reminders", "skool.request_access", "commission.generate", "social.response", "social.tracked_link", "meetup.request_action", "notification.create"]);
+const CONDITION_FIELDS = Object.freeze(["event.roles", "contact.status", "contact.stage", "contact.source", "contact.marketingConsent", "contact.smsConsent", "contact.tags", "contact.qualification", "contact.applicationCompleted", "contact.callBooked", "opportunity.stage", "enrollment.status", "enrollment.programId", "enrollment.skoolStatus", "assignment.coachProfileId", "session.status", "session.attendance", "event.provider", "event.campaignId", "event.occurredAt", "referral.present"]);
+const ACTIONS = Object.freeze(["ambassador.profile_reminder", "ambassador.welcome_draft", "contact.add_tag", "contact.remove_tag", "contact.update_status", "task.create", "opportunity.assign_closer", "communication.email", "communication.sms", "enrollment.create", "enrollment.activate", "coach.assign", "communication.onboarding", "communication.session_reminders", "skool.request_access", "commission.generate", "social.response", "social.tracked_link", "meetup.request_action", "notification.create"]);
 
 function automationError(message, code = "AUTOMATION_INVALID") { const error = new Error(message); error.code = code; return error; }
 function id(value) { return value == null ? "" : String(value); }
@@ -82,6 +83,24 @@ function conditionsPass(conditions, context) { return array(conditions).every((c
 function resultId(value) { return value?._id || value?.id || value?.token || null; }
 
 async function executeAction({ automation, execution, action, index, context }, models = deps) {
+  if (action.type === "ambassador.profile_reminder") {
+    const workspaceId = execution.workspaceId;
+    const profile = await require("../models/AmbassadorProfile").findOne({ workspaceId, userId: context.event.userId, status: "active" }).populate("userId", "avatarUrl").lean();
+    if (!profile) return { status: "skipped" };
+    const settings = await require("../models/WorkspaceConfig").findOne({ workspaceId, key: "primary" }).select("ambassadorOnboarding").lean();
+    if (require("./ambassadorWelcomeService").completeness(profile, profile.userId, settings?.ambassadorOnboarding?.requiredFields).complete) return { status: "already_complete" };
+    return require("../models/InAppNotification").findOneAndUpdate({ workspaceId, userId: profile.userId._id, type: "ambassador_reminder", actionUrl: `/ambassador?reminder=${execution._id}:${index}` }, { $setOnInsert: { title: String(action.config?.title || "Complete your profile").slice(0, 180), message: String(action.config?.body || "Please complete your ambassador profile.").slice(0, 2000) } }, { upsert: true, new: true });
+  }
+  if (action.type === "ambassador.welcome_draft") {
+    const settings = await require("../models/WorkspaceConfig").findOne({ workspaceId: execution.workspaceId, key: "primary" }).select("ambassadorOnboarding").lean();
+    if (!settings?.ambassadorOnboarding?.welcomeDraftOnComplete) throw automationError("Automatic welcome drafts require workspace permission", "ACTION_BLOCKED");
+    const profileId = context.event.ambassadorProfileId;
+    if (!profileId) throw automationError("Ambassador profile required", "ACTION_BLOCKED");
+    const profile = await require("../models/AmbassadorProfile").findOne({ _id: profileId, workspaceId: execution.workspaceId }).lean();
+    if (!profile || profile.status !== "active") throw automationError("Active ambassador profile required", "ACTION_BLOCKED");
+    if (profile.welcomePost?.contentBriefId) return { _id: profile.welcomePost.contentBriefId, status: "already_generated" };
+    return require("./ambassadorWelcomeService").generate({ workspaceId: execution.workspaceId, ambassadorProfileId: profileId, userId: automation.updatedBy });
+  }
   const workspaceId = execution.workspaceId; const contactId = context.contact?._id; const key = `automation:${execution._id}:action:${index}`; const config = action.config || {};
   if (action.type.startsWith("contact.") && !contactId) throw automationError("Action needs a Contact", "ACTION_BLOCKED");
   if (action.type === "contact.add_tag") return models.Contact.findByIdAndUpdate(contactId, { $addToSet: { tags: String(config.tag || "").trim() } }, { new: true });

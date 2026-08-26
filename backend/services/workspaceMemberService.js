@@ -6,12 +6,13 @@ const WorkspaceInvitation = require("../models/WorkspaceInvitation");
 const CoachProfile = require("../models/CoachProfile");
 const CoachingProgram = require("../models/CoachingProgram");
 const AmbassadorProfile = require("../models/AmbassadorProfile");
+const CrmActivity = require("../models/CrmActivity");
 const integrationHub = require("./integrationHub");
 const invitationTemplateService = require("./invitationTemplateService");
 const { hashPassword } = require("../utils/passwords");
 const { legacyRoleFor, normalizeRoles } = require("../authorization/capabilities");
 
-const dependencies = { User, Workspace, WorkspaceMembership, WorkspaceInvitation, CoachProfile, CoachingProgram, AmbassadorProfile, integrationHub, invitationTemplateService };
+const dependencies = { User, Workspace, WorkspaceMembership, WorkspaceInvitation, CoachProfile, CoachingProgram, AmbassadorProfile, CrmActivity, integrationHub, invitationTemplateService };
 const INVITATION_DAYS = 7;
 
 function cleanEmail(value) { return String(value || "").trim().toLowerCase(); }
@@ -55,6 +56,7 @@ async function deliverInvitation({ invitation, token = crypto.randomBytes(32).to
   invitation.deliveryHistory = invitation.deliveryHistory || [];
   invitation.deliveryHistory.push({ sentAt: new Date(), status: invitation.deliveryStatus, templateVersion: invitation.templateVersion || 1, subject: rendered.subject, body: rendered.body, invitedBy: invitation.invitedBy });
   await invitation.save();
+  if (models.CrmActivity) await models.CrmActivity.create({ workspaceId: invitation.workspaceId, type: "system", source: "crm", title: invitation.deliveryStatus === "sent" ? "Team invitation sent" : "Team invitation delivery failed", createdBy: invitation.invitedBy, metadata: { eventType: invitation.deliveryStatus === "sent" ? "team.invitation.sent" : "team.invitation.failed", invitationId: invitation._id, userId: invitation.userId, roles: invitation.roles } });
   return { deliveryStatus: invitation.deliveryStatus, ...(process.env.NODE_ENV === "production" ? {} : { acceptUrl }) };
 }
 
@@ -138,6 +140,7 @@ async function onboardAmbassador(input, models = dependencies) {
     commissionConfig: { mode: ["manual", "percent", "fixed"].includes(input.commissionConfig?.mode) ? input.commissionConfig.mode : existing?.commissionConfig?.mode || "manual", rateBps: Math.min(10000, Math.max(0, Number(input.commissionConfig?.rateBps ?? existing?.commissionConfig?.rateBps) || 0)), fixedAmountMinor: Math.max(0, Number(input.commissionConfig?.fixedAmountMinor ?? existing?.commissionConfig?.fixedAmountMinor) || 0), currency: String(input.commissionConfig?.currency || existing?.commissionConfig?.currency || "USD").toUpperCase().slice(0, 3) },
   };
   const ambassadorProfile = await models.AmbassadorProfile.findOneAndUpdate({ workspaceId: input.workspaceId, userId: invited.user._id }, { $set: values }, { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true });
+  if (models.CrmActivity) await models.CrmActivity.create({ workspaceId: input.workspaceId, type: "system", source: "crm", title: existing ? "Ambassador onboarding updated" : "Ambassador invitation prepared", createdBy: input.actorUserId, metadata: { eventType: existing ? "ambassador.onboarding.updated" : "ambassador.added", ambassadorProfileId: ambassadorProfile._id, userId: invited.user._id, invitationId: invited.invitation?._id || null } });
   return { ...invited, ambassadorProfile };
 }
 
@@ -164,6 +167,7 @@ async function acceptInvitation({ token, password, name }, models = dependencies
   invitation.status = "accepted";
   invitation.acceptedAt = new Date();
   await invitation.save();
+  if (models.CrmActivity) await models.CrmActivity.create({ workspaceId: invitation.workspaceId, type: "system", source: "crm", title: "Team invitation accepted; account activated", createdBy: user._id, metadata: { eventType: "team.invitation.accepted", invitationId: invitation._id, userId: user._id, roles: invitation.roles } });
   return { email: user.email, workspaceId: invitation.workspaceId };
 }
 

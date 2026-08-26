@@ -31,7 +31,14 @@ async function reserveEvent(event, deps = models) {
     return { record: await deps.SocialProviderEvent.create({ provider: event.provider, providerEventId: event.providerEventId, eventType: event.eventType, payloadHash: crypto.createHash("sha256").update(JSON.stringify(event.raw || event)).digest("hex"), occurredAt: event.occurredAt || new Date() }), duplicate: false };
   } catch (error) {
     if (error?.code !== 11000) throw error;
-    return { record: await deps.SocialProviderEvent.findOne({ provider: event.provider, providerEventId: event.providerEventId }), duplicate: true };
+    const record = await deps.SocialProviderEvent.findOne({ provider: event.provider, providerEventId: event.providerEventId });
+    if (deps.SocialProviderEvent.findOneAndUpdate && record?.processingStatus && record.processingStatus !== "processed") {
+      const claimed = await deps.SocialProviderEvent.findOneAndUpdate({ _id: record._id, $or: [{ processingStatus: "failed" }, { processingStatus: "processing", processingStartedAt: { $lt: new Date(Date.now() - 5 * 60000) } }] }, { $set: { processingStatus: "processing", processingStartedAt: new Date(), lastError: "" } }, { new: true });
+      if (claimed) return { record: claimed, duplicate: false };
+      // Keep the provider retrying rather than acknowledging an unfinished event.
+      throw new Error("Social event is still processing; retry delivery");
+    }
+    return { record, duplicate: true };
   }
 }
 
@@ -96,14 +103,15 @@ async function ingestSocialEvent(event, options = {}) {
   if (!SUPPORTED_TRIGGERS[event.provider]?.includes(event.triggerType) && event.eventType !== "dm_received") return { ignored: true, reason: "unsupported_provider_trigger" };
   const reserved = await reserveEvent(event, deps);
   if (reserved.duplicate) return { duplicate: true, event: reserved.record };
-  if(event.contentId&&deps.ContentBrief){const published=await deps.ContentBrief.findOne({type:"social",status:"published",social:{ $exists:true },"social.publications":{$elemMatch:{provider:event.provider,assetId:String(event.assetId||""),providerPostId:String(event.contentId),status:"published"}}}).lean();if(published){event={...event,contentBriefId:published._id,campaignId:published.campaignId||event.campaignId||null};reserved.record.contentBriefId=published._id}}
+  try {
+  if(event.contentId&&deps.ContentBrief){const published=await deps.ContentBrief.findOne({type:"social",status:{$in:["published","partially_published"]},social:{ $exists:true },"social.publications":{$elemMatch:{provider:event.provider,assetId:String(event.assetId||""),providerPostId:String(event.contentId),status:"published"}}}).lean();if(published){event={...event,contentBriefId:published._id,campaignId:published.campaignId||event.campaignId||null};reserved.record.contentBriefId=published._id}}
   const { contact, identity, created } = await resolveIdentity(event, deps);
   const automation = await matchingAutomation(event, deps);
   await applyAttribution(contact, event, automation);
   await activity(deps, contact, event, automation, created);
   let conversation = null;
-  if (["dm_received", "story_reply"].includes(event.eventType)) {
-    conversation = await (options.ingestMessage || ingestProviderMessage)({ thread: { channel: event.provider, provider: "meta", providerThreadId: event.providerThreadId || `${event.provider}:${event.assetId}:${event.providerUserId}`, participants: [{ kind: "contact", role: "from", address: event.providerUserId, contactId: contact._id }], contactIds: [contact._id], metadata: { assetId: event.assetId, socialOrigin: true, contentId: event.contentId || "" } }, message: { providerMessageId: event.messageId || event.providerEventId, direction: "inbound", body: event.text || "", sender: { name: event.displayName || event.username || "", address: event.providerUserId }, recipients: [{ address: event.assetId, role: "to" }], contactId: contact._id, deliveryStatus: "received", sentAt: event.occurredAt || new Date(), metadata: { socialIdentityId: identity._id, automationId: automation?._id || null } } });
+  if (["dm_received", "story_reply", "comment_received"].includes(event.eventType)) {
+    conversation = await (options.ingestMessage || ingestProviderMessage)({ thread: { channel: event.provider, provider: "meta", providerThreadId: event.providerThreadId || `${event.provider}:${event.assetId}:${event.providerUserId}${event.eventType === "comment_received" ? `:comment:${event.sourceMetadata?.commentId || event.providerEventId}` : ""}`, participants: [{ kind: "contact", role: "from", address: event.providerUserId, contactId: contact._id }], contactIds: [contact._id], metadata: { assetId: event.assetId, socialOrigin: true, contentId: event.contentId || "", interactionType: event.eventType === "comment_received" ? "comment" : "message", commentId: event.sourceMetadata?.commentId || "" } }, message: { providerMessageId: event.messageId || event.providerEventId, direction: "inbound", body: event.text || "", sender: { name: event.displayName || event.username || "", address: event.providerUserId }, recipients: [{ address: event.assetId, role: "to" }], contactId: contact._id, deliveryStatus: "received", sentAt: event.occurredAt || new Date(), metadata: { socialIdentityId: identity._id, automationId: automation?._id || null } } });
   }
   let responseTemplate = automation?.responseTemplate || "";
   const ctaDestination = clean(automation?.cta?.destination, 2000);
@@ -117,7 +125,12 @@ async function ingestSocialEvent(event, options = {}) {
     responseTemplate = [responseTemplate, automation?.cta?.label, responseUrl].filter(Boolean).join("\n");
   }
   reserved.record.contactId = contact._id; reserved.record.socialIdentityId = identity._id; reserved.record.automationId = automation?._id || null; await reserved.record.save();
+  reserved.record.processingStatus = "processed"; reserved.record.processedAt = new Date(); await reserved.record.save();
   return { duplicate: false, contact, identity, automation, conversation, responseTemplate };
+  } catch (error) {
+    reserved.record.processingStatus = "failed"; reserved.record.lastError = "Social event processing failed; delivery can be retried"; await reserved.record.save();
+    throw error;
+  }
 }
 
 function allowedDestination(value) {

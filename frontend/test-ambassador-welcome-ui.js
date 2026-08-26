@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const app = fs.readFileSync("src/App.jsx", "utf8");
+const sidebar = fs.readFileSync("src/components/Sidebar.jsx", "utf8");
+const settings = fs.readFileSync("src/pages/AmbassadorWelcomeSettings.jsx", "utf8");
+const portal = fs.readFileSync("src/pages/AmbassadorPortal.jsx", "utf8");
+assert.match(app, /ambassadors\/welcome-template/);
+assert.match(sidebar, /Ambassador Welcome Posts/);
+for (const label of ["Template name", "Logo / brand asset URL", "Headline", "Subheadline", "Photo layout", "AI caption instructions", "Create Welcome Post"]) assert.match(settings, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+assert.match(settings, /never publishes or schedules anything/i);
+assert.match(settings, /UserAvatar/);
+assert.match(portal, /Edit profile/);
+assert.match(portal, /Profile .*complete/);
+console.log("Ambassador profile and welcome-template management UI checks passed.");

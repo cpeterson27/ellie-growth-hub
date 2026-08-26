@@ -68,6 +68,8 @@ const SocialAutomation = lazy(() => import("./pages/SocialAutomation.jsx"));
 const Automations = lazy(() => import("./pages/Automations.jsx"));
 const AmbassadorPortal = lazy(() => import("./pages/AmbassadorPortal.jsx"));
 const AmbassadorAdmin = lazy(() => import("./pages/AmbassadorAdmin.jsx"));
+const AmbassadorWelcomeSettings = lazy(() => import("./pages/AmbassadorWelcomeSettings.jsx"));
+const SocialWorkspace = lazy(() => import("./pages/SocialWorkspace.jsx"));
 const MyProfile = lazy(() => import("./pages/MyProfile.jsx"));
 
 const PageLoading = () => <div className="auth-loading">Opening Growth Operator…</div>;
@@ -126,6 +128,7 @@ function ProtectedApp() {
           <Route path="/discovery/:workspace" element={<Discovery />} />
           <Route path="/partners" element={<Partners />} />
           <Route path="/content" element={<Content />} />
+          {hasPermission(session, "social.manage") ? <><Route path="/social" element={<SocialWorkspace />} /><Route path="/social/:section" element={<SocialWorkspace />} /></> : null}
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile" element={<MyProfile />} />
@@ -134,6 +137,7 @@ function ProtectedApp() {
           <Route path="/settings/communications/invitations" element={<Settings />} />
           <Route path="/settings/privacy" element={<Settings />} />
           <Route path="/ambassadors/manage" element={<AmbassadorAdmin />} />
+          <Route path="/ambassadors/welcome-template" element={<AmbassadorWelcomeSettings />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/integrations/eventbrite" element={<EventbriteIntegration />} />
           <Route path="/contacts/fields" element={<CrmSetup />} />

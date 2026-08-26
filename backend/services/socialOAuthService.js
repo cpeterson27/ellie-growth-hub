@@ -4,7 +4,7 @@ const SocialConnection = require("../models/SocialConnection");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const { encryptCredentials, decryptCredentials } = require("../utils/credentialEncryption");
 
-const PROVIDERS = new Set(["linkedin", "meta"]);
+const PROVIDERS = new Set(["linkedin", "meta", "instagram", "x"]);
 
 function required(name) {
   const value = String(process.env[name] || "").trim();
@@ -24,6 +24,8 @@ function safeProviderError(error, fallback = "Meta authorization could not be ve
 
 function config(provider) {
   if (!PROVIDERS.has(provider)) throw new Error("Unsupported social provider");
+  if (provider === "instagram") return { clientId: required("INSTAGRAM_APP_ID"), clientSecret: required("INSTAGRAM_APP_SECRET"), redirectUri: required("INSTAGRAM_REDIRECT_URI"), apiVersion: required("META_GRAPH_API_VERSION"), scopes: splitScopes(process.env.INSTAGRAM_OAUTH_SCOPES || "instagram_business_basic instagram_business_manage_comments instagram_business_manage_messages instagram_business_content_publish") };
+  if (provider === "x") return { clientId: required("X_CLIENT_ID"), clientSecret: required("X_CLIENT_SECRET"), redirectUri: required("X_REDIRECT_URI"), scopes: splitScopes(process.env.X_OAUTH_SCOPES || "tweet.read tweet.write users.read offline.access") };
   if (provider === "linkedin") return {
     clientId: required("LINKEDIN_CLIENT_ID"),
     clientSecret: required("LINKEDIN_CLIENT_SECRET"),
@@ -73,6 +75,17 @@ function configured(provider) {
 function authorizationUrl(provider, auth) {
   const providerConfig = config(provider);
   const state = createState({ provider, workspaceId: auth.workspaceId, userId: auth.user._id });
+  if (provider === "instagram") {
+    const url = new URL("https://www.instagram.com/oauth/authorize");
+    url.search = new URLSearchParams({ client_id: providerConfig.clientId, redirect_uri: providerConfig.redirectUri, state, response_type: "code", scope: providerConfig.scopes.join(","), enable_fb_login: "0" }).toString();
+    return url.toString();
+  }
+  if (provider === "x") {
+    const verifier = pkceVerifier(state);
+    const url = new URL("https://x.com/i/oauth2/authorize");
+    url.search = new URLSearchParams({ client_id: providerConfig.clientId, redirect_uri: providerConfig.redirectUri, state, response_type: "code", scope: providerConfig.scopes.join(" "), code_challenge: crypto.createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256" }).toString();
+    return url.toString();
+  }
   if (provider === "linkedin") {
     const url = new URL("https://www.linkedin.com/oauth/v2/authorization");
     url.search = new URLSearchParams({ response_type: "code", client_id: providerConfig.clientId, redirect_uri: providerConfig.redirectUri, state, scope: providerConfig.scopes.join(" ") }).toString();
@@ -168,7 +181,7 @@ async function exchangeCode(provider, code, rawState) {
   if (!state) throw new Error("Social connection request expired or is invalid");
   const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", $or: [{ role: { $in: ["owner", "admin"] } }, { roles: { $in: ["owner", "admin"] } }] });
   if (!membership) throw new Error("The user who started this connection no longer has permission to complete it");
-  const result = provider === "linkedin" ? await exchangeLinkedIn(code) : await exchangeMeta(code);
+  const result = provider === "linkedin" ? await exchangeLinkedIn(code) : provider === "instagram" ? await exchangeInstagram(code) : provider === "x" ? await exchangeX(code, rawState) : await exchangeMeta(code);
   const connection = await SocialConnection.findOneAndUpdate(
     { workspaceId: state.workspaceId, provider },
     { $set: { status: "connected", credentialsEncrypted: encryptCredentials(result.credentials), scopes: result.scopes, declinedScopes: result.declinedScopes || [], authorization: result.authorization || { valid: true, verifiedAt: new Date() }, expiresAt: result.expiresAt, providerAccount: result.account, assets: result.assets, selectedAssetIds: [], webhookSubscriptions: [], connectedByUserId: state.userId, connectedAt: new Date(), lastVerifiedAt: new Date(), lastError: "" } },
@@ -254,6 +267,7 @@ async function selectAssets(workspaceId, provider, assetIds, http = axios) {
   const removed = (connection.selectedAssetIds || []).map(String).filter((id) => !selected.includes(id));
   connection.selectedAssetIds = selected;
   if (provider === "meta") { await removeMetaSubscriptions(connection, removed, http); connection.webhookSubscriptions = await provisionMetaSubscriptions(connection, selected, http); }
+  if (provider === "instagram") connection.webhookSubscriptions = await provisionInstagramSubscriptions(connection, selected, http);
   await connection.save();
   return publicConnection(connection.toObject(), provider);
 }
@@ -273,4 +287,44 @@ async function disconnect(workspaceId, provider) {
   return status(workspaceId, provider);
 }
 
-module.exports = { authorizationUrl, configured, disconnect, exchangeCode, exchangeMeta, metaPermissions, provisionMetaSubscriptions, removeMetaSubscriptions, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };
+function pkceVerifier(state) { return crypto.createHmac("sha256", stateKey()).update(`x-pkce:${state}`).digest("base64url"); }
+async function exchangeX(code, rawState, http = axios) {
+  const settings = config("x");
+  const token = await http.post("https://api.x.com/2/oauth2/token", new URLSearchParams({ code, grant_type: "authorization_code", client_id: settings.clientId, redirect_uri: settings.redirectUri, code_verifier: pkceVerifier(rawState) }).toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${Buffer.from(`${settings.clientId}:${settings.clientSecret}`).toString("base64")}` }, timeout: 15000 });
+  if (!token.data?.access_token) throw new Error("X did not return authorization");
+  const profile = await http.get("https://api.x.com/2/users/me", { headers: { Authorization: `Bearer ${token.data.access_token}` }, timeout: 15000 });
+  if (!profile.data?.data?.id) throw new Error("X account could not be verified");
+  const user = profile.data.data;
+  return { credentials: { accessToken: token.data.access_token, refreshToken: token.data.refresh_token }, scopes: splitScopes(token.data.scope || ""), account: { id: user.id, name: user.name || user.username }, expiresAt: new Date(Date.now() + Number(token.data.expires_in || 7200) * 1000), assets: [{ id: user.id, name: user.name || user.username, username: user.username, type: "x_account" }] };
+}
+async function exchangeInstagram(code, http = axios) {
+  const settings = config("instagram");
+  const response = await http.post("https://api.instagram.com/oauth/access_token", new URLSearchParams({ client_id: settings.clientId, client_secret: settings.clientSecret, grant_type: "authorization_code", redirect_uri: settings.redirectUri, code }).toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000 });
+  const initial = response.data?.data?.[0] || response.data;
+  if (!initial?.access_token || !initial.user_id) throw new Error("Instagram did not return account authorization");
+  const token = await http.get("https://graph.instagram.com/access_token", { params: { grant_type: "ig_exchange_token", client_secret: settings.clientSecret, access_token: initial.access_token }, timeout: 15000 });
+  if (!token.data?.access_token) throw new Error("Instagram long-lived authorization unavailable");
+  const accessToken = token.data.access_token;
+  const [profile, permissionResponse] = await Promise.all([
+    http.get(`https://graph.instagram.com/${settings.apiVersion}/me`, { params: { fields: "user_id,username", access_token: accessToken }, timeout: 15000 }),
+    http.get(`https://graph.instagram.com/${settings.apiVersion}/me/permissions`, { params: { access_token: accessToken }, timeout: 15000 }),
+  ]);
+  const accountId = String(profile.data?.user_id || profile.data?.id || "");
+  if (accountId !== String(initial.user_id)) throw new Error("Instagram authorization identity mismatch");
+  const rows = permissionResponse.data?.data || [];
+  return { credentials: { accessToken }, scopes: rows.filter(row => row.status === "granted").map(row => row.permission), declinedScopes: rows.filter(row => row.status !== "granted").map(row => row.permission), account: { id: accountId, name: profile.data.username || "Instagram professional account" }, authorization: { valid: true, userId: accountId, verifiedAt: new Date() }, expiresAt: new Date(Date.now() + Number(token.data.expires_in || 3600) * 1000), assets: [{ id: accountId, name: profile.data.username || "Instagram", username: profile.data.username || "", type: "instagram_business" }] };
+}
+async function provisionInstagramSubscriptions(connection, selected, http = axios) {
+  const settings = config("instagram"), credentials = decryptCredentials(connection.credentialsEncrypted), results = [];
+  for (const assetId of selected) {
+    const fields = ["comments", "messages"];
+    try {
+      await http.post(`https://graph.instagram.com/${settings.apiVersion}/${assetId}/subscribed_apps`, null, { params: { subscribed_fields: fields.join(","), access_token: credentials.accessToken }, timeout: 15000 });
+      const response = await http.get(`https://graph.instagram.com/${settings.apiVersion}/${assetId}/subscribed_apps`, { params: { access_token: credentials.accessToken }, timeout: 15000 });
+      const verified = (response.data?.data || []).some(row => String(row.id) === settings.clientId && fields.every(field => (row.subscribed_fields || []).includes(field)));
+      results.push({ assetId, fields, status: verified ? "subscribed" : "not_subscribed", verifiedAt: new Date() });
+    } catch (error) { results.push({ assetId, fields, status: "failed", verifiedAt: new Date(), error: safeProviderError(error, "Instagram webhook subscription failed") }); }
+  }
+  return results;
+}
+module.exports = { authorizationUrl, configured, disconnect, exchangeCode, exchangeMeta, exchangeInstagram, exchangeX, metaPermissions, provisionMetaSubscriptions, provisionInstagramSubscriptions, removeMetaSubscriptions, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };

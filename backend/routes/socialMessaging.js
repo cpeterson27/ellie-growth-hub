@@ -4,8 +4,10 @@ const ConversationMessage = require("../models/ConversationMessage");
 const ConversationThread = require("../models/ConversationThread");
 const SocialConnection = require("../models/SocialConnection");
 const { metaMessagingAdapter } = require("../services/conversations/metaMessagingAdapter");
+const { requireCapability } = require("../middleware/auth");
 
 const router = express.Router();
+router.use(requireCapability("social.manage"));
 router.get("/status", async (_req, res) => {
   const connection = await SocialConnection.findOne({ provider: "meta" }).lean();
   res.json({ success: true, meta: await metaMessagingAdapter.status(connection), linkedin: { mode: "human_assisted", privateMessageApiEnabled: false } });
@@ -13,7 +15,7 @@ router.get("/status", async (_req, res) => {
 router.post("/meta/send", async (req, res) => {
   if (req.body?.approved !== true) return res.status(400).json({ success: false, error: "Explicit reply approval is required" });
   if (!["facebook", "instagram"].includes(req.body?.channel)) return res.status(400).json({ success: false, error: "Facebook or Instagram is required" });
-  try { res.status(201).json({ success: true, data: await metaMessagingAdapter.sendMessage(req.body) }); }
+  try { res.status(201).json({ success: true, data: await metaMessagingAdapter.sendMessage({ channel: req.body.channel, assetId: req.body.assetId, recipientId: req.body.recipientId, body: req.body.body, threadId: req.body.threadId, workspaceId: req.auth.workspaceId, userId: req.auth.user._id, senderType: "human" }) }); }
   catch (error) { res.status(400).json({ success: false, error: error.message }); }
 });
 router.post("/linkedin/manual-actions", async (req, res) => {

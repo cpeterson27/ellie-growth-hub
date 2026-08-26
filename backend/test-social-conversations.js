@@ -11,7 +11,7 @@ for (const [file, contracts] of Object.entries({
   "routes/chat.js": ['/widget/:key/config', '/widget/:key/session', '/widget/:key/messages', '/manage/widgets', 'approved !== true', "publicRateLimit"],
   "services/conversations/metaMessagingAdapter.js": ["validateMetaSignature", "connectionForAsset", "ingestMetaMessage", "lastInboundAt", "24 * 60 * 60 * 1000", "pages_messaging"],
   "routes/socialMessaging.js": ['/meta/send', '/linkedin/manual-actions', 'privateMessageApiEnabled: false', 'providerActionTaken: false', 'approved !== true'],
-  "routes/webhooks.js": ['router.get("/meta"', 'router.post("/meta"', 'x-hub-signature-256', "ingestMetaMessage"],
+  "routes/webhooks.js": ['router.get(["/meta", "/instagram"]', 'router.post(["/meta", "/instagram"]', 'x-hub-signature-256', "ingestMetaMessage"],
   "routes/telephony.js": ['/whatsapp/send', "sendWhatsApp", "contentSid"],
   "services/conversations/twilioConversationAdapter.js": ["sendWhatsApp", "customerWindowOpen", "ContentSid", 'channel = /^whatsapp:'],
   "server.js": ["publicChatCors", 'req.path.startsWith("/chat/widget/")', 'app.use("/api/social-messaging", socialMessagingRouter)'],

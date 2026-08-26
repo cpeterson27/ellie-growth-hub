@@ -49,6 +49,8 @@ const navGroups = [
   ] },
   { label: "Configure", items: [
     { label: "Brand Ambassadors", path: "/ambassadors/manage", icon: <FiLink />, permissions: ["ambassadors.view", "ambassadors.manage"] },
+    { label: "Ambassador Welcome Posts", path: "/ambassadors/welcome-template", icon: <FiUserCheck />, permissions: ["ambassadors.manage"] },
+    { label: "Social", path: "/social", icon: <FiUserCheck />, permissions: ["social.manage"] },
     { label: "Integrations", path: "/integrations", icon: <FiLink />, permissions: ["integrations.manage"] },
     { label: "Settings", path: "/settings/workspace", icon: <FiSettings />, permissions: ["workspace.manage", "team.view"] },
   ] },

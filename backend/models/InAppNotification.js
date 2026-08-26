@@ -6,7 +6,7 @@ const inAppNotificationSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   monitorId: { type: mongoose.Schema.Types.ObjectId, ref: "ResearchMonitor", default: null },
   signalId: { type: mongoose.Schema.Types.ObjectId, ref: "IntentSignal", default: null },
-  type: { type: String, enum: ["high_scoring_lead", "published_email", "monitor_complete", "source_failure", "qualified_lead", "privacy_request"], required: true },
+  type: { type: String, enum: ["high_scoring_lead", "published_email", "monitor_complete", "source_failure", "qualified_lead", "privacy_request", "ambassador_profile_complete", "ambassador_welcome_ready", "ambassador_reminder"], required: true },
   privacyRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "PrivacyRequest", default: null, index: true },
   actionUrl: { type: String, default: "", maxlength: 500 },
   title: { type: String, required: true },

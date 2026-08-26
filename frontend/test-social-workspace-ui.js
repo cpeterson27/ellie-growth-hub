@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const read = file => fs.readFileSync(new URL(file, import.meta.url), "utf8");
+const workspace = read("./src/pages/SocialWorkspace.jsx");
+for (const section of ["overview", "create", "calendar", "content", "inbox", "automations", "distribution", "analytics", "accounts", "settings"]) assert(workspace.includes(`"${section}"`));
+const studio = read("./src/pages/SocialStudio.jsx");
+for (const control of ["Generate post", "Repurpose existing content", "Upload image", "Related offering (optional)", "General content — no offering", "Save draft"]) assert(studio.includes(control));
+const tasks = read("./src/components/AmbassadorContentTasks.jsx");
+for (const control of ["My content tasks", "Copy caption", "Open approved media", "Mark completed", "Decline"]) assert(tasks.includes(control));
+assert(read("./src/App.jsx").includes('hasPermission(session, "social.manage")'));
+assert(read("./src/components/SocialReplyComposer.jsx").includes("I approve sending this exact reply"));
+assert(read("./src/pages/SocialWorkspace.css").includes("@media(max-width:700px)"));
+console.log("Social workspace, studio, calendar, inbox, distribution and permission UI contracts passed.");

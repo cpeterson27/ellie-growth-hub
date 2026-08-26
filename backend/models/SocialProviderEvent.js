@@ -12,7 +12,10 @@ const schema = new mongoose.Schema({
   contentBriefId: { type: mongoose.Schema.Types.ObjectId, ref: "ContentBrief", default: null, index: true },
   payloadHash: { type: String, default: "" },
   occurredAt: { type: Date, default: Date.now },
-  processedAt: { type: Date, default: Date.now },
+  processedAt: { type: Date, default: null },
+  processingStatus: { type: String, enum: ["processing", "processed", "failed"], default: "processing" },
+  processingStartedAt: { type: Date, default: Date.now },
+  lastError: { type: String, default: "", maxlength: 300 },
 }, { timestamps: true, collection: "social_provider_events" });
 
 schema.index({ workspaceId: 1, provider: 1, providerEventId: 1 }, { unique: true });

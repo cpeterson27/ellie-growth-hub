@@ -1,0 +1,6 @@
+import { useState } from "react";
+import { fetchSocialWorkspace } from "../services/api.js";
+export default function SocialContentDetail({ content }) {
+  const [history, setHistory] = useState(null), [error, setError] = useState("");
+  return <details onToggle={e => { if (e.currentTarget.open && !history) fetchSocialWorkspace(`content/${content._id}/history`).then(setHistory).catch(() => setError("Unable to load activity history.")); }}><summary>Variants, attribution and activity</summary>{error && <p>{error}</p>}<p>Created {new Date(content.createdAt).toLocaleString()} · {content.createdBy?.name || "Workspace team"}</p>{content.social?.variants?.map(row => <section key={row.provider}><h3>{row.provider}</h3><p style={{ whiteSpace: "pre-wrap" }}>{row.body}</p></section>)}<h3>Generation history</h3>{content.social?.generationHistory?.map((row, i) => <p key={i}>{new Date(row.generatedAt).toLocaleString()} · template version {row.templateVersion} · {row.kind}</p>)}<h3>Known interactions</h3>{history && <><p>{history.interactions.length} recorded interactions · {history.tasks.length} ambassador tasks</p>{history.activity.map(row => <p key={row._id}>{row.title} · {new Date(row.occurredAt).toLocaleString()}</p>)}</>}</details>;
+}
