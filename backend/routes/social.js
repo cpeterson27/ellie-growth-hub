@@ -61,6 +61,11 @@ router.patch("/:provider/assets", requireRole("owner", "admin"), async (req, res
   } catch (error) { return res.status(400).json({ error: error.message }); }
 });
 
+router.post("/instagram/oauth/refresh", requireRole("owner", "admin"), async (req, res) => {
+  try { return res.json(await socialOAuth.refreshInstagram(req.auth.workspaceId)); }
+  catch { return res.status(400).json({ error: "Instagram authorization could not be refreshed. It must be unexpired and at least 24 hours old. Reconnect if necessary." }); }
+});
+
 router.post("/:provider/oauth/disconnect", requireRole("owner", "admin"), async (req, res, next) => {
   const id = provider(req, res);
   if (!id) return;

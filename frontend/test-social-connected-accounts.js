@@ -41,6 +41,14 @@ try {
   assert(connectedHtml.includes("Example Page")); assert(connectedHtml.includes("@example"));
   assert(connectedHtml.includes("Reconnect Facebook")); assert(connectedHtml.includes("Disconnect Instagram"));
   assert(connectedHtml.includes("checked"));
+  assert(connectedHtml.includes("Choose the Facebook Page Growth Operator should manage"));
+  const unselected = structuredClone(connected);
+  unselected.connections[0].selectedAssetIds = [];
+  assert(render(unselected).indexOf("Choose the Facebook Page") < render(unselected).indexOf("<details"), "Initial selection is prominent");
+  unselected.connections[0].assets.push({ id: "ig", type: "instagram_business", parentId: "page", username: "example" });
+  const conflictHtml = render(unselected);
+  assert(conflictHtml.includes("Already connected through another method"));
+  assert(conflictHtml.includes("Linked Instagram: @example"));
   assert(render(fixture, true).includes('disabled=""'));
   console.log("Connected Accounts: real component renders, Meta actions, statuses, selected assets, single X row, safety flags, setup states, and preserved handler contracts passed.");
 } finally { await server.close(); }

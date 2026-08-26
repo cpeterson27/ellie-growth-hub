@@ -24,11 +24,12 @@ const CAPABILITIES = {
 router.use((req, res, next) => req.path.startsWith("/t/") ? next() : adminOnly(req, res, next));
 
 router.get("/overview", async (_req, res) => {
-  const [connections, automationCount, leadCount] = await Promise.all([SocialConnection.find({}).lean(), SocialAutomation.countDocuments({}), SocialIdentity.countDocuments({})]);
-  res.json({ success: true, data: { capabilities: CAPABILITIES, supportedTriggers: SUPPORTED_TRIGGERS, manyChat: { required: false, reason: "Native Meta supports the Phase 7 DM, story reply, comment webhook, keyword, and permitted private-reply flows. Follow-to-DM remains unsupported and optional." }, connections, counts: { automations: automationCount, socialLeads: leadCount } } });
+  const [connections, automationCount, leadCount, recentEvents] = await Promise.all([SocialConnection.find({}).lean(), SocialAutomation.countDocuments({}), SocialIdentity.countDocuments({}), SocialProviderEvent.find({}).select("provider eventType occurredAt processingStatus reply.status reply.error contactId").populate("contactId", "name").sort({ occurredAt: -1 }).limit(30).lean()]);
+  res.json({ success: true, data: { capabilities: CAPABILITIES, supportedTriggers: SUPPORTED_TRIGGERS, manyChat: { required: false, reason: "Native Meta supports the Phase 7 DM, story reply, comment webhook, keyword, and permitted private-reply flows. Follow-to-DM remains unsupported and optional." }, connections, recentEvents, counts: { automations: automationCount, socialLeads: leadCount } } });
 });
 
 router.get("/automations", async (_req, res) => res.json({ success: true, data: await SocialAutomation.find({}).populate("campaignId", "name").sort({ updatedAt: -1 }).lean() }));
+router.get("/history", async (_req, res) => res.json({ success: true, data: await SocialProviderEvent.find({}).select("provider eventType occurredAt processingStatus reply.status reply.error contactId").populate("contactId", "name").sort({ occurredAt: -1 }).limit(50).lean() }));
 
 router.post("/automations", async (req, res) => {
   const provider = String(req.body?.provider || "").toLowerCase();

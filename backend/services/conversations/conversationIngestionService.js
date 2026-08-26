@@ -31,7 +31,7 @@ async function ingestProviderMessage({ thread, message }) {
     opportunityId: thread.opportunityId || null,
     metadata: thread.metadata || {},
     lastMessageAt: occurredAt,
-    ...(message.direction === "inbound" ? { lastInboundAt: occurredAt } : { lastOutboundAt: occurredAt }),
+    ...(message.direction === "inbound" ? (message.opensMessagingWindow === false ? {} : { lastInboundAt: occurredAt }) : { lastOutboundAt: occurredAt }),
   };
   const setOnInsert = { status: "open", priority: "normal", assignedTo: thread.assignedTo || null, tags: thread.tags || [] };
   const threadUpdate = { $set: set, $setOnInsert: setOnInsert };

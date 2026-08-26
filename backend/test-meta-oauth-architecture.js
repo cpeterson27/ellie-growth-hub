@@ -5,6 +5,9 @@ const oauth = require("./services/socialOAuthService");
 const settings = require("./services/socialProviderConfig");
 const Connection = require("./models/SocialConnection");
 const Membership = require("./models/WorkspaceMembership");
+const health = require("./services/socialConnectionHealth");
+const notifyOwners = health.notifyOwners;
+health.notifyOwners = async () => {}; // Notification persistence tested separately, no database.
 const { decryptCredentials } = require("./utils/credentialEncryption");
 const routes = require("./routes/social");
 const env = { META_APP_ID: "fb-app", META_APP_SECRET: "fb-secret", FACEBOOK_LOGIN_CONFIG_ID: "123456789",
@@ -81,14 +84,15 @@ async function run() {
         if (address.endsWith("/debug_token")) return { data: { data: { is_valid: true, app_id: "fb-app", user_id: "fb-user" } } };
         if (address.endsWith("/me")) return { data: { id: "fb-user", name: "Fixture" } };
         if (address.endsWith("/me/permissions")) return { data: { data: [{ permission: "pages_show_list", status: "granted" }] } };
+        if (address.endsWith("/page-a")) return { data: { id: "page-a", access_token: "page-secret" } };
         if (address.endsWith("/me/accounts")) return { data: { data: [{ id: "page-a", name: "Fixture Page", access_token: "page-secret", instagram_business_account: { id: "linked-ig", username: "linked" } }] } };
-        if (address.endsWith("/subscribed_apps")) return { data: { data: [{ id: "fb-app", subscribed_fields: ["feed", "messages", "messaging_postbacks"] }] } };
+        if (address.endsWith("/subscribed_apps")) return { data: { data: [{ id: "fb-app", subscribed_fields: oauth.subscriptionFields({ type: "facebook_page" }) }] } };
       }
       if (u.hostname === "graph.instagram.com") {
         if (address.endsWith("/access_token")) return { data: { access_token: "ig-long", expires_in: 3600 } };
         if (address.endsWith("/me")) return { data: { user_id: "ig-user", username: "fixture" } };
         if (address.endsWith("/me/permissions")) return { data: { data: [{ permission: "instagram_business_basic", status: "granted" }, { permission: "instagram_business_content_publish", status: "declined" }] } };
-        if (address.endsWith("/subscribed_apps")) return { data: { data: [{ id: "ig-app", subscribed_fields: ["comments", "messages"] }] } };
+        if (address.endsWith("/subscribed_apps")) return { data: { data: [{ id: "ig-app", subscribed_fields: oauth.subscriptionFields({ type: "instagram_business" }) }] } };
       }
       throw Error("Unexpected mocked request");
     };
@@ -130,4 +134,4 @@ async function run() {
     console.log("Meta OAuth architecture passed: Business config, both URLs/callbacks, signed state, invalid config/scopes, encrypted upsert, workspace permissions, account discovery/status, subscriptions and local disconnect. All provider requests mocked.");
   } finally { axios.get = originals.get; axios.post = originals.post; axios.delete = originals.delete; Connection.findOne = originals.findOne; Connection.findOneAndUpdate = originals.update; Membership.findOne = originals.membership; }
 }
-run().catch(error => { console.error(error); process.exitCode = 1; });
+run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { health.notifyOwners = notifyOwners; });

@@ -37,6 +37,9 @@ export const beginSocialConnection = (provider) =>
 export const disconnectSocialConnection = (provider) =>
   api.post(`/social/${provider}/oauth/disconnect`).then((res) => res.data);
 
+export const refreshInstagramAuthorization = () =>
+  api.post("/social/instagram/oauth/refresh").then((res) => res.data);
+
 export const selectSocialAssets = (provider, assetIds) =>
   api.patch(`/social/${provider}/assets`, { assetIds }).then((res) => res.data);
 

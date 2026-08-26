@@ -9,7 +9,7 @@ export function connectionState(connection, now = Date.now()) {
   if (["expired", "failed"].includes(connection.status) ||
       (connection.connected && (connection.authorization?.valid === false ||
         connection.declinedScopes?.length ||
-        (connection.expiresAt && new Date(connection.expiresAt).getTime() <= now) ||
+        [connection.expiresAt, connection.authorization?.dataAccessExpiresAt].some(value => value && new Date(value).getTime() <= now + 7 * 86400000) ||
         connection.webhookSubscriptions?.some(row => ["failed", "not_subscribed"].includes(row.status))))) {
     return { label: "Needs attention", tone: "attention" };
   }

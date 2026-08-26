@@ -146,6 +146,21 @@ async function verifyMetaToken(accessToken, providerConfig, http = axios) {
   return { valid: true, userId: String(data.user_id || ""), dataAccessExpiresAt: data.data_access_expires_at ? new Date(Number(data.data_access_expires_at) * 1000) : null, verifiedAt: new Date() };
 }
 
+async function discoverPages(accessToken, providerConfig, http = axios) {
+  const pages = new Map(), cursors = new Set();
+  let after;
+  do {
+    const response = await http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me/accounts`, { params: { fields: "id,name,picture,tasks,instagram_business_account{id,username,name,profile_picture_url}", access_token: accessToken, ...(after ? { after } : {}) }, timeout: 15000 });
+    for (const page of response.data?.data || []) if (page.id) pages.set(String(page.id), page);
+    if (!response.data?.paging?.next) break;
+    after = response.data.paging.cursors?.after;
+    if (!after || cursors.has(after) || cursors.size >= 1000) throw new Error("Page discovery could not be completed; reconnect to retry");
+    cursors.add(after);
+    // Never follow an arbitrary provider next URL carrying credentials.
+  } while (after);
+  return [...pages.values()];
+}
+
 async function exchangeMeta(code, http = axios) {
   const providerConfig = config("meta");
   const tokenResponse = await http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/oauth/access_token`, { params: { client_id: providerConfig.clientId, client_secret: providerConfig.clientSecret, redirect_uri: providerConfig.redirectUri, code }, timeout: 15000 });
@@ -161,15 +176,14 @@ async function exchangeMeta(code, http = axios) {
     verifyMetaToken(accessToken, providerConfig, http),
     metaPermissions(accessToken, providerConfig, http),
     http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me`, { params: { fields: "id,name", access_token: accessToken }, timeout: 15000 }),
-    http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me/accounts`, { params: { fields: "id,name,access_token,tasks,instagram_business_account{id,username,name}", access_token: accessToken }, timeout: 15000 }),
+    discoverPages(accessToken, providerConfig, http),
   ]);
   const pageTokens = {};
   const assets = [];
   if (!authorization.userId || String(profileResponse.data?.id || "") !== authorization.userId) throw new Error("Facebook authorization identity mismatch");
-  for (const page of pagesResponse.data?.data || []) {
-    if (page.access_token) pageTokens[String(page.id)] = page.access_token;
-    assets.push({ id: String(page.id), name: page.name || "Facebook Page", type: "facebook_page", permissions: page.tasks || [] });
-    if (page.instagram_business_account?.id) assets.push({ id: String(page.instagram_business_account.id), name: page.instagram_business_account.name || page.instagram_business_account.username || "Instagram business account", username: page.instagram_business_account.username || "", type: "instagram_business", parentId: String(page.id), permissions: page.tasks || [] });
+  for (const page of pagesResponse) {
+    assets.push({ id: String(page.id), name: page.name || "Facebook Page", avatarUrl: page.picture?.data?.url || "", type: "facebook_page", permissions: page.tasks || [] });
+    if (page.instagram_business_account?.id) assets.push({ id: String(page.instagram_business_account.id), name: page.instagram_business_account.name || page.instagram_business_account.username || "Instagram business account", username: page.instagram_business_account.username || "", avatarUrl: page.instagram_business_account.profile_picture_url || "", type: "instagram_business", parentId: String(page.id), permissions: page.tasks || [] });
   }
   return {
     credentials: { accessToken, pageTokens },
@@ -214,21 +228,24 @@ function publicConnection(connection, provider) {
     connectedAt: connection?.connectedAt || null,
     lastVerifiedAt: connection?.lastVerifiedAt || null,
     lastError: connection?.lastError || "",
+    authorizationNotice: connection && connection.status !== "disconnected" ? (!require("./socialConnectionHealth").usable(connection) ? "Authorization needs attention. Reconnect before using this account." : require("./socialConnectionHealth").expiresSoon(connection) ? "Authorization expires within seven days. Refresh Instagram authorization or reconnect your account." : "") : "",
+    disconnectNotice: provider === "instagram" ? "Disconnect removes access from Growth Operator locally. To revoke the authorization at Instagram, also remove this app in Instagram's Apps and websites settings." : "",
   };
 }
 
 async function status(workspaceId, provider) {
   const connection = await SocialConnection.findOne({ workspaceId, provider }).lean();
-  if (connection?.status === "connected" && connection.expiresAt && new Date(connection.expiresAt).getTime() <= Date.now()) {
+  if (connection?.status === "connected" && !require("./socialConnectionHealth").usable(connection)) {
     await SocialConnection.updateOne({ _id: connection._id }, { $set: { status: "expired", lastError: "Authorization expired. Reconnect this account." } });
     connection.status = "expired";
     connection.lastError = "Authorization expired. Reconnect this account.";
   }
+  await require("./socialConnectionHealth").notifyOwners(connection);
   return publicConnection(connection, provider);
 }
 
 function subscriptionFields(asset) {
-  return asset.type === "instagram_business" ? ["comments", "messages"] : asset.type === "facebook_page" ? ["feed", "messages", "messaging_postbacks"] : [];
+  return asset.type === "instagram_business" ? ["comments", "messages", "mentions", "messaging_postbacks", "messaging_referral"] : asset.type === "facebook_page" ? ["feed", "messages", "messaging_postbacks", "messaging_referrals"] : [];
 }
 
 async function provisionMetaSubscriptions(connection, selected, http = axios) {
@@ -267,13 +284,34 @@ async function removeMetaSubscriptions(connection, removed, http = axios) {
 
 async function selectAssets(workspaceId, provider, assetIds, http = axios) {
   const connection = await SocialConnection.findOne({ workspaceId, provider }).select("+credentialsEncrypted");
-  if (!connection || connection.status !== "connected") throw new Error(`${provider} is not connected`);
+  if (!require("./socialConnectionHealth").usable(connection)) throw new Error(`${provider} requires reconnection`);
+  if (!Array.isArray(assetIds) || assetIds.some(id => typeof id !== "string")) throw new Error("Choose an account list");
   const allowed = new Set(connection.assets.map((asset) => String(asset.id)));
   const selected = [...new Set((assetIds || []).map(String))];
   if (selected.some((id) => !allowed.has(id))) throw new Error("Choose only assets returned by the connected provider");
+  for (const asset of connection.assets.filter(row => selected.includes(String(row.id)))) {
+    if (provider === "meta" && asset.type === "instagram_business" && !selected.includes(String(asset.parentId))) throw new Error("Select the Facebook Page before its linked Instagram account");
+  }
+  const other = await SocialConnection.findOne({ workspaceId, provider: { $ne: provider }, selectedAssetIds: { $in: selected } }).lean();
+  if (other && selected.length) throw new Error("This account is already selected through another connection. Deselect it there first; direct Instagram is recommended for Instagram.");
   const removed = (connection.selectedAssetIds || []).map(String).filter((id) => !selected.includes(id));
+  const previous = { ...connection.toObject(), credentialsEncrypted: connection.credentialsEncrypted };
+  if (provider === "meta") {
+    const credentials = decryptCredentials(connection.credentialsEncrypted), pageTokens = {};
+    for (const asset of connection.assets.filter(row => row.type === "facebook_page" && selected.includes(String(row.id)))) {
+      const existing = credentials.pageTokens?.[String(asset.id)];
+      const response = existing ? null : await http.get(`https://graph.facebook.com/${config("meta").apiVersion}/${asset.id}`, { params: { fields: "id,access_token", access_token: credentials.accessToken }, timeout: 15000 });
+      if (!existing && String(response?.data?.id || "") !== String(asset.id)) throw new Error("Selected Page authorization could not be verified");
+      const token = existing || response?.data?.access_token;
+      if (!token) throw new Error("Selected Page authorization is unavailable");
+      pageTokens[String(asset.id)] = token;
+    }
+    connection.credentialsEncrypted = encryptCredentials({ ...credentials, pageTokens });
+  }
   connection.selectedAssetIds = selected;
-  if (provider === "meta") { await removeMetaSubscriptions(connection, removed, http); connection.webhookSubscriptions = await provisionMetaSubscriptions(connection, selected, http); }
+  // Claim ownership before provider calls; the unique selected-asset index arbitrates races.
+  try { await connection.save(); } catch (error) { if (error.code === 11000) throw new Error("This account is already selected through another connection"); throw error; }
+  if (provider === "meta") { await removeMetaSubscriptions(previous, removed, http); connection.webhookSubscriptions = await provisionMetaSubscriptions(connection, selected, http); }
   if (provider === "instagram") connection.webhookSubscriptions = await provisionInstagramSubscriptions(connection, selected, http);
   await connection.save();
   return publicConnection(connection.toObject(), provider);
@@ -292,6 +330,33 @@ async function disconnect(workspaceId, provider) {
   }
   await SocialConnection.findOneAndUpdate({ workspaceId, provider }, { $set: { status: "disconnected", assets: [], selectedAssetIds: [], webhookSubscriptions: [], scopes: [], declinedScopes: [], authorization: { valid: false }, providerAccount: {}, connectedAt: null, lastVerifiedAt: null, lastError: "" }, $unset: { credentialsEncrypted: 1, expiresAt: 1 } });
   return status(workspaceId, provider);
+}
+
+async function refreshInstagram(workspaceId, http = axios) {
+  const connection = await SocialConnection.findOne({ workspaceId, provider: "instagram" }).select("+credentialsEncrypted");
+  if (!require("./socialConnectionHealth").usable(connection)) throw new Error("Reconnect Instagram; expired or invalid authorization cannot be refreshed");
+  const credentials = decryptCredentials(connection.credentialsEncrypted);
+  const issuedAt = credentials.refreshedAt || connection.connectedAt;
+  if (!issuedAt || Date.now() - new Date(issuedAt).getTime() < 86400000) throw new Error("Instagram authorization must be at least 24 hours old before refreshing");
+  const settings = config("instagram");
+  const refreshed = await http.get("https://graph.instagram.com/refresh_access_token", { params: { grant_type: "ig_refresh_token", access_token: credentials.accessToken }, timeout: 15000 });
+  if (!refreshed.data?.access_token || !(Number(refreshed.data.expires_in) > 0)) throw new Error("Instagram did not confirm refreshed authorization");
+  const token = refreshed.data.access_token;
+  const [profile, permissions] = await Promise.all([
+    http.get(`https://graph.instagram.com/${settings.apiVersion}/me`, { params: { fields: "user_id,username", access_token: token }, timeout: 15000 }),
+    http.get(`https://graph.instagram.com/${settings.apiVersion}/me/permissions`, { params: { access_token: token }, timeout: 15000 }),
+  ]);
+  if (String(profile.data?.user_id || profile.data?.id || "") !== String(connection.providerAccount.id)) throw new Error("Instagram authorization identity mismatch");
+  const rows = permissions.data?.data || [];
+  const updated = await SocialConnection.findOneAndUpdate({ _id: connection._id, workspaceId, provider: "instagram", status: "connected", credentialsEncrypted: connection.credentialsEncrypted }, { $set: {
+    credentialsEncrypted: encryptCredentials({ ...credentials, accessToken: token, refreshedAt: new Date().toISOString() }),
+    expiresAt: new Date(Date.now() + Number(refreshed.data.expires_in) * 1000),
+    scopes: rows.filter(row => row.status === "granted").map(row => row.permission),
+    declinedScopes: rows.filter(row => row.status !== "granted").map(row => row.permission),
+    lastVerifiedAt: new Date(), "authorization.valid": true, "authorization.verifiedAt": new Date(),
+  } }, { new: true });
+  if (!updated) throw new Error("Connection changed while refreshing; reload account status");
+  return publicConnection(updated, "instagram");
 }
 
 function pkceVerifier(state) { return crypto.createHmac("sha256", stateKey()).update(`x-pkce:${state}`).digest("base64url"); }
@@ -324,7 +389,7 @@ async function exchangeInstagram(code, http = axios) {
 async function provisionInstagramSubscriptions(connection, selected, http = axios) {
   const settings = config("instagram"), credentials = decryptCredentials(connection.credentialsEncrypted), results = [];
   for (const assetId of selected) {
-    const fields = ["comments", "messages"];
+    const fields = subscriptionFields({ type: "instagram_business" });
     try {
       await http.post(`https://graph.instagram.com/${settings.apiVersion}/${assetId}/subscribed_apps`, null, { params: { subscribed_fields: fields.join(","), access_token: credentials.accessToken }, timeout: 15000 });
       const response = await http.get(`https://graph.instagram.com/${settings.apiVersion}/${assetId}/subscribed_apps`, { params: { access_token: credentials.accessToken }, timeout: 15000 });
@@ -334,4 +399,4 @@ async function provisionInstagramSubscriptions(connection, selected, http = axio
   }
   return results;
 }
-module.exports = { authorizationUrl, configured, disconnect, exchangeCode, exchangeMeta, exchangeInstagram, exchangeX, metaPermissions, provisionMetaSubscriptions, provisionInstagramSubscriptions, removeMetaSubscriptions, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };
+module.exports = { discoverPages, subscriptionFields, refreshInstagram, authorizationUrl, configured, disconnect, exchangeCode, exchangeMeta, exchangeInstagram, exchangeX, metaPermissions, provisionMetaSubscriptions, provisionInstagramSubscriptions, removeMetaSubscriptions, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };

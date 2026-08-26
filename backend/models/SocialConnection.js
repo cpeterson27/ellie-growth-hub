@@ -26,6 +26,7 @@ const socialConnectionSchema = new mongoose.Schema({
     type: { type: String, enum: ["linkedin_organization", "facebook_page", "instagram_business", "x_account"], required: true },
     parentId: { type: String, default: "" },
     username: { type: String, default: "" },
+    avatarUrl: { type: String, default: "" },
     permissions: { type: [String], default: [] },
   }],
   selectedAssetIds: { type: [String], default: [] },
@@ -41,9 +42,11 @@ const socialConnectionSchema = new mongoose.Schema({
   connectedAt: { type: Date, default: Date.now },
   lastVerifiedAt: { type: Date, default: null },
   lastError: { type: String, default: "" },
-}, { timestamps: true });
+}, { timestamps: true, optimisticConcurrency: true });
 
 socialConnectionSchema.index({ workspaceId: 1, provider: 1 }, { unique: true });
+// Only explicitly selected assets claim ownership; discovery never does.
+socialConnectionSchema.index({ workspaceId: 1, selectedAssetIds: 1 }, { unique: true, name: "workspace_selected_social_asset", partialFilterExpression: { "selectedAssetIds.0": { $exists: true } } });
 
 socialConnectionSchema.plugin(workspacePlugin);
 module.exports = mongoose.model("SocialConnection", socialConnectionSchema);

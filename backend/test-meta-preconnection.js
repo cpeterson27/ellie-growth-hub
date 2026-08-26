@@ -50,13 +50,13 @@ async function subscriptionChecks() {
   const http = {
     async post(url, body, options) { posts.push({ url, fields: options.params.subscribed_fields }); return { data: { success: true } }; },
     async get(url) {
-      const fields = url.includes("ig-1") ? ["comments", "messages"] : ["feed", "messages", "messaging_postbacks"];
+      const fields = url.includes("ig-1") ? oauth.subscriptionFields({ type: "instagram_business" }) : oauth.subscriptionFields({ type: "facebook_page" });
       return { data: { data: [{ id: "meta-app-123", subscribed_fields: fields }] } };
     },
   };
   const result = await oauth.provisionMetaSubscriptions(connection, ["page-1", "ig-1"], http);
   assert.equal(result.every((row) => row.status === "subscribed"), true);
-  assert.deepEqual(posts.map((row) => row.fields), ["feed,messages,messaging_postbacks", "comments,messages"]);
+  assert.deepEqual(posts.map((row) => row.fields), ["feed,messages,messaging_postbacks,messaging_referrals", "comments,messages,mentions,messaging_postbacks,messaging_referral"]);
 }
 
 async function convergenceChecks() {
@@ -101,7 +101,8 @@ function loggingAndSafetyChecks() {
   const webhook = fs.readFileSync(path.join(__dirname, "routes/webhooks.js"), "utf8");
   const publishing = fs.readFileSync(path.join(__dirname, "services/socialPublishingService.js"), "utf8");
   assert.equal(route.includes("error.response?.data"), false);
-  assert.ok(webhook.includes('META_AUTOMATIC_REPLIES_ENABLED === "true"'));
+  assert.ok(webhook.includes("deliverMetaReply"));
+  assert.ok(fs.readFileSync(path.join(__dirname, "services/metaAutomationReplyService.js"), "utf8").includes('META_AUTOMATIC_REPLIES_ENABLED !== "true"'));
   assert.ok(publishing.includes('SOCIAL_PUBLISHING_ENABLED!=="true"'));
 }
 

@@ -15,7 +15,8 @@ const MessagingSender = require("../models/MessagingSender");
 const { normalizePhone } = require("../services/communicationPolicyService");
 const { twilioConversationAdapter, validateTwilioSignature } = require("../services/conversations/twilioConversationAdapter");
 const { runWithWorkspace } = require("../tenancy/workspaceContext");
-const { connectionForAsset, ingestMetaComment, ingestMetaMessage, metaMessagingAdapter, validateMetaSignature } = require("../services/conversations/metaMessagingAdapter");
+const { connectionForAsset, ingestMetaComment, ingestMetaMessage, validateMetaSignature } = require("../services/conversations/metaMessagingAdapter");
+const { deliver: deliverMetaReply } = require("../services/metaAutomationReplyService");
 
 const router = express.Router();
 
@@ -33,15 +34,13 @@ router.post(["/meta", "/instagram"], async (req, res) => {
       if (!connection?.workspaceId) continue;
       await runWithWorkspace(connection.workspaceId, async () => {
         for (const event of entry.messaging || []) {
-          const result = await ingestMetaMessage({ connection, assetId: entry.id, event });
-          if (process.env.META_AUTOMATIC_REPLIES_ENABLED === "true" && result?.responseTemplate && result?.conversation?.thread) await metaMessagingAdapter.sendMessage({ channel: result.identity.provider, assetId: entry.id, recipientId: result.identity.providerUserId, body: result.responseTemplate, threadId: result.conversation.thread._id });
+          const result = await ingestMetaMessage({ connection, assetId: entry.id, event, entryTime: entry.time });
+          await deliverMetaReply(result?.event);
         }
         for (const change of entry.changes || []) {
-          if (["comments", "feed"].includes(change.field)) {
-            const result = await ingestMetaComment({ connection, assetId: entry.id, change });
-            const commentId = String(change?.value?.id || change?.value?.comment_id || "");
-            const rawTime = Number(change?.value?.created_time || 0);
-            if (process.env.META_AUTOMATIC_REPLIES_ENABLED === "true" && result?.responseTemplate && ["instagram", "facebook"].includes(result.identity.provider) && commentId) await metaMessagingAdapter.sendCommentPrivateReply({ assetId: entry.id, commentId, body: result.responseTemplate, occurredAt: rawTime ? new Date(rawTime * (String(Math.trunc(rawTime)).length <= 10 ? 1000 : 1)) : new Date() });
+          if (["comments", "feed", "mentions"].includes(change.field)) {
+            const result = await ingestMetaComment({ connection, assetId: entry.id, change, entryTime: entry.time });
+            await deliverMetaReply(result?.event);
           }
         }
       });

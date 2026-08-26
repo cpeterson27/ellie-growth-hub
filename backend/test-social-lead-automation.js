@@ -17,7 +17,7 @@ assert.equal(allowedDestination("https://www.eventbrite.com/e/example"), true);
 assert.equal(allowedDestination("http://elliescoaching.com/apply"), false);
 assert.equal(allowedDestination("https://evil.example/elliescoaching.com"), false);
 
-assert.deepEqual(SUPPORTED_TRIGGERS.instagram, ["dm_keyword", "story_reply", "comment_any", "comment_keyword"]);
+assert.deepEqual(SUPPORTED_TRIGGERS.instagram, ["dm_keyword", "dm_any", "story_reply", "comment_any", "comment_keyword", "mention", "postback", "referral"]);
 assert.equal(CAPABILITIES.instagram.commentKeyword, true);
 assert.equal(CAPABILITIES.instagram.followToDm, false);
 assert.equal(CAPABILITIES.facebook.inboundDm, true);
@@ -37,7 +37,7 @@ includesAll(service, ["unsupported_engagement", "socialAttribution.first", "soci
 assert.equal(service.includes("ReferralAttribution.findOneAndUpdate"), false, "Social attribution must not overwrite Phase 3 referral attribution");
 
 const webhook = source("routes/webhooks.js");
-includesAll(webhook, ["validateMetaSignature", "ingestMetaComment", "sendCommentPrivateReply", "entry.messaging", "entry.changes"], "Meta webhook");
+includesAll(webhook, ["validateMetaSignature", "ingestMetaComment", "deliverMetaReply", "entry.messaging", "entry.changes"], "Meta webhook");
 const route = source("routes/socialAutomation.js");
 includesAll(route, ['requireCapability("social.manage")', 'router.get("/leads"', 'router.post("/automations"', 'router.post("/tracked-links"', "TRIGGER_UNSUPPORTED", "selectedAssetIds"], "social API");
 const server = source("server.js");
@@ -70,7 +70,7 @@ async function behaviorChecks() {
   assert.equal(first.duplicate, false); assert.equal(contacts.size, 1); assert.equal(identities.length, 1); assert.equal(first.automation._id, "auto-1");
   assert.equal(first.contact.socialAttribution.first.provider, "instagram"); assert.equal(first.contact.socialAttribution.latest.contentId, "reel-1");
   assert.ok(first.contact.tags.includes("underwriting")); assert.ok(activities.some((item) => item.metadata.eventType === "social.lead.created"));
-  const duplicate = await ingestSocialEvent(base, { models: fakeModels }); assert.equal(duplicate.duplicate, true); assert.equal(contacts.size, 1); assert.equal(activities.length, 2);
+  const duplicate = await ingestSocialEvent(base, { models: fakeModels }); assert.equal(duplicate.duplicate, true); assert.equal(contacts.size, 1); assert.equal(activities.length, 3);
   const ignored = await ingestSocialEvent({ ...base, providerEventId: "view-1", eventType: "view", triggerType: "view" }, { models: fakeModels }); assert.equal(ignored.reason, "unsupported_engagement"); assert.equal(providerEvents.size, 1);
   const dm = await ingestSocialEvent({ ...base, providerEventId: "dm-1", messageId: "message-1", eventType: "dm_received", triggerType: "dm_keyword", text: "deal", providerThreadId: "instagram:ig-asset:ig-user" }, { models: fakeModels, ingestMessage: async (payload) => { conversations.push(payload); return { thread: { _id: "thread-1" }, message: payload.message }; } });
   assert.equal(dm.contact._id, first.contact._id); assert.equal(conversations.length, 2); assert.equal(conversations[0].thread.contactIds[0], first.contact._id);

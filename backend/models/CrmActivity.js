@@ -25,6 +25,7 @@ const crmActivitySchema = new mongoose.Schema({
 
 crmActivitySchema.index({ workspaceId: 1, contactId: 1, occurredAt: -1 });
 crmActivitySchema.index({ workspaceId: 1, organizationId: 1, occurredAt: -1 });
+crmActivitySchema.index({ workspaceId: 1, "metadata.socialEventKey": 1 }, { unique: true, partialFilterExpression: { "metadata.socialEventKey": { $type: "string" } } });
 crmActivitySchema.plugin(workspacePlugin);
 
 module.exports = mongoose.model("CrmActivity", crmActivitySchema);
