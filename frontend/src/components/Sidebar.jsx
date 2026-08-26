@@ -29,7 +29,7 @@ const navGroups = [
   { label: "Operate", items: [
     { label: "Command Center", path: "/command-center", icon: <FiActivity />, permissions: ["crm.view", "analytics.view"] },
     { label: "CRM", path: "/crm/contacts", icon: <FiUsers />, permissions: ["crm.view"] },
-    { label: "Opportunities", path: "/opportunities", icon: <FiBriefcase />, permissions: ["sales.opportunities.view", "sales.opportunities.view_assigned"] },
+    { label: "Sales Pipeline", path: "/opportunities", icon: <FiBriefcase />, permissions: ["sales.opportunities.view", "sales.opportunities.view_assigned"] },
     { label: "Conversations", path: "/conversations", icon: <FiMessageSquare />, permissions: ["communications.view"] },
     { label: "Outreach", path: "/outreach", icon: <FiZap />, permissions: ["outreach.manage"] },
     { label: "Tasks", path: "/tasks", icon: <FiList />, permissions: ["crm.manage", "crm.manage_assigned"] },
@@ -49,7 +49,6 @@ const navGroups = [
   ] },
   { label: "Configure", items: [
     { label: "Brand Ambassadors", path: "/ambassadors/manage", icon: <FiLink />, permissions: ["ambassadors.view", "ambassadors.manage"] },
-    { label: "Ambassador Welcome Posts", path: "/ambassadors/welcome-template", icon: <FiUserCheck />, permissions: ["ambassadors.manage"] },
     { label: "Social", path: "/social", icon: <FiUserCheck />, permissions: ["social.manage"] },
     { label: "Integrations", path: "/integrations", icon: <FiLink />, permissions: ["integrations.manage"] },
     { label: "Settings", path: "/settings/workspace", icon: <FiSettings />, permissions: ["workspace.manage", "team.view"] },

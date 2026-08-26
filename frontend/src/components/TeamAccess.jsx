@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Button from "./Button.jsx";
 import UserAvatar from "./UserAvatar.jsx";
@@ -11,8 +12,9 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
   const [members, setMembers] = useState([]), [catalog, setCatalog] = useState({ capabilities: [], roleDefaults: {} }), [programs, setPrograms] = useState([]);
   const [editing, setEditing] = useState(null), [draft, setDraft] = useState(null), [preview, setPreview] = useState(null), [error, setError] = useState(""), [saving, setSaving] = useState(false);
   const blankInvite = { name: "", email: "", roles: ["member"], timezone: "", capacity: "", programIds: [], referralCode: "", communityUrl: "", commissionMode: "manual", ratePercent: "", fixedAmount: "", notes: "" };
+  const [params] = useSearchParams();
   const availableRoles = inviteRoles(actorRoles);
-  const [invite, setInvite] = useState(blankInvite);
+  const [invite, setInvite] = useState(() => ({ ...blankInvite, roles: params.get("role") === "ambassador" ? ["ambassador"] : ["member"] }));
   const load = async () => { try { const [team, caps, programRows] = await Promise.all([fetchWorkspaceMembers(), fetchWorkspaceCapabilities(), fetchCoachingPrograms({ limit: 200 }).catch(() => [])]); setMembers(team.members || []); setCatalog(caps); setPrograms(programRows || []); } catch (err) { setError(err.response?.data?.error || "Unable to load Team & Access."); } };
   useEffect(() => { const initialLoad = window.setTimeout(load, 0); return () => window.clearTimeout(initialLoad); }, []);
   const begin = (member) => { setEditing(member.id); setDraft({ roles: [...member.roles], status: member.status, permissionOverrides: { allow: [...(member.permissionOverrides?.allow || [])], deny: [...(member.permissionOverrides?.deny || [])] }, responsibilities: { programIds: (member.responsibilities?.programIds || []).map(String), applicationProgramIds: (member.responsibilities?.applicationProgramIds || []).map(String), salesPipelineIds: member.responsibilities?.salesPipelineIds || [] } }); };

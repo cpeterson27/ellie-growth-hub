@@ -18,7 +18,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
   const { session } = useAuth();
-  const [activeSection, setActiveSection] = useState(() => location.pathname.includes("/communications/invitations") ? "invitations" : location.pathname.endsWith("/privacy") ? "privacy" : location.pathname.endsWith("/team") ? "team" : "profile");
+  const [activeSection, setActiveSection] = useState(() => location.pathname.includes("/communications/invitations") ? "invitations" : location.pathname.endsWith("/privacy") ? "privacy" : location.pathname.endsWith("/website") ? "public" : location.pathname.endsWith("/applications") ? "applications" : location.pathname.endsWith("/team") ? "team" : "profile");
   const [workspaceName, setWorkspaceName] = useState(() => getWorkspaceSettings().workspaceName);
   const [accountEmail, setAccountEmail] = useState("");
   const [legalBusinessName, setLegalBusinessName] = useState("");
@@ -174,8 +174,8 @@ export default function Settings() {
         <button className={activeSection === "ai" ? "is-active" : ""} onClick={() => setActiveSection("ai")}><FiCpu /> AI connections</button>
         <button className={activeSection === "team" ? "is-active" : ""} onClick={() => { setActiveSection("team"); navigate("/settings/team"); }}><FiUsers /> Team & Access</button>
         {hasPermission(session, "team.manage") ? <button className={activeSection === "invitations" ? "is-active" : ""} onClick={() => { setActiveSection("invitations"); navigate("/settings/communications/invitations"); }}><FiMail /> Communications · Invitation templates</button> : null}
-        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "public" ? "is-active" : ""} onClick={() => setActiveSection("public")}><FiImage /> Public website</button> : null}
-        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "applications" ? "is-active" : ""} onClick={() => setActiveSection("applications")}><FiBriefcase /> Application routing</button> : null}
+        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "public" ? "is-active" : ""} onClick={() => { setActiveSection("public"); navigate("/settings/website"); }}><FiImage /> Website & Brand</button> : null}
+        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "applications" ? "is-active" : ""} onClick={() => { setActiveSection("applications"); navigate("/settings/applications"); }}><FiBriefcase /> Coaching Application</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "readiness" ? "is-active" : ""} onClick={() => setActiveSection("readiness")}><FiCheck /> Launch readiness</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "privacy" ? "is-active" : ""} onClick={() => { setActiveSection("privacy"); navigate("/settings/privacy"); }}><FiShield /> Privacy requests</button> : null}
       </nav>

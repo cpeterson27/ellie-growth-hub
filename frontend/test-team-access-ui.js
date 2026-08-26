@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import { createServer } from "vite";
+import { MemoryRouter } from "react-router-dom";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { accessGroups, inviteRoles, overrideValue, setOverride, lifecycleLabel } from "./src/components/teamAccessPresentation.js";
@@ -30,7 +31,7 @@ console.log("Team & Access roles, complete canonical permission mapping, overrid
 const server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" });
 try {
   const { default: TeamAccess } = await server.ssrLoadModule("/src/components/TeamAccess.jsx");
-  const render = roles => renderToStaticMarkup(createElement(TeamAccess, { canManage: true, actorRoles: roles }));
+  const render = roles => renderToStaticMarkup(createElement(MemoryRouter, null, createElement(TeamAccess, { canManage: true, actorRoles: roles })));
   assert(render(["owner"]).includes("Owner / Business Owner"));
   assert(!render(["admin"]).includes("Owner / Business Owner"));
   assert(render(["owner"]).includes("Create invite preview"));

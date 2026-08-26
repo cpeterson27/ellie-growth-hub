@@ -8,7 +8,7 @@ const api = fs.readFileSync(new URL("./src/services/api.js", import.meta.url), "
 
 assert.ok(app.includes('path="/social-automation"') && app.includes("mayManageCoaching"));
 assert.ok(sidebar.includes('permissions: ["social.manage"]') && sidebar.includes('label: "Social Leads"'));
-for (const text of ["Native Meta · ManyChat not required", "no automation runs from likes, views, saves", "Normal social posts remain unaffected", "LinkedIn is human-assisted", "TikTok is lead-form-only"]) assert.ok(page.includes(text), `UI missing ${text}`);
+for (const text of ["Replies require administrator approval", "no automation runs from likes, views, saves", "Normal social posts remain unaffected", "LinkedIn is human-assisted", "TikTok is lead-form-only"]) assert.ok(page.includes(text), `UI missing ${text}`);
 for (const endpoint of ["/social-automation/overview", "/social-automation/automations", "/social-automation/leads", "/social-automation/tracked-links"]) assert.ok(api.includes(endpoint), `API client missing ${endpoint}`);
 
 console.log("Social Automation owner/admin UI contracts passed.");
