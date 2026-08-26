@@ -53,7 +53,7 @@ export default function SocialAutomation() {
 
   if (loading) return <main className="social-automation"><p>Loading Social Automation…</p></main>;
   return <main className="social-automation">
-    <header><div><p className="eyebrow">Growth Operator</p><h1>Social Automation</h1><p>Turn comments and messages into contacts, conversations, and follow-up.</p></div><span className="native-badge">Replies require administrator approval</span></header>
+    <header><div><p className="eyebrow">Growth Operator</p><h1>Social Automation</h1><p>Social Automations are rules for what happens after an interaction. Social Leads shows the people captured; Social Content is where you create posts.</p></div><span className="native-badge">Replies require administrator approval</span></header>
     {message ? <div className="social-notice" role="status">{message}</div> : null}
     <section className="social-grid social-grid--metrics">
       <article><strong>{overview?.counts?.socialLeads || 0}</strong><span>Social leads</span></article>

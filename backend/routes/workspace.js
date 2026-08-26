@@ -77,7 +77,7 @@ function memberResponse(membership, coachProfile = null, ambassadorProfile = nul
   const roles = normalizeRoles(membership);
   return {
     id: membership._id, userId: membership.userId?._id || membership.userId,
-    name: membership.userId?.name || "", email: membership.userId?.email || "", avatarUrl: membership.userId?.avatarUrl || "", role: membership.role,
+    firstName: membership.userId?.firstName || "", lastName: membership.userId?.lastName || "", phone: membership.userId?.phone || "", name: membership.userId?.name || "", email: membership.userId?.email || "", avatarUrl: membership.userId?.avatarUrl || "", role: membership.role,
     roles, status: membership.status, lastLoginAt: membership.userId?.lastLoginAt || null,
     permissionOverrides: membership.permissionOverrides || { allow: [], deny: [] },
     effectivePermissions: effectivePermissions(membership), responsibilities: membership.responsibilities || {},
@@ -114,7 +114,7 @@ router.post("/invitation-templates/:roleKey/reset", requireCapability("team.mana
 
 router.get("/members", requireCapability("team.view", "team.manage"), async (req, res) => {
   const memberships = await WorkspaceMembership.find({ workspaceId: req.auth.workspaceId })
-    .populate("userId", "name email status lastLoginAt avatarUrl")
+    .populate("userId", "name firstName lastName phone email status lastLoginAt avatarUrl")
     .sort({ createdAt: 1 });
   const profiles = await CoachProfile.find({ workspaceId: req.auth.workspaceId, userId: { $in: memberships.map((item) => item.userId?._id || item.userId) } }).lean();
   const ambassadorProfiles = await AmbassadorProfile.find({ workspaceId: req.auth.workspaceId, userId: { $in: memberships.map((item) => item.userId?._id || item.userId) } }).lean();
@@ -139,7 +139,7 @@ router.post("/members", requireCapability("team.manage"), async (req, res) => {
       const data = await workspaceMemberService.onboardCoach({ ...req.body, roles, workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id });
       return res.status(data.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...data.membership.toObject(), userId: data.user }, data.coachProfile, null, data.invitation), invitation: invitationResponse(data.invitation), alreadyActive: data.alreadyActive });
     }
-    const result = await workspaceMemberService.inviteMember({ workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id, name: req.body?.name, email: req.body?.email, roles });
+    const result = await workspaceMemberService.inviteMember({ workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id, name: req.body?.name, firstName: req.body?.firstName, lastName: req.body?.lastName, phone: req.body?.phone, email: req.body?.email, roles });
     const profile = roles.includes("coach") ? await CoachProfile.findOne({ workspaceId: req.auth.workspaceId, userId: result.user._id }) : null;
     res.status(result.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...result.membership.toObject(), userId: result.user }, profile, null, result.invitation), invitation: invitationResponse(result.invitation), alreadyActive: result.alreadyActive });
   } catch (error) {
@@ -149,7 +149,7 @@ router.post("/members", requireCapability("team.manage"), async (req, res) => {
 
 router.patch("/members/:id", requireCapability("team.manage"), async (req, res) => {
   try {
-    const membership = await WorkspaceMembership.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).populate("userId", "name email status lastLoginAt avatarUrl");
+    const membership = await WorkspaceMembership.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).populate("userId", "name firstName lastName phone email status lastLoginAt avatarUrl");
     if (!membership) return res.status(404).json({ error: "Team member not found" });
     const currentRoles = normalizeRoles(membership);
     const requestedRoles = req.body.roles === undefined ? currentRoles : [...new Set((Array.isArray(req.body.roles) ? req.body.roles : []).filter((role) => ROLE_DEFAULTS[role]))];

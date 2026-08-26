@@ -344,13 +344,13 @@ function createCoachingRouter(overrides = {}) {
     const filter = { workspaceId: req.auth.workspaceId };
     if (!isAdminRole(req.auth.role)) filter.userId = authenticatedUserId(req);
     if (isAdminRole(req.auth.role) && req.query.status) filter.status = req.query.status;
-    const data = await deps.CoachProfile.find(filter).populate("userId", "name email status avatarUrl").sort({ displayName: 1, createdAt: 1 }).lean();
+    const data = await deps.CoachProfile.find(filter).populate("userId", "name firstName lastName phone email status avatarUrl").sort({ displayName: 1, createdAt: 1 }).lean();
     return res.json({ success: true, data });
   }));
 
   router.get("/coaches/me", asyncRoute(async (req, res) => {
     const data = await deps.CoachProfile.findOne({ workspaceId: req.auth.workspaceId, userId: authenticatedUserId(req) })
-      .populate("userId", "name email status avatarUrl").lean();
+      .populate("userId", "name firstName lastName phone email status avatarUrl").lean();
     return data ? res.json({ success: true, data }) : res.status(404).json({ success: false, error: "Coach profile not found", code: "COACH_NOT_FOUND" });
   }));
 
@@ -358,7 +358,7 @@ function createCoachingRouter(overrides = {}) {
     if (!validId(req.params.id)) return res.status(400).json({ success: false, error: "Invalid coach profile", code: "ID_INVALID" });
     const filter = { _id: req.params.id, workspaceId: req.auth.workspaceId };
     if (!isAdminRole(req.auth.role)) filter.userId = authenticatedUserId(req);
-    const data = await deps.CoachProfile.findOne(filter).populate("userId", "name email status avatarUrl").lean();
+    const data = await deps.CoachProfile.findOne(filter).populate("userId", "name firstName lastName phone email status avatarUrl").lean();
     return data ? res.json({ success: true, data }) : res.status(404).json({ success: false, error: "Coach profile not found", code: "COACH_NOT_FOUND" });
   }));
 
@@ -382,6 +382,9 @@ function createCoachingRouter(overrides = {}) {
         workspaceId: req.auth.workspaceId,
         actorUserId: authenticatedUserId(req),
         name: req.body?.name,
+        firstName: req.body?.firstName,
+        lastName: req.body?.lastName,
+        phone: req.body?.phone,
         email: req.body?.email,
         timezone: req.body?.timezone,
         capacity: req.body?.capacity,

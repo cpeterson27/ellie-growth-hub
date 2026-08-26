@@ -31,7 +31,7 @@ router.get("/invitations/:token", async (req, res) => {
 
 router.post("/invitations/:token/accept", async (req, res) => {
   try {
-    await workspaceMemberService.acceptInvitation({ token: req.params.token, password: req.body?.password, name: req.body?.name });
+    await workspaceMemberService.acceptInvitation({ token: req.params.token, password: req.body?.password, name: req.body?.name, firstName: req.body?.firstName, lastName: req.body?.lastName, phone: req.body?.phone });
     return res.json({ success: true });
   } catch (error) { return res.status(400).json({ error: error.message || "Unable to accept invitation", code: error.code }); }
 });

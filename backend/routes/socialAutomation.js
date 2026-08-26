@@ -61,9 +61,7 @@ router.patch("/automations/:id", async (req, res) => {
 });
 
 router.get("/leads", async (req, res) => {
-  const query = {};
-  if (req.query.provider) query.provider = String(req.query.provider);
-  const identities = await SocialIdentity.find(query).populate("contactId", "name email phone tags socialAttribution status").sort({ lastActivityAt: -1 }).limit(Math.min(Number(req.query.limit) || 100, 250)).lean();
+  const identities = await require("../services/socialLeadInboxService").list(req.auth.workspaceId, req.query);
   res.json({ success: true, data: identities });
 });
 

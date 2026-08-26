@@ -64,6 +64,7 @@ const CoachStudentDetail = lazy(() => import("./pages/CoachPortal.jsx").then((mo
 const CoachSchedule = lazy(() => import("./pages/CoachPortal.jsx").then((module) => ({ default: module.CoachSchedule })));
 const CoachReferrals = lazy(() => import("./pages/CoachPortal.jsx").then((module) => ({ default: module.CoachReferrals })));
 const CoachCommissions = lazy(() => import("./pages/CoachPortal.jsx").then((module) => ({ default: module.CoachCommissions })));
+const SocialLeads = lazy(() => import("./pages/SocialLeads.jsx"));
 const SocialAutomation = lazy(() => import("./pages/SocialAutomation.jsx"));
 const Automations = lazy(() => import("./pages/Automations.jsx"));
 const AmbassadorPortal = lazy(() => import("./pages/AmbassadorPortal.jsx"));
@@ -128,7 +129,7 @@ function ProtectedApp() {
           <Route path="/discovery/:workspace" element={<Discovery />} />
           <Route path="/partners" element={<Partners />} />
           <Route path="/content" element={<Content />} />
-          {hasPermission(session, "social.manage") ? <><Route path="/social" element={<SocialWorkspace />} /><Route path="/social/:section" element={<SocialWorkspace />} /></> : null}
+          {hasPermission(session, "social.manage") ? <><Route path="/social-leads" element={<SocialLeads />} /><Route path="/social" element={<SocialWorkspace />} /><Route path="/social/:section" element={<SocialWorkspace />} /></> : null}
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile" element={<MyProfile />} />

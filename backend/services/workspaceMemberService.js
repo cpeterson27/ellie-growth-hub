@@ -28,11 +28,22 @@ function cleanEmail(value) { return String(value || "").trim().toLowerCase(); }
 function invitationHash(token) { return crypto.createHash("sha256").update(String(token || "")).digest("hex"); }
 function publicFrontendUrl() { return String(process.env.PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, ""); }
 
-async function findOrCreateUser({ name, email }, models) {
+function personIdentity(input) {
+  const clean = value => String(value || "").trim().replace(/\s+/g, " ");
+  const structured = input.firstName !== undefined || input.lastName !== undefined;
+  const firstName = clean(input.firstName), lastName = clean(input.lastName);
+  if (structured && (!firstName || !lastName)) throw new Error("First name and last name are required");
+  const name = structured ? [firstName, lastName].join(" ") : clean(input.name);
+  const phone = String(input.phone || "").trim();
+  if (name.length < 2 || name.length > 120 || firstName.length > 80 || lastName.length > 80 || phone.length > 50) throw new Error("Check the name and phone length");
+  return { name, ...(structured ? { firstName, lastName } : {}), phone };
+}
+
+async function findOrCreateUser({ name, email, firstName, lastName, phone }, models) {
   let user = await models.User.findOne({ email });
   if (user) return { user, created: false };
   try {
-    user = await models.User.create({ name, email, passwordHash: await hashPassword(crypto.randomBytes(32).toString("base64url")) });
+    user = await models.User.create({ name, email, firstName, lastName, phone, passwordHash: await hashPassword(crypto.randomBytes(32).toString("base64url")) });
     return { user, created: true };
   } catch (error) {
     if (error.code !== 11000) throw error;
@@ -70,14 +81,28 @@ async function deliverInvitation({ invitation, token = crypto.randomBytes(32).to
 }
 
 async function inviteMember(input, models = dependencies) {
-  const email = cleanEmail(input.email), name = String(input.name || "").trim();
+  const identity = personIdentity(input);
+  const email = cleanEmail(input.email);
+  let name = identity.name;
   if (!email.includes("@") || name.length < 2) throw new Error("Enter a name and valid email");
   const roles = [...new Set((input.roles || []).filter((role) => ["owner", "admin", "coach", "closer", "ambassador", "member", "viewer"].includes(role)))];
   if (!roles.length) roles.push("member");
   if (roles.includes("owner")) await requireOwnerActor(input, models);
-  const { user } = await findOrCreateUser({ name, email }, models);
+  const { user } = await findOrCreateUser({ ...identity, email }, models);
+  name = user.name || name;
   const existing = await models.WorkspaceMembership.findOne({ workspaceId: input.workspaceId, userId: user._id });
   if (existing && normalizeRoles(existing).includes("owner")) await requireOwnerActor(input, models);
+  // Reuse established global identity. Only fill missing fields for an existing
+  // membership in this workspace; never edit a foreign workspace's user.
+  if (existing) {
+    let enriched = false;
+    const parts = String(user.name || name).trim().split(/\s+/);
+    const missingValues = { firstName: parts.shift() || "", lastName: parts.join(" "), phone: identity.phone };
+    for (const key of ["firstName", "lastName", "phone"]) {
+      if (!user[key] && identity[key] && missingValues[key]) { user[key] = missingValues[key]; enriched = true; }
+    }
+    if (enriched) await user.save();
+  }
   if (existing?.status === "active") {
     const combinedRoles = [...new Set([...normalizeRoles(existing), ...roles])];
     existing.roles = combinedRoles;
@@ -113,7 +138,7 @@ async function onboardCoach(input, models = dependencies) {
   const invited = await inviteMember({ ...input, roles: [...new Set([...(input.roles || []), "coach"])], deliverInvitation: false }, models);
   const active = invited.membership.status === "active";
   const update = {
-    displayName: String(input.name || invited.user.name || "").trim(),
+    displayName: invited.user.name,
     timezone: String(input.timezone || "").trim(),
     capacity: input.capacity == null || input.capacity === "" ? null : Math.max(0, Number(input.capacity) || 0),
     status: active ? "active" : "inactive",
@@ -142,10 +167,10 @@ async function availableAmbassadorCode(input, models) {
 async function onboardAmbassador(input, models = dependencies) {
   const invited = await inviteMember({ ...input, roles: [...new Set([...(input.roles || []), "ambassador"])], deliverInvitation: false }, models);
   const existing = await models.AmbassadorProfile.findOne({ workspaceId: input.workspaceId, userId: invited.user._id });
-  const code = existing?.referralCode || await availableAmbassadorCode(input, models);
+  const code = existing?.referralCode || await availableAmbassadorCode({ ...input, name: invited.user.name }, models);
   const active = invited.membership.status === "active";
   const values = {
-    displayName: String(input.name || invited.user.name || "").trim(), status: active ? "active" : "invited", referralCode: code, referralSlug: code,
+    displayName: invited.user.name, status: active ? "active" : "invited", referralCode: code, referralSlug: code,
     contactId: input.contactId || existing?.contactId || null, communityUrl: String(input.communityUrl || existing?.communityUrl || "").trim(),
     startDate: input.startDate || existing?.startDate || new Date(), notes: String(input.notes || existing?.notes || "").trim(), deactivatedAt: active ? null : existing?.deactivatedAt || null,
     commissionConfig: { mode: ["manual", "percent", "fixed"].includes(input.commissionConfig?.mode) ? input.commissionConfig.mode : existing?.commissionConfig?.mode || "manual", rateBps: Math.min(10000, Math.max(0, Number(input.commissionConfig?.rateBps ?? existing?.commissionConfig?.rateBps) || 0)), fixedAmountMinor: Math.max(0, Number(input.commissionConfig?.fixedAmountMinor ?? existing?.commissionConfig?.fixedAmountMinor) || 0), currency: String(input.commissionConfig?.currency || existing?.commissionConfig?.currency || "USD").toUpperCase().slice(0, 3) },
@@ -157,14 +182,15 @@ async function onboardAmbassador(input, models = dependencies) {
 
 async function sendInvitation({ workspaceId, invitationId, subject, body, actorUserId }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (invitation.roles?.includes("owner")) await requireOwnerActor({ workspaceId, actorUserId }, models); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.User.findById(invitation.invitedBy).select("name").lean()]); return deliverInvitation({ invitation, workspaceName: workspace?.name || "Growth Operator", invitedBy: inviter?.name || "A workspace administrator" }, models); }
 
-async function acceptInvitation({ token, password, name }, models = dependencies) {
+async function acceptInvitation({ token, password, name, firstName, lastName, phone }, models = dependencies) {
   const invitation = await models.WorkspaceInvitation.findOne({ tokenHash: invitationHash(token), status: "pending", expiresAt: { $gt: new Date() } }).select("+tokenHash +deliveryError");
   if (!invitation) { const error = new Error("This invitation is invalid or has expired"); error.code = "INVITATION_INVALID"; throw error; }
   const user = await models.User.findById(invitation.userId).select("+passwordHash");
   const membership = await models.WorkspaceMembership.findOne({ workspaceId: invitation.workspaceId, userId: invitation.userId });
   if (!user || !membership || membership.status !== "invited") { const error = new Error("This invitation is no longer available"); error.code = "INVITATION_INVALID"; throw error; }
+  const identity = personIdentity({ name: name || invitation.name || user.name, firstName, lastName, phone: phone === undefined ? user.phone : phone });
   user.passwordHash = await hashPassword(password);
-  user.name = String(name || invitation.name || user.name).trim();
+  Object.assign(user, identity);
   user.status = "active";
   await user.save();
   membership.status = "active";

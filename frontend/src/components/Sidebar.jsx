@@ -36,7 +36,7 @@ const navGroups = [
   ] },
   { label: "Grow", items: [
     { label: "Campaigns", path: "/campaigns", icon: <FiZap />, permissions: ["campaigns.manage"] },
-    { label: "Social Leads", path: "/social-automation", icon: <FiMessageSquare />, permissions: ["social.manage"] },
+    { label: "Social Leads", path: "/social-leads", icon: <FiMessageSquare />, permissions: ["social.manage"] },
     { label: "Automations", path: "/automations", icon: <FiZap />, permissions: ["automations.manage"] },
     { label: "Discovery", path: "/discovery", icon: <FiTrendingUp />, permissions: ["discovery.manage"] },
     { label: "Events", path: "/events", icon: <FiCalendar />, permissions: ["campaigns.manage"] },
