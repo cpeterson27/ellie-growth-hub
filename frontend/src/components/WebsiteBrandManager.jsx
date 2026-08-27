@@ -4,6 +4,7 @@ import PublicSiteAdmin from "./PublicSiteAdmin.jsx";
 import ProgramWebsiteSettings from "./ProgramWebsiteSettings.jsx";
 import TestimonialManager from "./TestimonialManager.jsx";
 import { fetchCoachingPrograms, fetchManagedProfiles, fetchManagedTestimonials, fetchPublicManagementConfig, updatePublicManagementConfig } from "../services/api.js";
+import { publicSiteUrl } from "../utils/publicSiteUrl.js";
 import "./WebsiteManagement.css";
 
 const sections = [
@@ -27,7 +28,7 @@ export default function WebsiteBrandManager({ websiteUrl }) {
     teamDraft: data.profiles.filter((row) => row.status !== "published").length,
     testimonials: data.testimonials.filter((row) => row.status === "approved").length,
   } : null;
-  const publicUrl = websiteUrl?.trim() || "/";
+  const publicUrl = publicSiteUrl(websiteUrl);
   return <div className="website-brand-manager">
     <header className="website-brand-header"><div><p className="page-eyebrow">Public experience</p><h2>Website &amp; Brand</h2><p>Manage what visitors see on Ellie’s Coaching.</p></div><div className="website-brand-header__actions"><a className="website-preview-action" href={publicUrl} target="_blank" rel="noreferrer">Preview</a><a className="website-live-action" href={publicUrl} target="_blank" rel="noreferrer">View Live Website ↗</a></div></header>
     <nav className="website-brand-tabs" aria-label="Website and Brand sections" role="tablist">{sections.map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={active === key} className={active === key ? "is-active" : ""} onClick={() => navigate(key)}>{label}</button>)}</nav>
