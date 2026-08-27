@@ -2,6 +2,7 @@ import axios from "axios";
 
 export const fetchSocialWorkspace = (section) => api.get(`/social-workspace/${section}`).then(res => res.data);
 export const mutateSocialWorkspace = (section, values) => api.post(`/social-workspace/${section}`, values).then(res => res.data);
+export const manageFacebookComment = (threadId, values) => api.post(`/social-workspace/inbox/${threadId}/comment-actions`, values).then(res => res.data);
 export const fetchAmbassadorNotifications = () => api.get("/ambassadors/me/notifications").then(res => res.data);
 export const fetchAmbassadorContentTasks = () => api.get("/ambassadors/me/content-tasks").then(res => res.data);
 export const updateAmbassadorContentTask = (id, values) => api.patch(`/ambassadors/me/content-tasks/${id}`, values).then(res => res.data);
@@ -106,6 +107,7 @@ export const createWorkspaceMember = (values) =>
   api.post("/workspace/members", values).then((res) => res.data);
 export const sendWorkspaceInvitation = (id, values = {}) =>
   api.post(`/workspace/invitations/${id}/send`, values).then((res) => res.data);
+export const cancelWorkspaceInvitation = (id) => api.delete(`/workspace/invitations/${id}`).then((res) => res.data);
 export const fetchInvitationTemplates = () =>
   api.get("/workspace/invitation-templates").then((res) => res.data.templates);
 export const saveInvitationTemplate = (roleKey, values) =>
@@ -134,7 +136,10 @@ export const fetchManagedApplications = (params = {}) => api.get("/public-manage
 export const fetchManagedTestimonials = () => api.get("/public-management/testimonials").then((res) => res.data.data);
 export const createManagedTestimonial = (values) => api.post("/public-management/testimonials", values).then((res) => res.data.data);
 export const updateManagedTestimonial = (id, values) => api.patch(`/public-management/testimonials/${id}`, values).then((res) => res.data.data);
+export const deleteManagedTestimonial = (id) => api.delete(`/public-management/testimonials/${id}`).then((res) => res.data);
 export const updateProgramPublicPresentation = (id, values) => api.patch(`/public-management/programs/${id}`, values).then((res) => res.data.data);
+export const uploadProgramVideo = (values) => api.post("/public-management/program-media", values).then((res) => res.data.data);
+export const fetchWorkspaceMedia = () => api.get("/social-workspace/media").then((res) => res.data);
 export const fetchManagedProfiles = () => api.get("/public-management/profiles").then((res) => res.data.data);
 export const createManagedProfile = (values) => api.post("/public-management/profiles", values).then((res) => res.data.data);
 export const updateManagedProfile = (id, values) => api.patch(`/public-management/profiles/${id}`, values).then((res) => res.data.data);

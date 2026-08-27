@@ -8,7 +8,7 @@ const schema = new mongoose.Schema({
   assetId: { type: String, required: true, trim: true },
   contentId: { type: String, default: "", trim: true },
   contentBriefId: { type: mongoose.Schema.Types.ObjectId, ref: "ContentBrief", default: null },
-  triggerType: { type: String, enum: ["comment_any", "comment_keyword", "dm_keyword", "dm_any", "story_reply", "mention", "postback", "referral"], required: true, index: true },
+  triggerType: { type: String, enum: ["comment_any", "comment_keyword", "dm_keyword", "dm_any", "story_reply", "mention", "postback", "referral", "optin"], required: true, index: true },
   keywords: { type: [String], default: [] },
   responseTemplate: { type: String, default: "", maxlength: 2000 },
   cta: { label: { type: String, default: "" }, destination: { type: String, default: "" } },

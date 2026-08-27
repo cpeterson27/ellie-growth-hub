@@ -6,6 +6,7 @@ import DashboardLayout from "./layouts/DashboardLayout.jsx";
 import { InitiativeProvider } from "./context/InitiativeContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { WorkspaceThemeProvider } from "./context/WorkspaceThemeContext.jsx";
+import PublicHomepageAnchors from "./components/PublicHomepageAnchors.jsx";
 import useAuth from "./context/useAuth.js";
 import { canManageCoaching, canUseCoachPortal, canUseSales, hasPermission, isAmbassadorOnly, isCoachOnly } from "./utils/roleAccess.js";
 
@@ -189,6 +190,7 @@ function App() {
   return (
     <BrowserRouter>
       <WorkspaceThemeProvider><AuthProvider>
+        <PublicHomepageAnchors />
         <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<PublicHome />} />

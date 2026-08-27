@@ -17,6 +17,8 @@ const llm = require("../services/llmService");
 const media = require("../services/imageAssetService");
 const distribution = require("../services/ambassadorContentService");
 const oauth = require("../services/socialOAuthService");
+const metaInsights = require("../services/metaInsightsService");
+const pageEngagement = require("../services/metaPageEngagementService");
 const { metaMessagingAdapter } = require("../services/conversations/metaMessagingAdapter");
 const router = express.Router();
 router.use(requireCapability("social.manage"));
@@ -56,7 +58,8 @@ router.get("/analytics", wrap(async (req, res) => {
   ]);
   const opportunities = applications.map(app => app.salesOpportunityId).filter(Boolean);
   const enrollments = opportunities.length ? await Enrollment.find({ workspaceId, sourceOpportunityId: { $in: opportunities } }).select("sourceOpportunityId status").lean() : [];
-  res.json({ rows: socialChannels.map(provider => ({ provider, interactions: events.filter(event => event.provider === provider).length, identifiableContacts: new Set(events.filter(event => event.provider === provider && event.contactId).map(event => String(event.contactId))).size, trackedClicks: links.filter(link => link.provider === provider).reduce((total, link) => total + (link.clickCount || 0), 0), attributedApplications: applications.filter(app => app.attribution.provider === provider).length, linkedEnrollments: enrollments.filter(enrollment => applications.some(app => app.attribution.provider === provider && String(app.salesOpportunityId) === String(enrollment.sourceOpportunityId))).length })), attributionNote: "Applications carry recorded provider attribution; enrollments are linked through the application's sales opportunity. These are known associations, not proof that social caused a purchase. Counts cover up to 1,000 records per source.", providerMetrics: { reach: null, impressions: null, likes: null, saves: null, shares: null }, metricsNote: "Provider insights sync is not implemented; unavailable metrics are not reported as zero." });
+  const providerInsights = await metaInsights.fetchWorkspaceInsights(workspaceId);
+  res.json({ rows: socialChannels.map(provider => ({ provider, interactions: events.filter(event => event.provider === provider).length, identifiableContacts: new Set(events.filter(event => event.provider === provider && event.contactId).map(event => String(event.contactId))).size, trackedClicks: links.filter(link => link.provider === provider).reduce((total, link) => total + (link.clickCount || 0), 0), attributedApplications: applications.filter(app => app.attribution.provider === provider).length, linkedEnrollments: enrollments.filter(enrollment => applications.some(app => app.attribution.provider === provider && String(app.salesOpportunityId) === String(enrollment.sourceOpportunityId))).length })), attributionNote: "Applications carry recorded provider attribution; enrollments are linked through the application's sales opportunity. These are known associations, not proof that social caused a purchase. Counts cover up to 1,000 records per source.", providerInsights, metricsNote: providerInsights.note });
 }));
 router.get("/inbox", wrap(async (req, res) => {
   const query = { workspaceId: req.auth.workspaceId, channel: { $in: socialChannels } };
@@ -82,6 +85,13 @@ router.post("/inbox/:id/reply", wrap(async (req, res) => {
   if (!recipient) return res.status(409).json({ error: "Identifiable recipient required" });
   const result = await metaMessagingAdapter.sendMessage({ workspaceId: req.auth.workspaceId, userId: req.auth.user._id, senderType: "human", threadId: thread._id, channel: thread.channel, assetId: thread.metadata.assetId, recipientId: recipient.address, body: req.body.body });
   res.json(result);
+}));
+router.post("/inbox/:id/comment-actions", wrap(async (req, res) => {
+  if (req.body.approved !== true) return res.status(400).json({ error: "Explicit approval is required for this Facebook Page action" });
+  try {
+    const result = await pageEngagement.perform({ workspaceId: req.auth.workspaceId, userId: req.auth.user._id, threadId: req.params.id, action: req.body.action, body: req.body.body, idempotencyKey: req.body.idempotencyKey });
+    return res.json(result);
+  } catch (error) { return res.status(error.status || 400).json({ error: error.message }); }
 }));
 router.post("/inbox/:id/read", wrap(async (req, res) => {
   const thread = await ConversationThread.findOneAndUpdate({ workspaceId: req.auth.workspaceId, _id: req.params.id, channel: { $in: socialChannels } }, { $set: { unreadCount: 0 } }, { new: true });

@@ -56,7 +56,11 @@ async function subscriptionChecks() {
   };
   const result = await oauth.provisionMetaSubscriptions(connection, ["page-1", "ig-1"], http);
   assert.equal(result.every((row) => row.status === "subscribed"), true);
-  assert.deepEqual(posts.map((row) => row.fields), ["feed,messages,messaging_postbacks,messaging_referrals", "comments,messages,mentions,messaging_postbacks,messaging_referral"]);
+  assert.equal(posts[0].fields, oauth.subscriptionFields({ type: "facebook_page" }).join(","));
+  assert.equal(posts[1].fields, oauth.subscriptionFields({ type: "instagram_business" }).join(","));
+  for (const field of ["messaging_optins", "message_reactions", "message_reads", "message_edits", "message_deliveries", "mention", "messaging_customer_information", "messaging_in_thread_lead_form_submit"]) assert(posts[0].fields.includes(field));
+  for (const field of ["live_comments", "message_edit", "message_reactions", "messaging_seen"]) assert(posts[1].fields.includes(field));
+  assert.equal(posts[1].fields.includes("messaging_optins"), false, "Do not provision an Instagram field not selected in the reviewed Meta configuration");
 }
 
 async function convergenceChecks() {

@@ -245,7 +245,11 @@ async function status(workspaceId, provider) {
 }
 
 function subscriptionFields(asset) {
-  return asset.type === "instagram_business" ? ["comments", "messages", "mentions", "messaging_postbacks", "messaging_referral"] : asset.type === "facebook_page" ? ["feed", "messages", "messaging_postbacks", "messaging_referrals"] : [];
+  return asset.type === "instagram_business"
+    ? ["comments", "live_comments", "messages", "message_edit", "message_reactions", "messaging_postbacks", "messaging_referral", "messaging_seen", "mentions"]
+    : asset.type === "facebook_page"
+      ? ["feed", "messages", "messaging_postbacks", "messaging_referrals", "messaging_optins", "message_reactions", "message_reads", "message_edits", "message_deliveries", "mention", "messaging_customer_information", "messaging_in_thread_lead_form_submit"]
+      : [];
 }
 
 async function provisionMetaSubscriptions(connection, selected, http = axios) {

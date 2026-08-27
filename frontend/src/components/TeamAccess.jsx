@@ -4,7 +4,7 @@ import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personName } from "../utils/personIdentity.js";
 import Button from "./Button.jsx";
 import UserAvatar from "./UserAvatar.jsx";
-import { createWorkspaceMember, fetchCoachingPrograms, fetchWorkspaceCapabilities, fetchWorkspaceMembers, sendWorkspaceInvitation, updateWorkspaceMember } from "../services/api.js";
+import { cancelWorkspaceInvitation, createWorkspaceMember, fetchCoachingPrograms, fetchWorkspaceCapabilities, fetchWorkspaceMembers, sendWorkspaceInvitation, updateWorkspaceMember } from "../services/api.js";
 import "./TeamAccess.css";
 
 import { accessGroups, inviteRoles, lifecycleLabel, overrideValue, roleLabels, setOverride } from "./teamAccessPresentation.js";
@@ -16,7 +16,7 @@ const memberStatusLabel = (member) => {
 
 export default function TeamAccess({ canManage, actorRoles = [] }) {
   const [members, setMembers] = useState([]), [catalog, setCatalog] = useState({ capabilities: [], roleDefaults: {} }), [programs, setPrograms] = useState([]);
-  const [editing, setEditing] = useState(null), [draft, setDraft] = useState(null), [preview, setPreview] = useState(null), [error, setError] = useState(""), [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(null), [draft, setDraft] = useState(null), [preview, setPreview] = useState(null), [canceling, setCanceling] = useState(null), [error, setError] = useState(""), [saving, setSaving] = useState(false);
   const blankInvite = { firstName: "", lastName: "", phone: "", email: "", roles: ["member"], timezone: "", capacity: "", programIds: [], referralCode: "", communityUrl: "", commissionMode: "manual", ratePercent: "", fixedAmount: "", notes: "" };
   const [params] = useSearchParams();
   const availableRoles = inviteRoles(actorRoles);
@@ -28,9 +28,11 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
   const add = async (event) => { event.preventDefault(); try { setSaving(true); const payload = { ...invite, name: personName(invite), capacity: invite.capacity === "" ? null : Number(invite.capacity), commissionConfig: { mode: invite.commissionMode, rateBps: Math.round((Number(invite.ratePercent) || 0) * 100), fixedAmountMinor: Math.round((Number(invite.fixedAmount) || 0) * 100), currency: "USD" } }; const result = await createWorkspaceMember(payload); setMembers((rows) => [...rows.filter((row) => row.id !== result.member.id), result.member]); if (result.invitation) setPreview({ ...result.invitation, recipient: invite.email, displayName: result.member.name || personName(invite), role: invite.roles.map(role => roleLabels[role]).join(", ") }); else setError("Existing active workspace member reused; no invitation was needed."); setInvite(blankInvite); } catch (err) { setError(err.response?.data?.error || "Unable to prepare invitation."); } finally { setSaving(false); } };
   const send = async () => { try { setSaving(true); await sendWorkspaceInvitation(preview.id, { subject: preview.subject, body: preview.body }); setPreview(null); setError(""); await load(); } catch (err) { setError(err.response?.data?.error || "Unable to send invitation."); } finally { setSaving(false); } };
   const reopen = (member) => member.invitation && setPreview({ ...member.invitation, recipient: member.email, displayName: member.name, role: member.roles.map(role => roleLabels[role]).join(", ") });
+  const cancelInvite = async () => { try { setSaving(true); await cancelWorkspaceInvitation(canceling.invitation.id); setCanceling(null); await load(); } catch (err) { setError(err.response?.data?.error || "Unable to cancel invitation."); } finally { setSaving(false); } };
   return <div className="account-settings-panel account-settings-panel--refined team-access">
     <header><p className="page-eyebrow">Workspace settings</p><h2>Team & Access</h2><p>Invite your team. Start with a role template, then tailor access to their responsibilities.</p><a href="#add-team-person">Add person</a></header>
     {error ? <p className="form-error">{error}</p> : null}
+    {canceling ? <section className="settings-section team-access__preview" role="dialog" aria-modal="true" aria-labelledby="cancel-invitation-title"><p className="page-eyebrow">Team access</p><h3 id="cancel-invitation-title">Cancel invitation?</h3><p>This revokes the secure signup link for <strong>{canceling.name}</strong> and removes pending access. It does not delete historical records.</p><div><Button loading={saving} onClick={cancelInvite}>Confirm cancellation</Button><Button variant="outline" onClick={() => setCanceling(null)}>Keep invitation</Button></div></section> : null}
     <section className="settings-section team-access__members">{members.map((member) => <article key={member.id}>
       <header className="team-access__member-header">
         <div className="team-access__identity">
@@ -44,7 +46,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
         <span className="team-access__status">{memberStatusLabel(member)}</span>
         {canManage && (actorRoles.includes("owner") || !member.roles.includes("owner")) ? <div className="team-access__member-actions">
           <Button variant="outline" size="sm" onClick={() => begin(member)}>Manage access</Button>
-          {member.invitation && member.status === "invited" ? <Button className="team-access__resend" variant="outline" size="sm" onClick={() => reopen(member)}>{member.invitation.sentAt ? "Resend invitation" : "Review invitation"}</Button> : null}
+          {member.invitation && member.status === "invited" ? <><Button className="team-access__resend" variant="outline" size="sm" onClick={() => reopen(member)}>{member.invitation.sentAt ? "Resend invitation" : "Review invitation"}</Button><Button className="team-access__resend" variant="ghost" size="sm" onClick={() => setCanceling(member)}>Cancel invitation</Button></> : null}
         </div> : null}
       </header>
       {editing === member.id && draft ? <div className="team-access__editor">

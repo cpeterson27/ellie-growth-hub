@@ -1,0 +1,11 @@
+import { useEffect, useState } from "react";
+import { fetchPublicManagementConfig, updatePublicManagementConfig } from "../services/api.js";
+import "./WebsiteManagement.css";
+
+export default function WebsiteManagementDashboard({ websiteUrl }) {
+  const [config, setConfig] = useState(null), [saving, setSaving] = useState(false), [error, setError] = useState("");
+  useEffect(() => { const timer = window.setTimeout(() => fetchPublicManagementConfig().then(setConfig).catch((err) => setError(err.response?.data?.error || "Unable to load website controls.")), 0); return () => window.clearTimeout(timer); }, []);
+  const toggleResults = async () => { try { setSaving(true); const next = { ...config, publicSite: { ...config.publicSite, sectionVisibility: { ...config.publicSite.sectionVisibility, results: config.publicSite.sectionVisibility?.results !== true } } }; setConfig(await updatePublicManagementConfig(next)); setError(""); } catch (err) { setError(err.response?.data?.error || "Unable to update Results visibility."); } finally { setSaving(false); } };
+  const publicUrl = websiteUrl?.trim() || "/";
+  return <section className="website-management-dashboard"><header><div><p className="page-eyebrow">Public experience</p><h2>Website &amp; Brand</h2><p>Control what visitors see without changing source code.</p></div><a className="website-view-action" href={publicUrl} target="_blank" rel="noreferrer">View Website ↗</a></header>{error ? <p className="form-error">{error}</p> : null}<nav aria-label="Website management"><a href="#website-settings"><strong>Website settings</strong><span>Brand, homepage and visible sections</span></a><a href="#website-programs"><strong>Programs</strong><span>Manage public program presentation</span></a><a href="#website-team"><strong>Team / Coaches</strong><span>Review and publish public profiles</span></a><a href="#website-testimonials"><strong>Testimonials</strong><span>Add and manage client stories</span></a><button type="button" onClick={toggleResults} disabled={!config || saving}><strong>Results page</strong><span>{config?.publicSite?.sectionVisibility?.results === true ? "Shown in public navigation" : "Hidden · default"}</span></button></nav></section>;
+}

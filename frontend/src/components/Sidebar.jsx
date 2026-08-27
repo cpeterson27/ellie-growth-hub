@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   FiActivity,
@@ -22,6 +23,7 @@ import {
 } from "react-icons/fi";
 import useAuth from "../context/useAuth.js";
 import useWorkspaceTheme from "../context/useWorkspaceTheme.js";
+import { fetchWorkspaceConfig } from "../services/api.js";
 import { canManageCoaching, canUseCoachPortal, hasAnyPermission, hasPermission, isAmbassadorOnly, isCoachOnly } from "../utils/roleAccess.js";
 import "./Sidebar.css";
 
@@ -76,6 +78,15 @@ const ambassadorGroups = [{ label: "Ambassador Portal", items: [{ label: "My Das
 export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   const { logout, session } = useAuth();
   const { site } = useWorkspaceTheme();
+  const [organization, setOrganization] = useState(null);
+  useEffect(() => {
+    let active = true;
+    const load = () => fetchWorkspaceConfig().then((config) => { if (active) setOrganization(config); }).catch(() => {});
+    const update = (event) => setOrganization((current) => ({ ...current, ...(event.detail || {}) }));
+    load();
+    window.addEventListener("workspace-organization-updated", update);
+    return () => { active = false; window.removeEventListener("workspace-organization-updated", update); };
+  }, []);
   const coachOnly = isCoachOnly(session);
   const ambassadorOnly = isAmbassadorOnly(session);
   let groups = ambassadorOnly ? ambassadorGroups : coachOnly ? coachGroups : canManageCoaching(session) ? [navGroups[0], coachingGroup, ...navGroups.slice(1)] : navGroups;
@@ -84,9 +95,9 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   return (
     <aside className={`${isOpen ? "sidebar sidebar--open" : "sidebar"} ${isCollapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebar__brand">
-        <div className="sidebar__logo">{site?.branding?.logoUrl?<img src={site.branding.logoUrl} alt=""/>:(site?.branding?.publicSiteName||"Growth Operator").slice(0,1)}</div>
+        <div className="sidebar__logo">{organization?.organizationLogoUrl?<img src={organization.organizationLogoUrl} alt={`${organization.workspaceName || "Workspace"} organization logo`}/>:<span aria-hidden="true">{(organization?.workspaceName||site?.workspace?.name||"Growth Operator").slice(0,1)}</span>}</div>
         <div>
-          <p>{site?.branding?.publicSiteName||"Growth Operator"}</p>
+          <p>{organization?.workspaceName||site?.workspace?.name||"Growth Operator"}</p>
           <small>Powered by Growth Operator</small>
         </div>
       </div>

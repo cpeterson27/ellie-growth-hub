@@ -19,6 +19,18 @@ assert.equal(comment.sourceMetadata.commentId, "comment"); assert.equal(comment.
 assert.equal(comment.opensMessagingWindow, false);
 const dm = normalize({ connection, assetId: "ig", messaging: { sender: { id: "person" }, recipient: { id: "ig" }, timestamp: now, message: { mid: "dm", text: "Hello" } } });
 assert.equal(dm.eventType, "dm_received"); assert.equal(dm.opensMessagingWindow, true);
+const edited = normalize({ connection, assetId: "ig", messaging: { sender: { id: "person" }, recipient: { id: "ig" }, timestamp: now, message: { mid: "edited", text: "Corrected", is_edited: true } } });
+assert.equal(edited.eventType, "dm_received"); assert.equal(edited.sourceMetadata.edited, true);
+const reaction = normalize({ connection, assetId: "ig", messaging: { sender: { id: "person" }, recipient: { id: "ig" }, timestamp: now, reaction: { mid: "dm", reaction: "love" } } });
+assert.equal(reaction.eventType, "message_reaction"); assert.equal(reaction.sourceMetadata.reaction, "love");
+const optin = normalize({ connection, assetId: "ig", messaging: { sender: { id: "person" }, recipient: { id: "ig" }, timestamp: now, optin: { ref: "welcome" } } });
+assert.equal(optin.eventType, "optin_received"); assert.equal(optin.triggerType, "optin"); assert.equal(optin.opensMessagingWindow, false);
+const seen = normalize({ connection, assetId: "ig", messaging: { sender: { id: "person" }, recipient: { id: "ig" }, timestamp: now, seen: { watermark: now } } });
+assert.equal(seen.eventType, "message_seen"); assert.equal(seen.recordOnly, true);
+const delivered = normalize({ connection, assetId: "ig", messaging: { sender: { id: "person" }, recipient: { id: "ig" }, timestamp: now, delivery: { mids: ["sent-message"] } } });
+assert.equal(delivered.eventType, "message_delivered"); assert.deepEqual(delivered.sourceMetadata.messageIds, ["sent-message"]);
+const changedEdit = normalize({ connection, assetId: "ig", entryTime: now, change: { field: "message_edit", value: { sender: { id: "person" }, recipient: { id: "ig" }, timestamp: now, message_id: "changed-edit", text: "Changed through field" } } });
+assert.equal(changedEdit.eventType, "dm_received"); assert.equal(changedEdit.sourceMetadata.edited, true);
 const mention = normalize({ connection, assetId: "ig", entryTime: now, change: { field: "mentions", value: { media_id: "media", comment_id: "mention", from: { id: "person" } } } });
 assert.equal(mention.eventType, "mention_received"); assert.equal(mention.replyPolicy, "none");
 const anonymous = normalize({ connection, assetId: "ig", entryTime: now, change: { field: "mentions", value: { media_id: "media-2" } } });
@@ -32,18 +44,26 @@ assert.equal(normalize(referralInput).providerEventId, referral.providerEventId)
 const story = normalize({ connection, assetId: "ig", messaging: { sender: { id: "person" }, timestamp: now, message: { mid: "story", text: "Interested", reply_to: { story: { id: "story-id" } } } } });
 assert.equal(story.eventType, "story_reply"); assert.equal(story.contentId, "story-id");
 assert.equal(normalize({ connection, assetId: "ig", change: { field: "story_insights", value: { id: "story", reach: 42 } } }), null);
+assert.equal(normalize({ connection, assetId: "ig", change: { field: "messaging_handover", value: { id: "handover" } } }), null);
+assert.equal(normalize({ connection, assetId: "ig", change: { field: "standby", value: { id: "standby" } } }), null);
 assert.equal(normalize({ connection, assetId: "ig", messaging: { sender: { id: "person" }, timestamp: now, follow: true } }), null);
 assert.equal(normalize({ connection, assetId: "unselected", change: { field: "comments", value: { id: "x" } } }), null);
 assert.equal(normalize({ connection, assetId: "ig", messaging: { sender: { id: "ig" }, timestamp: now, message: { mid: "echo", is_echo: true } } }), null);
 const facebook = { ...connection, provider: "meta", assets: [{ id: "page", type: "facebook_page" }], selectedAssetIds: ["page"] };
 const feed = normalize({ connection: facebook, assetId: "page", entryTime: now, change: { field: "feed", value: { item: "comment", verb: "add", comment_id: "fb-comment", post_id: "post", from: { id: "fb-person" }, message: "DEAL" } } });
 assert.equal(feed.provider, "facebook"); assert.equal(feed.contentId, "post");
+const liveComment = normalize({ connection, assetId: "ig", entryTime: now, change: { field: "live_comments", value: { id: "live-comment", from: { id: "person" }, media: { id: "live-video" }, text: "DEAL" } } });
+assert.equal(liveComment.eventType, "comment_received"); assert.equal(liveComment.sourceMetadata.field, "live_comments");
+const customerInfo = normalize({ connection: facebook, assetId: "page", entryTime: now, change: { field: "messaging_customer_information", value: { id: "info", psid: "fb-person", name: "Student" } } });
+assert.equal(customerInfo.eventType, "customer_information"); assert.equal(customerInfo.recordOnly, true);
+const leadForm = normalize({ connection: facebook, assetId: "page", entryTime: now, change: { field: "messaging_in_thread_lead_form_submit", value: { lead_id: "lead", psid: "fb-person" } } });
+assert.equal(leadForm.eventType, "lead_form_received"); assert.equal(leadForm.providerUserId, "fb-person");
 assert.equal(normalize({ connection: facebook, assetId: "page", change: { field: "feed", value: { item: "reaction", id: "reaction" } } }), null);
 assert.equal(normalize({ connection: facebook, assetId: "page", change: { field: "feed", value: { item: "comment", verb: "remove", comment_id: "x" } } }), null);
 
 function doc(values) { return { ...values, _id: values._id || crypto.randomUUID(), workspaceId: values.workspaceId || currentWorkspaceId(), set(path, value) { const [a, b] = path.split("."); if (b) { this[a] ||= {}; this[a][b] = value; } else this[a] = value; }, async save() { return this; } }; }
 async function pipeline() {
-  const contacts = [], identities = [], events = [], activities = [], inbox = [];
+  const contacts = [], identities = [], events = [], activities = [], inbox = [], deliveryUpdates = [], editUpdates = [];
   const scope = row => row.workspaceId === currentWorkspaceId();
   const models = {
     Contact: { create: async values => { const row = doc(values); contacts.push(row); return row; }, findById: async id => contacts.find(row => scope(row) && row._id === id) },
@@ -51,6 +71,7 @@ async function pipeline() {
     SocialProviderEvent: { create: async values => { if (events.some(row => scope(row) && row.providerEventId === values.providerEventId && row.provider === values.provider)) throw Object.assign(Error("duplicate"), { code: 11000 }); const row = doc(values); events.push(row); return row; }, findOne: async filter => events.find(row => scope(row) && row.providerEventId === filter.providerEventId && row.provider === filter.provider) },
     SocialAutomation: { find: () => ({ sort: async () => [doc({ triggerType: "comment_keyword", keywords: ["deal"], responseTemplate: "Here is your resource", tags: ["resource-request"] })] }) },
     CrmActivity: { create: async values => { activities.push(doc(values)); return values; } },
+    ConversationMessage: { updateMany: async (filter, update) => { deliveryUpdates.push({ filter, update }); }, updateOne: async (filter, update) => { editUpdates.push({ filter, update }); } },
   };
   const options = { models, ingestMessage: async payload => { inbox.push(payload); return { thread: { _id: "thread" }, message: payload.message }; } };
   await runWithWorkspace("a", async () => {
@@ -62,17 +83,22 @@ async function pipeline() {
     first.event.providerEventId = comment.legacyProviderEventId;
     assert.equal((await ingestSocialEvent(comment, options)).duplicate, true, "Legacy event receipt prevents repeat delivery");
     assert.equal(inbox.length, 1);
-    for (const event of [dm, mention, postback, referral, story]) {
+    for (const event of [dm, edited, reaction, optin, seen, delivered, mention, postback, referral, story, liveComment]) {
       const result = await ingestSocialEvent(event, options); assert.equal(result.contact._id, first.contact._id);
     }
-    assert.equal(identities.length, 1);
+    const customerResult = await ingestSocialEvent(customerInfo, options);
+    const leadResult = await ingestSocialEvent(leadForm, options);
+    assert.equal(customerResult.contact._id, leadResult.contact._id, "Facebook customer information and in-thread lead form converge by scoped Meta identity");
+    assert.equal(identities.length, 2);
     const count = contacts.length;
     assert.equal((await ingestSocialEvent(anonymous, options)).contextOnly, true);
     assert.equal(contacts.length, count);
     assert.equal((await ingestSocialEvent({ ...comment, eventType: "follow", triggerType: "follow" }, options)).ignored, true);
     assert(activities.some(row => row.metadata.eventType === "social.keyword.matched"));
     assert(activities.some(row => row.metadata.eventType === "social.dm.received"));
-    assert(inbox.every(row => row.thread.contactIds[0] === first.contact._id));
+    assert.equal(deliveryUpdates.length, 1); assert.equal(deliveryUpdates[0].update.$set.deliveryStatus, "delivered");
+    assert.equal(editUpdates.length, 1); assert.equal(editUpdates[0].update.$set.body, "Corrected");
+    assert(inbox.every(row => contacts.some(contact => contact._id === row.thread.contactIds[0])));
   });
   await runWithWorkspace("b", async () => {
     const other = await ingestSocialEvent(comment, options);

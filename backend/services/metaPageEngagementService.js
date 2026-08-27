@@ -1,0 +1,69 @@
+const axios = require("axios");
+const crypto = require("crypto");
+const ConversationThread = require("../models/ConversationThread");
+const CrmActivity = require("../models/CrmActivity");
+const { decryptCredentials } = require("../utils/credentialEncryption");
+const { connectionForAsset } = require("./conversations/metaMessagingAdapter");
+const { ingestProviderMessage } = require("./conversations/conversationIngestionService");
+const { graphVersion } = require("./socialProviderConfig");
+
+const ACTIONS = new Set(["reply", "hide", "unhide", "delete", "like", "unlike"]);
+const deps = { ConversationThread, CrmActivity, connectionForAsset, ingestProviderMessage, http: axios };
+
+function clean(value, max = 2000) { return String(value || "").trim().slice(0, max); }
+function safeProviderError(error) {
+  const status = Number(error?.response?.status || 0);
+  return status >= 400 && status < 500 ? `Meta rejected this action (HTTP ${status})` : "Meta action outcome could not be confirmed";
+}
+
+async function reserve(models, values) {
+  const existing = await models.CrmActivity.findOne({ workspaceId: values.workspaceId, "metadata.socialEventKey": values.metadata.socialEventKey });
+  if (existing) return { activity: existing, duplicate: true };
+  try { return { activity: await models.CrmActivity.create(values), duplicate: false }; }
+  catch (error) {
+    if (error?.code !== 11000) throw error;
+    return { activity: await models.CrmActivity.findOne({ workspaceId: values.workspaceId, "metadata.socialEventKey": values.metadata.socialEventKey }), duplicate: true };
+  }
+}
+
+async function perform({ workspaceId, userId, threadId, action, body, idempotencyKey }, models = deps) {
+  if (!ACTIONS.has(action)) throw new Error("Choose a supported Facebook comment action");
+  if (!/^[A-Za-z0-9_-]{16,120}$/.test(String(idempotencyKey || ""))) throw new Error("A valid action idempotency key is required");
+  const thread = await models.ConversationThread.findOne({ _id: threadId, workspaceId, channel: "facebook", "metadata.interactionType": "comment" }).lean();
+  if (!thread) throw new Error("Facebook comment conversation not found");
+  const assetId = clean(thread.metadata?.assetId, 255), commentId = clean(thread.metadata?.commentId, 500);
+  if (!assetId || !commentId) throw new Error("Facebook comment context is unavailable");
+  if (action === "reply" && (!clean(body) || clean(body).length > 2000)) throw new Error("Reply must contain 1–2000 characters");
+
+  const connection = await models.connectionForAsset(assetId, "meta", workspaceId);
+  const asset = connection?.assets?.find((row) => row.type === "facebook_page" && String(row.id) === assetId);
+  if (!connection || !asset || !connection.selectedAssetIds?.map(String).includes(assetId)) throw new Error("The selected Facebook Page is not connected");
+  if (!connection.scopes?.includes("pages_manage_engagement")) throw new Error("Facebook Page engagement permission is required");
+  const token = decryptCredentials(connection.credentialsEncrypted).pageTokens?.[assetId];
+  if (!token) throw new Error("Selected Facebook Page authorization is unavailable");
+
+  const socialEventKey = `facebook:manual-engagement:${crypto.createHash("sha256").update(`${workspaceId}:${threadId}:${idempotencyKey}`).digest("hex")}`;
+  const title = { reply: "Facebook comment replied to", hide: "Facebook comment hidden", unhide: "Facebook comment unhidden", delete: "Facebook comment deleted", like: "Facebook comment liked", unlike: "Facebook comment reaction removed" }[action];
+  const reserved = await reserve(models, { workspaceId, contactId: thread.contactIds?.[0] || null, type: "system", direction: action === "reply" ? "outbound" : "", title, body: action === "reply" ? clean(body) : "", source: "integration", createdBy: userId, metadata: { socialEventKey, eventType: `social.facebook.comment.${action}`, provider: "facebook", assetId, commentId, threadId, senderType: "human", outcome: "pending" } });
+  if (reserved.duplicate) return { duplicate: true, status: reserved.activity?.metadata?.outcome || "pending", activityId: reserved.activity?._id };
+
+  const version = graphVersion();
+  try {
+    let response;
+    if (action === "reply") response = await models.http.post(`https://graph.facebook.com/${version}/${commentId}/comments`, { message: clean(body) }, { params: { access_token: token }, timeout: 15000 });
+    else if (["hide", "unhide"].includes(action)) response = await models.http.post(`https://graph.facebook.com/${version}/${commentId}`, { is_hidden: action === "hide" }, { params: { access_token: token }, timeout: 15000 });
+    else if (action === "delete") response = await models.http.delete(`https://graph.facebook.com/${version}/${commentId}`, { params: { access_token: token }, timeout: 15000 });
+    else if (action === "like") response = await models.http.post(`https://graph.facebook.com/${version}/${commentId}/likes`, null, { params: { access_token: token }, timeout: 15000 });
+    else response = await models.http.delete(`https://graph.facebook.com/${version}/${commentId}/likes`, { params: { access_token: token }, timeout: 15000 });
+    if (response?.data?.success === false || (action === "reply" && !response?.data?.id)) throw new Error("Meta did not confirm the action");
+    if (action === "reply") await models.ingestProviderMessage({ thread: { channel: "facebook", provider: "meta", providerThreadId: thread.providerThreadId, participants: thread.participants, contactIds: thread.contactIds, metadata: thread.metadata }, message: { providerMessageId: String(response.data.id), direction: "outbound", body: clean(body), createdBy: userId, sender: { address: assetId }, contactId: thread.contactIds?.[0] || null, deliveryStatus: "sent", metadata: { assetId, senderType: "human", publicCommentReply: true, parentCommentId: commentId } } });
+    await models.CrmActivity.updateOne({ _id: reserved.activity._id, workspaceId }, { $set: { "metadata.outcome": "confirmed", "metadata.providerActionId": clean(response?.data?.id, 500), completedAt: new Date() } });
+    return { duplicate: false, status: "confirmed", action };
+  } catch (error) {
+    const outcome = Number(error?.response?.status || 0) >= 400 && Number(error?.response?.status || 0) < 500 ? "failed" : "unknown";
+    await models.CrmActivity.updateOne({ _id: reserved.activity._id, workspaceId }, { $set: { "metadata.outcome": outcome, "metadata.error": safeProviderError(error) } });
+    const failure = new Error(safeProviderError(error)); failure.status = outcome === "failed" ? 400 : 502; throw failure;
+  }
+}
+
+module.exports = { ACTIONS, perform, safeProviderError };

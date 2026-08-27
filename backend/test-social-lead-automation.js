@@ -19,7 +19,8 @@ assert.equal(allowedDestination("https://www.eventbrite.com/e/example"), true);
 assert.equal(allowedDestination("http://elliescoaching.com/apply"), false);
 assert.equal(allowedDestination("https://evil.example/elliescoaching.com"), false);
 
-assert.deepEqual(SUPPORTED_TRIGGERS.instagram, ["dm_keyword", "dm_any", "story_reply", "comment_any", "comment_keyword", "mention", "postback", "referral"]);
+assert.deepEqual(SUPPORTED_TRIGGERS.instagram, ["dm_keyword", "dm_any", "story_reply", "comment_any", "comment_keyword", "mention", "postback", "referral", "optin"]);
+assert(SUPPORTED_TRIGGERS.facebook.includes("mention") && SUPPORTED_TRIGGERS.facebook.includes("optin"));
 assert.equal(CAPABILITIES.instagram.commentKeyword, true);
 assert.equal(CAPABILITIES.instagram.followToDm, false);
 assert.equal(CAPABILITIES.facebook.inboundDm, true);

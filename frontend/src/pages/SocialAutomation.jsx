@@ -56,6 +56,7 @@ const CATEGORIES = [
     triggers: [
       ["postback", "Conversation button selected"],
       ["referral", "Referred conversation opened"],
+      ["optin", "Messaging opt-in received"],
     ],
     description:
       "Keep referral context. Referral-only events do not open a reply window.",

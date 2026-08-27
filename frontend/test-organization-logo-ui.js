@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const root = path.dirname(fileURLToPath(import.meta.url));
+const read = (file) => fs.readFileSync(path.join(root, "src", file), "utf8");
+const sidebar = read("components/Sidebar.jsx"), settings = read("pages/Settings.jsx"), css = read("components/Sidebar.css"), publicSite = read("pages/PublicSite.jsx");
+assert(sidebar.includes("fetchWorkspaceConfig"));
+assert(sidebar.includes("organization?.organizationLogoUrl"));
+assert(!sidebar.includes("site?.branding?.logoUrl?<img"));
+assert(settings.includes('CustomEvent("workspace-organization-updated"'));
+assert(settings.includes("authenticated Growth Operator sidebar and campaign email branding"));
+assert(css.includes("object-fit:contain"));
+assert(publicSite.includes("publicSiteLogoUrl"), "public website must retain its separate logo setting");
+console.log("Canonical organization logo sidebar, immediate update, responsive containment, email-brand explanation, and public-logo separation passed.");

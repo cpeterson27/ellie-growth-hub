@@ -1,0 +1,14 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const read = (file) => fs.readFileSync(require.resolve(file), "utf8");
+const model = read("./models/Testimonial"), management = read("./routes/publicManagement"), publicRoute = read("./routes/publicSite"), service = read("./services/publicSiteService"), media = require("./services/imageAssetService");
+for (const field of ["avatarUrl", "resultContext", "featured", "sortOrder", "status"]) assert(model.includes(field));
+assert(management.includes('router.delete("/testimonials/:id",admin'));
+assert(management.includes('item.status!=="approved"'));
+assert(publicRoute.includes('status:"approved"'));
+assert(service.includes("testimonialProjection"));
+assert(management.includes('router.post("/program-media",admin'));
+assert.throws(() => media.validateDataVideo("data:image/png;base64,AAAA"), /MP4, WEBM, or MOV/);
+assert.equal(media.validateDataVideo("data:video/mp4;base64,AAAA").mimeType, "video/mp4");
+for (const privateField of ["approvedBy", "rejectedBy", "contactId", "workspaceId"]) assert(!service.match(new RegExp(`function testimonialProjection\\(item\\).*${privateField}`)), `${privateField} must not be projected publicly`);
+console.log("Canonical testimonial management, approved-only publication, deletion RBAC route and safe public projection passed.");

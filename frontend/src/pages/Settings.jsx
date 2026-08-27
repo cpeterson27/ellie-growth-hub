@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { FiArrowUpRight, FiBriefcase, FiCheck, FiCopy, FiCpu, FiImage, FiLock, FiMail, FiShield, FiTrash2, FiUser, FiUsers } from "react-icons/fi";
 import Button from "../components/Button.jsx";
 import TeamAccess from "../components/TeamAccess.jsx";
-import PublicSiteAdmin from "../components/PublicSiteAdmin.jsx";
+import ApplicationNotificationSettings from "../components/ApplicationNotificationSettings.jsx";
+import WebsiteBrandManager from "../components/WebsiteBrandManager.jsx";
 import ApplicationRouting from "../components/ApplicationRouting.jsx";
 import LaunchReadiness from "../components/LaunchReadiness.jsx";
 import PrivacyRequests from "../components/PrivacyRequests.jsx";
@@ -132,6 +133,7 @@ export default function Settings() {
       const local = { ...getWorkspaceSettings(), workspaceName: config.workspaceName };
       saveWorkspaceSettings(local);
       setWorkspaceName(config.workspaceName);
+      window.dispatchEvent(new CustomEvent("workspace-organization-updated", { detail: { workspaceName: config.workspaceName, organizationLogoUrl: config.organizationLogoUrl || "" } }));
       setSaved(true);
       setError("");
     } catch (err) { setError(err.response?.data?.error || "Unable to save the workspace name."); }
@@ -154,7 +156,11 @@ export default function Settings() {
       });
       const uploaded = await uploadEventImage({ file: dataUrl, filename: file.name });
       setOrganizationLogoUrl(uploaded.url);
-      setSaved(false);
+      const cityLine = [address.city, address.region].filter(Boolean).join(", ");
+      const postalAddress = [address.line1, address.line2, [cityLine, address.postalCode].filter(Boolean).join(" "), address.country].map((part) => part.trim()).filter(Boolean).join(", ");
+      const config = await updateWorkspaceConfig({ workspaceName, legalBusinessName, postalAddress, addressLine1: address.line1, addressLine2: address.line2, addressCity: address.city, addressRegion: address.region, addressPostalCode: address.postalCode, addressCountry: address.country, websiteUrl, organizationLogoUrl: uploaded.url });
+      window.dispatchEvent(new CustomEvent("workspace-organization-updated", { detail: { workspaceName: config.workspaceName, organizationLogoUrl: config.organizationLogoUrl || uploaded.url } }));
+      setSaved(true);
     } catch (err) {
       setError(err.response?.data?.error || "Unable to upload the organization logo.");
     } finally {
@@ -183,7 +189,7 @@ export default function Settings() {
         <header><p className="page-eyebrow">Organization profile</p><h2>Identity and email brand</h2><p>Set the client-level identity once. Individual events and programs can use their own logo and campaign branding.</p></header>
 
         <section className="settings-section">
-          <div className="settings-section__heading"><FiImage /><div><h3>Brand assets</h3><p>The primary organization logo used across the client account.</p></div></div>
+          <div className="settings-section__heading"><FiImage /><div><h3>Brand assets</h3><p>The primary organization logo used in the authenticated Growth Operator sidebar and campaign email branding. Public website light/dark logos are managed separately under Website &amp; Brand.</p></div></div>
           <div className="brand-asset-row">
             <div className="brand-logo-preview">{organizationLogoUrl ? <img src={organizationLogoUrl} alt="Organization logo" /> : <span><FiImage />No logo uploaded</span>}</div>
             <div><label className="brand-upload-button">Choose logo<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label><small>{logoUploading ? "Uploading…" : "PNG, JPG, or WEBP · maximum 8 MB"}</small>{organizationLogoUrl ? <button className="brand-remove" type="button" onClick={() => { setOrganizationLogoUrl(""); setSaved(false); }}>Remove</button> : null}</div>
@@ -250,7 +256,7 @@ export default function Settings() {
           {mcpTokens.length && !newMcpToken ? <p className="settings-token-warning"><strong>Lost an existing manual token?</strong> For security, it cannot be recovered. Revoke it below and create a replacement.</p> : null}
         </section>
         <section className="settings-section"><div className="settings-section__heading"><FiShield /><div><h3>Active connections</h3><p>Every tool call is workspace-scoped and recorded in Growth Operator's audit log.</p></div></div><div className="team-member-list">{oauthConnections.map((connection) => <div key={connection.id}><span><strong>{connection.name}</strong><small>OAuth connection · {connection.scopes.join(" · ")}</small></span><button className="settings-revoke" onClick={() => disconnectAiApp(connection.clientId)} aria-label={`Disconnect ${connection.name}`}><FiTrash2 /></button></div>)}{mcpTokens.map((token) => <div key={token._id || token.id}><span><strong>{token.name}</strong><small>{token.prefix}… · expires {new Date(token.expiresAt).toLocaleDateString()} · secret hidden after creation</small></span><button className="settings-revoke" onClick={() => revokeAi(token._id || token.id)} aria-label={`Revoke ${token.name}`}><FiTrash2 /></button></div>)}{!oauthConnections.length && !mcpTokens.length ? <p>No AI assistants connected yet.</p> : null}</div></section>
-      </div> : activeSection === "public" ? <PublicSiteAdmin /> : activeSection === "applications" ? <ApplicationRouting /> : activeSection === "readiness" ? <LaunchReadiness /> : activeSection === "privacy" ? <PrivacyRequests /> : activeSection === "invitations" ? <InvitationTemplates /> : <TeamAccess canManage={hasPermission(session, "team.manage")} actorRoles={session?.roles || [session?.role].filter(Boolean)} />}
+      </div> : activeSection === "public" ? <WebsiteBrandManager websiteUrl={websiteUrl} /> : activeSection === "applications" ? <div className="account-settings-content"><ApplicationRouting /><ApplicationNotificationSettings /></div> : activeSection === "readiness" ? <LaunchReadiness /> : activeSection === "privacy" ? <PrivacyRequests /> : activeSection === "invitations" ? <InvitationTemplates /> : <TeamAccess canManage={hasPermission(session, "team.manage")} actorRoles={session?.roles || [session?.role].filter(Boolean)} />}
     </section>
   </div>;
 }

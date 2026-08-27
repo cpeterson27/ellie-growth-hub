@@ -30,10 +30,12 @@ export default function PublicApplication() {
   useEffect(() => {
     const timer = window.setTimeout(() => fetchPublicApplication().then((data) => {
       setConfig(data);
-      if (data.programs?.length === 1) setForm((value) => ({ ...value, coachingProgramId: data.programs[0].id }));
+      const selected = new URLSearchParams(location.search).get("program");
+      const matched = data.programs?.find((program) => String(program.id) === selected || program.slug === selected);
+      if (matched || data.programs?.length === 1) setForm((value) => ({ ...value, coachingProgramId: matched?.id || data.programs[0].id }));
     }).catch(() => setError("The application is temporarily unavailable.")), 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [location.search]);
 
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event) => {

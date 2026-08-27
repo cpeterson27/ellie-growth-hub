@@ -5,7 +5,7 @@ const schema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
   provider: { type: String, enum: ["instagram", "facebook", "tiktok", "linkedin", "x", "manychat"], required: true },
   providerEventId: { type: String, required: true, trim: true },
-  eventType: { type: String, enum: ["dm_received", "comment_received", "story_reply", "mention_received", "postback_received", "referral_received", "lead_form", "link_clicked"], required: true },
+  eventType: { type: String, enum: ["dm_received", "comment_received", "story_reply", "mention_received", "postback_received", "referral_received", "optin_received", "message_reaction", "message_read", "message_seen", "message_delivered", "customer_information", "lead_form_received", "lead_form", "link_clicked"], required: true },
   sourceMetadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   reply: {
     status: { type: String, enum: ["none", "pending", "sending", "sent", "unknown", "blocked"], default: "none" },

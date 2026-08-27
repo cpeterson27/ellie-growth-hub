@@ -6,12 +6,13 @@ const SocialProviderEvent = require("../models/SocialProviderEvent");
 const TrackedLink = require("../models/TrackedLink");
 const CrmActivity = require("../models/CrmActivity");
 const ContentBrief = require("../models/ContentBrief");
+const ConversationMessage = require("../models/ConversationMessage");
 const { ingestProviderMessage } = require("./conversations/conversationIngestionService");
 
-const models = { Contact, SocialIdentity, SocialAutomation, SocialProviderEvent, TrackedLink, CrmActivity, ContentBrief };
+const models = { Contact, SocialIdentity, SocialAutomation, SocialProviderEvent, TrackedLink, CrmActivity, ContentBrief, ConversationMessage };
 const SUPPORTED_TRIGGERS = Object.freeze({
-  instagram: ["dm_keyword", "dm_any", "story_reply", "comment_any", "comment_keyword", "mention", "postback", "referral"],
-  facebook: ["dm_keyword", "dm_any", "comment_any", "comment_keyword", "postback", "referral"],
+  instagram: ["dm_keyword", "dm_any", "story_reply", "comment_any", "comment_keyword", "mention", "postback", "referral", "optin"],
+  facebook: ["dm_keyword", "dm_any", "comment_any", "comment_keyword", "mention", "postback", "referral", "optin"],
   tiktok: ["lead_form"],
   linkedin: [],
   x: [],
@@ -134,11 +135,16 @@ async function activity(deps, contact, event, automation, identityCreated) {
 async function ingestSocialEvent(event, options = {}) {
   const deps = options.models || models;
   if (UNSUPPORTED_ENGAGEMENTS.has(event.eventType) || UNSUPPORTED_ENGAGEMENTS.has(event.triggerType)) return { ignored: true, reason: "unsupported_engagement" };
-  if (!SUPPORTED_TRIGGERS[event.provider]?.includes(event.triggerType) && event.eventType !== "dm_received") return { ignored: true, reason: "unsupported_provider_trigger" };
+  const recordOnly = event.recordOnly === true || ["lifecycle", "record_only"].includes(event.triggerType);
+  if (!recordOnly && !SUPPORTED_TRIGGERS[event.provider]?.includes(event.triggerType) && event.eventType !== "dm_received") return { ignored: true, reason: "unsupported_provider_trigger" };
   if (!event.assetId || (!event.providerUserId && !event.contextOnly)) return { ignored: true, reason: "identity_unavailable" };
   const reserved = await reserveEvent(event, deps);
   if (reserved.duplicate) return { duplicate: true, event: reserved.record };
   try {
+  if (event.recordOnly && event.sourceMetadata?.messageIds?.length && deps.ConversationMessage?.updateMany) {
+    const deliveryStatus = event.eventType === "message_delivered" ? "delivered" : "read";
+    await deps.ConversationMessage.updateMany({ provider: "meta", providerMessageId: { $in: event.sourceMetadata.messageIds } }, { $set: { deliveryStatus, ...(deliveryStatus === "delivered" ? { deliveredAt: event.occurredAt } : { readAt: event.occurredAt }) } });
+  }
   if (event.contextOnly) {
     await writeActivity(deps, { type: "system", title: "Social interaction received without a person identity", source: "integration", occurredAt: event.occurredAt, metadata: { eventType: "social.context.received", provider: event.provider, assetId: event.assetId, contentId: event.contentId, providerEventId: event.providerEventId, ...event.sourceMetadata } });
     reserved.record.processingStatus = "processed"; reserved.record.processedAt = new Date(); await reserved.record.save();
@@ -146,11 +152,12 @@ async function ingestSocialEvent(event, options = {}) {
   }
   if(event.contentId&&deps.ContentBrief){const published=await deps.ContentBrief.findOne({type:"social",status:{$in:["published","partially_published"]},social:{ $exists:true },"social.publications":{$elemMatch:{provider:event.provider,assetId:String(event.assetId||""),providerPostId:String(event.contentId),status:"published"}}}).lean();if(published){event={...event,contentBriefId:published._id,campaignId:published.campaignId||event.campaignId||null};reserved.record.contentBriefId=published._id}}
   const { contact, identity, created } = await resolveIdentity(event, deps);
-  const automation = await matchingAutomation(event, deps);
-  await applyAttribution(contact, event, automation);
+  const automation = recordOnly ? null : await matchingAutomation(event, deps);
+  if (!recordOnly) await applyAttribution(contact, event, automation);
   await activity(deps, contact, event, automation, created);
   let conversation = null;
-  if (["dm_received", "story_reply", "comment_received", "mention_received", "postback_received", "referral_received"].includes(event.eventType)) {
+  if (event.sourceMetadata?.edited && event.messageId && deps.ConversationMessage?.updateOne) await deps.ConversationMessage.updateOne({ provider: "meta", providerMessageId: event.messageId, direction: "inbound" }, { $set: { body: event.text, "metadata.editedAt": event.occurredAt } });
+  if (["dm_received", "story_reply", "comment_received", "mention_received", "postback_received", "referral_received", "optin_received", "message_reaction", "lead_form_received"].includes(event.eventType)) {
     conversation = await (options.ingestMessage || ingestProviderMessage)({ thread: { channel: event.provider, provider: "meta", providerThreadId: event.providerThreadId || `${event.provider}:${event.assetId}:${event.providerUserId}${event.eventType === "comment_received" ? `:comment:${event.sourceMetadata?.commentId || event.providerEventId}` : ""}`, participants: [{ kind: "contact", role: "from", address: event.providerUserId, contactId: contact._id }], contactIds: [contact._id], metadata: { assetId: event.assetId, socialOrigin: true, contentId: event.contentId || "", interactionType: event.eventType === "comment_received" ? "comment" : event.eventType === "mention_received" ? "mention" : "message", sourceMetadata: event.sourceMetadata || {}, commentId: event.sourceMetadata?.commentId || "" } }, message: { opensMessagingWindow: event.opensMessagingWindow !== false && !["comment_received", "mention_received", "referral_received"].includes(event.eventType), providerMessageId: event.messageId || event.providerEventId, direction: "inbound", body: event.text || "", sender: { name: event.displayName || event.username || "", address: event.providerUserId }, recipients: [{ address: event.assetId, role: "to" }], contactId: contact._id, deliveryStatus: "received", sentAt: event.occurredAt || new Date(), metadata: { socialIdentityId: identity._id, automationId: automation?._id || null } } });
   }
   let responseTemplate = automation?.responseTemplate || "";

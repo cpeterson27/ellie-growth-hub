@@ -30,5 +30,6 @@ assert(heroCss.includes("object-fit:contain"));
 assert(heroCss.includes("@media(max-width:520px)"));
 assert(siteCss.includes(".public-brand img"));
 assert(theme.includes("site?.branding"));
-assert(sidebar.includes("site?.branding?.logoUrl"));
+assert(sidebar.includes("organization?.organizationLogoUrl"));
+assert(!sidebar.includes('site?.branding?.logoUrl?<img'));
 console.log("Program-application copy, actual Ellie hero logos, workspace override, responsive stacking and overflow contracts passed.");

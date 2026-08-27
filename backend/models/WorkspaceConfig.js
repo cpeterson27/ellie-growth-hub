@@ -30,7 +30,7 @@ const workspaceConfigSchema = new mongoose.Schema({
     secondaryCtaLabel: { type: String, default: "", maxlength: 80 }, secondaryCtaUrl: { type: String, default: "", maxlength: 1000 },
     finalCtaEyebrow: { type: String, default: "", maxlength: 160 }, finalCtaTitle: { type: String, default: "", maxlength: 400 }, finalCtaCopy: { type: String, default: "", maxlength: 1200 }, finalCtaLabel: { type: String, default: "", maxlength: 80 }, finalCtaUrl: { type: String, default: "", maxlength: 1000 },
     communityTitle: { type: String, default: "", maxlength: 300 }, communityBody: { type: String, default: "", maxlength: 3000 }, communityCtaLabel: { type: String, default: "", maxlength: 80 }, communityCtaUrl: { type: String, default: "", maxlength: 1000 },
-    sectionVisibility: { video: { type: Boolean, default: true }, proof: { type: Boolean, default: true }, programs: { type: Boolean, default: true }, journey: { type: Boolean, default: true }, team: { type: Boolean, default: true }, testimonials: { type: Boolean, default: true }, event: { type: Boolean, default: true }, community: { type: Boolean, default: true } },
+    sectionVisibility: { video: { type: Boolean, default: true }, proof: { type: Boolean, default: true }, programs: { type: Boolean, default: true }, journey: { type: Boolean, default: true }, team: { type: Boolean, default: true }, testimonials: { type: Boolean, default: true }, results: { type: Boolean, default: false }, event: { type: Boolean, default: true }, community: { type: Boolean, default: true } },
     trustMetrics: { type: [{ _id: false, value: { type: String, maxlength: 80 }, label: { type: String, maxlength: 120 } }], default: [] },
     contactEmail: { type: String, default: "", maxlength: 320 }, contactPhone: { type: String, default: "", maxlength: 80 }, footerText: { type: String, default: "", maxlength: 1000 },
     socialLinks: { type: [{ _id: false, label: { type: String, maxlength: 60 }, url: { type: String, maxlength: 1000 } }], default: [] },
@@ -46,6 +46,7 @@ const workspaceConfigSchema = new mongoose.Schema({
     privacyUrl: { type: String, default: "/privacy", maxlength: 1000 },
     termsUrl: { type: String, default: "/terms", maxlength: 1000 },
     defaultAssigneeUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    notificationRecipientUserIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], default: [] },
     programAssignments: { type: [{ _id: false, coachingProgramId: { type: mongoose.Schema.Types.ObjectId, ref: "CoachingProgram", required: true }, userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true } }], default: [] },
   },
   customContactFields: {

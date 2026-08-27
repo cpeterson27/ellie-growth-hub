@@ -19,6 +19,7 @@ const { connectionForAsset, ingestMetaComment, ingestMetaMessage, validateMetaSi
 const { deliver: deliverMetaReply } = require("../services/metaAutomationReplyService");
 
 const router = express.Router();
+const META_FIELDS_TO_UNSUBSCRIBE = new Set(["messaging_handover", "standby", "story_insights"]);
 
 router.get(["/meta", "/instagram"], (req, res) => {
   const verifyToken = String((req.path === "/instagram" ? process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN : process.env.META_WEBHOOK_VERIFY_TOKEN) || "").trim();
@@ -33,12 +34,18 @@ router.post(["/meta", "/instagram"], async (req, res) => {
       const connection = await connectionForAsset(entry.id, req.path === "/instagram" ? "instagram" : "meta");
       if (!connection?.workspaceId) continue;
       await runWithWorkspace(connection.workspaceId, async () => {
+        if (Array.isArray(entry.standby) && entry.standby.length) console.warn("[Meta webhook] standby events are intentionally not processed; remove standby in Meta");
+        if (Array.isArray(entry.messaging_handover) && entry.messaging_handover.length) console.warn("[Meta webhook] handover events are intentionally not processed; remove messaging_handover in Meta");
         for (const event of entry.messaging || []) {
           const result = await ingestMetaMessage({ connection, assetId: entry.id, event, entryTime: entry.time });
           await deliverMetaReply(result?.event);
         }
         for (const change of entry.changes || []) {
-          if (["comments", "feed", "mentions"].includes(change.field)) {
+          if (META_FIELDS_TO_UNSUBSCRIBE.has(change.field)) {
+            console.warn("[Meta webhook] subscribed field is intentionally not processed; remove it in Meta", { field: change.field });
+            continue;
+          }
+          if (["comments", "live_comments", "feed", "mentions", "mention", "messages", "message_edit", "message_edits", "message_reactions", "message_reads", "message_deliveries", "messaging_seen", "messaging_optins", "messaging_postbacks", "messaging_referral", "messaging_referrals", "messaging_customer_information", "messaging_in_thread_lead_form_submit"].includes(change.field)) {
             const result = await ingestMetaComment({ connection, assetId: entry.id, change, entryTime: entry.time });
             await deliverMetaReply(result?.event);
           }
@@ -375,3 +382,4 @@ router.post("/resend", async (req, res) => {
 });
 
 module.exports = router;
+module.exports.META_FIELDS_TO_UNSUBSCRIBE = META_FIELDS_TO_UNSUBSCRIBE;

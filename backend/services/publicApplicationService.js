@@ -10,7 +10,8 @@ const CrmActivity=require("../models/CrmActivity");
 const TrackedLink=require("../models/TrackedLink");
 const referralService=require("./referralCommissionService");
 const SocialIdentity=require("../models/SocialIdentity");
-const deps={Contact,SocialIdentity,CoachingApplication,CoachingProgram,SalesOpportunity,WorkspaceConfig,WorkspaceMembership,CommunicationConsent,CrmActivity,TrackedLink,referralService};
+const applicationNotificationService=require("./applicationNotificationService");
+const deps={Contact,SocialIdentity,CoachingApplication,CoachingProgram,SalesOpportunity,WorkspaceConfig,WorkspaceMembership,CommunicationConsent,CrmActivity,TrackedLink,referralService,applicationNotificationService};
 function clean(value,max){return String(value||"").trim().slice(0,max)}
 function email(value){const result=clean(value,320).toLowerCase();
 if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result))throw new Error("A valid email is required");
@@ -43,7 +44,7 @@ return emailContact}
 async function submit({workspaceId,input,requestFingerprint=""},models=deps){if(input.privacyTermsAccepted!==true)throw new Error("Privacy and terms acknowledgement is required");
 const normalizedEmail=email(input.email),firstName=clean(input.firstName,120),lastName=clean(input.lastName,120);
 if(!firstName||!lastName)throw new Error("First and last name are required");
-const program=await models.CoachingProgram.findOne({_id:input.coachingProgramId,workspaceId,status:{$ne:"archived"},"publicPresentation.status":"published"}).lean();
+const program=await models.CoachingProgram.findOne({_id:input.coachingProgramId,workspaceId,status:"active","publicPresentation.status":"published"}).lean();
 if(!program)throw new Error("Select an available coaching program");
 const config=await models.WorkspaceConfig.findOne({workspaceId,key:"primary"}).lean();
 if(config?.publicApplication?.enabled===false)throw new Error("Applications are not currently open");
@@ -63,5 +64,6 @@ const opportunity=await models.SalesOpportunity.create({workspaceId,name:`${prog
 await application.save();
 if(input.smsConsent===true&&applicantPhone)await models.CommunicationConsent.findOneAndUpdate({workspaceId,channel:"sms",address:applicantPhone,purpose:"all"},{$set:{contactId:contact._id,status:"opted_in",source:"web_form",proof:"Ellie Coaching application checkbox",consentedAt:new Date(),revokedAt:null}},{upsert:true,new:true,setDefaultsOnInsert:true});
 if(attribution.referralCode)try{await models.referralService.attributeReferral({workspaceId,contactId:contact._id,referralCode:attribution.referralCode,source:"public_application",state:"applied",applicationId:application._id})}catch(error){if(error.code!=="REFERRAL_CODE_INVALID")throw error}await models.CrmActivity.create({workspaceId,contactId:contact._id,campaignId:attribution.campaignId,type:"system",title:"Coaching application completed",source:"integration",metadata:{eventType:"application.completed",applicationId:application._id,opportunityId:opportunity._id,coachingProgramId:program._id,assignedUserId,provider:attribution.provider,contentId:attribution.contentId,utm:attribution.utm}});
+try{await models.applicationNotificationService.notify({workspaceId,application,contact,program,opportunity,config,attribution})}catch(error){console.error("Application notification creation failed",{applicationId:String(application._id),type:error?.name||"Error"})}
 return application}
 module.exports={publicConfig,resolveApplicationContact,resolveAttribution,submit,utm};
