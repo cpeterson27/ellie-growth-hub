@@ -29,6 +29,7 @@
 .team-access__member-actions>.btn{min-height:32px;padding:6px 10px;font-size:.78rem;line-height:1.35;white-space:nowrap;box-shadow:none}
 .team-access__member-actions>.team-access__resend{border-color:transparent;background:transparent;color:var(--color-text-muted,#53665f);font-size:.74rem}
 .team-access__member-actions>.team-access__resend:hover{color:var(--color-brand,#315c4d);background:var(--color-brand-soft,#edf5f0)}
+.team-access__resend-feedback{display:grid;gap:2px;max-width:220px;padding:7px 9px;border-radius:7px;background:#edf5f0;color:#315c4d;font-size:.72rem;line-height:1.35}.team-access__resend-feedback span{overflow-wrap:anywhere}.team-access__resend-feedback.is-failed{background:#fff0ee;color:#8b3028}
 @container(max-width:680px){
   .team-access__members>article>.team-access__member-header{grid-template-columns:minmax(0,1fr) max-content;gap:10px 14px}
   .team-access__identity{grid-column:1;grid-row:1}

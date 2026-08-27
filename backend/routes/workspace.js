@@ -6,7 +6,7 @@ const CoachProfile = require("../models/CoachProfile");
 const AmbassadorProfile = require("../models/AmbassadorProfile");
 const WorkspaceInvitation = require("../models/WorkspaceInvitation");
 const invitationTemplateService = require("../services/invitationTemplateService");
-const { requireCapability } = require("../middleware/auth");
+const { requireCapability, requireRole } = require("../middleware/auth");
 const workspaceMemberService = require("../services/workspaceMemberService");
 const launchReadinessService = require("../services/launchReadinessService");
 const { CAPABILITIES, OWNER_PROTECTED, ROLE_DEFAULTS, effectivePermissions, legacyRoleFor, normalizeRoles, validCapabilities, validateMembershipChange } = require("../authorization/capabilities");
@@ -73,12 +73,12 @@ router.patch("/", async (req, res) => {
   });
 });
 
-function memberResponse(membership, coachProfile = null, ambassadorProfile = null, invitation = null) {
+function memberResponse(membership, coachProfile = null, ambassadorProfile = null, invitation = null, isSelf = false) {
   const roles = normalizeRoles(membership);
   return {
     id: membership._id, userId: membership.userId?._id || membership.userId,
     firstName: membership.userId?.firstName || "", lastName: membership.userId?.lastName || "", phone: membership.userId?.phone || "", name: membership.userId?.name || "", email: membership.userId?.email || "", avatarUrl: membership.userId?.avatarUrl || "", role: membership.role,
-    roles, status: membership.status, lastLoginAt: membership.userId?.lastLoginAt || null,
+    roles, status: membership.status, lastLoginAt: membership.userId?.lastLoginAt || null, isSelf,
     permissionOverrides: membership.permissionOverrides || { allow: [], deny: [] },
     effectivePermissions: effectivePermissions(membership), responsibilities: membership.responsibilities || {},
     coachProfile: coachProfile ? { id: coachProfile._id, status: coachProfile.status, displayName: coachProfile.displayName } : null,
@@ -122,10 +122,11 @@ router.get("/members", requireCapability("team.view", "team.manage"), async (req
   const profileByUser = new Map(profiles.map((item) => [String(item.userId), item]));
   const ambassadorByUser = new Map(ambassadorProfiles.map((item) => [String(item.userId), item]));
   const invitationByUser = new Map(); for (const item of invitations) if (!invitationByUser.has(String(item.userId))) invitationByUser.set(String(item.userId), item);
-  res.json({ members: memberships.map((membership) => memberResponse(membership, profileByUser.get(String(membership.userId?._id || membership.userId)), ambassadorByUser.get(String(membership.userId?._id || membership.userId)), invitationByUser.get(String(membership.userId?._id || membership.userId)))) });
+  res.json({ members: memberships.map((membership) => memberResponse(membership, profileByUser.get(String(membership.userId?._id || membership.userId)), ambassadorByUser.get(String(membership.userId?._id || membership.userId)), invitationByUser.get(String(membership.userId?._id || membership.userId)), String(membership.userId?._id || membership.userId) === String(req.auth.user._id))) });
 });
 router.post("/invitations/:id/send", requireCapability("team.manage"), async (req, res) => { try { const delivery = await workspaceMemberService.sendInvitation({ workspaceId: req.auth.workspaceId, invitationId: req.params.id, actorUserId: req.auth.user._id, subject: req.body?.subject, body: req.body?.body }); const invitation = await WorkspaceInvitation.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).lean(); res.json({ invitation: { id: invitation._id, status: invitation.status, deliveryStatus: delivery.deliveryStatus, sentAt: invitation.sentAt, expiresAt: invitation.expiresAt, subject: invitation.subject, body: invitation.body } }); } catch (error) { res.status(400).json({ error: error.message }); } });
 router.delete("/invitations/:id", requireCapability("team.manage"), async (req, res) => { try { const invitation = await WorkspaceInvitation.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }); if (!invitation) return res.status(404).json({ error: "Invitation not found" }); if (invitation.status === "accepted") return res.status(409).json({ error: "Accepted invitations cannot be cancelled; remove workspace access instead" }); invitation.status = "revoked"; invitation.expiresAt = new Date(); await invitation.save(); await WorkspaceMembership.updateOne({ workspaceId: req.auth.workspaceId, userId: invitation.userId, status: "invited" }, { $set: { status: "suspended" } }); return res.json({ success: true }); } catch (error) { return res.status(400).json({ error: error.message }); } });
+router.delete("/members/:id", requireRole("owner", "admin"), requireCapability("team.manage"), async (req, res) => { try { const removed = await workspaceMemberService.removeMember({ workspaceId: req.auth.workspaceId, membershipId: req.params.id, actorUserId: req.auth.user._id, actorRoles: req.auth.roles }); return res.json({ success: true, removed }); } catch (error) { const status = error.code === "MEMBER_NOT_FOUND" ? 404 : error.code?.includes("BLOCKED") ? 409 : 400; return res.status(status).json({ error: error.message, code: error.code }); } });
 
 router.post("/members", requireCapability("team.manage"), async (req, res) => {
   try {

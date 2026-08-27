@@ -4,7 +4,7 @@ import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personName } from "../utils/personIdentity.js";
 import Button from "./Button.jsx";
 import UserAvatar from "./UserAvatar.jsx";
-import { cancelWorkspaceInvitation, createWorkspaceMember, fetchCoachingPrograms, fetchWorkspaceCapabilities, fetchWorkspaceMembers, sendWorkspaceInvitation, updateWorkspaceMember } from "../services/api.js";
+import { cancelWorkspaceInvitation, createWorkspaceMember, fetchCoachingPrograms, fetchWorkspaceCapabilities, fetchWorkspaceMembers, removeWorkspaceMember, sendWorkspaceInvitation, updateWorkspaceMember } from "../services/api.js";
 import "./TeamAccess.css";
 
 import { accessGroups, inviteRoles, lifecycleLabel, overrideValue, roleLabels, setOverride } from "./teamAccessPresentation.js";
@@ -16,8 +16,8 @@ const memberStatusLabel = (member) => {
 
 export default function TeamAccess({ canManage, actorRoles = [] }) {
   const [members, setMembers] = useState([]), [catalog, setCatalog] = useState({ capabilities: [], roleDefaults: {} }), [programs, setPrograms] = useState([]);
-  const [editing, setEditing] = useState(null), [draft, setDraft] = useState(null), [preview, setPreview] = useState(null), [canceling, setCanceling] = useState(null), [error, setError] = useState(""), [notice, setNotice] = useState(""), [saving, setSaving] = useState(false), [resendingId, setResendingId] = useState("");
-  const resendInFlight = useRef(new Set());
+  const [editing, setEditing] = useState(null), [draft, setDraft] = useState(null), [preview, setPreview] = useState(null), [canceling, setCanceling] = useState(null), [removing, setRemoving] = useState(null), [error, setError] = useState(""), [notice, setNotice] = useState(""), [saving, setSaving] = useState(false), [resendingId, setResendingId] = useState(""), [removingId, setRemovingId] = useState(""), [resendFeedback, setResendFeedback] = useState({});
+  const resendInFlight = useRef(new Set()), removalInFlight = useRef(new Set());
   const blankInvite = { firstName: "", lastName: "", phone: "", email: "", roles: ["member"], timezone: "", capacity: "", programIds: [], referralCode: "", communityUrl: "", commissionMode: "manual", ratePercent: "", fixedAmount: "", notes: "" };
   const [params] = useSearchParams();
   const availableRoles = inviteRoles(actorRoles);
@@ -32,15 +32,29 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
   const resend = async (member) => {
     const invitationId = member.invitation?.id;
     if (!invitationId || resendInFlight.current.has(invitationId)) return;
-    resendInFlight.current.add(invitationId); setResendingId(invitationId); setError(""); setNotice("");
+    resendInFlight.current.add(invitationId); setResendingId(invitationId); setError(""); setResendFeedback((current) => ({ ...current, [invitationId]: null }));
     try {
       const result = await sendWorkspaceInvitation(invitationId);
       setMembers((rows) => rows.map((row) => row.id === member.id ? { ...row, invitation: { ...row.invitation, ...result.invitation } } : row));
-      setNotice(`Invitation resent to ${member.email}. A fresh secure signup link was included.`);
+      setResendFeedback((current) => ({ ...current, [invitationId]: { status: "sent", email: member.email, sentAt: result.invitation?.sentAt || new Date().toISOString() } }));
     } catch (err) {
-      setError(err.response?.data?.error || "Unable to resend invitation. Please try again.");
+      setResendFeedback((current) => ({ ...current, [invitationId]: { status: "failed", email: member.email, message: err.response?.data?.error || "Unable to resend invitation. Please try again." } }));
     } finally {
       resendInFlight.current.delete(invitationId); setResendingId("");
+    }
+  };
+  const removeMember = async () => {
+    const memberId = removing?.id;
+    if (!memberId || removalInFlight.current.has(memberId)) return;
+    removalInFlight.current.add(memberId); setRemovingId(memberId); setError(""); setNotice("");
+    try {
+      await removeWorkspaceMember(memberId);
+      setMembers((rows) => rows.filter((row) => row.id !== memberId));
+      setEditing(null); setDraft(null); setRemoving(null); setNotice(`${removing.name} was removed from this workspace.`);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to remove this team member.");
+    } finally {
+      removalInFlight.current.delete(memberId); setRemovingId("");
     }
   };
   const cancelInvite = async () => { try { setSaving(true); await cancelWorkspaceInvitation(canceling.invitation.id); setCanceling(null); await load(); } catch (err) { setError(err.response?.data?.error || "Unable to cancel invitation."); } finally { setSaving(false); } };
@@ -49,6 +63,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
     {error ? <p className="form-error">{error}</p> : null}
     {notice ? <p className="discovery-notice" role="status">{notice}</p> : null}
     {canceling ? <section className="settings-section team-access__preview" role="dialog" aria-modal="true" aria-labelledby="cancel-invitation-title"><p className="page-eyebrow">Team access</p><h3 id="cancel-invitation-title">Cancel invitation?</h3><p>This revokes the secure signup link for <strong>{canceling.name}</strong> and removes pending access. It does not delete historical records.</p><div><Button loading={saving} onClick={cancelInvite}>Confirm cancellation</Button><Button variant="outline" onClick={() => setCanceling(null)}>Keep invitation</Button></div></section> : null}
+    {removing ? <section className="settings-section team-access__preview" role="dialog" aria-modal="true" aria-labelledby="remove-member-title"><p className="page-eyebrow">Team access</p><h3 id="remove-member-title">Remove member?</h3><p>Permanently remove <strong>{removing.name}</strong> ({removing.email}) from this workspace? Pending invitation links will be revoked. CRM Contacts and business records will not be deleted.</p><div><Button variant="danger" loading={removingId === removing.id} onClick={removeMember}>Remove member</Button><Button variant="outline" disabled={removingId === removing.id} onClick={() => setRemoving(null)}>Keep member</Button></div></section> : null}
     <section className="settings-section team-access__members">{members.map((member) => <article key={member.id}>
       <header className="team-access__member-header">
         <div className="team-access__identity">
@@ -62,7 +77,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
         <span className="team-access__status">{memberStatusLabel(member)}</span>
         {canManage && (actorRoles.includes("owner") || !member.roles.includes("owner")) ? <div className="team-access__member-actions">
           <Button variant="outline" size="sm" onClick={() => begin(member)}>Manage access</Button>
-          {member.invitation && member.status === "invited" ? <><Button className="team-access__resend" variant="outline" size="sm" loading={resendingId === member.invitation.id} onClick={() => member.invitation.sentAt ? resend(member) : reopen(member)}>{member.invitation.sentAt ? "Resend invitation" : "Review invitation"}</Button><Button className="team-access__resend" variant="ghost" size="sm" disabled={resendingId === member.invitation.id} onClick={() => setCanceling(member)}>Cancel invitation</Button></> : null}
+          {member.invitation && member.status === "invited" ? <><Button className="team-access__resend" variant="outline" size="sm" loading={resendingId === member.invitation.id} onClick={() => member.invitation.sentAt ? resend(member) : reopen(member)}>{resendingId === member.invitation.id ? "Sending…" : member.invitation.sentAt ? "Resend invitation" : "Review invitation"}</Button><Button className="team-access__resend" variant="ghost" size="sm" disabled={resendingId === member.invitation.id} onClick={() => setCanceling(member)}>Cancel invitation</Button>{resendFeedback[member.invitation.id] ? <div className={`team-access__resend-feedback is-${resendFeedback[member.invitation.id].status}`} role="status" aria-live="polite"><strong>{resendFeedback[member.invitation.id].status === "sent" ? "Invite resent" : "Delivery failed"}</strong><span>{resendFeedback[member.invitation.id].status === "sent" ? `Sent just now to ${resendFeedback[member.invitation.id].email}` : resendFeedback[member.invitation.id].message}</span></div> : null}</> : null}
         </div> : null}
       </header>
       {editing === member.id && draft ? <div className="team-access__editor">
@@ -75,7 +90,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
           })}</details>)}<Button variant="outline" onClick={() => setDraft({ ...draft, permissionOverrides: { allow: [], deny: [] } })}>Reset to role defaults</Button></>}
         </section>
         <fieldset><legend>Program responsibilities</legend>{programs.map((program) => <div key={program._id}><span>{program.name}</span><label><input type="checkbox" checked={draft.responsibilities.programIds.includes(String(program._id))} onChange={() => setDraft({ ...draft, responsibilities: { ...draft.responsibilities, programIds: toggle(draft.responsibilities.programIds, String(program._id)) } })}/>Program</label><label><input type="checkbox" checked={draft.responsibilities.applicationProgramIds.includes(String(program._id))} onChange={() => setDraft({ ...draft, responsibilities: { ...draft.responsibilities, applicationProgramIds: toggle(draft.responsibilities.applicationProgramIds, String(program._id)) } })}/>Applications</label></div>)}</fieldset>
-        <div><Button loading={saving} onClick={() => save(member.id)}>Save access</Button><Button variant="outline" onClick={() => { setEditing(null); setDraft(null); }}>Cancel</Button></div>
+        <div><Button loading={saving} onClick={() => save(member.id)}>Save access</Button><Button variant="outline" onClick={() => { setEditing(null); setDraft(null); }}>Cancel</Button>{!member.isSelf ? <Button variant="danger" disabled={Boolean(removingId)} onClick={() => setRemoving(member)}>Remove member</Button> : null}</div>
       </div> : null}
     </article>)}</section>
     {canManage ? <form id="add-team-person" className="settings-section team-access__invite" onSubmit={add}><h3>Add person</h3><p>Choose their role and prepare a secure invitation. Nothing is sent until you review the email and select Send invitation.</p><PersonIdentityFields value={invite} onChange={setInvite}/><fieldset><legend>Initial roles</legend>{availableRoles.map((role) => <label key={role}><input type="checkbox" checked={invite.roles.includes(role)} onChange={() => setInvite({ ...invite, roles: toggle(invite.roles, role) })}/>{roleLabels[role]}</label>)}</fieldset>{invite.roles.includes("coach") ? <fieldset><legend>Coach profile</legend><label>Timezone<input value={invite.timezone} onChange={(event) => setInvite({ ...invite, timezone: event.target.value })}/></label><label>Student capacity<input min="0" type="number" value={invite.capacity} onChange={(event) => setInvite({ ...invite, capacity: event.target.value })}/></label>{programs.map((program) => <label key={program._id}><input type="checkbox" checked={invite.programIds.includes(String(program._id))} onChange={() => setInvite({ ...invite, programIds: toggle(invite.programIds, String(program._id)) })}/>{program.name}</label>)}</fieldset> : null}{invite.roles.includes("ambassador") ? <fieldset><legend>Brand Ambassador profile</legend><label>Referral code<input value={invite.referralCode} onChange={(event) => setInvite({ ...invite, referralCode: event.target.value })} placeholder="Generated from name if blank"/></label><label>Community URL<input type="url" value={invite.communityUrl} onChange={(event) => setInvite({ ...invite, communityUrl: event.target.value })}/></label><label>Commission method<select value={invite.commissionMode} onChange={(event) => setInvite({ ...invite, commissionMode: event.target.value })}><option value="manual">Manual per payout</option><option value="percent">Percentage</option><option value="fixed">Fixed amount</option></select></label>{invite.commissionMode === "percent" ? <label>Commission percent<input min="0" max="100" step="0.01" type="number" value={invite.ratePercent} onChange={(event) => setInvite({ ...invite, ratePercent: event.target.value })}/></label> : null}{invite.commissionMode === "fixed" ? <label>Fixed amount (USD)<input min="0" step="0.01" type="number" value={invite.fixedAmount} onChange={(event) => setInvite({ ...invite, fixedAmount: event.target.value })}/></label> : null}<label>Internal notes<input value={invite.notes} onChange={(event) => setInvite({ ...invite, notes: event.target.value })}/></label><small>Ambassador does not grant CRM, coaching, Skool, settings, or integration access.</small></fieldset> : null}<Button type="submit" loading={saving} disabled={!invite.firstName.trim() || !invite.lastName.trim() || !invite.email.includes("@") || !invite.roles.length}>Create invite preview</Button></form> : null}

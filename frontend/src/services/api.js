@@ -116,6 +116,8 @@ export const resetInvitationTemplate = (roleKey) =>
   api.post(`/workspace/invitation-templates/${roleKey}/reset`).then((res) => res.data.template);
 export const updateWorkspaceMember = (id, values) =>
   api.patch(`/workspace/members/${id}`, values).then((res) => res.data);
+export const removeWorkspaceMember = (id) =>
+  api.delete(`/workspace/members/${id}`).then((res) => res.data);
 export const fetchWorkspaceCapabilities = () =>
   api.get("/workspace/capabilities").then((res) => res.data);
 export const fetchLaunchReadiness = () => api.get("/workspace/readiness").then((res) => res.data.data);

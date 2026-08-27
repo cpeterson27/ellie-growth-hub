@@ -186,6 +186,24 @@ async function onboardAmbassador(input, models = dependencies) {
 
 async function sendInvitation({ workspaceId, invitationId, subject, body, actorUserId }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (invitation.roles?.includes("owner")) await requireOwnerActor({ workspaceId, actorUserId }, models); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.User.findById(invitation.invitedBy).select("name").lean()]); const delivery = await deliverInvitation({ invitation, workspaceName: workspace?.name || "Growth Operator", invitedBy: inviter?.name || "A workspace administrator" }, models); if (delivery.deliveryStatus !== "sent") { const error = new Error("Invitation email could not be sent. Check the email connection and try again."); error.code = "INVITATION_DELIVERY_FAILED"; throw error; } return delivery; }
 
+async function removeMember({ workspaceId, membershipId, actorUserId, actorRoles = [] }, models = dependencies) {
+  const membership = await models.WorkspaceMembership.findOne({ _id: membershipId, workspaceId });
+  if (!membership) { const error = new Error("Team member not found"); error.code = "MEMBER_NOT_FOUND"; throw error; }
+  if (String(membership.userId?._id || membership.userId) === String(actorUserId)) { const error = new Error("You cannot remove your own workspace membership"); error.code = "MEMBER_SELF_REMOVAL_BLOCKED"; throw error; }
+  const roles = normalizeRoles(membership);
+  if (roles.includes("owner") && !actorRoles.includes("owner")) { const error = new Error("Only an Owner can remove another Owner"); error.code = "OWNER_ESCALATION_BLOCKED"; throw error; }
+  if (roles.includes("owner")) {
+    const activeOwnerCount = await models.WorkspaceMembership.countDocuments({ workspaceId, status: "active", $or: [{ role: "owner" }, { roles: "owner" }] });
+    if (membership.status === "active" && activeOwnerCount <= 1) { const error = new Error("The last active workspace Owner cannot be removed"); error.code = "OWNER_LOCKOUT_BLOCKED"; throw error; }
+  }
+  await models.WorkspaceInvitation.updateMany(
+    { workspaceId, userId: membership.userId, status: { $in: ["draft", "ready", "pending", "expired"] } },
+    { $set: { status: "revoked", expiresAt: new Date() } },
+  );
+  await membership.deleteOne();
+  return { id: membership._id, userId: membership.userId?._id || membership.userId };
+}
+
 async function acceptInvitation({ token, password, name, firstName, lastName, phone }, models = dependencies) {
   const invitation = await models.WorkspaceInvitation.findOne({ tokenHash: invitationHash(token), status: "pending", expiresAt: { $gt: new Date() } }).select("+tokenHash +deliveryError");
   if (!invitation) { const error = new Error("This invitation is invalid or has expired"); error.code = "INVITATION_INVALID"; throw error; }
@@ -212,4 +230,4 @@ async function acceptInvitation({ token, password, name, firstName, lastName, ph
   return { email: user.email, workspaceId: invitation.workspaceId };
 }
 
-module.exports = { acceptInvitation, cleanEmail, invitationHash, inviteMember, onboardAmbassador, onboardCoach, sendInvitation };
+module.exports = { acceptInvitation, cleanEmail, invitationHash, inviteMember, onboardAmbassador, onboardCoach, removeMember, sendInvitation };

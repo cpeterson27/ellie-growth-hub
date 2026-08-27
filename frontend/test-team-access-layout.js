@@ -34,6 +34,8 @@ try {
   const source = fs.readFileSync("src/components/TeamAccess.jsx", "utf8");
   assert(source.includes("onClick={() => begin(member)}"));
   assert(source.includes("member.invitation.sentAt ? resend(member) : reopen(member)"));
+  assert(source.includes("Remove member?") && source.includes("CRM Contacts and business records will not be deleted"));
+  assert(source.includes("!member.isSelf"), "The current user must not be offered self-removal");
   const css = fs.readFileSync("src/components/TeamAccess.css", "utf8");
   assert(css.includes("container-type:inline-size"));
   assert(css.includes("@container(max-width:440px)"));

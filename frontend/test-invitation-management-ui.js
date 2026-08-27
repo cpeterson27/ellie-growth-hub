@@ -12,7 +12,12 @@ for (const variable of ["firstName", "displayName", "role", "workspaceName", "in
 assert(team.includes("Create invite preview")); assert(team.includes("Send invitation")); assert(team.includes("Resend invitation"));
 assert(team.includes("sendWorkspaceInvitation(invitationId)"), "Resend must call the invitation endpoint directly");
 assert(team.includes("resendInFlight.current.has(invitationId)"), "Repeated clicks must be blocked while resend is in flight");
-assert(team.includes("Invitation resent to ${member.email}"), "A successful resend must be visible");
+assert(team.includes("email: member.email"), "Resend feedback must use the pending member email");
 assert(team.includes("Unable to resend invitation"), "A failed resend must be visible");
+assert(team.includes('"Sending…"'), "Resend must expose its in-flight state");
+assert(team.includes('"Invite resent"') && team.includes("Sent just now to"), "Resend success must appear inline with its recipient");
+assert(team.includes('"Delivery failed"') && team.includes('aria-live="polite"'), "Resend failure must be accessible inline");
+assert(team.includes("removeWorkspaceMember(memberId)"), "Confirmed removal must use the workspace member API");
+assert(team.includes("You cannot remove") === false, "Backend safeguards must not be duplicated as frontend-only authorization");
 assert(coaches.includes("Continue to invitation preview")); assert(coaches.includes("Preview coach invitation"));
 console.log("Invitation template, preview-before-send, resend, and coach workflow UI contracts passed.");
