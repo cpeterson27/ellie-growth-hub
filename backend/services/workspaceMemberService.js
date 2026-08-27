@@ -57,6 +57,7 @@ async function deliverInvitation({ invitation, token = crypto.randomBytes(32).to
   const acceptUrl = `${publicFrontendUrl()}/accept-invitation/${encodeURIComponent(token)}`;
   const vars = { firstName: invitation.name.split(/\s+/)[0], displayName: invitation.name, role: invitation.roleKey === "ambassador" ? "Brand Ambassador" : invitation.roleKey === "closer" ? "Closer / Sales" : invitation.roleKey === "coach" ? "Coach" : invitation.roles[0] || "Team Member", workspaceName, inviteLink: acceptUrl, invitedBy };
   const rendered = invitationTemplateService.render({ subject: invitation.subject, body: invitation.body }, vars);
+  const previousAuthorization = { tokenHash: invitation.tokenHash, expiresAt: invitation.expiresAt, status: invitation.status };
   invitation.tokenHash = invitationHash(token); invitation.expiresAt = new Date(Date.now() + INVITATION_DAYS * 86400000); invitation.renderedSubject = rendered.subject; invitation.renderedBody = rendered.body;
   try {
     await models.integrationHub.execute("resend", "sendEmail", {
@@ -70,6 +71,9 @@ async function deliverInvitation({ invitation, token = crypto.randomBytes(32).to
     invitation.status = "pending"; invitation.sentAt = new Date();
     invitation.deliveryError = "";
   } catch (error) {
+    invitation.tokenHash = previousAuthorization.tokenHash;
+    invitation.expiresAt = previousAuthorization.expiresAt;
+    invitation.status = previousAuthorization.status;
     invitation.deliveryStatus = "failed";
     invitation.deliveryError = String(error?.message || "Invitation delivery failed").slice(0, 500);
   }
@@ -180,7 +184,7 @@ async function onboardAmbassador(input, models = dependencies) {
   return { ...invited, ambassadorProfile };
 }
 
-async function sendInvitation({ workspaceId, invitationId, subject, body, actorUserId }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (invitation.roles?.includes("owner")) await requireOwnerActor({ workspaceId, actorUserId }, models); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.User.findById(invitation.invitedBy).select("name").lean()]); return deliverInvitation({ invitation, workspaceName: workspace?.name || "Growth Operator", invitedBy: inviter?.name || "A workspace administrator" }, models); }
+async function sendInvitation({ workspaceId, invitationId, subject, body, actorUserId }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (invitation.roles?.includes("owner")) await requireOwnerActor({ workspaceId, actorUserId }, models); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.User.findById(invitation.invitedBy).select("name").lean()]); const delivery = await deliverInvitation({ invitation, workspaceName: workspace?.name || "Growth Operator", invitedBy: inviter?.name || "A workspace administrator" }, models); if (delivery.deliveryStatus !== "sent") { const error = new Error("Invitation email could not be sent. Check the email connection and try again."); error.code = "INVITATION_DELIVERY_FAILED"; throw error; } return delivery; }
 
 async function acceptInvitation({ token, password, name, firstName, lastName, phone }, models = dependencies) {
   const invitation = await models.WorkspaceInvitation.findOne({ tokenHash: invitationHash(token), status: "pending", expiresAt: { $gt: new Date() } }).select("+tokenHash +deliveryError");
