@@ -120,6 +120,11 @@ export const removeWorkspaceMember = (id) =>
   api.delete(`/workspace/members/${id}`).then((res) => res.data);
 export const fetchWorkspaceCapabilities = () =>
   api.get("/workspace/capabilities").then((res) => res.data);
+export const saveWorkspaceRolePermissions = (role, permissions) =>
+  api.put(`/workspace/role-permissions/${role}`, { permissions }).then((res) => res.data);
+export const resetWorkspaceRolePermissions = (role) =>
+  api.delete(`/workspace/role-permissions/${role}`).then((res) => res.data);
+export const fetchPlatformBusinesses = () => api.get("/platform/businesses").then((res) => res.data.businesses);
 export const fetchLaunchReadiness = () => api.get("/workspace/readiness").then((res) => res.data.data);
 export const fetchPublicSite = () => api.get("/public/site").then((res) => res.data.data);
 export const fetchPublicProgram = (slug) => api.get(`/public/programs/${slug}`).then((res) => res.data.data);
@@ -544,6 +549,12 @@ export const updateOpportunity = (opportunityId, payload) =>
 
 export const savePipelineStages = (stages) =>
   api.put("/opportunities/stages", { stages }).then((res) => res.data);
+export const fetchCloserQueue = (params = {}) => api.get("/opportunities/closer-queue", { params }).then((res) => res.data);
+export const assignCloser = (opportunityId, payload) => api.post(`/opportunities/${opportunityId}/assign`, payload).then((res) => res.data);
+export const recordCloserActivity = (opportunityId, payload) => api.post(`/opportunities/${opportunityId}/activities`, payload).then((res) => res.data);
+export const requestSalesAssist = (opportunityId, payload) => api.post(`/opportunities/${opportunityId}/sales-assist`, payload).then((res) => res.data);
+export const fetchLeadWorkflowAnalytics = () => api.get("/opportunities/lead-workflow/analytics").then((res) => res.data);
+export const prepareCoachingHandoff = (opportunityId) => api.post(`/opportunities/${opportunityId}/coaching-handoff/prepare`).then((res) => res.data);
 export const fetchConnectionPriorities = (campaignId) =>
   api.get("/contacts/priorities/ranked", { params: { campaignId } }).then((res) => res.data);
 

@@ -7,6 +7,11 @@ const { runWithWorkspace } = require("../tenancy/workspaceContext");
 const { ACTIVE_ROLES } = require("../authorization/accessPolicy");
 const { effectivePermissions, hasCapability, normalizeRoles } = require("../authorization/capabilities");
 
+function isPlatformOwner(user) {
+  const allowed = String(process.env.PLATFORM_OWNER_EMAILS || "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+  return Boolean(user?.email && allowed.includes(String(user.email).trim().toLowerCase()));
+}
+
 const COOKIE_NAME = "ellie_session";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -65,7 +70,8 @@ function createAuthContext({ user, workspace, role, roles, membership, session }
     workspaceId: workspace?._id || null,
     role: role || source.role || normalizedRoles[0],
     roles: normalizedRoles,
-    effectivePermissions: effectivePermissions(source),
+    effectivePermissions: effectivePermissions(source, workspace),
+    isPlatformOwner: isPlatformOwner(user),
     session,
   };
 }
@@ -88,7 +94,7 @@ async function requireAuth(req, res, next) {
       workspaceId: session.workspaceId,
       userId: session.userId._id,
       status: "active",
-    }).populate("workspaceId", "name slug status billingStatus");
+    }).populate("workspaceId", "name slug status billingStatus rolePermissionTemplates");
 
     if (!membership || !membership.workspaceId || membership.workspaceId.status !== "active") {
       return res.status(403).json({ error: "Workspace access is unavailable", code: "WORKSPACE_UNAVAILABLE" });
@@ -128,6 +134,10 @@ function requireCapability(...capabilities) {
     : res.status(403).json({ error: "You do not have permission to perform this action", code: "CAPABILITY_FORBIDDEN" });
 }
 
+function requirePlatformOwner(req, res, next) {
+  return req.auth?.isPlatformOwner ? next() : res.status(403).json({ error: "Platform owner access is required", code: "PLATFORM_OWNER_FORBIDDEN" });
+}
+
 module.exports = {
   COOKIE_NAME,
   clearSessionCookie,
@@ -135,6 +145,7 @@ module.exports = {
   parseCookies,
   requireAuth,
   requireCapability,
+  requirePlatformOwner,
   requireRole,
   sessionCookie,
   sessionToken,

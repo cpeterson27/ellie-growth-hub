@@ -49,6 +49,7 @@ function publicSession(req) {
     roles: req.auth.roles,
     effectivePermissions: req.auth.effectivePermissions,
     membershipStatus: "active",
+    isPlatformOwner: Boolean(req.auth.isPlatformOwner),
     csrfToken: req.auth.session.csrfToken,
   };
 }
@@ -63,7 +64,7 @@ router.post("/login", async (req, res) => {
     }
 
     const membership = await WorkspaceMembership.findOne({ userId: user._id, status: "active" })
-      .populate("workspaceId", "name slug status billingStatus");
+      .populate("workspaceId", "name slug status billingStatus rolePermissionTemplates");
     if (!membership?.workspaceId || membership.workspaceId.status !== "active") {
       return res.status(403).json({ error: "No active workspace is available for this account" });
     }

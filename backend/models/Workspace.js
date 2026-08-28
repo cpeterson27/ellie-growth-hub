@@ -10,6 +10,7 @@ const workspaceSchema = new mongoose.Schema(
       enum: ["setup", "trialing", "active", "past_due", "canceled"],
       default: "setup",
     },
+    rolePermissionTemplates: { type: Map, of: [String], default: undefined },
   },
   { timestamps: true },
 );

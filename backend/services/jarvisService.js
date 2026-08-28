@@ -14,24 +14,34 @@ const contactService = require("./contactService");
 const bootcampMarketingWorkflow = require("./bootcampMarketingWorkflow");
 const marketingCampaignExecution = require("./marketingCampaignExecution");
 const llmService = require("./llmService");
-const jarvisMemoryService = require("./jarvisMemoryService");
+const knowledgeService = require("./knowledgeService");
+const jarvisConversationService = require("./jarvisConversationService");
 const jarvisProfileService = require("./jarvisProfileService");
 const growthAnalyticsService = require("./growthAnalyticsService");
+const jarvisAgentCoordinator = require("./jarvisAgentCoordinator");
 
 class JarvisService {
+  selectSpecializedAgent(message) {
+    return jarvisAgentCoordinator.selectSpecializedAgent(message);
+  }
   /**
    * Process natural language queries and return insights
    * @param {String} message - User query
    * @returns {Object} { answer, data, actionsAvailable }
    */
-  async processQuery(message) {
+  async processQuery(message, executionContext = {}) {
     if (!message || typeof message !== "string") {
       throw new Error("Message is required");
     }
 
     const activity = [{ label: "Checking Growth Operator workspace data", status: "complete" }];
     const profile = await jarvisProfileService.getProfile();
-    const memory = await jarvisMemoryService.retrieveRelevantNotes(message);
+    const memory = executionContext.workspaceId
+      ? await knowledgeService.retrieveKnowledge({ workspaceId: executionContext.workspaceId, query: message, agent: "jarvis" })
+      : { available: false, sources: [], context: "", authority: "approved_business_knowledge" };
+    const conversation = executionContext.conversationId
+      ? await jarvisConversationService.history({ workspaceId: executionContext.workspaceId, userId: executionContext.userId, conversationId: executionContext.conversationId })
+      : { conversation: null, messages: [] };
     if (memory.available) activity.push({ label: memory.sources.length ? `Consulted ${memory.sources.length} relevant vault note${memory.sources.length === 1 ? "" : "s"}` : "No matching vault notes found", status: "complete", sources: memory.sources });
     const lowerMessage = message.toLowerCase();
     let result = null;
@@ -80,8 +90,18 @@ class JarvisService {
       try {
         const answer = await llmService.chat({
           message,
-          context: [result.answer, memory.context].filter(Boolean).join("\n\n"),
+          context: [
+            "AUTHORITATIVE OPERATIONAL FACTS (Growth Operator database):",
+            result.answer,
+            memory.context ? `APPROVED LONG-TERM BUSINESS KNOWLEDGE (must not override operational facts):\n${memory.context}` : "",
+            conversation.messages.length ? `RECENT CONVERSATION CONTINUITY:\n${conversation.messages.map((item) => `${item.role}: ${item.content}`).join("\n")}` : "",
+          ].filter(Boolean).join("\n\n"),
           profile,
+          workspaceId: executionContext.workspaceId,
+          userId: executionContext.userId,
+          agent: "jarvis",
+          feature: "jarvis.chat",
+          correlationId: executionContext.correlationId,
         });
         activity.push({ label: "Drafted a response with OpenAI", status: "complete" });
         result = { ...result, answer, aiAssisted: true };
@@ -91,16 +111,11 @@ class JarvisService {
       }
     }
 
-    try {
-      const memory = await jarvisMemoryService.recordConversation({
-        userMessage: message,
-        assistantMessage: result.answer,
-      });
-      result.memory = memory;
-    } catch (error) {
-      console.warn("[Jarvis] Obsidian memory write skipped", { code: "MEMORY_WRITE_FAILED" });
-      result.memory = { recorded: false, reason: "memory_write_failed" };
+    if (executionContext.conversationId) {
+      const savedConversation = await jarvisConversationService.appendTurn({ workspaceId: executionContext.workspaceId, userId: executionContext.userId, conversationId: executionContext.conversationId, userMessage: message, assistantMessage: result.answer });
+      result.conversationId = savedConversation._id;
     }
+    result.memory = { recorded: false, reason: "long_term_memory_requires_explicit_approval" };
 
     return { ...result, activity, memorySources: memory.sources };
   }

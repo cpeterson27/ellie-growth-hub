@@ -135,7 +135,10 @@ Values belong only in Render/backend secret settings unless explicitly identifie
 - `MARKET_RESEARCH_AI_ENABLED=false`
 - `MARKET_RESEARCH_OPENAI_MODEL`
 - `JARVIS_MEMORY_SOURCE`
-- `JARVIS_MEMORY_SYNC_SECRET`
+- `JARVIS_MEMORY_SYNC_SECRET` (legacy only; must also set `JARVIS_MEMORY_SYNC_WORKSPACE_ID`)
+- `JARVIS_MEMORY_SYNC_CREDENTIALS` (preferred workspace-bound JSON map)
+- `JARVIS_MEMORY_SYNC_WORKSPACE_ID` (required only during legacy single-secret migration)
+- `OBSIDIAN_WORKSPACE_ID` (local vault workspace binding)
 - `DEVELOPMENT_APPROVAL_SECRET`
 
 ## Worker configuration

@@ -73,6 +73,7 @@ const AmbassadorAdmin = lazy(() => import("./pages/AmbassadorAdmin.jsx"));
 const AmbassadorWelcomeSettings = lazy(() => import("./pages/AmbassadorWelcomeSettings.jsx"));
 const SocialWorkspace = lazy(() => import("./pages/SocialWorkspace.jsx"));
 const MyProfile = lazy(() => import("./pages/MyProfile.jsx"));
+const Businesses = lazy(() => import("./pages/Businesses.jsx"));
 
 const PageLoading = () => <div className="auth-loading">Opening Growth Operator…</div>;
 
@@ -94,6 +95,7 @@ function ProtectedApp() {
           <Route path="/coach/commissions" element={<CoachCommissions />} />
           <Route path="/coach/profile" element={<CoachPublicProfile />} />
           <Route path="/profile" element={<MyProfile />} />
+          {session.isPlatformOwner ? <Route path="/businesses" element={<Businesses />} /> : null}
           <Route path="*" element={<Navigate to="/coach" replace />} />
         </Routes>
       </DashboardLayout>

@@ -1,0 +1,12 @@
+import { useEffect, useState } from "react";
+import { fetchPlatformBusinesses } from "../services/api.js";
+import "./Businesses.css";
+
+const providerNames = { facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", tiktok: "TikTok", x: "X" };
+const statusNames = { connected: "Connected", needs_attention: "Needs attention", not_connected: "Not connected" };
+
+export default function Businesses() {
+  const [businesses, setBusinesses] = useState([]), [selected, setSelected] = useState(null), [error, setError] = useState("");
+  useEffect(() => { fetchPlatformBusinesses().then(setBusinesses).catch((err) => setError(err.response?.data?.error || "Unable to load businesses.")); }, []);
+  return <main className="businesses-page"><header><p className="page-eyebrow">Platform administration</p><h1>Businesses</h1><p>Workspace membership and connected-account health across Growth Operator.</p></header>{error ? <p className="form-error">{error}</p> : null}<section className="businesses-list">{businesses.map((business) => <article key={business.id} className="business-card"><button type="button" className="business-card__summary" onClick={() => setSelected(selected === business.id ? null : business.id)} aria-expanded={selected === business.id}><span><strong>{business.name}</strong><small>{business.owner ? `${business.owner.name || "Owner"} · ${business.owner.email}` : "No active owner found"}</small></span><span><b className={`business-status is-${business.status}`}>{business.status}</b><small>{business.teamMemberCount} active team member{business.teamMemberCount === 1 ? "" : "s"}</small></span></button><div className="business-card__connections">{business.social.map((social) => <div key={social.provider}><strong>{providerNames[social.provider]}</strong><span className={`business-connection is-${social.status}`}>{statusNames[social.status]}</span>{social.accountName ? <small>{social.accountName}</small> : null}</div>)}</div>{selected === business.id ? <div className="business-card__details"><span>Workspace: {business.slug}</span><span>Updated: {business.updatedAt ? new Date(business.updatedAt).toLocaleString() : "Not available"}</span>{business.social.filter((item) => item.lastVerifiedAt).map((item) => <span key={item.provider}>{providerNames[item.provider]} verified: {new Date(item.lastVerifiedAt).toLocaleString()}</span>)}</div> : null}</article>)}</section></main>;
+}

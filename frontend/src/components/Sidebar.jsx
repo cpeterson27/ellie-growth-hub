@@ -28,6 +28,7 @@ import { canManageCoaching, canUseCoachPortal, hasAnyPermission, hasPermission, 
 import "./Sidebar.css";
 
 const navGroups = [
+  { label: "Platform", items: [{ label: "Businesses", path: "/businesses", icon: <FiBriefcase />, platformOnly: true }] },
   { label: "Operate", items: [
     { label: "Command Center", path: "/command-center", icon: <FiActivity />, permissions: ["crm.view", "analytics.view"] },
     { label: "CRM", path: "/crm/contacts", icon: <FiUsers />, permissions: ["crm.view"] },
@@ -91,7 +92,7 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   const ambassadorOnly = isAmbassadorOnly(session);
   let groups = ambassadorOnly ? ambassadorGroups : coachOnly ? coachGroups : canManageCoaching(session) ? [navGroups[0], coachingGroup, ...navGroups.slice(1)] : navGroups;
   if (!coachOnly && canUseCoachPortal(session)) groups = [...groups, ...coachGroups];
-  const visibleGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => !item.permissions || hasAnyPermission(session, item.permissions)) })).filter((group) => group.items.length);
+  const visibleGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => (!item.platformOnly || session?.isPlatformOwner) && (!item.permissions || hasAnyPermission(session, item.permissions))) })).filter((group) => group.items.length);
   return (
     <aside className={`${isOpen ? "sidebar sidebar--open" : "sidebar"} ${isCollapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebar__brand">

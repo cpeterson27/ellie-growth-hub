@@ -47,6 +47,8 @@ const coachingRouter = require("./routes/coaching");
 const publicSiteRouter = require("./routes/publicSite");
 const publicManagementRouter = require("./routes/publicManagement");
 const meetupRouter = require("./routes/meetup");
+const platformRouter = require("./routes/platform");
+const aiRouter = require("./routes/ai");
 const { requireAuth } = require("./middleware/auth");
 const { restrictNewRoleSurface } = require("./middleware/authorization");
 const { startResearchMonitorRunner } = require("./services/researchMonitorService");
@@ -196,6 +198,8 @@ connectDatabase(mongoUri)
     app.use("/api/development-requests", developmentRequestsRouter);
     app.use("/api/gmail", gmailRouter);
     app.use("/api/workspace", workspaceRouter);
+    app.use("/api/platform", platformRouter);
+    app.use("/api/ai", aiRouter);
     app.use("/api/unsubscribe", unsubscribeRouter);
     app.use("/api/business-index", businessIndexRouter);
     app.use("/api/mcp-access-tokens", mcpAccessRouter);

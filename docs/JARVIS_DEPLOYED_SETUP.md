@@ -20,7 +20,7 @@ JARVIS_RESEARCH_OPENAI_MODEL=gpt-5.6-sol
 JARVIS_TTS_MODEL=gpt-4o-mini-tts
 JARVIS_OBSIDIAN_MEMORY_ENABLED=true
 JARVIS_MEMORY_SOURCE=cloud
-JARVIS_MEMORY_SYNC_SECRET=a-long-random-secret-you-create-once
+JARVIS_MEMORY_SYNC_CREDENTIALS={"<workspace-object-id>":"a-long-random-workspace-specific-secret"}
 ```
 
 Do not set `OBSIDIAN_VAULT_PATH` on Render. It is a local Mac path and has no
@@ -100,8 +100,8 @@ cd /Users/cassandrapeterson/ellie-growth-hub/tools/jarvis-vault-bridge
 cp .env.example .env
 ```
 
-Set `OBSIDIAN_VAULT_PATH`, `JARVIS_API_URL`, and the same
-`JARVIS_MEMORY_SYNC_SECRET` in that file. Then load the values into your shell
+Set `OBSIDIAN_VAULT_PATH`, `JARVIS_API_URL`, and that workspace's secret from
+`JARVIS_MEMORY_SYNC_CREDENTIALS` in that file. Then load the values into your shell
 and run `npm run sync`. Use `npm run watch` to refresh the cloud copy every
 minute. No local Growth Operator backend is involved.
 

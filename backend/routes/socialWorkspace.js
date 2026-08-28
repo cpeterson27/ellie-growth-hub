@@ -5,6 +5,7 @@ const ConversationThread = require("../models/ConversationThread");
 const ConversationMessage = require("../models/ConversationMessage");
 const SocialIdentity = require("../models/SocialIdentity");
 const SocialProviderEvent = require("../models/SocialProviderEvent");
+const AutomationActionRun = require("../models/AutomationActionRun");
 const CrmActivity = require("../models/CrmActivity");
 const AmbassadorContentTask = require("../models/AmbassadorContentTask");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
@@ -19,6 +20,10 @@ const distribution = require("../services/ambassadorContentService");
 const oauth = require("../services/socialOAuthService");
 const metaInsights = require("../services/metaInsightsService");
 const pageEngagement = require("../services/metaPageEngagementService");
+const socialAiService = require("../services/socialAiService");
+const automationPolicyService = require("../services/automationPolicyService");
+const automationActionService = require("../services/automationActionService");
+const automationExecutorService = require("../services/automationExecutorService");
 const { metaMessagingAdapter } = require("../services/conversations/metaMessagingAdapter");
 const router = express.Router();
 router.use(requireCapability("social.manage"));
@@ -74,7 +79,30 @@ router.get("/inbox/:id", wrap(async (req, res) => {
   const thread = await ConversationThread.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId, channel: { $in: socialChannels } }).populate("contactIds", "name").lean();
   if (!thread) return res.status(404).json({ error: "Social conversation not found" });
   const messages = await ConversationMessage.find({ workspaceId: req.auth.workspaceId, threadId: thread._id }).populate("createdBy", "name").sort({ createdAt: 1 }).limit(500).lean();
-  res.json({ thread, messages });
+  res.json({ thread, messages, socialAi: await socialAiService.latest(req.auth.workspaceId, thread._id) });
+}));
+router.post("/inbox/:id/ai-assist", wrap(async (req, res) => {
+  const result = await socialAiService.analyze({ workspaceId: req.auth.workspaceId, userId: req.auth.user._id, auth: req.auth, threadId: req.params.id, action: req.body.action, extraInstruction: req.body.extraInstruction, forceAi: true });
+  res.json(result);
+}));
+router.get("/social-ai/settings", wrap(async (req, res) => res.json(await socialAiService.getConfig(req.auth.workspaceId))));
+router.patch("/social-ai/settings", wrap(async (req, res) => {
+  const allowed = socialAiService.INTENTS.filter((intent) => (req.body.allowedIntents || []).includes(intent));
+  const config = await WorkspaceConfig.findOneAndUpdate({ workspaceId: req.auth.workspaceId, key: "primary" }, { $set: { socialAi: { analysisEnabled: req.body.analysisEnabled === true, suggestedRepliesEnabled: req.body.suggestedRepliesEnabled !== false, qualificationAssistanceEnabled: req.body.qualificationAssistanceEnabled !== false, humanApprovalRequired: true, confidenceThreshold: Math.min(1, Math.max(0, Number(req.body.confidenceThreshold) || .78)), allowedIntents: allowed.length ? allowed : socialAiService.INTENTS } } }, { upsert: true, new: true, runValidators: true });
+  res.json(config.socialAi);
+}));
+router.get("/social-ai/analytics", wrap(async (req, res) => res.json(await socialAiService.analytics(req.auth.workspaceId))));
+router.get("/automation-controls", requireCapability("workspace.manage"), wrap(async (req, res) => res.json({ policy: await automationPolicyService.get(req.auth.workspaceId), environment: { socialPublishingEnabled: process.env.SOCIAL_PUBLISHING_ENABLED === "true", metaAutomaticRepliesEnabled: process.env.META_AUTOMATIC_REPLIES_ENABLED === "true" } })));
+router.patch("/automation-controls", requireCapability("workspace.manage"), wrap(async (req, res) => res.json({ policy: await automationPolicyService.save(req.auth.workspaceId, req.body || {}) })));
+router.get("/automation-actions", requireCapability("workspace.manage"), wrap(async (req, res) => {
+  const rows = await AutomationActionRun.find({ workspaceId: req.auth.workspaceId }).select("actorType principal userId triggerType triggerId agent actionType provider targetType targetId status policyDecision approvalId attemptCount providerResultCategory failureCategory correlationId createdAt updatedAt completedAt").sort({ createdAt: -1 }).limit(Math.min(200, Math.max(1, Number(req.query.limit) || 50))).lean();
+  res.json({ actions: rows });
+}));
+router.post("/automation-actions/:id/prepare-approval", requireCapability("workspace.manage"), wrap(async (req, res) => res.json(await automationActionService.prepareApproval({ workspaceId: req.auth.workspaceId, runId: req.params.id, userId: req.auth.user._id }))));
+router.post("/automation-actions/:id/execute", requireCapability("workspace.manage"), wrap(async (req, res) => {
+  const actor = { actorType: "user", workspaceId: String(req.auth.workspaceId), userId: req.auth.user._id, effectivePermissions: req.auth.effectivePermissions };
+  const run = await automationExecutorService.executeRequest({ workspaceId: req.auth.workspaceId, runId: req.params.id, approvalId: req.body.approvalId, confirmation: req.body.confirmation, actor }, automationActionService);
+  res.json({ action: run });
 }));
 router.post("/inbox/:id/reply", wrap(async (req, res) => {
   if (req.body.approved !== true) return res.status(400).json({ error: "Explicit reply approval is required" });

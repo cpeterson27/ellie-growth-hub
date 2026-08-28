@@ -27,6 +27,7 @@ const { ensureLinks, generateIntentEmailDraft } = require("../services/intentEma
 const { researchAudienceForSignal } = require("../services/researchAudienceTemplates");
 const { researchPublicWebsite } = require("../services/publicWebsiteResearchService");
 const { RESEARCH_MONITOR_PRESETS } = require("../services/researchMonitorPresets");
+const leadQualificationService = require("../services/leadQualificationService");
 
 const router = express.Router();
 const MONITOR_SOURCE_DEFAULTS = {
@@ -345,28 +346,14 @@ router.post("/research/signals/:signalId/identity-research", async (req, res) =>
 });
 
 router.post("/research/signals/:signalId/convert", async (req, res) => {
-  const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
-  if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
-  const name = String(req.body?.name || signal.authorName || "").trim();
-  if (!name) return res.status(400).json({ success: false, error: "Add the person's name before creating a CRM lead." });
-  if (!supportedPublicPerson({ name })) return res.status(400).json({ success: false, error: "This is a platform, team, or organization name—not an identified person. Research a real named contact before creating the CRM lead." });
-  if (/^(?:\/?u\/|@|https?:\/\/)/i.test(name)) return res.status(400).json({ success: false, error: "A public username is not a verified real name. Research and enter the person's real name before creating the CRM record." });
-  const organizationName = String(req.body?.company || signal.organizationName || signal.organizationDomain || "").trim();
-  if (organizationName && signal.identityResolution?.status !== "supported") return res.status(400).json({ success: false, error: "The company connection is not supported by public evidence. Add this lead without a company or review the source first." });
-  let organization = null;
-  if (organizationName) {
-    const identity = signal.organizationDomain ? { workspaceId: req.auth.workspaceId, domain: signal.organizationDomain } : { workspaceId: req.auth.workspaceId, name: organizationName };
-    organization = await Organization.findOneAndUpdate(identity, { $set: { workspaceId: req.auth.workspaceId, name: organizationName, domain: signal.organizationDomain || null, source: "public_web", website: signal.organizationDomain ? `https://${signal.organizationDomain}` : "", lastResearchVerifiedAt: new Date() }, $addToSet: { researchEvidence: { sourceType: signal.source, sourceUrl: signal.sourceUrl, field: "intent_signal", observedValue: signal.title, observedAt: new Date() } } }, { upsert: true, new: true, setDefaultsOnInsert: true });
-  }
-  const parts = name.split(/\s+/);
-  const contact = await Contact.findOneAndUpdate(
-    { sourceProvider: "intent_monitor", providerContactId: String(signal._id) },
-    { $set: { name, firstName: parts[0] || "", lastName: parts.slice(1).join(" "), company: organizationName, organizationId: organization?._id || null, sourceProvider: "intent_monitor", providerContactId: String(signal._id), providerRecordId: signal.sourceId, sources: ["public_web", signal.source], status: "active", type: "lead", stage: "Needs Research", researchStatus: "needs_research", qualifyContact: true, tags: ["intent-signal", signal.source], website: signal.sourceUrl, notes: `Public intent signal: ${signal.title}\nSource: ${signal.sourceUrl}` } },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
-  );
-  signal.status = "converted";
-  await signal.save();
-  return res.status(201).json({ success: true, contact, organization });
+  try {
+    const evaluated = await leadQualificationService.evaluate({ workspaceId: req.auth.workspaceId, userId: req.auth.user?._id, signalId: req.params.signalId, auth: req.auth, useAi: false });
+    const qualification = evaluated.signal.status === "qualified"
+      ? { ...evaluated.qualification, qualificationStatus: "qualified", warnings: [...new Set([...(evaluated.qualification.warnings || []), "Qualification was confirmed by a human before CRM conversion."])] }
+      : evaluated.qualification;
+    const result = await leadQualificationService.converge({ workspaceId: req.auth.workspaceId, userId: req.auth.user?._id, signal: evaluated.signal, qualification, input: req.body || {} });
+    return res.status(result.createdOpportunity ? 201 : 200).json({ success: true, contact: result.contact, organization: result.organization, opportunity: result.opportunity, qualification });
+  } catch (error) { return res.status(error.code === "LEAD_SIGNAL_NOT_FOUND" ? 404 : 400).json({ success: false, error: error.message || "Unable to create CRM lead." }); }
 });
 
 function campaignRegistrationLinks(campaign) {

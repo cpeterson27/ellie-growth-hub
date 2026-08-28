@@ -12,6 +12,9 @@ const ContactFieldUpdateAudit = require("../models/ContactFieldUpdateAudit");
 const jarvisService = require("../services/jarvisService");
 const llmService = require("../services/llmService");
 const jarvisMemoryService = require("../services/jarvisMemoryService");
+const jarvisConversationService = require("../services/jarvisConversationService");
+const jarvisMemoryCaptureService = require("../services/jarvisMemoryCaptureService");
+const jarvisVaultSyncAuthService = require("../services/jarvisVaultSyncAuthService");
 const jarvisProfileService = require("../services/jarvisProfileService");
 const developmentRequestService = require("../services/developmentRequestService");
 const { compileMarketQuestion } = require("../services/marketResearchService");
@@ -19,9 +22,23 @@ const { ingestContacts } = require("../services/contactIngestionService");
 const { isJarvisWebResearchEnabled, normalizePublicPeople, researchAndStagePublicPeople } = require("../services/publicPeopleResearchService");
 const { applyContactFieldUpdate, availableContactFields, buildContactFieldUpdatePreview } = require("../services/contactFieldUpdateService");
 const { collectMonitorSignals } = require("../services/intentSourceService");
-const { requireCapability } = require("../middleware/auth");
+const { requireCapability, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
+
+// Public only to the vault bridge: the bearer credential itself resolves the
+// workspace. A workspaceId supplied in the JSON body is never trusted.
+router.post("/memory/sync", async (req, res) => {
+  try {
+    const bridge = jarvisVaultSyncAuthService.resolveWorkspace({ authorization: req.get("authorization") });
+    if (!bridge) return res.status(401).json({ success: false, error: "Unauthorized vault bridge" });
+    const result = await jarvisMemoryService.syncCloudNotes(bridge.workspaceId, req.body?.notes);
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, error: error.statusCode ? error.message : "Vault sync failed" });
+  }
+});
+
 router.use(requireCapability("jarvis.manage"));
 const OPENAI_VOICES = new Set(["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"]);
 
@@ -179,7 +196,7 @@ router.post("/chat", async (req, res) => {
       });
     }
 
-    const result = await jarvisService.processQuery(message);
+    const result = await jarvisService.processQuery(message, { workspaceId: req.auth.workspaceId, userId: req.auth.user?._id, conversationId: req.body?.conversationId || null, correlationId: req.get("x-request-id") || "" });
 
     res.json({
       success: true,
@@ -409,7 +426,7 @@ router.post("/voice/speech", async (req, res) => {
 // Configuration-only status. This intentionally exposes no vault path or credentials.
 router.get("/status", async (req, res) => {
   try {
-    const memory = await jarvisMemoryService.getStatus();
+    const memory = await jarvisMemoryService.getStatus(req.auth.workspaceId);
     res.json({
       success: true,
       data: {
@@ -438,23 +455,23 @@ router.put("/profile", async (req, res) => {
   }
 });
 
-function hasValidMemorySyncSecret(req) {
-  const provided = String(req.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  const expected = process.env.JARVIS_MEMORY_SYNC_SECRET || "";
-  if (!provided || !expected || provided.length !== expected.length) return false;
-  return require("crypto").timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
-}
-
-// This endpoint accepts only approved Markdown notes from the user's local vault bridge.
-// It never returns note content and never accepts provider credentials.
-router.post("/memory/sync", async (req, res) => {
-  if (!hasValidMemorySyncSecret(req)) return res.status(401).json({ success: false, error: "Unauthorized vault bridge" });
-  try {
-    const result = await jarvisMemoryService.syncCloudNotes(req.body?.notes);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    res.status(error.statusCode || 500).json({ success: false, error: error.statusCode ? error.message : "Vault sync failed" });
-  }
+router.get("/conversations", async (req, res) => res.json({ success: true, data: await jarvisConversationService.list({ workspaceId: req.auth.workspaceId, userId: req.auth.userId }) }));
+router.post("/conversations", async (req, res) => res.status(201).json({ success: true, data: await jarvisConversationService.create({ workspaceId: req.auth.workspaceId, userId: req.auth.userId, title: req.body?.title }) }));
+router.get("/conversations/:id", async (req, res) => {
+  const conversation = await jarvisConversationService.get({ workspaceId: req.auth.workspaceId, userId: req.auth.userId, conversationId: req.params.id });
+  return conversation ? res.json({ success: true, data: conversation }) : res.status(404).json({ error: "Jarvis conversation not found" });
+});
+router.patch("/conversations/:id/archive", async (req, res) => {
+  const conversation = await jarvisConversationService.archive({ workspaceId: req.auth.workspaceId, userId: req.auth.userId, conversationId: req.params.id });
+  return conversation ? res.json({ success: true, data: conversation }) : res.status(404).json({ error: "Jarvis conversation not found" });
+});
+router.post("/memory/prepare", requireRole("owner", "admin"), async (req, res) => {
+  try { return res.status(201).json({ success: true, data: await jarvisMemoryCaptureService.prepare({ workspaceId: req.auth.workspaceId, userId: req.auth.userId, title: req.body?.title, content: req.body?.content, category: req.body?.category }) }); }
+  catch (error) { return res.status(400).json({ error: error.message, code: error.code }); }
+});
+router.post("/memory/:id/confirm", requireRole("owner", "admin"), async (req, res) => {
+  try { return res.json({ success: true, data: await jarvisMemoryCaptureService.confirm({ workspaceId: req.auth.workspaceId, userId: req.auth.userId, approvalId: req.params.id, confirmationPhrase: req.body?.confirmationPhrase }) }); }
+  catch (error) { return res.status(error.code === "MEMORY_APPROVAL_NOT_FOUND" ? 404 : 400).json({ error: error.message, code: error.code }); }
 });
 
 /**
@@ -768,7 +785,7 @@ router.post("/voice", async (req, res) => {
     }
 
     // Process transcript with Jarvis chat logic
-    const jarvisResponse = await jarvisService.processQuery(transcript);
+    const jarvisResponse = await jarvisService.processQuery(transcript, { workspaceId: req.auth.workspaceId, userId: req.auth.user?._id, correlationId: req.get("x-request-id") || "" });
 
     res.json({
       success: true,

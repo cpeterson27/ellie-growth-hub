@@ -181,7 +181,7 @@ export default function Settings() {
         <button className={activeSection === "team" ? "is-active" : ""} onClick={() => { setActiveSection("team"); navigate("/settings/team"); }}><FiUsers /> Team & Access</button>
         {hasPermission(session, "team.manage") ? <button className={activeSection === "invitations" ? "is-active" : ""} onClick={() => { setActiveSection("invitations"); navigate("/settings/communications/invitations"); }}><FiMail /> Communications · Invitation templates</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "public" ? "is-active" : ""} onClick={() => { setActiveSection("public"); navigate("/settings/website"); }}><FiImage /> Website & Brand</button> : null}
-        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "applications" ? "is-active" : ""} onClick={() => { setActiveSection("applications"); navigate("/settings/applications"); }}><FiBriefcase /> Coaching Application</button> : null}
+        {hasPermission(session, "workspace.manage") ? <button className={activeSection === "applications" ? "is-active" : ""} onClick={() => { setActiveSection("applications"); navigate("/settings/applications"); }}><FiBriefcase /> Student Application</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "readiness" ? "is-active" : ""} onClick={() => setActiveSection("readiness")}><FiCheck /> Launch readiness</button> : null}
         {hasPermission(session, "workspace.manage") ? <button className={activeSection === "privacy" ? "is-active" : ""} onClick={() => { setActiveSection("privacy"); navigate("/settings/privacy"); }}><FiShield /> Privacy requests</button> : null}
       </nav>

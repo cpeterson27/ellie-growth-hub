@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
+const Workspace = require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const CoachProfile = require("../models/CoachProfile");
 const AmbassadorProfile = require("../models/AmbassadorProfile");
@@ -9,7 +10,7 @@ const invitationTemplateService = require("../services/invitationTemplateService
 const { requireCapability, requireRole } = require("../middleware/auth");
 const workspaceMemberService = require("../services/workspaceMemberService");
 const launchReadinessService = require("../services/launchReadinessService");
-const { CAPABILITIES, OWNER_PROTECTED, ROLE_DEFAULTS, effectivePermissions, legacyRoleFor, normalizeRoles, validCapabilities, validateMembershipChange } = require("../authorization/capabilities");
+const { CAPABILITIES, OWNER_PROTECTED, ROLE_DEFAULTS, effectivePermissions, legacyRoleFor, normalizeRoles, roleDefaultsForWorkspace, validCapabilities, validateMembershipChange } = require("../authorization/capabilities");
 const router = express.Router();
 router.get("/readiness",requireCapability("workspace.manage"),async(req,res)=>res.json({success:true,data:await launchReadinessService.readiness(req.auth.workspaceId)}));
 
@@ -105,8 +106,32 @@ const ROLE_DESCRIPTIONS = Object.freeze({
   viewer: "Read-only CRM, opportunity, communications, and analytics access.",
 });
 
-router.get("/capabilities", requireCapability("team.view", "team.manage"), (_req, res) => {
-  res.json({ capabilities: CAPABILITIES, roleDefaults: ROLE_DEFAULTS, roleDescriptions: ROLE_DESCRIPTIONS, ownerProtected: OWNER_PROTECTED });
+router.get("/capabilities", requireCapability("team.view", "team.manage"), (req, res) => {
+  res.json({ capabilities: CAPABILITIES, roleDefaults: roleDefaultsForWorkspace(req.auth.workspace), systemRoleDefaults: ROLE_DEFAULTS, roleDescriptions: ROLE_DESCRIPTIONS, ownerProtected: OWNER_PROTECTED, canEditRoleTemplates: req.auth.roles.includes("owner") || req.auth.isPlatformOwner });
+});
+router.put("/role-permissions/:role", requireCapability("team.manage"), async (req, res) => {
+  try {
+    if (!req.auth.roles.includes("owner") && !req.auth.isPlatformOwner) return res.status(403).json({ error: "Only a workspace owner can change role templates", code: "OWNER_REQUIRED" });
+    const role = String(req.params.role || "").toLowerCase();
+    if (!ROLE_DEFAULTS[role]) return res.status(404).json({ error: "Role template not found" });
+    if (role === "owner") return res.status(409).json({ error: "Owner permissions are protected and cannot be customized", code: "OWNER_TEMPLATE_PROTECTED" });
+    const workspace = await Workspace.findOne({ _id: req.auth.workspaceId, status: "active" });
+    if (!workspace) return res.status(404).json({ error: "Workspace not found" });
+    if (!workspace.rolePermissionTemplates) workspace.rolePermissionTemplates = new Map();
+    workspace.rolePermissionTemplates.set(role, validCapabilities(req.body?.permissions));
+    workspace.markModified("rolePermissionTemplates");
+    await workspace.save();
+    return res.json({ role, roleDefaults: roleDefaultsForWorkspace(workspace) });
+  } catch (error) { return res.status(400).json({ error: error.message || "Unable to save role permissions" }); }
+});
+router.delete("/role-permissions/:role", requireCapability("team.manage"), async (req, res) => {
+  if (!req.auth.roles.includes("owner") && !req.auth.isPlatformOwner) return res.status(403).json({ error: "Only a workspace owner can reset role templates", code: "OWNER_REQUIRED" });
+  const role = String(req.params.role || "").toLowerCase();
+  if (!ROLE_DEFAULTS[role] || role === "owner") return res.status(409).json({ error: "This role template cannot be reset" });
+  const workspace = await Workspace.findById(req.auth.workspaceId);
+  if (!workspace) return res.status(404).json({ error: "Workspace not found" });
+  workspace.rolePermissionTemplates?.delete(role); workspace.markModified("rolePermissionTemplates"); await workspace.save();
+  return res.json({ role, roleDefaults: roleDefaultsForWorkspace(workspace) });
 });
 router.get("/invitation-templates", requireCapability("team.view", "team.manage"), async (req, res) => res.json({ templates: await invitationTemplateService.list(req.auth.workspaceId) }));
 router.put("/invitation-templates/:roleKey", requireCapability("team.manage"), async (req, res) => { try { res.json({ template: await invitationTemplateService.save({ workspaceId: req.auth.workspaceId, roleKey: req.params.roleKey, subject: req.body?.subject, body: req.body?.body, actorUserId: req.auth.user._id }) }); } catch (error) { res.status(400).json({ error: error.message }); } });

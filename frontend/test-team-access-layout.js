@@ -34,12 +34,15 @@ try {
   const source = fs.readFileSync("src/components/TeamAccess.jsx", "utf8");
   assert(source.includes("onClick={() => begin(member)}"));
   assert(source.includes("member.invitation.sentAt ? resend(member) : reopen(member)"));
-  assert(source.includes("Remove member?") && source.includes("CRM Contacts and business records will not be deleted"));
+  assert(source.includes('title="Remove team member"') && source.includes("Their CRM Contacts and business records will stay intact"));
   assert(source.includes("!member.isSelf"), "The current user must not be offered self-removal");
+  const memberActions = source.slice(source.indexOf('className="team-access__member-actions"'), source.indexOf("</div> : null}", source.indexOf('className="team-access__member-actions"')));
+  assert(memberActions.indexOf('className="team-access__remove"') < memberActions.indexOf("member.invitation &&"), "Remove member belongs directly beneath Manage access");
   const css = fs.readFileSync("src/components/TeamAccess.css", "utf8");
   assert(css.includes("container-type:inline-size"));
   assert(css.includes("@container(max-width:440px)"));
   assert(css.includes("white-space:nowrap;overflow-wrap:normal"));
+  assert(css.includes("team-access__responsibility-options input[type=checkbox]") && css.includes("height:16px"), "Program responsibility checkboxes must stay compact");
   const styles = ["src/index.css", "src/pages/Settings.css", "src/components/Button.css", "src/components/UserAvatar.css", "src/components/TeamAccess.css"].map(path => fs.readFileSync(path, "utf8")).join("\n");
   html = `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Team layout fixtures</title><style>${styles}body{margin:0;padding:24px}main{max-width:1100px;margin:auto}</style><main>${owner}</main>`;
   console.log("Team member fixture rendering, long content, role visibility, actions and responsive layout contracts passed.");

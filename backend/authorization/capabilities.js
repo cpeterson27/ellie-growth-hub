@@ -28,9 +28,17 @@ function normalizeRoles(membership = {}) {
   const roles = [...new Set([...(Array.isArray(membership.roles) ? membership.roles : []), membership.role].filter((role) => ROLE_DEFAULTS[role]))];
   return roles.length ? roles : ["member"];
 }
-function effectivePermissions(membership = {}) {
+function roleDefaultsForWorkspace(workspace = {}) {
+  const configured = workspace?.rolePermissionTemplates;
+  const read = (role) => configured?.get ? configured.get(role) : configured?.[role];
+  return Object.fromEntries(Object.keys(ROLE_DEFAULTS).map((role) => [role,
+    role === "owner" ? ROLE_DEFAULTS.owner : validCapabilities(read(role) ?? ROLE_DEFAULTS[role]),
+  ]));
+}
+function effectivePermissions(membership = {}, workspace = membership.workspaceId) {
   const roles = normalizeRoles(membership);
-  const result = new Set(roles.flatMap((role) => ROLE_DEFAULTS[role] || []));
+  const defaults = roleDefaultsForWorkspace(workspace);
+  const result = new Set(roles.flatMap((role) => defaults[role] || []));
   validCapabilities(membership.permissionOverrides?.allow).forEach((item) => result.add(item));
   validCapabilities(membership.permissionOverrides?.deny).forEach((item) => result.delete(item));
   if (roles.includes("owner")) OWNER_PROTECTED.forEach((item) => result.add(item));
@@ -47,4 +55,4 @@ function validateMembershipChange({ currentRoles, requestedRoles, requestedStatu
   if (self && targetIsOwner && requestedStatus === "suspended") { const error = new Error("A workspace owner cannot deactivate their own membership"); error.code = "OWNER_LOCKOUT_BLOCKED"; throw error; }
 }
 
-module.exports = { CAPABILITIES, OWNER_PROTECTED, ROLE_DEFAULTS, effectivePermissions, hasAnyCapability, hasCapability, hasRole, legacyRoleFor, normalizeRoles, validCapabilities, validateMembershipChange };
+module.exports = { CAPABILITIES, OWNER_PROTECTED, ROLE_DEFAULTS, effectivePermissions, hasAnyCapability, hasCapability, hasRole, legacyRoleFor, normalizeRoles, roleDefaultsForWorkspace, validCapabilities, validateMembershipChange };

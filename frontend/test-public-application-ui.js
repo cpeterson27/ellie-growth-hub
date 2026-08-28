@@ -13,6 +13,9 @@ const heroCss = source("pages/PublicHeroLogo.css");
 const siteCss = source("pages/PublicSite.css");
 const theme = source("context/WorkspaceThemeContext.jsx");
 const sidebar = source("components/Sidebar.jsx");
+const settings = source("pages/Settings.jsx");
+const management = source("components/ApplicationRouting.jsx");
+const api = source("services/api.js");
 
 assert(fs.existsSync(path.join(root, "public", "elliescoachinglogo.png")));
 assert(app.includes('path="/apply" element={<PublicApplication />}'));
@@ -32,4 +35,8 @@ assert(siteCss.includes(".public-brand img"));
 assert(theme.includes("site?.branding"));
 assert(sidebar.includes("organization?.organizationLogoUrl"));
 assert(!sidebar.includes('site?.branding?.logoUrl?<img'));
+assert(settings.includes("Student Application") && !settings.includes("Coaching Application</button>"));
+for (const value of ["Student Application", "prospective-student application shown on the public website", "enrollment happens later"]) assert(management.includes(value), `missing student application management copy: ${value}`);
+assert(management.includes("fetchApplicationConfig()") && management.includes("updateApplicationConfig(config)"));
+assert(api.includes('api.get("/public/application")') && api.includes('api.get("/public-management/application-config")'));
 console.log("Program-application copy, actual Ellie hero logos, workspace override, responsive stacking and overflow contracts passed.");

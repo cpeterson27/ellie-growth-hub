@@ -41,10 +41,11 @@ In `backend/.env`, set the absolute vault path and explicitly opt in:
 
 ```dotenv
 OBSIDIAN_VAULT_PATH=/absolute/path/to/Ellie AI Command Center
+OBSIDIAN_WORKSPACE_ID=the-workspace-object-id-bound-to-this-vault
 JARVIS_OBSIDIAN_MEMORY_ENABLED=true
 ```
 
-When enabled, every Jarvis chat interaction is appended to `01 Inbox/Jarvis Conversations/YYYY-MM-DD.md`. Jarvis also reads matching Markdown notes from the Dashboard, Campaigns, Contacts & ICP, Partners & Affiliates, Offers & Programs, Marketing Channels, SOPs, and Decisions folders before answering. The Jarvis screen lists the notes it consulted. Jarvis never reads or writes outside the configured vault path. Disable it at any time with `JARVIS_OBSIDIAN_MEMORY_ENABLED=false`.
+Jarvis reads matching approved Markdown notes from the Dashboard, Campaigns, Contacts & ICP, Partners & Affiliates, Offers & Programs, Marketing Channels, SOPs, and Decisions folders before answering. Routine chat history is stored as a workspace/user-scoped Growth Operator conversation, not appended to Obsidian. Only an explicitly prepared and confirmed business memory is written to the vault. Jarvis never reads or writes outside the configured vault path or for a workspace other than `OBSIDIAN_WORKSPACE_ID`. Disable it at any time with `JARVIS_OBSIDIAN_MEMORY_ENABLED=false`.
 
 Do not add `JARVIS_OBSIDIAN_MEMORY_PATH`; the application uses `OBSIDIAN_VAULT_PATH` only.
 

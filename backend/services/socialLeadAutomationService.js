@@ -8,6 +8,7 @@ const CrmActivity = require("../models/CrmActivity");
 const ContentBrief = require("../models/ContentBrief");
 const ConversationMessage = require("../models/ConversationMessage");
 const { ingestProviderMessage } = require("./conversations/conversationIngestionService");
+const backgroundSocialAiService = require("./backgroundSocialAiService");
 
 const models = { Contact, SocialIdentity, SocialAutomation, SocialProviderEvent, TrackedLink, CrmActivity, ContentBrief, ConversationMessage };
 const SUPPORTED_TRIGGERS = Object.freeze({
@@ -174,7 +175,8 @@ async function ingestSocialEvent(event, options = {}) {
   reserved.record.contactId = contact._id; reserved.record.socialIdentityId = identity._id; reserved.record.automationId = automation?._id || null; await reserved.record.save();
   reserved.record.reply = { status: responseTemplate && event.replyPolicy && event.replyPolicy !== "none" ? "pending" : "none", body: responseTemplate, policy: event.replyPolicy || "none", assetId: event.assetId, recipientId: event.providerUserId, commentId: event.sourceMetadata?.commentId || "", connectionProvider: event.connectionProvider || "meta", threadId: conversation?.thread?._id || null };
   reserved.record.processingStatus = "processed"; reserved.record.processedAt = new Date(); await reserved.record.save();
-  return { duplicate: false, contact, identity, automation, conversation, responseTemplate, event: reserved.record };
+  const backgroundAi = await (options.backgroundSocialAi || backgroundSocialAiService.processInbound)({ workspaceId: reserved.record.workspaceId, providerEventId: reserved.record.providerEventId, conversation, automation }).catch(() => ({ skippedReason: "background_analysis_failed_safely" }));
+  return { duplicate: false, contact, identity, automation, conversation, responseTemplate, backgroundAi, event: reserved.record };
   } catch (error) {
     reserved.record.processingStatus = "failed"; reserved.record.lastError = "Social event processing failed; delivery can be retried"; await reserved.record.save();
     throw error;
