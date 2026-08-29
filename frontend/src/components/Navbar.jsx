@@ -16,7 +16,8 @@ export default function Navbar({ onMenuClick }) {
   const [createOpen, setCreateOpen] = useState(false);
   const createRef = useRef(null);
   const { campaigns, selected, selectedId, setSelectedId } = useInitiative();
-  const { session } = useAuth();
+  const { session, workspaces, switchWorkspace } = useAuth();
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const isCoach = isCoachOnly(session);
   const pageKey = location.pathname.split("/")[1] || "command-center";
   const pageMeta = {
@@ -46,6 +47,12 @@ export default function Navbar({ onMenuClick }) {
   const changeInitiative = (value) => {
     setSelectedId(value);
     if (value !== "all") navigate(`/campaigns/${value}`);
+  };
+  const changeWorkspace = async (workspaceId) => {
+    if (!workspaceId || workspaceId === String(session?.workspace?.id)) return;
+    setSwitchingWorkspace(true);
+    try { await switchWorkspace(workspaceId); window.location.assign("/command-center"); }
+    finally { setSwitchingWorkspace(false); }
   };
 
   useEffect(() => {
@@ -101,7 +108,7 @@ export default function Navbar({ onMenuClick }) {
           <p className="navbar__eyebrow"><span>{workspaceName}</span><i />{pageMeta[0]}</p>
           <h1 className="navbar__title">{pageMeta[1]}</h1>
         </div>
-        <div className="navbar__mobile-brand"><strong>Growth Operator</strong><span>{pageMeta[0]}</span></div>
+        <div className="navbar__mobile-brand"><strong>{session?.workspace?.name || "Growth Operator"}</strong><span>{pageMeta[0]}</span></div>
         {!isCoach ? <label className="initiative-switcher">
           <span>Current campaign</span>
           <select value={selectedId} onChange={(event) => changeInitiative(event.target.value)}>
@@ -117,6 +124,10 @@ export default function Navbar({ onMenuClick }) {
         </label> : null}
       </div>
 
+      <label className="workspace-switcher">
+        <span>Current workspace</span>
+        {workspaces.length > 1 ? <select aria-label="Current workspace" disabled={switchingWorkspace} value={session?.workspace?.id || ""} onChange={(event) => changeWorkspace(event.target.value)}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select> : <strong>{session?.workspace?.name || "Workspace"}</strong>}
+      </label>
       {!isCoach ? <div className="navbar__actions">
         <button className="navbar__search" type="button" aria-label="Search workspace" onClick={() => navigate("/crm/contacts?focus=search")}>
           <FiSearch /><span>Search workspace</span><kbd>⌘ K</kbd>

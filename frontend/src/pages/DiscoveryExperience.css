@@ -148,6 +148,13 @@
 .published-email-note { background: #fff3d9; border-radius: 7px; color: #76551d; font-size: .7rem; margin-top: .5rem; padding: .5rem; }
 .intent-signal-actions { align-self: stretch; display: flex; flex-direction: column; gap: .45rem; justify-content: center; }
 .intent-signal-actions > small { color: var(--text-muted); font-size: .68rem; line-height: 1.4; }
+.biggerpockets-policy { background: #fff8e8; border: 1px solid #ead49e; border-radius: 10px; padding: .8rem; }
+.biggerpockets-policy strong { color: #7b4d00; }
+.biggerpockets-response { display: grid; gap: .75rem; }
+.biggerpockets-response > strong { color: #7b4d00; }
+.biggerpockets-response p, .biggerpockets-response small { color: var(--text-muted); line-height: 1.5; margin: 0; }
+.biggerpockets-response label { display: grid; gap: .4rem; }
+.biggerpockets-response textarea { min-height: 210px; resize: vertical; }
 .intent-progress { grid-template-columns: repeat(auto-fit,minmax(105px,1fr)); }
 .identity-research-result { background: #edf5f1; border-left: 3px solid #28765f; border-radius: 8px; display: grid; gap: .3rem; padding: .65rem; }
 .identity-research-result.is-no_person_found { background: #f7f1e4; border-left-color: #b47b24; }

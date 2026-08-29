@@ -28,6 +28,7 @@ const { researchAudienceForSignal } = require("../services/researchAudienceTempl
 const { researchPublicWebsite } = require("../services/publicWebsiteResearchService");
 const { RESEARCH_MONITOR_PRESETS } = require("../services/researchMonitorPresets");
 const leadQualificationService = require("../services/leadQualificationService");
+const biggerPocketsPolicy = require("../services/biggerPocketsEngagementPolicy");
 
 const router = express.Router();
 const MONITOR_SOURCE_DEFAULTS = {
@@ -216,7 +217,7 @@ router.get("/research/signals", async (req, res) => {
     if (signal.nextStep === "verify_email") counts.needsEmailVerification += 1;
     if (["create_draft", "review_draft", "ready_in_outreach"].includes(signal.nextStep)) counts.contactReady += 1;
     return counts;
-  }, { total: 0, person: 0, community_partner: 0, organization: 0, intent_signal: 0, new: 0, qualified: 0, converted: 0, needsIdentity: 0, needsEmailVerification: 0, contactReady: 0 });
+  }, { total: 0, person: 0, community_partner: 0, organization: 0, intent_signal: 0, public_engagement: 0, new: 0, qualified: 0, converted: 0, needsIdentity: 0, needsEmailVerification: 0, contactReady: 0 });
   return res.json({ success: true, signals: categorizedSignals, summary, automaticallyRejected: rejected.length });
 });
 
@@ -245,6 +246,7 @@ function supportedPublicPerson(person) {
 const COMMUNITY_SOURCES = new Set(["linkedin_public", "facebook_public", "meetup_public", "community_directories"]);
 
 function opportunityKind(signal, monitor) {
+  if (biggerPocketsPolicy.isBiggerPocketsSignal(signal)) return "public_engagement";
   if (supportedPublicPerson({ name: signal.authorName }) || (signal.people || []).some(supportedPublicPerson)) return "person";
   if (monitor?.monitorType === "community_partner" || COMMUNITY_SOURCES.has(signal.source)) return "community_partner";
   if (signal.organizationName || signal.organizationDomain) return "organization";
@@ -252,6 +254,7 @@ function opportunityKind(signal, monitor) {
 }
 
 function opportunityNextStep(signal, kind, crmContact, drafts = []) {
+  if (kind === "public_engagement") return "manual_public_response";
   if (signal.status === "new") return "review_fit";
   if (kind !== "person" && signal.identityResolution?.status !== "supported") return "identify_person";
   if (!crmContact) return "add_to_crm";
@@ -264,6 +267,8 @@ function opportunityNextStep(signal, kind, crmContact, drafts = []) {
 router.post("/research/signals/:signalId/identity-research", async (req, res) => {
   const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
   if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
+  try { biggerPocketsPolicy.assertNoBiggerPocketsSolicitation(signal, "Author enrichment for solicitation"); }
+  catch (error) { return res.status(403).json({ success: false, error: error.message, code: error.code }); }
 
   const selected = req.body?.selectedPerson;
   if (selected) {
@@ -348,9 +353,11 @@ router.post("/research/signals/:signalId/identity-research", async (req, res) =>
 router.post("/research/signals/:signalId/convert", async (req, res) => {
   try {
     const evaluated = await leadQualificationService.evaluate({ workspaceId: req.auth.workspaceId, userId: req.auth.user?._id, signalId: req.params.signalId, auth: req.auth, useAi: false });
-    const qualification = evaluated.signal.status === "qualified"
+    if (biggerPocketsPolicy.isBiggerPocketsSignal(evaluated.signal) && !biggerPocketsPolicy.validIndependentRelationship(req.body)) return res.status(403).json({ success: false, code: "BIGGERPOCKETS_RELATIONSHIP_EVIDENCE_REQUIRED", error: `${biggerPocketsPolicy.POLICY_MESSAGE} CRM conversion requires documented inbound interest or an independently sourced relationship.` });
+    let qualification = evaluated.signal.status === "qualified"
       ? { ...evaluated.qualification, qualificationStatus: "qualified", warnings: [...new Set([...(evaluated.qualification.warnings || []), "Qualification was confirmed by a human before CRM conversion."])] }
       : evaluated.qualification;
+    if (biggerPocketsPolicy.isBiggerPocketsSignal(evaluated.signal)) qualification = { ...qualification, reasons: [...(qualification.reasons || []), `Relationship basis: ${req.body.relationshipBasis} — ${String(req.body.relationshipNote).trim().slice(0, 1000)}`] };
     const result = await leadQualificationService.converge({ workspaceId: req.auth.workspaceId, userId: req.auth.user?._id, signal: evaluated.signal, qualification, input: req.body || {} });
     return res.status(result.createdOpportunity ? 201 : 200).json({ success: true, contact: result.contact, organization: result.organization, opportunity: result.opportunity, qualification });
   } catch (error) { return res.status(error.code === "LEAD_SIGNAL_NOT_FOUND" ? 404 : 400).json({ success: false, error: error.message || "Unable to create CRM lead." }); }
@@ -375,6 +382,7 @@ router.post("/research/signals/:signalId/email-drafts", async (req, res) => {
   try {
     const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
     if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
+    biggerPocketsPolicy.assertNoBiggerPocketsSolicitation(signal, "Email-draft generation");
     if (!['qualified', 'converted'].includes(signal.status)) return res.status(400).json({ success: false, error: "Save this as a possible lead before creating an email draft." });
     if (!identifiedSignalPersonName(signal)) return res.status(400).json({ success: false, error: "This result identifies a community or organization, not a person. Use Find contact person & email before creating a person-level email draft." });
     const campaign = await Campaign.findById(req.body?.campaignId).populate("eventId");
@@ -414,6 +422,8 @@ router.post("/research/signals/:signalId/email-drafts/:draftId/transfer", async 
   if (draft.status !== "reviewed") return res.status(400).json({ success: false, error: "Review and save the draft before moving it to Outreach." });
   if (!draft.templateAudienceKey || !draft.templateAudienceLabel || !draft.templateVersion) return res.status(400).json({ success: false, error: "This is an older untracked draft. Click Choose another campaign, select the campaign again, and generate a new draft from its approved template." });
   const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId });
+  try { biggerPocketsPolicy.assertNoBiggerPocketsSolicitation(signal || {}, "Outbound sequence transfer"); }
+  catch (error) { return res.status(403).json({ success: false, error: error.message, code: error.code }); }
   if (!signal || !identifiedSignalPersonName(signal)) return res.status(400).json({ success: false, error: "This draft is not linked to a valid identified person. Research a real named contact before moving anything to Outreach." });
   const contact = await Contact.findOne({ sourceProvider: "intent_monitor", providerContactId: String(req.params.signalId) });
   if (!contact) return res.status(400).json({ success: false, error: "This person is not linked to a CRM contact yet. Close this window, click Add researched person to CRM, complete the contact, then reopen this draft." });
@@ -435,6 +445,17 @@ router.post("/research/signals/:signalId/email-drafts/:draftId/transfer", async 
   );
   draft.status = "transferred"; draft.outreachId = outreach._id; await draft.save();
   return res.status(201).json({ success: true, draft, outreach, message: "Draft moved to Outreach as pending review. Nothing was sent." });
+});
+
+router.post("/research/signals/:signalId/public-response-draft", async (req, res) => {
+  const signal = await IntentSignal.findOne({ _id: req.params.signalId, workspaceId: req.auth.workspaceId }).lean();
+  if (!signal) return res.status(404).json({ success: false, error: "Signal not found." });
+  if (!biggerPocketsPolicy.isBiggerPocketsSignal(signal)) return res.status(400).json({ success: false, error: "This public-response policy applies only to BiggerPockets-derived results." });
+  const draft = req.body?.draft === undefined ? biggerPocketsPolicy.publicResponseDraft(signal) : String(req.body.draft || "").trim();
+  if (!draft) return res.status(400).json({ success: false, error: "Enter a useful individualized public response." });
+  const violations = biggerPocketsPolicy.prohibitedPublicResponseContent(draft);
+  if (violations.length) return res.status(400).json({ success: false, code: "BIGGERPOCKETS_PROMOTION_BLOCKED", error: `Remove ${violations.join(", ")} before copying this public response.` });
+  return res.json({ success: true, draft, policy: biggerPocketsPolicy.POLICY_MESSAGE, manualReviewRequired: true, postingSupported: false });
 });
 
 router.post("/research/plan", async (req, res) => {

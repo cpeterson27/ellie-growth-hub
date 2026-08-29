@@ -21,11 +21,46 @@ const {
 const router = express.Router();
 const SESSION_DAYS = 14;
 
+function membershipSummary(membership) {
+  const workspace = membership.workspaceId;
+  return { id: workspace._id, name: workspace.name, slug: workspace.slug, roles: normalizeRoles(membership) };
+}
+
+async function activeMemberships(userId) {
+  const memberships = await WorkspaceMembership.find({ userId, status: "active" })
+    .populate("workspaceId", "name slug status billingStatus rolePermissionTemplates")
+    .sort({ createdAt: 1, _id: 1 });
+  return memberships.filter((membership) => membership.workspaceId?.status === "active" && normalizeRoles(membership).some((role) => ACTIVE_ROLES.includes(role)));
+}
+
+function selectLoginMembership(memberships, requestedWorkspaceId = "") {
+  if (!memberships.length) throw Object.assign(new Error("No active workspace is available for this account"), { code: "NO_ACTIVE_WORKSPACE" });
+  if (!requestedWorkspaceId && memberships.length > 1) throw Object.assign(new Error("Choose a workspace to continue"), { code: "WORKSPACE_SELECTION_REQUIRED", workspaces: memberships.map(membershipSummary) });
+  const membership = requestedWorkspaceId ? memberships.find((item) => String(item.workspaceId._id) === String(requestedWorkspaceId)) : memberships[0];
+  if (!membership) throw Object.assign(new Error("You do not have active access to that workspace"), { code: "WORKSPACE_FORBIDDEN" });
+  return membership;
+}
+
+function freshSessionValues(req, userId, workspaceId) {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const csrfToken = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  return { token, csrfToken, expiresAt, record: { tokenHash: tokenHash(token), csrfToken, userId, workspaceId, expiresAt, userAgent: String(req.headers["user-agent"] || "").slice(0, 500), lastSeenAt: new Date() } };
+}
+
+async function rotateSession({ req, sessionId, userId, workspaceId }, SessionModel = AuthSession) {
+  const values = freshSessionValues(req, userId, workspaceId);
+  const session = await SessionModel.findOneAndUpdate({ _id: sessionId, userId }, { $set: values.record }, { new: true }).select("+csrfToken");
+  return session ? { ...values, session } : null;
+}
+
 router.get("/invitations/:token", async (req, res) => {
   try {
     const WorkspaceInvitation = require("../models/WorkspaceInvitation");
-    const invitation = await WorkspaceInvitation.findOne({ tokenHash: workspaceMemberService.invitationHash(req.params.token), status: "pending", expiresAt: { $gt: new Date() } }).select("name email expiresAt").lean();
-    return invitation ? res.json({ valid: true, name: invitation.name, email: invitation.email, expiresAt: invitation.expiresAt }) : res.status(404).json({ valid: false, error: "This invitation is invalid or has expired" });
+    const invitation = await WorkspaceInvitation.findOne({ tokenHash: workspaceMemberService.invitationHash(req.params.token), status: "pending", expiresAt: { $gt: new Date() } }).select("name email userId workspaceId expiresAt requiresAccountActivation").lean();
+    if (!invitation) return res.status(404).json({ valid: false, error: "This invitation is invalid or has expired" });
+    const hasActiveMembership = await WorkspaceMembership.exists({ userId: invitation.userId, workspaceId: { $ne: invitation.workspaceId }, status: "active" });
+    return res.json({ valid: true, name: invitation.name, email: invitation.email, expiresAt: invitation.expiresAt, requiresAccountActivation: invitation.requiresAccountActivation !== false && !hasActiveMembership });
   } catch (_error) { return res.status(400).json({ valid: false, error: "Unable to verify invitation" }); }
 });
 
@@ -63,32 +98,23 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Email or password is incorrect" });
     }
 
-    const membership = await WorkspaceMembership.findOne({ userId: user._id, status: "active" })
-      .populate("workspaceId", "name slug status billingStatus rolePermissionTemplates");
-    if (!membership?.workspaceId || membership.workspaceId.status !== "active") {
-      return res.status(403).json({ error: "No active workspace is available for this account" });
-    }
-    if (!normalizeRoles(membership).some((role) => ACTIVE_ROLES.includes(role))) {
-      return res.status(403).json({ error: "A valid workspace role is required", code: "ROLE_INVALID" });
+    const memberships = await activeMemberships(user._id);
+    const requestedWorkspaceId = String(req.body?.workspaceId || "");
+    let membership;
+    try { membership = selectLoginMembership(memberships, requestedWorkspaceId); }
+    catch (selectionError) {
+      const status = selectionError.code === "WORKSPACE_SELECTION_REQUIRED" ? 409 : 403;
+      return res.status(status).json({ error: selectionError.message, code: selectionError.code, ...(selectionError.workspaces ? { workspaces: selectionError.workspaces } : {}) });
     }
 
-    const token = crypto.randomBytes(32).toString("base64url");
-    const csrfToken = crypto.randomBytes(32).toString("base64url");
-    const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-    const session = await AuthSession.create({
-      tokenHash: tokenHash(token),
-      csrfToken,
-      userId: user._id,
-      workspaceId: membership.workspaceId._id,
-      expiresAt,
-      userAgent: String(req.headers["user-agent"] || "").slice(0, 500),
-    });
+    const values = freshSessionValues(req, user._id, membership.workspaceId._id);
+    const session = await AuthSession.create(values.record);
 
     user.lastLoginAt = new Date();
     await user.save();
-    res.setHeader("Set-Cookie", sessionCookie(token, expiresAt));
+    res.setHeader("Set-Cookie", sessionCookie(values.token, values.expiresAt));
     req.auth = createAuthContext({ user, workspace: membership.workspaceId, membership, session });
-    res.json({ ...publicSession(req), sessionToken: token });
+    res.json({ ...publicSession(req), sessionToken: values.token });
   } catch (error) {
     console.error("LOGIN ERROR:", error);
     res.status(500).json({ error: "Unable to sign in" });
@@ -96,6 +122,24 @@ router.post("/login", async (req, res) => {
 });
 
 router.get("/session", requireAuth, (req, res) => res.json(publicSession(req)));
+
+router.get("/workspaces", requireAuth, async (req, res) => {
+  const memberships = await activeMemberships(req.auth.userId);
+  res.json({ currentWorkspaceId: req.auth.workspaceId, workspaces: memberships.map(membershipSummary) });
+});
+
+router.post("/switch-workspace", requireAuth, async (req, res) => {
+  try {
+    const workspaceId = String(req.body?.workspaceId || "");
+    const membership = await WorkspaceMembership.findOne({ userId: req.auth.userId, workspaceId, status: "active" }).populate("workspaceId", "name slug status billingStatus rolePermissionTemplates");
+    if (!membership?.workspaceId || membership.workspaceId.status !== "active" || !normalizeRoles(membership).some((role) => ACTIVE_ROLES.includes(role))) return res.status(403).json({ error: "You do not have active access to that workspace", code: "WORKSPACE_FORBIDDEN" });
+    const rotated = await rotateSession({ req, sessionId: req.auth.session._id, userId: req.auth.userId, workspaceId: membership.workspaceId._id });
+    if (!rotated) return res.status(401).json({ error: "Session expired", code: "SESSION_EXPIRED" });
+    res.setHeader("Set-Cookie", sessionCookie(rotated.token, rotated.expiresAt));
+    req.auth = createAuthContext({ user: req.auth.user, workspace: membership.workspaceId, membership, session: rotated.session });
+    return res.json({ ...publicSession(req), sessionToken: rotated.token });
+  } catch (error) { return res.status(400).json({ error: error.message || "Unable to switch workspace" }); }
+});
 
 router.get("/profile", requireAuth, async (req, res) => {
   try { return res.json({ user: await require("../services/userProfileService").load(req.auth) }); }
@@ -159,3 +203,8 @@ router.post("/logout", async (req, res) => {
 });
 
 module.exports = router;
+module.exports.activeMemberships = activeMemberships;
+module.exports.freshSessionValues = freshSessionValues;
+module.exports.membershipSummary = membershipSummary;
+module.exports.rotateSession = rotateSession;
+module.exports.selectLoginMembership = selectLoginMembership;

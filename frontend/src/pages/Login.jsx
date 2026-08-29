@@ -11,6 +11,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [workspaceOptions, setWorkspaceOptions] = useState([]);
+  const [workspaceId, setWorkspaceId] = useState("");
 
   if (session) return <Navigate to={location.state?.from || "/dashboard"} replace />;
 
@@ -19,9 +21,16 @@ export default function Login() {
     setError("");
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(email, password, workspaceId);
       navigate(location.state?.from || "/dashboard", { replace: true });
     } catch (requestError) {
+      if (requestError.response?.data?.code === "WORKSPACE_SELECTION_REQUIRED") {
+        const options = requestError.response.data.workspaces || [];
+        setWorkspaceOptions(options);
+        setWorkspaceId(options[0]?.id || "");
+        setError("Choose the workspace you want to open, then sign in again.");
+        return;
+      }
       setError(requestError.response?.data?.error || "Unable to sign in.");
     } finally {
       setSubmitting(false);
@@ -44,6 +53,12 @@ export default function Login() {
             Password
             <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           </label>
+          {workspaceOptions.length > 1 ? <label>
+            Workspace
+            <select value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} required>
+              {workspaceOptions.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
+            </select>
+          </label> : null}
           {error ? <p className="login-error" role="alert">{error}</p> : null}
           <button type="submit" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
         </form>

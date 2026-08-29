@@ -3,6 +3,7 @@ const Workspace = require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const SocialConnection = require("../models/SocialConnection");
 const { requirePlatformOwner } = require("../middleware/auth");
+const workspaceProvisioningService = require("../services/workspaceProvisioningService");
 
 const router = express.Router();
 const PROVIDERS = ["facebook", "instagram", "linkedin", "tiktok", "x"];
@@ -36,6 +37,15 @@ router.get("/businesses", requirePlatformOwner, async (_req, res) => {
     return { id: workspace._id, name: workspace.name, slug: workspace.slug, status: workspace.status, owner: owner?.userId ? { name: owner.userId.name, email: owner.userId.email } : null, teamMemberCount: team.filter((item) => item.status === "active").length, social: PROVIDERS.map((provider) => connectionSummary(provider, social)), createdAt: workspace.createdAt, updatedAt: workspace.updatedAt };
   });
   res.json({ businesses: data });
+});
+
+router.post("/workspaces", requirePlatformOwner, async (req, res) => {
+  try {
+    const workspace = await workspaceProvisioningService.createWorkspace({ name: req.body?.name, slug: req.body?.slug, ownerUserId: req.auth.userId });
+    return res.status(201).json({ workspace: { id: workspace._id, name: workspace.name, slug: workspace.slug, status: workspace.status, billingStatus: workspace.billingStatus } });
+  } catch (error) {
+    return res.status(error.code === "WORKSPACE_SLUG_EXISTS" ? 409 : 400).json({ error: error.message || "Unable to create workspace", code: error.code });
+  }
 });
 
 module.exports = router;

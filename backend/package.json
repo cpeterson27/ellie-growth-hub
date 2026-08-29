@@ -50,6 +50,7 @@
     "test:market-intelligence": "node test-market-intelligence-boundaries.js",
     "test:monitor-presets": "node test-research-monitor-presets.js",
     "test:acquisition-reliability": "node test-acquisition-reliability.js",
+    "test:biggerpockets-policy": "node test-biggerpockets-engagement-policy.js",
     "test:meetup": "node test-meetup-integration.js",
     "test:coaching-domain": "node test-coaching-domain.js",
     "test:coaching-api-security": "node test-coaching-api-security.js",

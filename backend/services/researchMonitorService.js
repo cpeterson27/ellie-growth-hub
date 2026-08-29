@@ -257,7 +257,7 @@ async function runResearchMonitor(monitorId) {
           { upsert: true, new: true, setDefaultsOnInsert: true },
         );
         found += 1;
-        if (["google_web", "bing_web", "duckduckgo"].includes(signal.source) && signal.organizationDomain && ranking.score >= 55) websiteCandidates.push({ signalId: saved._id, domain: signal.organizationDomain });
+        if (["google_web", "bing_web", "duckduckgo"].includes(signal.source) && signal.organizationDomain && ranking.score >= 55 && !isBiggerPocketsForumTopicUrl(signal.sourceUrl)) websiteCandidates.push({ signalId: saved._id, domain: signal.organizationDomain });
         if (ranking.score >= 75) await notify(monitor, "high_scoring_lead", "High-scoring lead found", `${saved.title || "A public signal"} scored ${ranking.score}.`, saved._id);
     }
     await activity(monitor, runId, "weak_matches_rejected", `Rejected ${rejected} weak or non-buyer matches.`, rejected);

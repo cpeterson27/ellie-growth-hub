@@ -7,6 +7,7 @@ const workspaceInvitationSchema = new mongoose.Schema({
   email: { type: String, required: true, trim: true, lowercase: true, maxlength: 320 },
   name: { type: String, required: true, trim: true, maxlength: 120 },
   roles: { type: [String], default: [] },
+  requiresAccountActivation: { type: Boolean, default: true },
   tokenHash: { type: String, required: true, select: false },
   status: { type: String, enum: ["draft", "ready", "pending", "accepted", "revoked", "expired"], default: "draft", index: true },
   deliveryStatus: { type: String, enum: ["pending", "sent", "failed"], default: "pending" },
