@@ -203,6 +203,7 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/people/:slug" element={<PublicProfilePage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/data-deletion" element={<DataDeletionPage />} />
             <Route path="/apply" element={<PublicApplication />} />
