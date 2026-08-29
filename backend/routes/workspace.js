@@ -95,12 +95,13 @@ function memberResponse(membership, coachProfile = null, ambassadorProfile = nul
   };
 }
 
-const invitationResponse = (invitation) => invitation ? ({
+const invitationResponse = (invitation, previewVariables = null) => invitation ? ({
   id: invitation._id, status: invitation.status, deliveryStatus: invitation.deliveryStatus,
   roleKey: invitation.roleKey, templateVersion: invitation.templateVersion,
   subject: invitation.subject, body: invitation.body, sentAt: invitation.sentAt,
-  expiresAt: invitation.expiresAt,
+  expiresAt: invitation.expiresAt, ...(previewVariables ? { previewVariables } : {}),
 }) : null;
+const previewVariablesFor = (invitation, workspaceId = invitation.workspaceId) => invitationTemplateService.variables({ workspaceId, name: invitation.name, roles: invitation.roles, inviteLink: "__SECURE_INVITATION_PREVIEW__", invitedByUserId: invitation.invitedBy });
 
 const ROLE_DESCRIPTIONS = Object.freeze({
   owner: "Full workspace access, including team administration, workspace settings, integrations, security, CRM, coaching, communications, automation, and analytics.",
@@ -142,6 +143,7 @@ router.delete("/role-permissions/:role", requireCapability("team.manage"), async
 router.get("/invitation-templates", requireCapability("team.view", "team.manage"), async (req, res) => res.json({ templates: await invitationTemplateService.list(req.auth.workspaceId) }));
 router.put("/invitation-templates/:roleKey", requireCapability("team.manage"), async (req, res) => { try { res.json({ template: await invitationTemplateService.save({ workspaceId: req.auth.workspaceId, roleKey: req.params.roleKey, subject: req.body?.subject, body: req.body?.body, actorUserId: req.auth.user._id }) }); } catch (error) { res.status(400).json({ error: error.message }); } });
 router.post("/invitation-templates/:roleKey/reset", requireCapability("team.manage"), async (req, res) => { try { res.json({ template: await invitationTemplateService.reset({ workspaceId: req.auth.workspaceId, roleKey: req.params.roleKey }) }); } catch (error) { res.status(400).json({ error: error.message }); } });
+router.get("/invitations/:id/preview", requireCapability("team.manage"), async (req, res) => { try { const invitation = await WorkspaceInvitation.findOne({ _id: req.params.id, workspaceId: req.auth.workspaceId }).lean(); if (!invitation) return res.status(404).json({ error: "Invitation not found" }); return res.json({ invitation: invitationResponse(invitation, await previewVariablesFor(invitation, req.auth.workspaceId)) }); } catch (error) { return res.status(400).json({ error: error.message, code: error.code }); } });
 
 router.get("/members", requireCapability("team.view", "team.manage"), async (req, res) => {
   const memberships = await WorkspaceMembership.find({ workspaceId: req.auth.workspaceId })
@@ -164,17 +166,22 @@ router.post("/members", requireCapability("team.manage"), async (req, res) => {
     const roles = [...new Set((Array.isArray(req.body?.roles) ? req.body.roles : [req.body?.role || "member"]).filter((role) => ROLE_DEFAULTS[role]))];
     if (!roles.length) roles.push("member");
     validateMembershipChange({ currentRoles: [], requestedRoles: roles, actorRoles: req.auth.roles || [req.auth.role].filter(Boolean) });
+    const requestedName = String(req.body?.name || [req.body?.firstName, req.body?.lastName].filter(Boolean).join(" ")).trim();
+    await invitationTemplateService.variables({ workspaceId: req.auth.workspaceId, name: requestedName, roles, inviteLink: "__SECURE_INVITATION_PREVIEW__", invitedByUserId: req.auth.user._id });
     if (roles.includes("ambassador")) {
       const data = await workspaceMemberService.onboardAmbassador({ ...req.body, roles, workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id });
-      return res.status(data.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...data.membership.toObject(), userId: data.user }, null, data.ambassadorProfile, data.invitation), invitation: invitationResponse(data.invitation), alreadyActive: data.alreadyActive });
+      const previewVariables = data.invitation ? await previewVariablesFor(data.invitation, req.auth.workspaceId) : null;
+      return res.status(data.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...data.membership.toObject(), userId: data.user }, null, data.ambassadorProfile, data.invitation), invitation: invitationResponse(data.invitation, previewVariables), alreadyActive: data.alreadyActive });
     }
     if (roles.includes("coach") && (req.body?.timezone !== undefined || req.body?.capacity !== undefined || req.body?.programIds !== undefined)) {
       const data = await workspaceMemberService.onboardCoach({ ...req.body, roles, workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id });
-      return res.status(data.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...data.membership.toObject(), userId: data.user }, data.coachProfile, null, data.invitation), invitation: invitationResponse(data.invitation), alreadyActive: data.alreadyActive });
+      const previewVariables = data.invitation ? await previewVariablesFor(data.invitation, req.auth.workspaceId) : null;
+      return res.status(data.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...data.membership.toObject(), userId: data.user }, data.coachProfile, null, data.invitation), invitation: invitationResponse(data.invitation, previewVariables), alreadyActive: data.alreadyActive });
     }
     const result = await workspaceMemberService.inviteMember({ workspaceId: req.auth.workspaceId, actorUserId: req.auth.user._id, name: req.body?.name, firstName: req.body?.firstName, lastName: req.body?.lastName, phone: req.body?.phone, email: req.body?.email, roles });
     const profile = roles.includes("coach") ? await CoachProfile.findOne({ workspaceId: req.auth.workspaceId, userId: result.user._id }) : null;
-    res.status(result.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...result.membership.toObject(), userId: result.user }, profile, null, result.invitation), invitation: invitationResponse(result.invitation), alreadyActive: result.alreadyActive });
+    const previewVariables = result.invitation ? await previewVariablesFor(result.invitation, req.auth.workspaceId) : null;
+    res.status(result.alreadyActive ? 200 : 201).json({ member: memberResponse({ ...result.membership.toObject(), userId: result.user }, profile, null, result.invitation), invitation: invitationResponse(result.invitation, previewVariables), alreadyActive: result.alreadyActive });
   } catch (error) {
     res.status(400).json({ error: error.code === 11000 ? "That email already belongs to an account" : error.message });
   }

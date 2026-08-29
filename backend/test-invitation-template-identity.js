@@ -38,6 +38,9 @@ async function run() {
   assert.equal(saved[0].workspaceId, "ellie");
 
   await assert.rejects(templates.variables({ workspaceId: "missing", name: "Jordan", roles: ["coach"], inviteLink: "x", invitedByUserId: "owner" }, variableModels), (error) => error.code === "INVITATION_BUSINESS_NAME_REQUIRED" && error.message.includes("Organization Profile"));
+  await assert.rejects(templates.variables({ workspaceId: "ellie", name: "", roles: ["coach"], inviteLink: "x", invitedByUserId: "owner" }, variableModels), (error) => error.code === "INVITATION_RECIPIENT_NAME_REQUIRED" && error.message.includes("recipient"));
+  const missingInviterModels = { ...variableModels, WorkspaceConfig: { findOne: () => query({ workspaceName: "Workspace", invitationIdentity: {} }) }, User: { findById: () => query({ name: "" }) } };
+  await assert.rejects(templates.variables({ workspaceId: "ellie", name: "Jordan Taylor", roles: ["ambassador"], inviteLink: "x", invitedByUserId: "owner" }, missingInviterModels), (error) => error.code === "INVITATION_INVITER_NAME_REQUIRED" && error.message.includes("sender name"));
   console.log("Workspace invitation identity, persistence, recipient rendering, secure button, missing-name validation, isolation, and legacy compatibility passed.");
 }
 

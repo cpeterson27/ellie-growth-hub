@@ -107,6 +107,8 @@ export const createWorkspaceMember = (values) =>
   api.post("/workspace/members", values).then((res) => res.data);
 export const sendWorkspaceInvitation = (id, values = {}) =>
   api.post(`/workspace/invitations/${id}/send`, values).then((res) => res.data);
+export const fetchWorkspaceInvitationPreview = (id) =>
+  api.get(`/workspace/invitations/${id}/preview`).then((res) => res.data.invitation);
 export const cancelWorkspaceInvitation = (id) => api.delete(`/workspace/invitations/${id}`).then((res) => res.data);
 export const fetchInvitationTemplates = () =>
   api.get("/workspace/invitation-templates").then((res) => res.data.templates);

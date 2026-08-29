@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { insertPersonalization } from "./src/utils/invitationTemplateTokens.js";
+import { insertPersonalization, invitationPreviewParts } from "./src/utils/invitationTemplateTokens.js";
 
 const inserted = insertPersonalization("Hello , welcome", "First name", 6, 6);
 assert.equal(inserted.value, "Hello [First name], welcome");
 assert.equal(inserted.cursor, 18);
 const replaced = insertPersonalization("Before selected after", "Business name", 7, 15);
 assert.equal(replaced.value, "Before [Business name] after");
+const previewVariables = { firstName: "Ellie", displayName: "Ellie Baxter", role: "Brand Ambassador", workspaceName: "Ellie’s Coaching", invitedBy: "Cassandra Peterson" };
+const preview = invitationPreviewParts("Hi [First name] / [Full name] / [Role] / [Business name] / [Invited by] / [Secure invitation button]", previewVariables);
+assert.equal(preview.filter((part) => part.type === "button").length, 1);
+assert.equal(preview.filter((part) => part.type === "text").map((part) => part.value).join(""), "Hi Ellie / Ellie Baxter / Brand Ambassador / Ellie’s Coaching / Cassandra Peterson / ");
 
 const component = fs.readFileSync(new URL("src/components/InvitationTemplates.jsx", import.meta.url), "utf8");
 assert(component.includes('useRef(null)'));
@@ -17,4 +21,11 @@ assert(component.includes('setSamples({ ...samples'));
 assert(!component.includes('workspaceName: "Your business"'));
 assert(!component.includes('body: `${draft.body}'));
 assert(component.includes('fetchWorkspaceConfig()'));
+const team = fs.readFileSync(new URL("src/components/TeamAccess.jsx", import.meta.url), "utf8");
+assert(team.includes("ActualInvitationPreview"));
+assert(team.includes("preview.previewVariables"));
+assert(team.includes("fetchWorkspaceInvitationPreview"));
+assert(!team.includes('replace(/{{firstName}}'));
+assert(!team.includes('"your workspace"'));
+assert(!team.includes('"Workspace administrator"'));
 console.log("Invitation editor cursor insertion, isolated preview samples, and workspace identity UI checks passed.");
