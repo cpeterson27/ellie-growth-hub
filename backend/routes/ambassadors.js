@@ -4,6 +4,7 @@ const service = require("../services/ambassadorService");
 const workspaceMemberService = require("../services/workspaceMemberService");
 const welcomeService = require("../services/ambassadorWelcomeService");
 const contentTasks = require("../services/ambassadorContentService");
+const referralIdentity = require("../services/ambassadorReferralIdentityService");
 const CrmActivity = require("../models/CrmActivity");
 const InAppNotification = require("../models/InAppNotification");
 const { requireCapability } = require("../middleware/auth");
@@ -27,12 +28,13 @@ router.get("/me/referrals", asyncRoute(async (req, res) => { const profile = awa
 router.get("/me/payouts", asyncRoute(async (req, res) => { const profile = await service.ownProfile({ workspaceId: req.auth.workspaceId, userId: actorId(req) }); res.json({ success: true, data: await service.payouts({ workspaceId: req.auth.workspaceId, ambassadorProfileId: profile._id }) }); }));
 router.get("/", requireCapability("ambassadors.view", "ambassadors.manage"), asyncRoute(async (req, res) => {
   const profiles = await AmbassadorProfile.find({ workspaceId: req.auth.workspaceId }).populate("userId", "name email lastLoginAt avatarUrl").sort({ displayName: 1 }).lean();
-  res.json({ success: true, data: profiles.map((profile) => ({ ...profile, displayName: profile.userId?.name || profile.displayName })) });
+  res.json({ success: true, data: profiles.map((profile) => ({ ...profile, displayName: profile.userId?.name || profile.displayName, referralUrl: referralIdentity.referralUrl(profile.referralSlug || profile.referralCode) })) });
 }));
 router.post("/", admin, asyncRoute(async (req, res) => { const data = await workspaceMemberService.onboardAmbassador({ ...req.body, workspaceId: req.auth.workspaceId, actorUserId: actorId(req) }); const lifecycle = data.membership.status === "active" ? "ambassador_profile_active" : "invite_ready"; res.status(data.alreadyActive ? 200 : 201).json({ success: true, data: { profile: data.ambassadorProfile, lifecycle, invitation: data.invitation ? { id: data.invitation._id, status: data.invitation.status, deliveryStatus: data.invitation.deliveryStatus, roleKey: data.invitation.roleKey, templateVersion: data.invitation.templateVersion, subject: data.invitation.subject, body: data.invitation.body, expiresAt: data.invitation.expiresAt } : null } }); }));
 router.get("/welcome-template", admin, asyncRoute(async (req, res) => res.json({ success: true, data: await welcomeService.getTemplate(req.auth.workspaceId) })));
 router.put("/welcome-template", admin, asyncRoute(async (req, res) => res.json({ success: true, data: await welcomeService.saveTemplate({ workspaceId: req.auth.workspaceId, input: req.body || {}, userId: actorId(req) }) })));
 router.post("/:id/welcome-content", admin, asyncRoute(async (req, res) => res.status(201).json({ success: true, data: await welcomeService.generate({ workspaceId: req.auth.workspaceId, ambassadorProfileId: req.params.id, userId: actorId(req) }) })));
+router.patch("/:id/referral-identity", admin, asyncRoute(async (req, res) => res.json({ success: true, data: await referralIdentity.updateIdentity({ workspaceId: req.auth.workspaceId, profileId: req.params.id, referralCode: req.body?.referralCode, regenerate: req.body?.regenerate === true, actorUserId: actorId(req) }) })));
 router.patch("/:id", admin, asyncRoute(async (req, res) => res.json({ success: true, data: await service.updateProfile({ workspaceId: req.auth.workspaceId, profileId: req.params.id, changes: req.body || {} }) })));
 router.patch("/:id/status", admin, asyncRoute(async (req, res) => res.json({ success: true, data: await service.setStatus({ workspaceId: req.auth.workspaceId, profileId: req.params.id, status: req.body?.status }) })));
 router.get("/:id/referrals", requireCapability("ambassadors.view", "ambassadors.manage"), asyncRoute(async (req, res) => res.json({ success: true, data: await service.referrals({ workspaceId: req.auth.workspaceId, ambassadorProfileId: req.params.id }) })));

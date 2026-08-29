@@ -125,6 +125,7 @@ export const saveWorkspaceRolePermissions = (role, permissions) =>
 export const resetWorkspaceRolePermissions = (role) =>
   api.delete(`/workspace/role-permissions/${role}`).then((res) => res.data);
 export const fetchPlatformBusinesses = () => api.get("/platform/businesses").then((res) => res.data.businesses);
+export const createPlatformWorkspace = (values) => api.post("/platform/workspaces", values).then((res) => res.data.workspace);
 export const fetchLaunchReadiness = () => api.get("/workspace/readiness").then((res) => res.data.data);
 export const fetchPublicSite = () => api.get("/public/site").then((res) => res.data.data);
 export const fetchPublicProgram = (slug) => api.get(`/public/programs/${slug}`).then((res) => res.data.data);
@@ -181,6 +182,8 @@ export const generateAmbassadorWelcomeContent = (id) => api.post(`/ambassadors/$
 export const fetchAmbassadorReferrals = (id) => api.get(`/ambassadors/${id}/referrals`).then((res) => res.data.data);
 export const fetchAmbassadorPayouts = (id) => api.get(`/ambassadors/${id}/payouts`).then((res) => res.data.data);
 export const updateAmbassadorStatus = (id, status) => api.patch(`/ambassadors/${id}/status`, { status }).then((res) => res.data.data);
+export const updateAmbassadorProfile = (id, values) => api.patch(`/ambassadors/${id}`, values).then((res) => res.data.data);
+export const updateAmbassadorReferralIdentity = (id, values) => api.patch(`/ambassadors/${id}/referral-identity`, values).then((res) => res.data.data);
 export const updateAmbassadorReferralState = (id, state) => api.patch(`/ambassadors/referrals/${id}/state`, { state }).then((res) => res.data.data);
 export const createAmbassadorPayout = (values) => api.post("/ambassadors/payouts", values).then((res) => res.data.data);
 export const updateAmbassadorPayoutStatus = (id, status, notes = "") => api.patch(`/ambassadors/payouts/${id}/status`, { status, notes }).then((res) => res.data.data);
@@ -618,6 +621,9 @@ export const researchIntentSignalIdentity = (signalId, payload = {}) =>
 
 export const convertIntentSignal = (signalId, payload = {}) =>
   api.post(`/audience/research/signals/${signalId}/convert`, payload).then((res) => res.data);
+
+export const generateBiggerPocketsPublicResponse = (signalId, draft) =>
+  api.post(`/audience/research/signals/${signalId}/public-response-draft`, draft === undefined ? {} : { draft }).then((res) => res.data);
 
 export const generateIntentEmailDraft = (signalId, campaignId) =>
   api.post(`/audience/research/signals/${signalId}/email-drafts`, { campaignId }).then((res) => res.data);

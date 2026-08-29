@@ -14,6 +14,10 @@ const workspaceConfigSchema = new mongoose.Schema({
   addressCountry: { type: String, default: "", trim: true, maxlength: 100 },
   websiteUrl: { type: String, default: "", trim: true, maxlength: 300 },
   organizationLogoUrl: { type: String, default: "", trim: true, maxlength: 600 },
+  invitationIdentity: {
+    senderName: { type: String, default: "", trim: true, maxlength: 120 },
+    replyToEmail: { type: String, default: "", trim: true, lowercase: true, maxlength: 320 },
+  },
   branding: {
     logoUrl: { type: String, default: "", maxlength: 1000 }, faviconUrl: { type: String, default: "", maxlength: 1000 },
     primaryColor: { type: String, default: "#173f36" }, accentColor: { type: String, default: "#a8d65e" },

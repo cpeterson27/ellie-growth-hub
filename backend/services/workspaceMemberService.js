@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const User = require("../models/User");
 const Workspace = require("../models/Workspace");
+const WorkspaceConfig = require("../models/WorkspaceConfig");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const WorkspaceInvitation = require("../models/WorkspaceInvitation");
 const CoachProfile = require("../models/CoachProfile");
@@ -9,10 +10,11 @@ const AmbassadorProfile = require("../models/AmbassadorProfile");
 const CrmActivity = require("../models/CrmActivity");
 const integrationHub = require("./integrationHub");
 const invitationTemplateService = require("./invitationTemplateService");
+const ambassadorReferralIdentityService = require("./ambassadorReferralIdentityService");
 const { hashPassword } = require("../utils/passwords");
 const { legacyRoleFor, normalizeRoles } = require("../authorization/capabilities");
 
-const dependencies = { User, Workspace, WorkspaceMembership, WorkspaceInvitation, CoachProfile, CoachingProgram, AmbassadorProfile, CrmActivity, integrationHub, invitationTemplateService };
+const dependencies = { User, Workspace, WorkspaceConfig, WorkspaceMembership, WorkspaceInvitation, CoachProfile, CoachingProgram, AmbassadorProfile, CrmActivity, integrationHub, invitationTemplateService };
 const INVITATION_DAYS = 7;
 
 async function requireOwnerActor(input, models) {
@@ -53,7 +55,9 @@ async function findOrCreateUser({ name, email, firstName, lastName, phone }, mod
   }
 }
 
-async function deliverInvitation({ invitation, token = crypto.randomBytes(32).toString("base64url"), workspaceName, invitedBy = "A workspace administrator" }, models) {
+async function deliverInvitation({ invitation, token = crypto.randomBytes(32).toString("base64url"), workspaceName, invitedBy = "", replyToEmail = "" }, models) {
+  workspaceName = String(workspaceName || "").trim();
+  if (!workspaceName) throw Object.assign(new Error("Set the Business/display name in Settings → Organization Profile before sending invitations."), { code: "INVITATION_BUSINESS_NAME_REQUIRED" });
   const acceptUrl = `${publicFrontendUrl()}/accept-invitation/${encodeURIComponent(token)}`;
   const vars = { firstName: invitation.name.split(/\s+/)[0], displayName: invitation.name, role: invitation.roleKey === "ambassador" ? "Brand Ambassador" : invitation.roleKey === "closer" ? "Closer / Sales" : invitation.roleKey === "coach" ? "Coach" : invitation.roles[0] || "Team Member", workspaceName, inviteLink: acceptUrl, invitedBy };
   const rendered = invitationTemplateService.render({ subject: invitation.subject, body: invitation.body }, vars);
@@ -65,7 +69,8 @@ async function deliverInvitation({ invitation, token = crypto.randomBytes(32).to
       to: invitation.email,
       subject: rendered.subject,
       text: rendered.body,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6">${rendered.body.split("\n").map((line) => `<p>${line.replace(/[<>&"]/g, "")}</p>`).join("")}</div>`,
+      html: rendered.html,
+      ...(replyToEmail ? { replyTo: replyToEmail } : {}),
     });
     invitation.deliveryStatus = "sent";
     invitation.status = "pending"; invitation.sentAt = new Date();
@@ -92,9 +97,10 @@ async function inviteMember(input, models = dependencies) {
   const roles = [...new Set((input.roles || []).filter((role) => ["owner", "admin", "coach", "closer", "ambassador", "member", "viewer"].includes(role)))];
   if (!roles.length) roles.push("member");
   if (roles.includes("owner")) await requireOwnerActor(input, models);
-  const { user } = await findOrCreateUser({ ...identity, email }, models);
+  const { user, created: userCreated } = await findOrCreateUser({ ...identity, email }, models);
   name = user.name || name;
   const existing = await models.WorkspaceMembership.findOne({ workspaceId: input.workspaceId, userId: user._id });
+  const establishedElsewhere = !userCreated && Boolean(models.WorkspaceMembership.exists && await models.WorkspaceMembership.exists({ userId: user._id, status: "active", ...(existing?._id ? { _id: { $ne: existing._id } } : {}) }));
   if (existing && normalizeRoles(existing).includes("owner")) await requireOwnerActor(input, models);
   // Reuse established global identity. Only fill missing fields for an existing
   // membership in this workspace; never edit a foreign workspace's user.
@@ -124,13 +130,17 @@ async function inviteMember(input, models = dependencies) {
   const template = input.invitationSubject && input.invitationBody ? { subject: input.invitationSubject, body: input.invitationBody, version: input.templateVersion || 1 } : models.invitationTemplateService ? await models.invitationTemplateService.get(input.workspaceId, key) : { ...invitationTemplateService.defaults[key], version: 1 };
   const invitation = await models.WorkspaceInvitation.findOneAndUpdate(
     { workspaceId: input.workspaceId, email },
-    { $set: { userId: user._id, name, roles, tokenHash: invitationHash(token), status: "ready", deliveryStatus: "pending", deliveryError: "", expiresAt: new Date(Date.now() + INVITATION_DAYS * 86400000), acceptedAt: null, sentAt: null, invitedBy: input.actorUserId, roleKey: key, templateVersion: template.version || 1, subject: template.subject, body: template.body, renderedSubject: "", renderedBody: "" } },
+    { $set: { userId: user._id, name, roles, requiresAccountActivation: userCreated || !establishedElsewhere, tokenHash: invitationHash(token), status: "ready", deliveryStatus: "pending", deliveryError: "", expiresAt: new Date(Date.now() + INVITATION_DAYS * 86400000), acceptedAt: null, sentAt: null, invitedBy: input.actorUserId, roleKey: key, templateVersion: template.version || 1, subject: template.subject, body: template.body, renderedSubject: "", renderedBody: "" } },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
   let delivery = null;
   if (input.deliverInvitation === true) {
-    const workspace = await models.Workspace.findById(input.workspaceId).select("name").lean();
-    delivery = await deliverInvitation({ invitation, token, workspaceName: workspace?.name || "Growth Operator" }, models);
+    const [workspace, config, inviter] = await Promise.all([
+      models.Workspace.findById(input.workspaceId).select("name").lean(),
+      models.WorkspaceConfig?.findOne ? models.WorkspaceConfig.findOne({ workspaceId: input.workspaceId, key: "primary" }).select("workspaceName invitationIdentity").lean() : null,
+      models.User.findById(input.actorUserId).select("name").lean(),
+    ]);
+    delivery = await deliverInvitation({ invitation, token, workspaceName: config?.workspaceName || workspace?.name, invitedBy: config?.invitationIdentity?.senderName || inviter?.name, replyToEmail: config?.invitationIdentity?.replyToEmail || "" }, models);
   }
   return { user, membership, invitation, delivery, invitationToken: token, alreadyActive: false };
 }
@@ -157,15 +167,13 @@ async function onboardCoach(input, models = dependencies) {
   return { ...invited, coachProfile };
 }
 
-function referralCode(value) { return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70); }
 async function availableAmbassadorCode(input, models) {
-  const base = referralCode(input.referralCode || input.name) || `ambassador-${crypto.randomBytes(3).toString("hex")}`;
-  for (let index = 0; index < 20; index += 1) {
-    const candidate = index ? `${base}-${index + 1}` : base;
-    const [ambassador, coach] = await Promise.all([models.AmbassadorProfile.findOne({ workspaceId: input.workspaceId, $or: [{ referralCode: candidate }, { referralSlug: candidate }] }).lean(), models.CoachProfile.findOne({ workspaceId: input.workspaceId, $or: [{ referralCode: candidate }, { referralSlug: candidate }] }).lean()]);
-    if (!ambassador && !coach) return candidate;
+  if (input.referralCode) {
+    const requested = ambassadorReferralIdentityService.validateCustomCode(input.referralCode);
+    if (await ambassadorReferralIdentityService.codeExists({ workspaceId: input.workspaceId, code: requested }, models)) throw Object.assign(new Error("That referral code is already used in this workspace."), { code: "AMBASSADOR_REFERRAL_CODE_CONFLICT" });
+    return requested;
   }
-  throw new Error("Unable to create a unique referral code; enter a different code");
+  return ambassadorReferralIdentityService.availableCode({ workspaceId: input.workspaceId, name: input.name }, models);
 }
 
 async function onboardAmbassador(input, models = dependencies) {
@@ -175,16 +183,23 @@ async function onboardAmbassador(input, models = dependencies) {
   const active = invited.membership.status === "active";
   const values = {
     displayName: invited.user.name, status: active ? "active" : "invited", referralCode: code, referralSlug: code,
-    contactId: input.contactId || existing?.contactId || null, communityUrl: String(input.communityUrl || existing?.communityUrl || "").trim(),
+    contactId: input.contactId || existing?.contactId || null, communityUrl: input.communityUrl === undefined ? existing?.communityUrl || "" : ambassadorReferralIdentityService.validateCommunityUrl(input.communityUrl),
     startDate: input.startDate || existing?.startDate || new Date(), notes: String(input.notes || existing?.notes || "").trim(), deactivatedAt: active ? null : existing?.deactivatedAt || null,
     commissionConfig: { mode: ["manual", "percent", "fixed"].includes(input.commissionConfig?.mode) ? input.commissionConfig.mode : existing?.commissionConfig?.mode || "manual", rateBps: Math.min(10000, Math.max(0, Number(input.commissionConfig?.rateBps ?? existing?.commissionConfig?.rateBps) || 0)), fixedAmountMinor: Math.max(0, Number(input.commissionConfig?.fixedAmountMinor ?? existing?.commissionConfig?.fixedAmountMinor) || 0), currency: String(input.commissionConfig?.currency || existing?.commissionConfig?.currency || "USD").toUpperCase().slice(0, 3) },
   };
-  const ambassadorProfile = await models.AmbassadorProfile.findOneAndUpdate({ workspaceId: input.workspaceId, userId: invited.user._id }, { $set: values }, { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true });
+  let ambassadorProfile;
+  try { ambassadorProfile = await models.AmbassadorProfile.findOneAndUpdate({ workspaceId: input.workspaceId, userId: invited.user._id }, { $set: values }, { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }); }
+  catch (error) {
+    if (error?.code !== 11000 || existing) throw error;
+    const retryCode = await ambassadorReferralIdentityService.availableCode({ workspaceId: input.workspaceId, name: invited.user.name }, models);
+    values.referralCode = retryCode; values.referralSlug = retryCode;
+    ambassadorProfile = await models.AmbassadorProfile.findOneAndUpdate({ workspaceId: input.workspaceId, userId: invited.user._id }, { $set: values }, { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true });
+  }
   if (models.CrmActivity) await models.CrmActivity.create({ workspaceId: input.workspaceId, type: "system", source: "crm", title: existing ? "Ambassador onboarding updated" : "Ambassador invitation prepared", createdBy: input.actorUserId, metadata: { eventType: existing ? "ambassador.onboarding.updated" : "ambassador.added", ambassadorProfileId: ambassadorProfile._id, userId: invited.user._id, invitationId: invited.invitation?._id || null } });
   return { ...invited, ambassadorProfile };
 }
 
-async function sendInvitation({ workspaceId, invitationId, subject, body, actorUserId }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (invitation.roles?.includes("owner")) await requireOwnerActor({ workspaceId, actorUserId }, models); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.User.findById(invitation.invitedBy).select("name").lean()]); const delivery = await deliverInvitation({ invitation, workspaceName: workspace?.name || "Growth Operator", invitedBy: inviter?.name || "A workspace administrator" }, models); if (delivery.deliveryStatus !== "sent") { const error = new Error("Invitation email could not be sent. Check the email connection and try again."); error.code = "INVITATION_DELIVERY_FAILED"; throw error; } return delivery; }
+async function sendInvitation({ workspaceId, invitationId, subject, body, actorUserId }, models = dependencies) { const invitation = await models.WorkspaceInvitation.findOne({ _id: invitationId, workspaceId }); if (!invitation || invitation.status === "accepted" || invitation.status === "revoked") throw new Error("Invitation is not available to send"); if (invitation.roles?.includes("owner")) await requireOwnerActor({ workspaceId, actorUserId }, models); if (subject !== undefined) invitation.subject = String(subject).trim().slice(0, 300); if (body !== undefined) invitation.body = String(body).slice(0, 10000); if (!invitation.subject || !invitation.body) throw new Error("Invitation subject and message are required"); const [workspace, config, inviter] = await Promise.all([models.Workspace.findById(workspaceId).select("name").lean(), models.WorkspaceConfig?.findOne ? models.WorkspaceConfig.findOne({ workspaceId, key: "primary" }).select("workspaceName invitationIdentity").lean() : null, models.User.findById(invitation.invitedBy).select("name").lean()]); const delivery = await deliverInvitation({ invitation, workspaceName: config?.workspaceName || workspace?.name, invitedBy: config?.invitationIdentity?.senderName || inviter?.name, replyToEmail: config?.invitationIdentity?.replyToEmail || "" }, models); if (delivery.deliveryStatus !== "sent") { const error = new Error("Invitation email could not be sent. Check the email connection and try again."); error.code = "INVITATION_DELIVERY_FAILED"; throw error; } return delivery; }
 
 async function removeMember({ workspaceId, membershipId, actorUserId, actorRoles = [] }, models = dependencies) {
   const membership = await models.WorkspaceMembership.findOne({ _id: membershipId, workspaceId });
@@ -210,8 +225,10 @@ async function acceptInvitation({ token, password, name, firstName, lastName, ph
   const user = await models.User.findById(invitation.userId).select("+passwordHash");
   const membership = await models.WorkspaceMembership.findOne({ workspaceId: invitation.workspaceId, userId: invitation.userId });
   if (!user || !membership || membership.status !== "invited") { const error = new Error("This invitation is no longer available"); error.code = "INVITATION_INVALID"; throw error; }
+  const hasActiveMembership = Boolean(models.WorkspaceMembership.exists && await models.WorkspaceMembership.exists({ userId: user._id, status: "active", _id: { $ne: membership._id } }));
+  const requiresAccountActivation = invitation.requiresAccountActivation !== false && !hasActiveMembership;
   const identity = personIdentity({ name: name || invitation.name || user.name, firstName, lastName, phone: phone === undefined ? user.phone : phone });
-  user.passwordHash = await hashPassword(password);
+  if (requiresAccountActivation) user.passwordHash = await hashPassword(password);
   Object.assign(user, identity);
   user.status = "active";
   await user.save();

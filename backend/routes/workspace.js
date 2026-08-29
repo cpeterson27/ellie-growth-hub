@@ -36,12 +36,16 @@ router.get("/", async (_req, res) => {
     addressCountry: config.addressCountry,
     websiteUrl: config.websiteUrl,
     organizationLogoUrl: config.organizationLogoUrl,
+    invitationIdentity: config.invitationIdentity || { senderName: "", replyToEmail: "" },
   });
 });
 
 router.patch("/", async (req, res) => {
   const workspaceName = String(req.body?.workspaceName || "").trim();
   if (workspaceName.length < 2) return res.status(400).json({ error: "Enter a workspace name." });
+  const invitationSenderName = String(req.body?.invitationIdentity?.senderName || "").trim();
+  const invitationReplyToEmail = String(req.body?.invitationIdentity?.replyToEmail || "").trim().toLowerCase();
+  if (invitationReplyToEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invitationReplyToEmail)) return res.status(400).json({ error: "Enter a valid invitation reply-to email." });
   const config = await WorkspaceConfig.findOneAndUpdate(
     { key: "primary" },
     { $set: {
@@ -56,6 +60,7 @@ router.patch("/", async (req, res) => {
       addressCountry: String(req.body?.addressCountry || "").trim(),
       websiteUrl: String(req.body?.websiteUrl || "").trim(),
       organizationLogoUrl: String(req.body?.organizationLogoUrl || "").trim(),
+      invitationIdentity: { senderName: invitationSenderName, replyToEmail: invitationReplyToEmail },
     } },
     { upsert: true, new: true },
   );
@@ -71,6 +76,7 @@ router.patch("/", async (req, res) => {
     addressCountry: config.addressCountry,
     websiteUrl: config.websiteUrl,
     organizationLogoUrl: config.organizationLogoUrl,
+    invitationIdentity: config.invitationIdentity || { senderName: "", replyToEmail: "" },
   });
 });
 

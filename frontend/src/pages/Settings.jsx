@@ -26,6 +26,7 @@ export default function Settings() {
   const [address, setAddress] = useState({ line1: "", line2: "", city: "", region: "", postalCode: "", country: "United States" });
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState("");
+  const [invitationIdentity, setInvitationIdentity] = useState({ senderName: "", replyToEmail: "" });
   const [campaigns, setCampaigns] = useState([]);
   const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -67,6 +68,7 @@ export default function Settings() {
       });
       setWebsiteUrl(config.websiteUrl || "");
       setOrganizationLogoUrl(config.organizationLogoUrl || "");
+      setInvitationIdentity({ senderName: config.invitationIdentity?.senderName || "", replyToEmail: config.invitationIdentity?.replyToEmail || "" });
     }).catch(() => {});
     fetchGmailConnection().then((connection) => setAccountEmail(connection.email || "")).catch(() => {});
     fetchCampaigns().then((items) => setCampaigns(items || [])).catch(() => {});
@@ -129,6 +131,7 @@ export default function Settings() {
         addressCountry: address.country,
         websiteUrl,
         organizationLogoUrl,
+        invitationIdentity,
       });
       const local = { ...getWorkspaceSettings(), workspaceName: config.workspaceName };
       saveWorkspaceSettings(local);
@@ -158,7 +161,7 @@ export default function Settings() {
       setOrganizationLogoUrl(uploaded.url);
       const cityLine = [address.city, address.region].filter(Boolean).join(", ");
       const postalAddress = [address.line1, address.line2, [cityLine, address.postalCode].filter(Boolean).join(" "), address.country].map((part) => part.trim()).filter(Boolean).join(", ");
-      const config = await updateWorkspaceConfig({ workspaceName, legalBusinessName, postalAddress, addressLine1: address.line1, addressLine2: address.line2, addressCity: address.city, addressRegion: address.region, addressPostalCode: address.postalCode, addressCountry: address.country, websiteUrl, organizationLogoUrl: uploaded.url });
+      const config = await updateWorkspaceConfig({ workspaceName, legalBusinessName, postalAddress, addressLine1: address.line1, addressLine2: address.line2, addressCity: address.city, addressRegion: address.region, addressPostalCode: address.postalCode, addressCountry: address.country, websiteUrl, organizationLogoUrl: uploaded.url, invitationIdentity });
       window.dispatchEvent(new CustomEvent("workspace-organization-updated", { detail: { workspaceName: config.workspaceName, organizationLogoUrl: config.organizationLogoUrl || uploaded.url } }));
       setSaved(true);
     } catch (err) {
@@ -199,8 +202,10 @@ export default function Settings() {
         <section className="settings-section">
           <div className="settings-section__heading"><FiBriefcase /><div><h3>Business details</h3><p>Used in navigation and the compliance footer on campaign email.</p></div></div>
           <div className="account-profile-form account-profile-form--compact">
-            <label className="form-field"><span>Workspace name</span><input value={workspaceName} onChange={(event) => { setWorkspaceName(event.target.value); setSaved(false); }} /></label>
+            <label className="form-field"><span>Business / display name</span><input value={workspaceName} onChange={(event) => { setWorkspaceName(event.target.value); setSaved(false); }} /><small>Used in Growth Operator and as [Business name] in invitations.</small></label>
             <label className="form-field"><span>Legal business name</span><input value={legalBusinessName} onChange={(event) => { setLegalBusinessName(event.target.value); setSaved(false); }} /></label>
+            <label className="form-field"><span>Default invitation sender name</span><input value={invitationIdentity.senderName} onChange={(event) => { setInvitationIdentity({ ...invitationIdentity, senderName: event.target.value }); setSaved(false); }} placeholder={session?.user?.name || "Authenticated inviter"} /><small>Optional. If blank, [Invited by] uses the person who created the invitation.</small></label>
+            <label className="form-field"><span>Invitation reply-to email</span><input type="email" value={invitationIdentity.replyToEmail} onChange={(event) => { setInvitationIdentity({ ...invitationIdentity, replyToEmail: event.target.value }); setSaved(false); }} placeholder={session?.user?.email || "name@example.com"} /><small>Optional. Replies to invitation emails are directed here when configured.</small></label>
             <label className="form-field"><span>Business website</span><input type="url" value={websiteUrl} onChange={(event) => { setWebsiteUrl(event.target.value); setSaved(false); }} placeholder="https://elliescoaching.com" /></label>
             <fieldset className="settings-address-fields">
               <legend>Business mailing address</legend>
