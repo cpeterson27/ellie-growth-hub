@@ -62,6 +62,7 @@ function staticUxAndSourceChecks() {
   assert.ok(ui.includes("Legacy Apollo-labeled research")); assert.ok(ui.includes("titles alone never qualify"));
   assert.ok(ui.includes("Latest acquisition funnel")); assert.ok(ui.includes("legacy stored source count"));
   assert.ok(ui.includes("no dedicated reliable BiggerPockets adapter") || ui.includes("has no dedicated reliable BiggerPockets adapter"));
+  assert.ok(ui.includes("indexedSourceLabel"), "Live Leads should identify BiggerPockets provenance instead of only generic Bing");
   assert.ok(ui.includes("Temporarily rate limited"));
 }
 

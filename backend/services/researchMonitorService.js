@@ -5,7 +5,7 @@ const IntentSignal = require("../models/IntentSignal");
 const ResearchMonitor = require("../models/ResearchMonitor");
 const MonitorActivity = require("../models/MonitorActivity");
 const InAppNotification = require("../models/InAppNotification");
-const { collectMonitorSignals, isCommunityPartnerMonitor, isInvestorProfileMonitor } = require("./intentSourceService");
+const { collectMonitorSignals, isBiggerPocketsForumTopicUrl, isCommunityPartnerMonitor, isInvestorProfileMonitor } = require("./intentSourceService");
 const { researchPublicWebsite } = require("./publicWebsiteResearchService");
 const { runWithWorkspace } = require("../tenancy/workspaceContext");
 
@@ -63,7 +63,9 @@ function scoreSignal(signal, monitor) {
   let score = buyer.eligible ? 55 : 0;
   const reasons = buyer.reasons.slice();
   if (buyer.eligible) score += Math.min(15, matched.length * 5);
-  if (/\b(?:first (?:multifamily |apartment |\d+[- ]unit )?(?:deal|acquisition)|underwrit(?:e|ing)|deal analysis|cap rate|\bnoi\b|debt service|multifamily mentor|multifamily (?:course|class|bootcamp|training)|raising capital)\b/i.test(content)) { score += 20; reasons.push("Shows a specific current multifamily learning or deal need"); }
+  if (/\b(?:first (?:multifamily |apartment |\d+[- ]unit )?(?:deal|acquisition)|underwrit(?:e|ing)|deal analysis|cap rate|\bnoi\b|debt service|multifamily mentor|multifamily (?:course|class|bootcamp|training)|(?:mentor|mentoring|coaching) programs?|raising capital)\b/i.test(content)) { score += 20; reasons.push("Shows a specific current multifamily learning, coaching, or deal need"); }
+  if (/\b(?:overwhelmed|stuck|confused|need guidance)\b/i.test(content)) { score += 10; reasons.push("Expresses being overwhelmed or needing guidance"); }
+  if (/\$\s?\d[\d,.]*\s*[km]?\s*(?:-|–|to)\s*\$?\s?\d[\d,.]*\s*[km]?|\b(?:price|cost|budget)\b/i.test(content) && /\b(?:coach|coaching|mentor|mentoring|program|course|training)\b/i.test(content)) { score += 10; reasons.push("Shows concrete coaching-program price or budget awareness"); }
   if (/\b(?:urgent|as soon as possible|this month|right now|ready to|actively looking)\b/.test(content)) { score += 15; reasons.push("Shows current urgency"); }
   if (/\b(?:my business|my company|our company|my portfolio|i own|founder|business owner)\b/.test(content)) { score += 15; reasons.push("Indicates an existing business or portfolio"); }
   if (signal.organizationDomain && signal.identityResolution?.status === "supported") { score += 10; reasons.push("Organization connection has public support"); }
@@ -136,6 +138,7 @@ function buyerIntentAssessment(signal) {
   const basic = audienceEligibility(signal);
   if (!basic.eligible) return { ...basic, reasons: [basic.reason] };
   const text = `${signal.title || ""} ${signal.excerpt || ""}`.toLowerCase();
+  if (isBiggerPocketsForumTopicUrl(signal.sourceUrl) && signal.publishedAt && Date.now() - new Date(signal.publishedAt).valueOf() > 120 * 86400000) return { eligible: false, reason: "Historical BiggerPockets discussion retained as evidence, not a current outreach lead.", reasons: ["Public forum post is older than the 120-day buyer-intent window"] };
   const communityMetadataSources = new Set(["linkedin_public", "facebook_public", "meetup_public", "community_directories", "configured_community"]);
   if (signal.source === "sec_form_d") return { eligible: false, reason: "SEC Form D is filing evidence, not student buying intent.", reasons: ["Institutional filing excluded from student intent"] };
   if (communityMetadataSources.has(signal.source)) return { eligible: false, reason: "Public community metadata belongs in Community Partner discovery, not individual student intent.", reasons: ["Community metadata is not an individual conversation"] };
@@ -153,7 +156,7 @@ function buyerIntentAssessment(signal) {
     [/\b(?:i(?:'m| am)|we(?:'re| are)) (?:actively )?looking for (?:a |an )?(?:coach|mentor|consultant|program|community|system|solution|event|training|advice|help)\b/, "Actively looking for help or a solution"],
     [/\b(?:how (?:do|can|should) i|what should i do)\b/, "Asks how to solve a current problem"],
     [/\b(?:i want to|we want to|i(?:'m| am) ready to|we(?:'re| are) ready to|i plan to|planning to) (?:start|buy|scale|grow|leave|quit|invest|build|systemize)\b/, "States a current business or investment goal"],
-    [/\b(?:i(?:'m| am)|we(?:'re| are)) (?:thinking about|considering|trying to|looking to|exploring)\b|\bthinking about (?:my|our|the) next move\b/, "Actively considering a next business or investment move"],
+    [/\b(?:i(?:'m| am|'ve)|we(?:'re| are|'ve)) (?:thinking about|considering|trying to|looking to|exploring)\b|\bthinking about (?:my|our|the) next move\b/, "Actively considering a next business or investment move"],
     [/\b(?:struggling (?:to|with)|stuck (?:in|with)|overwhelmed (?:by|with))\b/, "Describes a current business challenge"],
     [/\b(?:can anyone recommend|recommendations? for|seeking (?:a |an )?(?:coach|mentor|consultant|program|community|system|solution))\b/, "Requests a recommendation"],
     [/\b(?:my first|our first|i(?:'m| am) (?:underwriting|analyzing)|we(?:'re| are) (?:underwriting|analyzing)|need help (?:with|calculating)|stuck (?:on|with)|looking for (?:a )?(?:multifamily )?(?:mentor|course|class|bootcamp|training))\b/, "Describes a current multifamily learning or deal-analysis need"],

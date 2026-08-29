@@ -20,6 +20,32 @@ const decodeEntities = (value) => String(value || "")
   .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCodePoint(parseInt(code, 16)));
 const hashId = (value) => crypto.createHash("sha256").update(String(value)).digest("hex").slice(0, 32);
 
+function isBiggerPocketsForumTopicUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return /(^|\.)biggerpockets\.com$/i.test(parsed.hostname) && /\/forums\/\d+\/topics\/\d+/i.test(parsed.pathname);
+  } catch (_error) { return false; }
+}
+
+function canonicalSourceUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    parsed.hash = "";
+    if (isBiggerPocketsForumTopicUrl(parsed.toString())) return `https://www.biggerpockets.com${parsed.pathname.replace(/\/$/, "")}`;
+    [...parsed.searchParams.keys()].forEach((key) => {
+      if (/^utm_/i.test(key) || /^(?:fbclid|gclid|msclkid)$/i.test(key)) parsed.searchParams.delete(key);
+    });
+    return parsed.toString().replace(/\/$/, "");
+  } catch (_error) { return String(value || "").trim(); }
+}
+
+function indexedPostDate(value) {
+  const match = String(value || "").match(/\b(?:posted|published)\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(20\d{2})\b/i);
+  if (!match) return null;
+  const parsed = new Date(`${match[1]} ${match[2]}, ${match[3]} 00:00:00 UTC`);
+  return Number.isNaN(parsed.valueOf()) ? null : parsed;
+}
+
 function queryFor(monitor) {
   const keywords = (monitor.keywords || []).map(clean).filter(Boolean);
   const locations = (monitor.locations || []).map(clean).filter(Boolean);
@@ -45,11 +71,13 @@ function isInvestorProfileMonitor(monitor) {
 }
 
 function normalizeSignal(source, item = {}) {
-  const sourceUrl = String(item.sourceUrl || "").trim();
+  const sourceUrl = canonicalSourceUrl(item.sourceUrl);
   if (!sourceUrl) return null;
+  const explicitIndexedDate = isBiggerPocketsForumTopicUrl(sourceUrl) ? indexedPostDate(`${item.title || ""} ${item.excerpt || ""}`) : null;
+  const publishedAt = explicitIndexedDate || (item.publishedAt && !Number.isNaN(new Date(item.publishedAt).valueOf()) ? new Date(item.publishedAt) : null);
   return {
     source,
-    sourceId: String(item.sourceId || hashId(sourceUrl)).trim(),
+    sourceId: isBiggerPocketsForumTopicUrl(sourceUrl) ? sourceUrl : String(item.sourceId || hashId(sourceUrl)).trim(),
     sourceUrl,
     title: decodeEntities(clean(item.title)).slice(0, 1000),
     excerpt: decodeEntities(clean(item.excerpt)).slice(0, 6000),
@@ -57,7 +85,7 @@ function normalizeSignal(source, item = {}) {
     authorUrl: String(item.authorUrl || "").trim(),
     organizationName: decodeEntities(clean(item.organizationName)),
     organizationDomain: String(item.organizationDomain || "").trim().toLowerCase(),
-    publishedAt: item.publishedAt && !Number.isNaN(new Date(item.publishedAt).valueOf()) ? new Date(item.publishedAt) : null,
+    publishedAt,
     evidence: [{ label: item.evidenceLabel || source.replaceAll("_", " "), url: sourceUrl, observedAt: new Date() }],
     raw: item.raw || {},
   };
@@ -224,26 +252,41 @@ async function searchRedditRss(monitor, limit, operations = { fetchFeed }) {
 
 function resetRedditPublicState() { redditCache.clear(); redditInFlight.clear(); redditLastRequestAt = 0; redditCooldownUntil = 0; }
 
-async function searchBingWeb(monitor, limit) {
+function bingQueriesFor(monitor) {
   const baseQuery = booleanQueryFor(monitor);
-  const queries = isInvestorProfileMonitor(monitor) ? [
-    `(\"accredited investor\" OR \"limited partner\" OR \"LP investor\" OR \"passive investor\" OR \"multifamily investor\") (physician OR orthodontist OR founder OR \"managing partner\" OR \"software architect\" OR VP OR director)`,
-    `(inurl:bio OR inurl:team OR inurl:leadership OR inurl:about) (\"passive investor\" OR \"real estate investor\" OR multifamily) (founder OR physician OR dentist OR executive OR director)`,
-    `(site:meetup.com OR site:eventbrite.com OR site:biggerpockets.com) (\"passive income\" OR \"multifamily investing\" OR syndication OR \"accredited investor\") (${baseQuery})`,
-    baseQuery,
+  return isInvestorProfileMonitor(monitor) ? [
+    { type: "investor_profile", query: `(\"accredited investor\" OR \"limited partner\" OR \"LP investor\" OR \"passive investor\" OR \"multifamily investor\") (physician OR orthodontist OR founder OR \"managing partner\" OR \"software architect\" OR VP OR director)` },
+    { type: "professional_profile", query: `(inurl:bio OR inurl:team OR inurl:leadership OR inurl:about) (\"passive investor\" OR \"real estate investor\" OR multifamily) (founder OR physician OR dentist OR executive OR director)` },
+    { type: "community", query: `(site:meetup.com OR site:eventbrite.com OR site:biggerpockets.com) (\"passive income\" OR \"multifamily investing\" OR syndication OR \"accredited investor\") (${baseQuery})` },
+    { type: "monitor", query: baseQuery },
   ] : [
-    `(site:facebook.com/groups OR site:linkedin.com/groups OR site:x.com OR site:twitter.com OR site:instagram.com OR site:threads.net) (${baseQuery})`,
-    `(site:youtube.com OR site:biggerpockets.com OR site:meetup.com OR site:eventbrite.com) (${baseQuery})`,
-    `(site:discord.com OR site:discord.gg OR inurl:forum OR "real estate investors association" OR "local REIA") (${baseQuery})`,
-    baseQuery,
+    { type: "biggerpockets_forum", query: `site:biggerpockets.com/forums inurl:topics (multifamily OR \"multi-family\" OR apartments) (coaching OR coach OR mentor OR mentoring OR mentorship OR \"mentoring program\" OR course OR training OR overwhelmed OR \"need help\" OR \"worth it\")` },
+    { type: "social", query: `(site:facebook.com/groups OR site:linkedin.com/groups OR site:x.com OR site:twitter.com OR site:instagram.com OR site:threads.net) (${baseQuery})` },
+    { type: "community", query: `(site:youtube.com OR site:meetup.com OR site:eventbrite.com) (${baseQuery})` },
+    { type: "forums", query: `(site:discord.com OR site:discord.gg OR inurl:forum OR "real estate investors association" OR "local REIA") (${baseQuery})` },
+    { type: "monitor", query: baseQuery },
   ];
-  const responses = await Promise.allSettled(queries.map((query) => {
+}
+
+function roundRobinSignals(groups, limit) {
+  const output = []; let index = 0;
+  while (output.length < limit && groups.some((group) => index < group.length)) {
+    for (const group of groups) if (group[index] && output.length < limit) output.push(group[index]);
+    index += 1;
+  }
+  return output;
+}
+
+async function searchBingWeb(monitor, limit, operations = { fetchFeed }) {
+  const queries = bingQueriesFor(monitor);
+  const responses = await Promise.allSettled(queries.map(({ query, type }) => {
     const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&format=rss`;
-    return fetchFeed(url, "bing_web", "Bing public web and community result", limit);
+    return operations.fetchFeed(url, "bing_web", type === "biggerpockets_forum" ? "BiggerPockets forum via Bing" : "Bing public web and community result", limit)
+      .then((signals) => signals.map((signal) => ({ ...signal, raw: { ...(signal.raw || {}), bingQueryType: type, indexedSourceLabel: isBiggerPocketsForumTopicUrl(signal.sourceUrl) ? "BiggerPockets forum via Bing" : "Bing public web" } })));
   }));
   const successful = responses.filter((response) => response.status === "fulfilled");
   if (!successful.length) throw responses[0]?.reason || new Error("Bing returned no usable search responses.");
-  const signals = [...new Map(successful.flatMap((response) => response.value).map((signal) => [signal.sourceUrl, signal])).values()].slice(0, limit);
+  const signals = [...new Map(roundRobinSignals(successful.map((response) => response.value), limit).map((signal) => [canonicalSourceUrl(signal.sourceUrl), signal])).values()];
   return signals.map((signal) => {
     try { return { ...signal, organizationDomain: new URL(signal.sourceUrl).hostname.replace(/^www\./, "") }; }
     catch (_error) { return signal; }
@@ -668,4 +711,4 @@ async function collectMonitorSignals(monitor) {
   };
 }
 
-module.exports = { booleanQueryFor, collectMonitorSignals, crawlConfiguredSite, explicitOrganizerCandidates, extractXmlItems, isCommunityPartnerMonitor, isInvestorProfileMonitor, normalizeSignal, parseSecFormD, queryFor, searchConfiguredFeeds, searchMeetupPublic, searchRedditRss, resetRedditPublicState, termsFor };
+module.exports = { bingQueriesFor, booleanQueryFor, canonicalSourceUrl, collectMonitorSignals, crawlConfiguredSite, explicitOrganizerCandidates, extractXmlItems, indexedPostDate, isBiggerPocketsForumTopicUrl, isCommunityPartnerMonitor, isInvestorProfileMonitor, normalizeSignal, parseSecFormD, queryFor, roundRobinSignals, searchBingWeb, searchConfiguredFeeds, searchMeetupPublic, searchRedditRss, resetRedditPublicState, termsFor };
