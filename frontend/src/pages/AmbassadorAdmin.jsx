@@ -372,10 +372,9 @@ export default function AmbassadorAdmin() {
             <span>
               <strong>{row.contactId?.name || "Referred Contact"}</strong>
               <small>
-                {row.applicationId
-                  ? "Application linked"
-                  : "No application linked"}
-                {row.enrollmentId ? " · Enrollment linked" : ""}
+                Referred {row.attributedAt ? new Date(row.attributedAt).toLocaleDateString() : "date unavailable"}
+                {row.applicationId ? ` · Application ${row.applicationId.status || "linked"}` : " · No application yet"}
+                {row.enrollmentId ? ` · Enrollment ${row.enrollmentId.status || "linked"}` : ""}
               </small>
             </span>
             <select
@@ -485,10 +484,10 @@ export default function AmbassadorAdmin() {
                 {money(row.commissionAmountMinor, row.currency)}
               </strong>
               <small>
-                {row.productLabel} · {row.payoutNotes || "No notes"} ·{" "}
-                {row.paidAt
-                  ? `Paid ${new Date(row.paidAt).toLocaleDateString()}`
-                  : "Not paid"}
+                {row.productLabel || "Qualifying referral"} · Gross {money(row.grossAmountMinor, row.currency)} · Commission method {row.ruleSnapshot?.mode || profile?.commissionConfig?.mode || "manual"} · Recorded {row.calculatedAt ? new Date(row.calculatedAt).toLocaleDateString() : "date unavailable"}
+                {row.approvedAt ? ` · Approved ${new Date(row.approvedAt).toLocaleDateString()}` : ""}
+                {row.paidAt ? ` · Paid ${new Date(row.paidAt).toLocaleDateString()}` : ""}
+                {row.payoutNotes ? ` · ${row.payoutNotes}` : ""}
               </small>
             </span>
             <span>

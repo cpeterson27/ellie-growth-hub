@@ -3,7 +3,7 @@ const WorkspaceConfig = require("../models/WorkspaceConfig");
 const User = require("../models/User");
 const defaults = Object.freeze({
   coach: { subject: "You’re invited to coach with {{workspaceName}}", body: "Hi {{firstName}},\n\n{{invitedBy}} invited you to join {{workspaceName}} as a Coach. Use the secure link below to create your account and access only your assigned coaching workspace.\n\n{{inviteLink}}\n\nWelcome to the team." },
-  ambassador: { subject: "You’re invited to become a Brand Ambassador for {{workspaceName}}", body: "Hi {{firstName}},\n\n{{invitedBy}} invited you to join {{workspaceName}} as a Brand Ambassador. Activate your account to access your referral link, referral status, and payout history.\n\n{{inviteLink}}" },
+  ambassador: { subject: "You’re invited to become a Brand Ambassador for {{workspaceName}}", body: "Hi {{firstName}},\n\n{{invitedBy}} invited you to join {{workspaceName}} as a Brand Ambassador. Use the secure button below to activate your account. After you sign in, open your Ambassador Portal to copy your unique referral link, follow referral progress, and view your commission and payment history.\n\n{{inviteLink}}\n\nYour referral link becomes available after account activation." },
   closer: { subject: "You’re invited to the {{workspaceName}} sales team", body: "Hi {{firstName}},\n\n{{invitedBy}} invited you to join {{workspaceName}} as a Closer / Sales team member. Activate your account to access only the sales records assigned to you.\n\n{{inviteLink}}" },
   general: { subject: "You’re invited to join {{workspaceName}}", body: "Hi {{firstName}},\n\n{{invitedBy}} invited you to join {{workspaceName}} as {{role}}. Create your account using this secure invitation link:\n\n{{inviteLink}}" },
 });
