@@ -177,6 +177,7 @@ function loggingAndSafetyChecks() {
   const webhook = fs.readFileSync(path.join(__dirname, "routes/webhooks.js"), "utf8");
   const publishing = fs.readFileSync(path.join(__dirname, "services/socialPublishingService.js"), "utf8");
   assert.equal(route.includes("error.response?.data"), false);
+  assert.ok(route.includes("/social/accounts?"), "OAuth callback returns to Connected Accounts with status preserved");
   assert.equal(route.includes('requireRole("owner", "admin")'), false);
   for (const operation of ['router.get("/:provider/oauth/start", requireCapability("social.manage")', 'router.patch("/:provider/assets", requireCapability("social.manage")', 'router.post("/instagram/oauth/refresh", requireCapability("social.manage")', 'router.post("/:provider/oauth/disconnect", requireCapability("social.manage")']) assert.ok(route.includes(operation));
   assert.ok(webhook.includes("deliverMetaReply"));

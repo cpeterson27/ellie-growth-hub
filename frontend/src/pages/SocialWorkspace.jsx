@@ -50,6 +50,9 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
     [selected, setSelected] = useState(null),
     [detail, setDetail] = useState(null),
     [busy, setBusy] = useState(false);
+  const oauthStatus = connectionsOnly ? params.get("status") : "";
+  const oauthNotice = oauthStatus === "connected" ? "Facebook connected. Choose the Facebook Page and linked Instagram professional account Growth Operator should use." : "";
+  const oauthError = oauthStatus === "denied" ? "Facebook authorization was cancelled. Choose Connect Facebook when you are ready to try again." : oauthStatus === "failed" ? params.get("message") || "Facebook connection failed. Try Connect Facebook again or ask the app administrator to verify Meta configuration." : "";
   useEffect(() => {
     let active = true;
     if (section === "inbox" && threadId)
@@ -90,12 +93,12 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
         }
       })
       .catch(() => {
-        if (active) setError("Unable to load this Social area.");
+        if (active) setError(connectionsOnly ? "Connected Accounts could not load. Refresh the page or ask the workspace owner to verify this review account's Social access." : "Unable to load this Social area.");
       });
     return () => {
       active = false;
     };
-  }, [section, filter, provider]);
+  }, [section, filter, provider, connectionsOnly]);
   const action = async (fn) => {
     setBusy(true);
     setError("");
@@ -135,11 +138,12 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
           ))}
         </nav>
       ) : null}
-      {error && (
+      {(error || oauthError) && (
         <p role="alert" className="form-error">
-          {error}
+          {error || oauthError}
         </p>
       )}
+      {oauthNotice ? <p role="status" className="discovery-notice">{oauthNotice}</p> : null}
       {section === "leads" && <SocialLeads />}
       {section === "create" ? (
         <SocialStudio />

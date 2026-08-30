@@ -5,7 +5,7 @@ import { getWorkspaceSettings } from "../utils/workspaceSettings.js";
 import useInitiative from "../context/useInitiative.js";
 import useAuth from "../context/useAuth.js";
 import { fetchWorkspaceConfig } from "../services/api.js";
-import { isCoachOnly } from "../utils/roleAccess.js";
+import { isCoachOnly, isSocialConnectionOnly } from "../utils/roleAccess.js";
 import UserAvatar from "./UserAvatar.jsx";
 import "./Navbar.css";
 
@@ -19,6 +19,8 @@ export default function Navbar({ onMenuClick }) {
   const { session, workspaces, switchWorkspace } = useAuth();
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const isCoach = isCoachOnly(session);
+  const socialConnectionOnly = isSocialConnectionOnly(session);
+  const displayedWorkspaceName = socialConnectionOnly ? session?.workspace?.name || "Growth Operator" : workspaceName;
   const pageKey = location.pathname.split("/")[1] || "command-center";
   const pageMeta = {
     "command-center": ["Command Center", "Today’s priorities and next best actions."],
@@ -56,12 +58,12 @@ export default function Navbar({ onMenuClick }) {
   };
 
   useEffect(() => {
-    if (isCoach) return undefined;
+    if (isCoach || socialConnectionOnly) return undefined;
     const refresh = () => setWorkspaceName(getWorkspaceSettings().workspaceName);
     window.addEventListener("ellie-settings-changed", refresh);
     fetchWorkspaceConfig().then((config) => setWorkspaceName(config.workspaceName)).catch(() => {});
     return () => window.removeEventListener("ellie-settings-changed", refresh);
-  }, [isCoach]);
+  }, [isCoach, socialConnectionOnly]);
 
   useEffect(() => {
     const handleShortcut = (event) => {
@@ -105,7 +107,7 @@ export default function Navbar({ onMenuClick }) {
           <span className="navbar__menu-label">Menu</span>
         </button>
         <div className="navbar__context">
-          <p className="navbar__eyebrow"><span>{workspaceName}</span><i />{pageMeta[0]}</p>
+          <p className="navbar__eyebrow"><span>{displayedWorkspaceName}</span><i />{pageMeta[0]}</p>
           <h1 className="navbar__title">{pageMeta[1]}</h1>
         </div>
         <div className="navbar__mobile-brand"><strong>{session?.workspace?.name || "Growth Operator"}</strong><span>{pageMeta[0]}</span></div>
