@@ -193,6 +193,7 @@ function ProtectedApp() {
             <Route path="/coach/commissions" element={<CoachCommissions />} />
             <Route path="/coach/profile" element={<CoachPublicProfile />} />
           </> : null}
+          {session.isPlatformOwner ? <Route path="/businesses" element={<Businesses />} /> : null}
           <Route path="*" element={<Navigate to="/command-center" replace />} />
         </Routes>
       </DashboardLayout>

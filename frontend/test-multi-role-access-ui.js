@@ -5,5 +5,6 @@ assert(role.includes("effectivePermissions")); assert(role.includes("!hasRole(se
 assert(app.includes("isCoachOnly(session)")); assert(app.includes("mayUseCoachPortal")); assert(app.includes('path="/opportunities"')); assert(app.includes('path="/coach/students"'));
 assert(sidebar.includes("hasAnyPermission(session")); assert(sidebar.includes("sales.opportunities.view_assigned")); assert(sidebar.includes("canUseCoachPortal(session)"));
 assert(role.includes("isSocialConnectionOnly")); assert(sidebar.includes('item.path === "/social"'));
+assert.equal((app.match(/session\.isPlatformOwner \? <Route path="\/businesses"/g) || []).length, 2, "Businesses must be guarded and routable from both normal and coach authenticated route tables");
 for (const value of ["Team & Access", "Custom access", "permissionOverrides", "applicationProgramIds", "Role templates", "roleLabels"]) assert(team.includes(value), `TeamAccess missing ${value}`);
 console.log("Multi-role capability navigation and Team & Access UI contracts passed.");
