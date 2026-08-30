@@ -12,7 +12,8 @@ const provisioning = require("./services/workspaceProvisioningService");
 const authRoutes = require("./routes/auth");
 const workspaceMembers = require("./services/workspaceMemberService");
 const socialOAuth = require("./services/socialOAuthService");
-const { createAuthContext } = require("./middleware/auth");
+const { createAuthContext, isPlatformOwner } = require("./middleware/auth");
+const { CAPABILITIES, effectivePermissions } = require("./authorization/capabilities");
 
 function doc(values) { return { ...values, async save() { return this; } }; }
 function query(value) { return { select() { return this; }, then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } }; }
@@ -76,6 +77,22 @@ function reviewerIsNotPlatformOwner() {
   process.env.PLATFORM_OWNER_EMAILS = previous;
 }
 
+function platformOwnerEmailNormalization() {
+  const previous = process.env.PLATFORM_OWNER_EMAILS;
+  process.env.PLATFORM_OWNER_EMAILS = " first@example.test,  Cassandra@Example.Test ,third@example.test ";
+  assert.equal(isPlatformOwner({ email: "cassandra@example.test" }), true);
+  assert.equal(isPlatformOwner({ email: " CASSANDRA@EXAMPLE.TEST " }), true);
+  assert.equal(isPlatformOwner({ email: "reviewer@example.test" }), false);
+  process.env.PLATFORM_OWNER_EMAILS = previous;
+}
+
+function minimumReviewerPermissions() {
+  const workspace = { _id: "review", status: "active" };
+  const reviewer = { role: "viewer", roles: ["viewer"], permissionOverrides: { allow: ["social.manage"], deny: CAPABILITIES.filter((item) => item !== "social.manage") } };
+  assert.deepEqual(effectivePermissions(reviewer, workspace), ["social.manage"]);
+  for (const forbidden of ["crm.view", "sales.opportunities.view", "coaching.view", "team.view", "team.manage", "ambassadors.view", "workspace.manage", "integrations.manage", "communications.view", "campaigns.manage", "analytics.view"]) assert.equal(effectivePermissions(reviewer, workspace).includes(forbidden), false, forbidden);
+}
+
 function oauthBindsSelectedWorkspace() {
   const url = new URL(socialOAuth.authorizationUrl("meta", { workspaceId: "review", user: { _id: "reviewer" } }));
   const state = socialOAuth.verifyState(url.searchParams.get("state"), "meta");
@@ -88,6 +105,8 @@ Promise.resolve()
   .then(secureSessionRotation)
   .then(existingUserPasswordIsPreserved)
   .then(reviewerIsNotPlatformOwner)
+  .then(platformOwnerEmailNormalization)
+  .then(minimumReviewerPermissions)
   .then(oauthBindsSelectedWorkspace)
   .then(() => console.log("Workspace atomic provisioning, deterministic selection, secure session rotation, invitation password safety, platform isolation, and OAuth workspace binding passed."))
   .catch((error) => { console.error(error); process.exitCode = 1; });

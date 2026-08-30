@@ -15,7 +15,7 @@ import "./SocialWorkspace.css";
 const sections = [["overview", "Overview"], ["create", "Create post"], ["leads", "Leads"], ["calendar", "Calendar"], ["content", "Content"], ["inbox", "Inbox"], ["automations", "Automations"], ["distribution", "Ambassadors"], ["analytics", "Analytics"], ["accounts", "Connected accounts"], ["settings", "Setup center"]];
 const human = value => String(value || "").replaceAll("_", " ");
 const date = value => value ? new Date(value).toLocaleString() : "Not recorded";
-export default function SocialWorkspace() {
+export default function SocialWorkspace({ connectionsOnly = false }) {
   const { section = "overview" } = useParams();
   const [params] = useSearchParams();
   const threadId = params.get("thread");
@@ -32,7 +32,7 @@ export default function SocialWorkspace() {
   }, [section, filter, provider]);
   const action = async fn => { setBusy(true); setError(""); try { await fn(); setData(await fetchSocialWorkspace("accounts")); } catch (err) { setError(err.response?.data?.error || "Unable to update account."); } finally { setBusy(false); } };
   const openThread = async row => { setSelected(row._id); try { setDetail(await fetchSocialWorkspace(`inbox/${row._id}`)); } catch { setError("Conversation unavailable."); } };
-  return <main className="social-workspace"><header><p className="page-eyebrow">Growth Operator</p><h1>Social</h1><p>Connect and manage the social accounts Growth Operator can use for content, conversations, and automations.</p></header><nav aria-label="Social workspace">{sections.map(([key, label]) => <NavLink key={key} to={`/social/${key}`} end>{label}</NavLink>)}</nav>{error && <p role="alert" className="form-error">{error}</p>}
+  return <main className="social-workspace"><header><p className="page-eyebrow">Growth Operator</p><h1>Social</h1><p>Connect and manage the social accounts Growth Operator can use for content, conversations, and automations.</p></header>{!connectionsOnly ? <nav aria-label="Social workspace">{sections.map(([key, label]) => <NavLink key={key} to={`/social/${key}`} end>{label}</NavLink>)}</nav> : null}{error && <p role="alert" className="form-error">{error}</p>}
     {section === "leads" && <SocialLeads/>}{section === "create" ? <SocialStudio /> : section === "content" ? <Content /> : null}
     {section === "automations" ? <><SocialAutomation/><Link to="/automations">Open workflow builder and execution history</Link></> : null}
     {["overview", "analytics"].includes(section) && data?.counts ? <><section className="social-stat-grid">{Object.entries(data.counts).map(([key, value]) => <article key={key}><strong>{value}</strong><span>{human(key.replace(/([A-Z])/g, " $1"))}</span></article>)}</section><p>Counts reflect stored activity. Content counts cover the latest {data.boundedContentCount} items. Reach, impressions, likes, and inferred conversions are not fabricated.</p><section className="social-panel"><h2>{section === "analytics" ? "Known social activity" : "Recent activity"}</h2>{data.activity?.length ? data.activity.map(row => <article key={row._id}><strong>{row.title}</strong><small>{date(row.occurredAt)}</small>{row.contactId ? <Link to={`/crm/contacts/${row.contactId}`}>Open CRM contact</Link> : null}</article>) : <p>No recorded social activity yet.</p>}</section></> : null}

@@ -18,6 +18,10 @@ assert(studio.includes("metaDestinations") && studio.includes("destination.provi
 const tasks = read("./src/components/AmbassadorContentTasks.jsx");
 for (const control of ["My content tasks", "Copy caption", "Open approved media", "Mark completed", "Decline"]) assert(tasks.includes(control));
 assert(read("./src/App.jsx").includes('hasPermission(session, "social.manage")'));
+assert(read("./src/App.jsx").includes("isSocialConnectionOnly(session)"));
+assert(read("./src/App.jsx").includes('<SocialWorkspace connectionsOnly />'));
+const connectedAccounts = read("./src/components/SocialConnectedAccounts.jsx");
+for (const value of ["socialAssetIdentity", "identity.primary", "identity.secondary", "asset.avatarUrl", "social-asset-initials"]) assert(connectedAccounts.includes(value));
 assert(read("./src/components/SocialReplyComposer.jsx").includes("I approve sending this exact reply"));
 assert(read("./src/pages/SocialWorkspace.css").includes("@media(max-width:700px)"));
 console.log("Social workspace, studio, calendar, inbox, distribution and permission UI contracts passed.");

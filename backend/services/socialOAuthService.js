@@ -3,6 +3,7 @@ const axios = require("axios");
 const SocialConnection = require("../models/SocialConnection");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const { encryptCredentials, decryptCredentials } = require("../utils/credentialEncryption");
+const { effectivePermissions } = require("../authorization/capabilities");
 
 const providerSettings = require("./socialProviderConfig");
 const PROVIDERS = new Set(providerSettings.SOCIAL_PROVIDERS);
@@ -196,14 +197,32 @@ async function exchangeMeta(code, http = axios) {
   };
 }
 
-async function exchangeCode(provider, code, rawState) {
+async function resolveSocialOAuthMembership(state, models = { WorkspaceMembership }) {
+  const membership = await models.WorkspaceMembership.findOne({
+    workspaceId: state.workspaceId,
+    userId: state.userId,
+    status: "active",
+  }).populate("workspaceId", "status rolePermissionTemplates");
+  const membershipWorkspaceId = membership?.workspaceId?._id || membership?.workspaceId;
+  if (!membership || membership.status !== "active" || !membership.workspaceId || membership.workspaceId.status !== "active"
+    || String(membershipWorkspaceId) !== String(state.workspaceId) || String(membership.userId?._id || membership.userId) !== String(state.userId)) {
+    throw new Error("The user who started this connection no longer has permission to complete it");
+  }
+  if (!effectivePermissions(membership, membership.workspaceId).includes("social.manage")) {
+    throw new Error("The user who started this connection no longer has permission to complete it");
+  }
+  return membership;
+}
+
+async function exchangeCode(provider, code, rawState, dependencies = {}) {
   if (!PROVIDERS.has(provider)) throw new Error("Unsupported social provider");
   const state = verifyState(rawState, provider);
   if (!state) throw new Error("Social connection request expired or is invalid");
-  const membership = await WorkspaceMembership.findOne({ workspaceId: state.workspaceId, userId: state.userId, status: "active", $or: [{ role: { $in: ["owner", "admin"] } }, { roles: { $in: ["owner", "admin"] } }] });
-  if (!membership) throw new Error("The user who started this connection no longer has permission to complete it");
-  const result = provider === "linkedin" ? await exchangeLinkedIn(code) : provider === "instagram" ? await exchangeInstagram(code) : provider === "x" ? await exchangeX(code, rawState) : await exchangeMeta(code);
-  const connection = await SocialConnection.findOneAndUpdate(
+  await resolveSocialOAuthMembership(state, dependencies.models || { WorkspaceMembership });
+  const exchange = dependencies.exchangeProvider || (provider === "linkedin" ? exchangeLinkedIn : provider === "instagram" ? exchangeInstagram : provider === "x" ? (value) => exchangeX(value, rawState) : exchangeMeta);
+  const result = await exchange(code);
+  const ConnectionModel = dependencies.SocialConnection || SocialConnection;
+  const connection = await ConnectionModel.findOneAndUpdate(
     { workspaceId: state.workspaceId, provider },
     { $set: { status: "connected", credentialsEncrypted: encryptCredentials(result.credentials), scopes: result.scopes, declinedScopes: result.declinedScopes || [], authorization: result.authorization || { valid: true, verifiedAt: new Date() }, expiresAt: result.expiresAt, providerAccount: result.account, assets: result.assets, selectedAssetIds: [], webhookSubscriptions: [], connectedByUserId: state.userId, connectedAt: new Date(), lastVerifiedAt: new Date(), lastError: "" } },
     { upsert: true, new: true, setDefaultsOnInsert: true },
@@ -403,4 +422,4 @@ async function provisionInstagramSubscriptions(connection, selected, http = axio
   }
   return results;
 }
-module.exports = { discoverPages, subscriptionFields, refreshInstagram, authorizationUrl, configured, disconnect, exchangeCode, exchangeMeta, exchangeInstagram, exchangeX, metaPermissions, provisionMetaSubscriptions, provisionInstagramSubscriptions, removeMetaSubscriptions, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };
+module.exports = { discoverPages, subscriptionFields, refreshInstagram, authorizationUrl, configured, disconnect, exchangeCode, exchangeMeta, exchangeInstagram, exchangeX, metaPermissions, provisionMetaSubscriptions, provisionInstagramSubscriptions, removeMetaSubscriptions, resolveSocialOAuthMembership, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };

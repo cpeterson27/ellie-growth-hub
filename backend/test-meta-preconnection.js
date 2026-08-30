@@ -14,6 +14,8 @@ const oauth = require("./services/socialOAuthService");
 const { encryptCredentials } = require("./utils/credentialEncryption");
 const { resolveApplicationContact } = require("./services/publicApplicationService");
 const { resolveIdentity } = require("./services/socialLeadAutomationService");
+const { CAPABILITIES } = require("./authorization/capabilities");
+const { restrictNewRoleSurface } = require("./middleware/authorization");
 
 function document(values) {
   return { ...values, async save() { return this; } };
@@ -29,7 +31,7 @@ async function oauthChecks() {
       if (url.endsWith("/debug_token")) return { data: { data: { is_valid: true, app_id: "meta-app-123", user_id: "meta-user", data_access_expires_at: 1900000000 } } };
       if (url.endsWith("/me/permissions")) return { data: { data: [{ permission: "pages_show_list", status: "granted" }, { permission: "pages_messaging", status: "declined" }] } };
       if (url.endsWith("/me")) return { data: { id: "meta-user", name: "Ellie" } };
-      if (url.endsWith("/me/accounts")) return { data: { data: [{ id: "page-1", name: "Ellie Page", access_token: "page-token", tasks: ["MANAGE"], instagram_business_account: { id: "ig-1", username: "ellie", name: "Ellie IG" } }] } };
+      if (url.endsWith("/me/accounts")) return { data: { data: [{ id: "page-1", name: "Ellie Page", access_token: "page-token", tasks: ["MANAGE"], instagram_business_account: { id: "ig-1", username: "ellie", name: "Ellie IG", profile_picture_url: "https://images.example.test/ellie.jpg" } }] } };
       throw new Error(`Unexpected GET ${url}`);
     },
   };
@@ -39,6 +41,75 @@ async function oauthChecks() {
   assert.equal(result.authorization.valid, true);
   assert.equal(result.authorization.userId, "meta-user");
   assert.equal(result.assets.length, 2);
+  assert.deepEqual(result.assets[1], { id: "ig-1", name: "Ellie IG", username: "ellie", avatarUrl: "https://images.example.test/ellie.jpg", type: "instagram_business", parentId: "page-1", permissions: ["MANAGE"] });
+}
+
+function membershipQuery(value, expected = {}) {
+  return {
+    populate(path, fields) {
+      assert.equal(path, "workspaceId"); assert.equal(fields, "status rolePermissionTemplates");
+      return Promise.resolve(value);
+    },
+    filter: expected,
+  };
+}
+
+async function reviewerOAuthAuthorizationChecks() {
+  const workspace = { _id: "review", status: "active" };
+  const reviewer = { workspaceId: workspace, userId: "reviewer", role: "viewer", roles: ["viewer"], status: "active", permissionOverrides: { allow: ["social.manage"], deny: CAPABILITIES.filter(item => item !== "social.manage") } };
+  let filter;
+  const allowedModels = { WorkspaceMembership: { findOne(value) { filter = value; return membershipQuery(reviewer); } } };
+  assert.equal(await oauth.resolveSocialOAuthMembership({ workspaceId: "review", userId: "reviewer" }, allowedModels), reviewer);
+  assert.deepEqual(filter, { workspaceId: "review", userId: "reviewer", status: "active" });
+  for (const membership of [
+    null,
+    { ...reviewer, status: "suspended" },
+    { ...reviewer, workspaceId: { _id: "review", status: "suspended" } },
+    { ...reviewer, workspaceId: { _id: "ellie", status: "active" } },
+    { ...reviewer, userId: "different-user" },
+    { ...reviewer, permissionOverrides: { allow: [], deny: ["social.manage"] } },
+  ]) {
+    await assert.rejects(() => oauth.resolveSocialOAuthMembership({ workspaceId: "review", userId: "reviewer" }, { WorkspaceMembership: { findOne: () => membershipQuery(membership) } }), /no longer has permission/);
+  }
+  for (const role of ["owner", "admin"]) {
+    const membership = { ...reviewer, userId: role, role, roles: [role], permissionOverrides: { allow: [], deny: [] } };
+    assert.equal(await oauth.resolveSocialOAuthMembership({ workspaceId: "review", userId: role }, { WorkspaceMembership: { findOne: () => membershipQuery(membership) } }), membership);
+  }
+}
+
+async function signedStateAndCompletionChecks() {
+  const authorizationUrl = new URL(oauth.authorizationUrl("meta", { workspaceId: "review", user: { _id: "reviewer" } }));
+  const signedState = authorizationUrl.searchParams.get("state");
+  assert.deepEqual(oauth.verifyState(signedState, "meta").workspaceId, "review");
+  const [payload, signature] = signedState.split(".");
+  const substituted = `${Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, "base64url").toString("utf8")), workspaceId: "ellie" })).toString("base64url")}.${signature}`;
+  assert.equal(oauth.verifyState(substituted, "meta"), null, "signed workspace cannot be substituted");
+  const substitutedUser = `${Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload, "base64url").toString("utf8")), userId: "different-user" })).toString("base64url")}.${signature}`;
+  assert.equal(oauth.verifyState(substitutedUser, "meta"), null, "signed initiating user cannot be substituted");
+  const expiredPayload = Buffer.from(JSON.stringify({ provider: "meta", workspaceId: "review", userId: "reviewer", expiresAt: Date.now() - 1 })).toString("base64url");
+  const expiredSignature = crypto.createHmac("sha256", Buffer.from(process.env.INTEGRATION_CREDENTIAL_ENCRYPTION_KEY, "base64")).update(expiredPayload).digest("base64url");
+  assert.equal(oauth.verifyState(`${expiredPayload}.${expiredSignature}`, "meta"), null);
+  let storedFilter;
+  await oauth.exchangeCode("meta", "mock-code", signedState, {
+    models: { WorkspaceMembership: { findOne: () => membershipQuery({ workspaceId: { _id: "review", status: "active" }, userId: "reviewer", role: "viewer", roles: ["viewer"], status: "active", permissionOverrides: { allow: ["social.manage"], deny: CAPABILITIES.filter(item => item !== "social.manage") } }) } },
+    exchangeProvider: async () => ({ credentials: { accessToken: "mock-token" }, scopes: ["instagram_business_basic"], assets: [{ id: "ig-1", username: "review", name: "Review IG", avatarUrl: "https://images.example.test/review.jpg" }] }),
+    SocialConnection: { async findOneAndUpdate(value) { storedFilter = value; return { _id: "connection" }; } },
+  });
+  assert.deepEqual(storedFilter, { workspaceId: "review", provider: "meta" });
+}
+
+function reviewerSurfaceChecks() {
+  const auth = { roles: ["viewer"], effectivePermissions: ["social.manage"] };
+  const check = (method, path) => new Promise((resolve) => {
+    const response = { status(code) { return { json(body) { resolve({ code, body }); } }; } };
+    restrictNewRoleSurface({ method, path, auth }, response, () => resolve({ code: 200 }));
+  });
+  return Promise.all([
+    check("GET", "/social-workspace/accounts").then(result => assert.equal(result.code, 200)),
+    check("GET", "/social/meta/oauth/start").then(result => assert.equal(result.code, 200)),
+    check("PATCH", "/social/meta/assets").then(result => assert.equal(result.code, 200)),
+    ...["/contacts", "/opportunities", "/coaching", "/workspace/members", "/ambassadors", "/integrations", "/conversations", "/analytics", "/social-workspace/inbox"].map(path => check("GET", path).then(result => assert.equal(result.code, 403, path))),
+  ]);
 }
 
 async function subscriptionChecks() {
@@ -105,11 +176,13 @@ function loggingAndSafetyChecks() {
   const webhook = fs.readFileSync(path.join(__dirname, "routes/webhooks.js"), "utf8");
   const publishing = fs.readFileSync(path.join(__dirname, "services/socialPublishingService.js"), "utf8");
   assert.equal(route.includes("error.response?.data"), false);
+  assert.equal(route.includes('requireRole("owner", "admin")'), false);
+  for (const operation of ['router.get("/:provider/oauth/start", requireCapability("social.manage")', 'router.patch("/:provider/assets", requireCapability("social.manage")', 'router.post("/instagram/oauth/refresh", requireCapability("social.manage")', 'router.post("/:provider/oauth/disconnect", requireCapability("social.manage")']) assert.ok(route.includes(operation));
   assert.ok(webhook.includes("deliverMetaReply"));
   assert.ok(fs.readFileSync(path.join(__dirname, "services/metaAutomationReplyService.js"), "utf8").includes('META_AUTOMATIC_REPLIES_ENABLED !== "true"'));
   assert.ok(publishing.includes('SOCIAL_PUBLISHING_ENABLED!=="true"'));
 }
 
-Promise.resolve().then(oauthChecks).then(subscriptionChecks).then(convergenceChecks).then(raceCheck).then(loggingAndSafetyChecks)
+Promise.resolve().then(oauthChecks).then(reviewerOAuthAuthorizationChecks).then(signedStateAndCompletionChecks).then(reviewerSurfaceChecks).then(subscriptionChecks).then(convergenceChecks).then(raceCheck).then(loggingAndSafetyChecks)
   .then(() => console.log("Meta pre-connection checks passed: actual permissions, token verification, subscriptions, convergence, race safety, idempotent/fail-closed outbound behavior, and secret-safe logging."))
   .catch((error) => { console.error(error); process.exitCode = 1; });

@@ -142,6 +142,7 @@ module.exports = {
   COOKIE_NAME,
   clearSessionCookie,
   createAuthContext,
+  isPlatformOwner,
   parseCookies,
   requireAuth,
   requireCapability,

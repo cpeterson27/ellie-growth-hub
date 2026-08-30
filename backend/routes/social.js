@@ -1,5 +1,5 @@
 const express = require("express");
-const { requireRole } = require("../middleware/auth");
+const { requireCapability } = require("../middleware/auth");
 const socialOAuth = require("../services/socialOAuthService");
 const metaDeauthorization = require("../services/metaDeauthorizationService");
 
@@ -38,7 +38,7 @@ router.get("/:provider/oauth/status", async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
-router.get("/:provider/oauth/start", requireRole("owner", "admin"), (req, res) => {
+router.get("/:provider/oauth/start", requireCapability("social.manage"), (req, res) => {
   const id = provider(req, res);
   if (!id) return;
   try {
@@ -63,7 +63,7 @@ router.get("/:provider/oauth/callback", async (req, res) => {
   }
 });
 
-router.patch("/:provider/assets", requireRole("owner", "admin"), async (req, res) => {
+router.patch("/:provider/assets", requireCapability("social.manage"), async (req, res) => {
   const id = provider(req, res);
   if (!id) return;
   try {
@@ -72,12 +72,12 @@ router.patch("/:provider/assets", requireRole("owner", "admin"), async (req, res
   } catch (error) { return res.status(400).json({ error: error.message }); }
 });
 
-router.post("/instagram/oauth/refresh", requireRole("owner", "admin"), async (req, res) => {
+router.post("/instagram/oauth/refresh", requireCapability("social.manage"), async (req, res) => {
   try { return res.json(await socialOAuth.refreshInstagram(req.auth.workspaceId)); }
   catch { return res.status(400).json({ error: "Instagram authorization could not be refreshed. It must be unexpired and at least 24 hours old. Reconnect if necessary." }); }
 });
 
-router.post("/:provider/oauth/disconnect", requireRole("owner", "admin"), async (req, res, next) => {
+router.post("/:provider/oauth/disconnect", requireCapability("social.manage"), async (req, res, next) => {
   const id = provider(req, res);
   if (!id) return;
   try { return res.json(await socialOAuth.disconnect(req.auth.workspaceId, id)); }

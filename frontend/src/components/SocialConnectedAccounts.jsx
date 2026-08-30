@@ -6,6 +6,10 @@ import "./SocialConnectedAccounts.css";
 
 const icons = { meta: FaFacebookF, instagram: FaInstagram, linkedin: FaLinkedinIn };
 const date = value => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : "Not recorded";
+const socialAssetIdentity = asset => ({
+  primary: asset?.username ? `@${String(asset.username).replace(/^@/, "")}` : asset?.name || "Account",
+  secondary: asset?.username && asset?.name && asset.name !== asset.username ? asset.name : "",
+});
 function ChannelRow({ channel, connection, connections, busy, onConnect, onDisconnect, onSelectAssets, onRefresh }) {
   const Icon = icons[channel.provider];
   const state = connectionState(connection);
@@ -21,16 +25,17 @@ function ChannelRow({ channel, connection, connections, busy, onConnect, onDisco
       const ownedElsewhere = elsewhere.has(asset.id);
       const needsParent = asset.type === "instagram_business" && asset.parentId && !selectedIds.includes(asset.parentId);
       const linked = assets.find(row => row.parentId === asset.id);
+      const identity = socialAssetIdentity(asset);
       return <label key={asset.id}><input type="checkbox" checked={selectedIds.includes(asset.id)} disabled={ownedElsewhere || needsParent} onChange={event => choose(asset, event.target.checked)}/>
-        {asset.avatarUrl ? <img className="social-asset-avatar" src={asset.avatarUrl} alt="" referrerPolicy="no-referrer"/> : <span className="social-asset-avatar social-asset-initials" aria-hidden="true">{(asset.name || "Account").slice(0, 1)}</span>}
-        <span>{asset.username ? `@${asset.username}` : asset.name || "Account"}<small>{ownedElsewhere ? "Already connected through another method — deselect it there to switch" : needsParent ? "Select its Facebook Page first" : selectedIds.includes(asset.id) ? "Selected" : "Available to select"}{linked ? ` · Linked Instagram: @${linked.username || linked.name}` : ""}</small></span></label>;
+        {asset.avatarUrl ? <img className="social-asset-avatar" src={asset.avatarUrl} alt={`${identity.primary} profile`} referrerPolicy="no-referrer"/> : <span className="social-asset-avatar social-asset-initials" aria-hidden="true">{(asset.name || asset.username || "Account").slice(0, 1).toUpperCase()}</span>}
+        <span>{identity.primary}<small>{[identity.secondary, ownedElsewhere ? "Already connected through another method — deselect it there to switch" : needsParent ? "Select its Facebook Page first" : selectedIds.includes(asset.id) ? "Selected" : "Available to select", linked ? `Linked Instagram: @${linked.username || linked.name}` : ""].filter(Boolean).join(" · ")}</small></span></label>;
     })}
     {channel.provider === "meta" && <p>For Instagram-specific work, prefer Connect Instagram. A linked Instagram account stays inactive unless explicitly selected here.</p>}
   </fieldset>;
   return <article className={`social-channel ${channel.secondary ? "social-channel--secondary" : ""}`}>
     <div className="social-channel-main">
       <span className={`social-channel-icon social-channel-icon--${channel.provider}`} aria-hidden="true">{Icon ? <Icon/> : "𝕏"}</span>
-      <div className="social-channel-copy"><h3>{channel.name}</h3><p>{connection.connected ? selected.map(asset => asset.username ? `@${asset.username.replace(/^@/, "")}` : asset.name).filter(Boolean).join(", ") || connection.account?.name || "Account authorized — choose an account below" : channel.description}</p></div>
+      <div className="social-channel-copy"><h3>{channel.name}</h3><p>{connection.connected ? selected.map(asset => { const identity = socialAssetIdentity(asset); return [identity.primary, identity.secondary].filter(Boolean).join(" · "); }).filter(Boolean).join(", ") || connection.account?.name || "Account authorized — choose an account below" : channel.description}</p></div>
       <span className={`social-connection-badge social-connection-badge--${state.tone}`}>{state.label}</span>
       <div className="social-channel-action">{connection.configured ? <Button disabled={busy} onClick={() => onConnect(connection.provider)}>{connection.connected || state.tone === "attention" ? `Reconnect ${channel.name}` : `Connect ${channel.name}`}</Button> : <span className="social-setup-label">Setup required</span>}</div>
     </div>

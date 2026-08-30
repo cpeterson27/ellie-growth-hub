@@ -24,7 +24,7 @@ import {
 import useAuth from "../context/useAuth.js";
 import useWorkspaceTheme from "../context/useWorkspaceTheme.js";
 import { fetchWorkspaceConfig } from "../services/api.js";
-import { canManageCoaching, canUseCoachPortal, hasAnyPermission, hasPermission, isAmbassadorOnly, isCoachOnly } from "../utils/roleAccess.js";
+import { canManageCoaching, canUseCoachPortal, hasAnyPermission, hasPermission, isAmbassadorOnly, isCoachOnly, isSocialConnectionOnly } from "../utils/roleAccess.js";
 import "./Sidebar.css";
 
 const navGroups = [
@@ -90,7 +90,8 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   }, []);
   const coachOnly = isCoachOnly(session);
   const ambassadorOnly = isAmbassadorOnly(session);
-  let groups = ambassadorOnly ? ambassadorGroups : coachOnly ? coachGroups : canManageCoaching(session) ? [navGroups[0], coachingGroup, ...navGroups.slice(1)] : navGroups;
+  const socialConnectionOnly = isSocialConnectionOnly(session);
+  let groups = socialConnectionOnly ? [{ label: "Meta App Review", items: navGroups.flatMap((group) => group.items).filter((item) => item.path === "/social") }] : ambassadorOnly ? ambassadorGroups : coachOnly ? coachGroups : canManageCoaching(session) ? [navGroups[0], coachingGroup, ...navGroups.slice(1)] : navGroups;
   if (!coachOnly && canUseCoachPortal(session)) groups = [...groups, ...coachGroups];
   const visibleGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => (!item.platformOnly || session?.isPlatformOwner) && (!item.permissions || hasAnyPermission(session, item.permissions))) })).filter((group) => group.items.length);
   const appBranding = organization?.appBranding || site?.appBranding || {};

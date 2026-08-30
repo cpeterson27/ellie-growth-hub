@@ -8,7 +8,7 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { WorkspaceThemeProvider } from "./context/WorkspaceThemeContext.jsx";
 import PublicHomepageAnchors from "./components/PublicHomepageAnchors.jsx";
 import useAuth from "./context/useAuth.js";
-import { canManageCoaching, canUseCoachPortal, canUseSales, hasPermission, isAmbassadorOnly, isCoachOnly } from "./utils/roleAccess.js";
+import { canManageCoaching, canUseCoachPortal, canUseSales, hasPermission, isAmbassadorOnly, isCoachOnly, isSocialConnectionOnly } from "./utils/roleAccess.js";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Events = lazy(() => import("./pages/Events.jsx"));
@@ -81,6 +81,18 @@ function ProtectedApp() {
   const { loading, session } = useAuth();
   if (loading) return <div className="auth-loading">Opening your private workspace…</div>;
   if (!session) return <Navigate to="/login" replace />;
+  if (isSocialConnectionOnly(session)) return (
+    <InitiativeProvider enabled={false}>
+      <DashboardLayout>
+        <Routes>
+          <Route path="/social" element={<Navigate to="/social/accounts" replace />} />
+          <Route path="/social/accounts" element={<SocialWorkspace connectionsOnly />} />
+          <Route path="/profile" element={<MyProfile />} />
+          <Route path="*" element={<Navigate to="/social/accounts" replace />} />
+        </Routes>
+      </DashboardLayout>
+    </InitiativeProvider>
+  );
   if (isAmbassadorOnly(session)) return <InitiativeProvider enabled={false}><DashboardLayout><Routes><Route path="/ambassador" element={<AmbassadorPortal />} /><Route path="/profile" element={<MyProfile />} /><Route path="*" element={<Navigate to="/ambassador" replace />} /></Routes></DashboardLayout></InitiativeProvider>;
   if (isCoachOnly(session)) return (
     <InitiativeProvider enabled={false}>

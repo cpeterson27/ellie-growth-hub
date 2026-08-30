@@ -1,6 +1,10 @@
 export function hasPermission(session, permission) { return Boolean(session?.effectivePermissions?.includes(permission)); }
 export function hasAnyPermission(session, permissions) { return permissions.some((item) => hasPermission(session, item)); }
 export function hasRole(session, role) { return (session?.roles || [session?.role]).includes(role); }
+export function isSocialConnectionOnly(session) {
+  const permissions = session?.effectivePermissions || [];
+  return permissions.length === 1 && permissions[0] === "social.manage" && !hasRole(session, "owner") && !hasRole(session, "admin");
+}
 export function isCoachOnly(session) { return hasRole(session, "coach") && !hasRole(session, "closer") && !hasRole(session, "owner") && !hasRole(session, "admin"); }
 export function isAmbassadorOnly(session) { return hasRole(session, "ambassador") && !hasRole(session, "coach") && !hasRole(session, "closer") && !hasRole(session, "owner") && !hasRole(session, "admin") && !hasRole(session, "member") && !hasRole(session, "viewer"); }
 export function canManageCoaching(session) { return hasPermission(session, "coaching.view"); }
