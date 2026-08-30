@@ -8,7 +8,7 @@
   gap: 1.5rem;
   min-height: 76px;
   padding: .75rem 1.4rem;
-  background: rgba(250,249,246,.94);
+  background: color-mix(in srgb, var(--app-header, #faf9f6) 94%, transparent);
   border-bottom: 1px solid rgba(27,54,47,.1);
   box-shadow: 0 8px 30px rgba(18,38,33,.045);
   backdrop-filter: blur(24px) saturate(150%);
@@ -35,7 +35,7 @@
   height: 46px;
   padding: 0 .8rem;
   border: 1px solid rgba(255,255,255,.12);
-  background: linear-gradient(145deg, #173d35, #0e2822);
+  background: var(--app-primary-action, #173d35);
   color: #fffdf7;
   border-radius: 3px;
   box-shadow: none;

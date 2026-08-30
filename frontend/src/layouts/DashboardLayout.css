@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: 236px 1fr;
   min-height: 100vh;
-  background: #f4f2ed;
+  background: var(--app-background, #f4f2ed);
   position: relative;
 }
 .dashboard-shell--collapsed{grid-template-columns:78px 1fr}.dashboard-shell--collapsed .dashboard-view{grid-column:2}

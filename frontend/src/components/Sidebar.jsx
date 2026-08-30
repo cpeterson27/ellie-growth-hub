@@ -93,10 +93,14 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   let groups = ambassadorOnly ? ambassadorGroups : coachOnly ? coachGroups : canManageCoaching(session) ? [navGroups[0], coachingGroup, ...navGroups.slice(1)] : navGroups;
   if (!coachOnly && canUseCoachPortal(session)) groups = [...groups, ...coachGroups];
   const visibleGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => (!item.platformOnly || session?.isPlatformOwner) && (!item.permissions || hasAnyPermission(session, item.permissions))) })).filter((group) => group.items.length);
+  const appBranding = organization?.appBranding || site?.appBranding || {};
+  const appLogo = appBranding.logoUrl || organization?.organizationLogoUrl || "";
+  const compactLogo = appBranding.compactLogoUrl || appLogo;
+  const sidebarStyle = { "--app-sidebar-background": appBranding.sidebarBackgroundColor, "--app-sidebar-text": appBranding.sidebarTextColor };
   return (
-    <aside className={`${isOpen ? "sidebar sidebar--open" : "sidebar"} ${isCollapsed ? "sidebar--collapsed" : ""}`}>
+    <aside style={sidebarStyle} className={`${isOpen ? "sidebar sidebar--open" : "sidebar"} ${isCollapsed ? "sidebar--collapsed" : ""}`}>
       <div className="sidebar__brand">
-        <div className="sidebar__logo">{organization?.organizationLogoUrl?<img src={organization.organizationLogoUrl} alt={`${organization.workspaceName || "Workspace"} organization logo`}/>:<span aria-hidden="true">{(organization?.workspaceName||site?.workspace?.name||"Growth Operator").slice(0,1)}</span>}</div>
+        <div className="sidebar__logo">{appLogo?<picture>{compactLogo!==appLogo?<source media="(max-width: 900px)" srcSet={compactLogo}/>:null}<img src={appLogo} alt={`${organization?.workspaceName || "Workspace"} dashboard logo`}/></picture>:<span aria-hidden="true">{(organization?.workspaceName||site?.workspace?.name||"Growth Operator").slice(0,1)}</span>}</div>
         <div>
           <p>{organization?.workspaceName||site?.workspace?.name||"Growth Operator"}</p>
           <small>Powered by Growth Operator</small>

@@ -36,6 +36,7 @@ router.get("/", async (_req, res) => {
     addressCountry: config.addressCountry,
     websiteUrl: config.websiteUrl,
     organizationLogoUrl: config.organizationLogoUrl,
+    appBranding: config.appBranding || {},
     invitationIdentity: config.invitationIdentity || { senderName: "", replyToEmail: "" },
   });
 });
@@ -61,6 +62,7 @@ router.patch("/", async (req, res) => {
       websiteUrl: String(req.body?.websiteUrl || "").trim(),
       organizationLogoUrl: String(req.body?.organizationLogoUrl || "").trim(),
       invitationIdentity: { senderName: invitationSenderName, replyToEmail: invitationReplyToEmail },
+      ...(req.body?.appBranding ? { appBranding: req.body.appBranding } : {}),
     } },
     { upsert: true, new: true },
   );
@@ -76,6 +78,7 @@ router.patch("/", async (req, res) => {
     addressCountry: config.addressCountry,
     websiteUrl: config.websiteUrl,
     organizationLogoUrl: config.organizationLogoUrl,
+    appBranding: config.appBranding || {},
     invitationIdentity: config.invitationIdentity || { senderName: "", replyToEmail: "" },
   });
 });

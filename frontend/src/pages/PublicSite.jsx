@@ -1,28 +1,1041 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { FiArrowRight, FiCheck, FiExternalLink, FiMapPin, FiMenu, FiPlay, FiStar, FiX } from "react-icons/fi";
+import {
+  FiArrowRight,
+  FiCheck,
+  FiExternalLink,
+  FiMapPin,
+  FiMenu,
+  FiPlay,
+  FiStar,
+  FiX,
+} from "react-icons/fi";
 import useWorkspaceTheme from "../context/useWorkspaceTheme.js";
-import { fetchPublicProfile, fetchPublicProgram, fetchPublicTestimonials } from "../services/api.js";
+import {
+  fetchPublicProfile,
+  fetchPublicProgram,
+  fetchPublicTestimonials,
+} from "../services/api.js";
 import "./PublicSite.css";
 import "./PublicEnhancements.css";
 
 const applyPath = "/apply";
-function Brand({site}){const logo=site?.branding?.surfaceMode==="light"?"/elliescoachinglogo-dark.png":"/elliescoachinglogo-white.png";return <a className="public-brand" href="/#home" aria-label={`${site?.branding?.publicSiteName||"Ellie's Coaching"} home`}><img src={logo} alt={site?.branding?.publicSiteName||"Ellie's Coaching"}/></a>}
-function SmartLink({to,className,children}){return String(to||"").startsWith("/")?<Link className={className} to={to}>{children}</Link>:<a className={className} href={to}>{children}</a>}
-export function PublicLayout({children}){const{site,loading}=useWorkspaceTheme();const[open,setOpen]=useState(false);if(loading)return <div className="public-loading">Opening Ellie&apos;s Coaching…</div>;const socials=site?.publicSite?.socialLinks||[],showResults=site?.publicSite?.sectionVisibility?.results===true,close=()=>setOpen(false);return <div className="public-site"><a className="public-skip" href="#main-content">Skip to content</a><header className="public-nav"><Brand site={site}/><button className="public-menu" onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-controls="public-navigation" aria-label="Toggle navigation">{open?<FiX/>:<FiMenu/>}</button><nav id="public-navigation" className={open?"is-open":""}><a onClick={close} href="/#about">About</a><a onClick={close} href="/#programs">Programs</a><a onClick={close} href="/#team">Team</a><a onClick={close} href="/#testimonials">Testimonials</a>{showResults?<Link to="/testimonials">Results</Link>:null}<a onClick={close} href="/#contact">Contact</a><Link className="public-login" to="/login">Staff login</Link><Link className="public-button public-button--small" to={applyPath}>Apply</Link></nav></header>{children}<footer className="public-footer"><div className="public-footer__brand"><Brand site={site}/><p>{site?.publicSite?.footerText||"Multifamily coaching for investors ready to operate with intention."}</p></div><div><strong>Explore</strong><a href="/#programs">Programs</a><a href="/#about">About</a><a href="/#team">Team</a>{showResults?<Link to="/testimonials">Results</Link>:null}</div><div><strong>Connect</strong><a href="/#contact">Contact</a><Link to="/apply">Application</Link>{socials.map(link=><a key={link.url} href={link.url} target="_blank" rel="noreferrer">{link.label}</a>)}</div><div><strong>Company</strong><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link><Link to="/data-deletion">Data deletion</Link><Link to="/login">Staff login</Link></div><small>© {new Date().getFullYear()} {site?.branding?.publicSiteName||"Ellie's Coaching"}. {site?.branding?.poweredByGrowthOperator?"Powered by Growth Operator.":"All rights reserved."}</small></footer></div>}
+function Brand({ site }) {
+  const logo =
+    site?.branding?.publicSiteLogoUrl ||
+    (site?.branding?.surfaceMode === "light"
+      ? "/elliescoachinglogo-dark.png"
+      : "/elliescoachinglogo-white.png");
+  return (
+    <a
+      className="public-brand"
+      href="/#home"
+      aria-label={`${site?.branding?.publicSiteName || "Ellie's Coaching"} home`}
+    >
+      <img
+        src={logo}
+        alt={site?.branding?.publicSiteName || "Ellie's Coaching"}
+      />
+    </a>
+  );
+}
+function SmartLink({ to, className, children }) {
+  return String(to || "").startsWith("/") ? (
+    <Link className={className} to={to}>
+      {children}
+    </Link>
+  ) : (
+    <a className={className} href={to}>
+      {children}
+    </a>
+  );
+}
+export function PublicLayout({ children }) {
+  const { site, loading } = useWorkspaceTheme();
+  const [open, setOpen] = useState(false);
+  if (loading)
+    return <div className="public-loading">Opening Ellie&apos;s Coaching…</div>;
+  const socials = site?.publicSite?.socialLinks || [],
+    showResults = site?.publicSite?.sectionVisibility?.results === true,
+    close = () => setOpen(false);
+  return (
+    <div className="public-site">
+      <a className="public-skip" href="#main-content">
+        Skip to content
+      </a>
+      <header className="public-nav">
+        <Brand site={site} />
+        <button
+          className="public-menu"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls="public-navigation"
+          aria-label="Toggle navigation"
+        >
+          {open ? <FiX /> : <FiMenu />}
+        </button>
+        <nav id="public-navigation" className={open ? "is-open" : ""}>
+          <a onClick={close} href="/#about">
+            About
+          </a>
+          <a onClick={close} href="/#programs">
+            Programs
+          </a>
+          <a onClick={close} href="/#team">
+            Team
+          </a>
+          <a onClick={close} href="/#testimonials">
+            Testimonials
+          </a>
+          {showResults ? <Link to="/testimonials">Results</Link> : null}
+          <a onClick={close} href="/#contact">
+            Contact
+          </a>
+          <Link className="public-login" to="/login">
+            Staff login
+          </Link>
+          <Link className="public-button public-button--small" to={applyPath}>
+            Apply
+          </Link>
+        </nav>
+      </header>
+      {children}
+      <footer className="public-footer">
+        <div className="public-footer__brand">
+          <Brand site={site} />
+          <p>
+            {site?.publicSite?.footerText ||
+              "Multifamily coaching for investors ready to operate with intention."}
+          </p>
+        </div>
+        <div>
+          <strong>Explore</strong>
+          <a href="/#programs">Programs</a>
+          <a href="/#about">About</a>
+          <a href="/#team">Team</a>
+          {showResults ? <Link to="/testimonials">Results</Link> : null}
+        </div>
+        <div>
+          <strong>Connect</strong>
+          <a href="/#contact">Contact</a>
+          <Link to="/apply">Application</Link>
+          {socials.map((link) => (
+            <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
+              {link.label}
+            </a>
+          ))}
+        </div>
+        <div>
+          <strong>Company</strong>
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/data-deletion">Data deletion</Link>
+          <Link to="/login">Staff login</Link>
+        </div>
+        <small>
+          © {new Date().getFullYear()}{" "}
+          {site?.branding?.publicSiteName || "Ellie's Coaching"}.{" "}
+          {site?.branding?.poweredByGrowthOperator
+            ? "Powered by Growth Operator."
+            : "All rights reserved."}
+        </small>
+      </footer>
+    </div>
+  );
+}
 
-function ProgramCards({programs=[]}){if(!programs.length)return <p className="public-empty">Published program details are being prepared. Contact the Ellie Coaching team for current options.</p>;return <div className="program-list">{programs.map((program,index)=><article className={index===0?"program-card program-card--featured":"program-card"} key={program.id}><div className="program-card__number">{String(index+1).padStart(2,"0")}</div><div><p className="public-kicker">{index===0?"Featured program":"Coaching program"}</p><h3>{program.title}</h3><p>{program.summary||"Program details are being prepared."}</p>{program.audience?<small>Designed for: {program.audience}</small>:null}</div><div className="program-card__meta">{program.duration?.value?<span>{program.duration.value} {program.duration.unit}</span>:null}{program.price?.amount!=null?<strong>{new Intl.NumberFormat("en-US",{style:"currency",currency:program.price.currency||"USD",maximumFractionDigits:0}).format(program.price.amount)}</strong>:null}<Link to={`/coaching-programs/${program.slug}`}>Explore program <FiArrowRight/></Link></div></article>)}</div>}
-function Testimonials({rows=[]}){return <div className="testimonial-grid">{rows.map((row,index)=><blockquote className={index===0?"is-featured":""} key={row.id}>{row.avatarUrl?<img className="testimonial-avatar" src={row.avatarUrl} alt="" loading="lazy"/>:null}{row.rating?<div className="testimonial-stars" aria-label={`${row.rating} out of 5 stars`}>{Array.from({length:row.rating},(_,i)=><FiStar key={i}/>)}</div>:null}<p>“{row.body}”</p>{row.resultContext?<small>{row.resultContext}</small>:null}<footer><strong>{row.displayName}</strong>{row.headline?<span>{row.headline}</span>:null}</footer>{row.videoUrl?<a href={row.videoUrl} target="_blank" rel="noreferrer">Watch their story <FiExternalLink/></a>:null}</blockquote>)}</div>}
-function embedUrl(value){try{const url=new URL(value);if(url.hostname.includes("youtube.com"))return `https://www.youtube.com/embed/${url.searchParams.get("v")||url.pathname.split("/").filter(Boolean).pop()}`;if(url.hostname==="youtu.be")return `https://www.youtube.com/embed/${url.pathname.slice(1)}`;if(url.hostname.includes("vimeo.com"))return `https://player.vimeo.com/video/${url.pathname.split("/").filter(Boolean).pop()}`}catch{return ""}return ""}
-function VideoFeature({site}){const p=site?.publicSite||{};const[playing,setPlaying]=useState(false),closeRef=useRef(null),embed=embedUrl(p.introVideoUrl);useEffect(()=>{if(playing)closeRef.current?.focus()},[playing]);if(!p.introVideoUrl&&!p.introVideoPosterUrl)return null;return <section className="video-feature" aria-labelledby="video-title"><div className="video-feature__media" style={p.introVideoPosterUrl?{backgroundImage:`linear-gradient(90deg,rgba(4,7,5,.2),rgba(4,7,5,.74)),url(${p.introVideoPosterUrl})`}:undefined}><button type="button" className="video-play" onClick={()=>setPlaying(true)} disabled={!p.introVideoUrl} aria-label={p.introVideoUrl?`Play ${p.introVideoTitle||"intro video"}`:"Intro video coming soon"}><FiPlay/><span>{p.introVideoUrl?"Play film":"Video coming soon"}</span></button></div><div className="video-feature__copy"><p className="public-kicker">{p.introVideoEyebrow||"Meet Ellie"}</p><h2 id="video-title">{p.introVideoTitle}</h2><p>{p.introVideoCopy}</p><div className="public-actions"><Link className="public-button" to="/apply">Start your application <FiArrowRight/></Link><Link className="public-text-link" to="/coaching-programs">Explore programs</Link></div></div>{playing?<div className="video-modal" role="dialog" aria-modal="true" aria-label={p.introVideoTitle||"Ellie Coaching introduction"} onKeyDown={event=>event.key==="Escape"&&setPlaying(false)}><button ref={closeRef} onClick={()=>setPlaying(false)} aria-label="Close video"><FiX/></button><div>{embed?<iframe src={embed} title={p.introVideoTitle||"Ellie Coaching introduction"} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen/>:<video src={p.introVideoUrl} poster={p.introVideoPosterUrl} controls autoPlay/>}</div></div>:null}</section>}
-function Portrait({person}){return person.avatarUrl?<img src={person.avatarUrl} alt={person.displayName} loading="lazy"/>:<div className="team-placeholder" aria-hidden="true">{person.displayName.slice(0,2).toUpperCase()}</div>}
-function Team({rows=[]}){if(!rows.length)return null;const[leader,...team]=rows;return <section className="team-section public-section" id="team"><header><div><p className="public-kicker">The people behind the program</p><h2>Guidance from a team—not a faceless course.</h2></div><p>Published profiles introduce the specialists students may learn from across the journey.</p></header><article className="team-lead"><Portrait person={leader}/><div><p className="public-kicker">{leader.publicTitle||"Coaching team"}</p><h3>{leader.displayName}</h3><p className="team-headline">{leader.headline}</p><p>{leader.bio}</p><Link to={`/people/${leader.slug}`}>Meet {leader.displayName.split(" ")[0]} <FiArrowRight/></Link></div></article>{team.length?<div className="team-rail">{team.map(person=><article key={person.slug}><Portrait person={person}/><p className="public-kicker">{person.publicTitle||"Coach"}</p><h3>{person.displayName}</h3><p>{person.headline}</p><Link to={`/people/${person.slug}`}>View profile <FiArrowRight/></Link></article>)}</div>:null}</section>}
+function ProgramCards({ programs = [] }) {
+  const [expanded, setExpanded] = useState(""),
+    [applying, setApplying] = useState(null),
+    closeRef = useRef(null);
+  useEffect(() => {
+    if (applying) closeRef.current?.focus();
+  }, [applying]);
+  if (!programs.length)
+    return <p className="public-empty">No programs are currently published.</p>;
+  return (
+    <>
+      <div className="program-list">
+        {programs.map((program) => (
+          <article className="program-card" key={program.id}>
+            {program.imageUrl ? (
+              <img
+                className="program-card__image"
+                src={program.imageUrl}
+                alt=""
+                loading="lazy"
+              />
+            ) : null}
+            <div className="program-card__body">
+              <p className="public-kicker">Coaching program</p>
+              <h3>{program.title}</h3>
+              <p>{program.summary}</p>
+              <div className="program-card__facts">
+                {program.duration?.value ? (
+                  <span>
+                    {program.duration.value} {program.duration.unit}
+                  </span>
+                ) : null}
+                {program.price?.amount != null ? (
+                  <strong>
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: program.price.currency || "USD",
+                      maximumFractionDigits: 0,
+                    }).format(program.price.amount)}
+                  </strong>
+                ) : null}
+              </div>
+              <div className="program-card__actions">
+                <button
+                  type="button"
+                  className="public-text-link"
+                  aria-expanded={expanded === String(program.id)}
+                  aria-controls={`program-details-${program.id}`}
+                  onClick={() =>
+                    setExpanded((current) =>
+                      current === String(program.id) ? "" : String(program.id),
+                    )
+                  }
+                >
+                  {expanded === String(program.id)
+                    ? "Hide details"
+                    : "View details"}
+                </button>
+                <button
+                  type="button"
+                  className="public-button public-button--small"
+                  onClick={() => setApplying(program)}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+            {expanded === String(program.id) ? (
+              <div
+                className="program-card__details"
+                id={`program-details-${program.id}`}
+              >
+                <p>{program.description}</p>
+                {program.audience ? (
+                  <>
+                    <h4>Who it is for</h4>
+                    <p>{program.audience}</p>
+                  </>
+                ) : null}
+                {program.curriculum?.length ? (
+                  <>
+                    <h4>Curriculum</h4>
+                    <ul>
+                      {program.curriculum.map((item) => (
+                        <li key={item}>
+                          <FiCheck />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                {program.outcomes?.length ? (
+                  <>
+                    <h4>Outcomes</h4>
+                    <ul>
+                      {program.outcomes.map((item) => (
+                        <li key={item}>
+                          <FiCheck />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                {program.highlights?.length ? (
+                  <>
+                    <h4>What to expect</h4>
+                    <ul>
+                      {program.highlights.map((item) => (
+                        <li key={item}>
+                          <FiCheck />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </article>
+        ))}
+      </div>
+      {applying ? (
+        <div
+          className="program-application-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="program-application-title"
+          onKeyDown={(event) => event.key === "Escape" && setApplying(null)}
+        >
+          <div>
+            <header>
+              <div>
+                <p className="public-kicker">Program application</p>
+                <h2 id="program-application-title">
+                  Apply for {applying.title}
+                </h2>
+              </div>
+              <button
+                ref={closeRef}
+                type="button"
+                onClick={() => setApplying(null)}
+                aria-label="Close application"
+              >
+                <FiX />
+              </button>
+            </header>
+            <iframe
+              title={`Application for ${applying.title}`}
+              src={`/apply?program=${encodeURIComponent(applying.slug || applying.id)}`}
+            />
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+function Testimonials({ rows = [] }) {
+  return (
+    <div className="testimonial-grid">
+      {rows.map((row, index) => (
+        <blockquote className={index === 0 ? "is-featured" : ""} key={row.id}>
+          {row.avatarUrl ? (
+            <img
+              className="testimonial-avatar"
+              src={row.avatarUrl}
+              alt=""
+              loading="lazy"
+            />
+          ) : null}
+          {row.rating ? (
+            <div
+              className="testimonial-stars"
+              aria-label={`${row.rating} out of 5 stars`}
+            >
+              {Array.from({ length: row.rating }, (_, i) => (
+                <FiStar key={i} />
+              ))}
+            </div>
+          ) : null}
+          <p>“{row.body}”</p>
+          {row.resultContext ? <small>{row.resultContext}</small> : null}
+          <footer>
+            <strong>{row.displayName}</strong>
+            {row.headline ? <span>{row.headline}</span> : null}
+          </footer>
+          {row.videoUrl ? (
+            <a href={row.videoUrl} target="_blank" rel="noreferrer">
+              Watch their story <FiExternalLink />
+            </a>
+          ) : null}
+        </blockquote>
+      ))}
+    </div>
+  );
+}
+function embedUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.hostname.includes("youtube.com"))
+      return `https://www.youtube.com/embed/${url.searchParams.get("v") || url.pathname.split("/").filter(Boolean).pop()}`;
+    if (url.hostname === "youtu.be")
+      return `https://www.youtube.com/embed/${url.pathname.slice(1)}`;
+    if (url.hostname.includes("vimeo.com"))
+      return `https://player.vimeo.com/video/${url.pathname.split("/").filter(Boolean).pop()}`;
+  } catch {
+    return "";
+  }
+  return "";
+}
+function VideoFeature({ site }) {
+  const p = site?.publicSite || {};
+  const [playing, setPlaying] = useState(false),
+    closeRef = useRef(null),
+    embed = embedUrl(p.introVideoUrl);
+  useEffect(() => {
+    if (playing) closeRef.current?.focus();
+  }, [playing]);
+  if (!p.introVideoUrl && !p.introVideoPosterUrl) return null;
+  return (
+    <section className="video-feature" aria-labelledby="video-title">
+      <div
+        className="video-feature__media"
+        style={
+          p.introVideoPosterUrl
+            ? {
+                backgroundImage: `linear-gradient(90deg,rgba(4,7,5,.2),rgba(4,7,5,.74)),url(${p.introVideoPosterUrl})`,
+              }
+            : undefined
+        }
+      >
+        <button
+          type="button"
+          className="video-play"
+          onClick={() => setPlaying(true)}
+          disabled={!p.introVideoUrl}
+          aria-label={
+            p.introVideoUrl
+              ? `Play ${p.introVideoTitle || "intro video"}`
+              : "Intro video coming soon"
+          }
+        >
+          <FiPlay />
+          <span>{p.introVideoUrl ? "Play film" : "Video coming soon"}</span>
+        </button>
+      </div>
+      <div className="video-feature__copy">
+        <p className="public-kicker">{p.introVideoEyebrow || "Meet Ellie"}</p>
+        <h2 id="video-title">{p.introVideoTitle}</h2>
+        <p>{p.introVideoCopy}</p>
+        <div className="public-actions">
+          <Link className="public-button" to="/apply">
+            Start your application <FiArrowRight />
+          </Link>
+          <Link className="public-text-link" to="/coaching-programs">
+            Explore programs
+          </Link>
+        </div>
+      </div>
+      {playing ? (
+        <div
+          className="video-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={p.introVideoTitle || "Ellie Coaching introduction"}
+          onKeyDown={(event) => event.key === "Escape" && setPlaying(false)}
+        >
+          <button
+            ref={closeRef}
+            onClick={() => setPlaying(false)}
+            aria-label="Close video"
+          >
+            <FiX />
+          </button>
+          <div>
+            {embed ? (
+              <iframe
+                src={embed}
+                title={p.introVideoTitle || "Ellie Coaching introduction"}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <video
+                src={p.introVideoUrl}
+                poster={p.introVideoPosterUrl}
+                controls
+                autoPlay
+              />
+            )}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+function Portrait({ person }) {
+  return person.avatarUrl ? (
+    <img src={person.avatarUrl} alt={person.displayName} loading="lazy" />
+  ) : (
+    <div className="team-placeholder" aria-hidden="true">
+      {person.displayName.slice(0, 2).toUpperCase()}
+    </div>
+  );
+}
+function Team({ rows = [] }) {
+  if (!rows.length) return null;
+  const [leader, ...team] = rows;
+  return (
+    <section className="team-section public-section" id="team">
+      <header>
+        <div>
+          <p className="public-kicker">The people behind the program</p>
+          <h2>Guidance from a team—not a faceless course.</h2>
+        </div>
+        <p>
+          Published profiles introduce the specialists students may learn from
+          across the journey.
+        </p>
+      </header>
+      <article className="team-lead">
+        <Portrait person={leader} />
+        <div>
+          <p className="public-kicker">
+            {leader.publicTitle || "Coaching team"}
+          </p>
+          <h3>{leader.displayName}</h3>
+          <p className="team-headline">{leader.headline}</p>
+          <p>{leader.bio}</p>
+          <Link to={`/people/${leader.slug}`}>
+            Meet {leader.displayName.split(" ")[0]} <FiArrowRight />
+          </Link>
+        </div>
+      </article>
+      {team.length ? (
+        <div className="team-rail">
+          {team.map((person) => (
+            <article key={person.slug}>
+              <Portrait person={person} />
+              <p className="public-kicker">{person.publicTitle || "Coach"}</p>
+              <h3>{person.displayName}</h3>
+              <p>{person.headline}</p>
+              <Link to={`/people/${person.slug}`}>
+                View profile <FiArrowRight />
+              </Link>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
 
-export function PublicHome(){const{site}=useWorkspaceTheme();const p=site?.publicSite||{},visibility=p.sectionVisibility||{},logo=site?.branding?.publicSiteLogoUrl||(site?.workspace?.slug==="ellie"?"/elliescoachinglogo.png":"");return <PublicLayout><main id="main-content"><section className="public-hero"><div className="public-hero__copy"><p className="public-kicker">{p.eyebrow||"Multifamily investing · coaching · execution"}</p><h1>{p.headline}</h1><p>{p.subheadline}</p><div className="public-actions"><SmartLink className="public-button" to={p.primaryCtaUrl||applyPath}>{p.primaryCtaLabel||"Apply to join"}<FiArrowRight/></SmartLink>{p.secondaryCtaLabel&&p.secondaryCtaUrl?<SmartLink className="public-button public-button--ghost" to={p.secondaryCtaUrl}>{p.secondaryCtaLabel}</SmartLink>:<Link className="public-text-link" to="/coaching-programs">View programs</Link>}</div></div><div className="public-hero__mark"><span>Structured programs</span>{logo?<img src={logo} alt={site?.branding?.publicSiteName||"Ellie Coaching"}/>:null}<small>Real people · practical work · accountable progress</small></div></section>{visibility.video!==false?<VideoFeature site={site}/>:null}<section className="public-intro"><div><p className="public-kicker">Why Ellie Coaching</p><h2>{p.introTitle}</h2></div><div><p>{p.introBody}</p><Link to="/about">Learn about the approach <FiArrowRight/></Link></div></section>{visibility.proof!==false&&p.trustMetrics?.length?<section className="proof-strip" aria-label="Ellie Coaching facts">{p.trustMetrics.map(metric=><div key={`${metric.value}-${metric.label}`}><strong>{metric.value}</strong><span>{metric.label}</span></div>)}</section>:null}<section className="public-value"><article><span>01</span><h3>Practical education</h3><p>Turn multifamily concepts into decisions and next steps you can actually work through.</p></article><article><span>02</span><h3>Specialist guidance</h3><p>Learn with experienced people whose perspectives support different parts of the process.</p></article><article><span>03</span><h3>Structured progression</h3><p>Move through a defined program with continuity, accountability, and a clear view of what comes next.</p></article></section>{visibility.programs!==false?<section className="public-section public-section--programs" id="programs"><header><div><p className="public-kicker">Programs</p><h2>Choose the support that meets you where you are.</h2></div><Link to="/coaching-programs">View all programs <FiArrowRight/></Link></header><ProgramCards programs={site?.programs}/></section>:null}{visibility.journey!==false?<section className="public-process"><header><p className="public-kicker">Your path</p><h2>From exploring a program to doing the work.</h2><p>Applying starts a conversation. Enrollment is not automatic or guaranteed.</p></header><ol>{["Explore the programs","Submit a program application","Speak with Ellie’s team","Join the appropriate program","Enter the Skool community","Work with your coaching team"].map((step,i)=><li key={step}><span>{String(i+1).padStart(2,"0")}</span><strong>{step}</strong></li>)}</ol></section>:null}{visibility.team!==false?<Team rows={site?.team}/>:null}{visibility.testimonials!==false&&site?.featuredTestimonials?.length?<section className="public-section results-section"><header><div><p className="public-kicker">Student perspectives</p><h2>Progress, told by people doing the work.</h2></div><Link to="/testimonials">View all results <FiArrowRight/></Link></header><Testimonials rows={site.featuredTestimonials}/></section>:null}{visibility.event!==false&&site?.upcomingEvent?<section className="public-event"><div className="public-event__date"><span>{new Date(site.upcomingEvent.startDate).toLocaleDateString(undefined,{month:"short"})}</span><strong>{new Date(site.upcomingEvent.startDate).getDate()}</strong></div><div><p className="public-kicker">Upcoming training</p><h2>{site.upcomingEvent.name}</h2><p>{site.upcomingEvent.summary}</p>{site.upcomingEvent.registrationUrl?<a className="public-button public-button--dark" href={site.upcomingEvent.registrationUrl}>Event details <FiArrowRight/></a>:null}</div></section>:null}{visibility.community!==false&&p.communityTitle&&p.communityBody?<section className="community-section"><p className="community-section__word" aria-hidden="true">COMMUNITY</p><div><p className="public-kicker">After enrollment</p><h2>{p.communityTitle}</h2><p>{p.communityBody}</p>{p.communityCtaLabel&&p.communityCtaUrl?<SmartLink className="public-text-link" to={p.communityCtaUrl}>{p.communityCtaLabel}<FiArrowRight/></SmartLink>:null}</div></section>:null}<section className="public-final"><div><p className="public-kicker">{p.finalCtaEyebrow||"Ready for your next move?"}</p><h2>{p.finalCtaTitle||"Choose the program that fits your goals and apply to become a student."}</h2><p>{p.finalCtaCopy}</p></div><div><SmartLink className="public-button" to={p.finalCtaUrl||applyPath}>{p.finalCtaLabel||"Apply to join"}<FiArrowRight/></SmartLink><Link className="public-text-link" to="/coaching-programs">Explore programs</Link></div></section></main></PublicLayout>}
+export function PublicHome() {
+  const { site } = useWorkspaceTheme();
+  const p = site?.publicSite || {},
+    visibility = p.sectionVisibility || {},
+    logo =
+      p.heroMediaUrl ||
+      site?.branding?.publicSiteLogoUrl ||
+      (site?.workspace?.slug === "ellie" ? "/elliescoachinglogo.png" : "");
+  return (
+    <PublicLayout>
+      <main id="main-content">
+        <section className="public-hero">
+          <div className="public-hero__copy">
+            <p className="public-kicker">
+              {p.eyebrow || "Multifamily investing · coaching · execution"}
+            </p>
+            <h1>{p.headline}</h1>
+            <p>{p.subheadline}</p>
+            <div className="public-actions">
+              <SmartLink
+                className="public-button"
+                to={p.primaryCtaUrl || applyPath}
+              >
+                {p.primaryCtaLabel || "Apply to join"}
+                <FiArrowRight />
+              </SmartLink>
+              {p.secondaryCtaLabel && p.secondaryCtaUrl ? (
+                <SmartLink
+                  className="public-button public-button--ghost"
+                  to={p.secondaryCtaUrl}
+                >
+                  {p.secondaryCtaLabel}
+                </SmartLink>
+              ) : (
+                <Link className="public-text-link" to="/coaching-programs">
+                  View programs
+                </Link>
+              )}
+            </div>
+          </div>
+          <div className="public-hero__mark">
+            <span>Structured programs</span>
+            {logo ? (
+              <img
+                src={logo}
+                alt={p.heroMediaUrl ? "" : site?.branding?.publicSiteName || "Ellie Coaching"}
+              />
+            ) : null}
+            <small>Real people · practical work · accountable progress</small>
+          </div>
+        </section>
+        {visibility.video !== false ? <VideoFeature site={site} /> : null}
+        <section className="public-intro">
+          <div>
+            <p className="public-kicker">Why Ellie Coaching</p>
+            <h2>{p.introTitle}</h2>
+          </div>
+          <div>
+            <p>{p.introBody}</p>
+            <Link to="/about">
+              Learn about the approach <FiArrowRight />
+            </Link>
+          </div>
+        </section>
+        {visibility.proof !== false && p.trustMetrics?.length ? (
+          <section className="proof-strip" aria-label="Ellie Coaching facts">
+            {p.trustMetrics.map((metric) => (
+              <div key={`${metric.value}-${metric.label}`}>
+                <strong>{metric.value}</strong>
+                <span>{metric.label}</span>
+              </div>
+            ))}
+          </section>
+        ) : null}
+        <section className="public-value">
+          <article>
+            <span>01</span>
+            <h3>Practical education</h3>
+            <p>
+              Turn multifamily concepts into decisions and next steps you can
+              actually work through.
+            </p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Specialist guidance</h3>
+            <p>
+              Learn with experienced people whose perspectives support different
+              parts of the process.
+            </p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Structured progression</h3>
+            <p>
+              Move through a defined program with continuity, accountability,
+              and a clear view of what comes next.
+            </p>
+          </article>
+        </section>
+        {visibility.programs !== false ? (
+          <section
+            className="public-section public-section--programs"
+            id="programs"
+          >
+            <header>
+              <div>
+                <p className="public-kicker">Programs</p>
+                <h2>Choose the support that meets you where you are.</h2>
+              </div>
+              <Link to="/coaching-programs">
+                View all programs <FiArrowRight />
+              </Link>
+            </header>
+            <ProgramCards programs={site?.programs} />
+          </section>
+        ) : null}
+        {visibility.journey !== false ? (
+          <section className="public-process">
+            <header>
+              <p className="public-kicker">Your path</p>
+              <h2>From exploring a program to doing the work.</h2>
+              <p>
+                Applying starts a conversation. Enrollment is not automatic or
+                guaranteed.
+              </p>
+            </header>
+            <ol>
+              {[
+                "Explore the programs",
+                "Submit a program application",
+                "Speak with Ellie’s team",
+                "Join the appropriate program",
+                "Enter the Skool community",
+                "Work with your coaching team",
+              ].map((step, i) => (
+                <li key={step}>
+                  <span>{String(i + 1).padStart(2, "0")}</span>
+                  <strong>{step}</strong>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
+        {visibility.team !== false ? <Team rows={site?.team} /> : null}
+        {visibility.testimonials !== false &&
+        site?.featuredTestimonials?.length ? (
+          <section className="public-section results-section">
+            <header>
+              <div>
+                <p className="public-kicker">Student perspectives</p>
+                <h2>Progress, told by people doing the work.</h2>
+              </div>
+              <Link to="/testimonials">
+                View all results <FiArrowRight />
+              </Link>
+            </header>
+            <Testimonials rows={site.featuredTestimonials} />
+          </section>
+        ) : null}
+        {visibility.event !== false && site?.upcomingEvent ? (
+          <section className="public-event">
+            <div className="public-event__date">
+              <span>
+                {new Date(site.upcomingEvent.startDate).toLocaleDateString(
+                  undefined,
+                  { month: "short" },
+                )}
+              </span>
+              <strong>
+                {new Date(site.upcomingEvent.startDate).getDate()}
+              </strong>
+            </div>
+            <div>
+              <p className="public-kicker">Upcoming training</p>
+              <h2>{site.upcomingEvent.name}</h2>
+              <p>{site.upcomingEvent.summary}</p>
+              {site.upcomingEvent.registrationUrl ? (
+                <a
+                  className="public-button public-button--dark"
+                  href={site.upcomingEvent.registrationUrl}
+                >
+                  Event details <FiArrowRight />
+                </a>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+        {visibility.community !== false &&
+        p.communityTitle &&
+        p.communityBody ? (
+          <section className="community-section">
+            <p className="community-section__word" aria-hidden="true">
+              COMMUNITY
+            </p>
+            <div>
+              <p className="public-kicker">After enrollment</p>
+              <h2>{p.communityTitle}</h2>
+              <p>{p.communityBody}</p>
+              {p.communityCtaLabel && p.communityCtaUrl ? (
+                <SmartLink className="public-text-link" to={p.communityCtaUrl}>
+                  {p.communityCtaLabel}
+                  <FiArrowRight />
+                </SmartLink>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+        <section className="public-final">
+          <div>
+            <p className="public-kicker">
+              {p.finalCtaEyebrow || "Ready for your next move?"}
+            </p>
+            <h2>
+              {p.finalCtaTitle ||
+                "Choose the program that fits your goals and apply to become a student."}
+            </h2>
+            <p>{p.finalCtaCopy}</p>
+          </div>
+          <div>
+            <SmartLink
+              className="public-button"
+              to={p.finalCtaUrl || applyPath}
+            >
+              {p.finalCtaLabel || "Apply to join"}
+              <FiArrowRight />
+            </SmartLink>
+            <Link className="public-text-link" to="/coaching-programs">
+              Explore programs
+            </Link>
+          </div>
+        </section>
+      </main>
+    </PublicLayout>
+  );
+}
 
-export function AboutPage(){const{site}=useWorkspaceTheme();return <PublicLayout><main id="main-content" className="public-inner"><p className="public-kicker">About Ellie</p><h1>Experience, perspective, and practical support.</h1><div className="public-prose"><p>{site?.publicSite?.aboutBody||"Ellie's complete public biography is ready to be configured in Growth Operator. Ellie Coaching helps multifamily investors develop clearer strategy, stronger operating habits, and the confidence to take informed action."}</p><h2>Why clients work with Ellie Coaching</h2><ul><li><FiCheck/>Business and operator-focused guidance</li><li><FiCheck/>Practical multifamily investing perspective</li><li><FiCheck/>Structured accountability and honest next steps</li></ul></div></main></PublicLayout>}
-export function ProgramsPage(){const{site}=useWorkspaceTheme();return <PublicLayout><main id="main-content" className="public-inner"><p className="public-kicker">Coaching programs</p><h1>Support designed around the work of becoming an operator.</h1><ProgramCards programs={site?.programs}/></main></PublicLayout>}
-export function ProgramDetail(){const{slug}=useParams();const[row,setRow]=useState(null),[error,setError]=useState("");useEffect(()=>{const timer=window.setTimeout(()=>fetchPublicProgram(slug).then(setRow).catch(()=>setError("This program is not currently published.")),0);return()=>window.clearTimeout(timer)},[slug]);if(!row)return <PublicLayout><main id="main-content" className="public-inner">{error?<p className="public-empty">{error}</p>:<div className="public-loading">Loading program…</div>}</main></PublicLayout>;const base=row.cta?.url||applyPath,applyUrl=base.startsWith("/apply")?`${base}${base.includes("?")?"&":"?"}program=${encodeURIComponent(row.slug)}`:base;return <PublicLayout><main id="main-content" className="public-inner"><p className="public-kicker">Coaching program</p><h1>{row.title}</h1><p className="public-lead">{row.summary}</p>{row.introVideoUrl?<video className="public-program-video" src={row.introVideoUrl} controls preload="metadata"/>:null}<div className="public-prose"><p>{row.description}</p>{row.audience?<><h2>Who it is for</h2><p>{row.audience}</p></>:null}{row.highlights?.length?<><h2>What to expect</h2><ul>{row.highlights.map(item=><li key={item}><FiCheck/>{item}</li>)}</ul></>:null}</div><SmartLink className="public-button" to={applyUrl}>{row.cta?.label||"Apply to join"}</SmartLink>{row.cta?.supportingText?<p>{row.cta.supportingText}</p>:null}</main></PublicLayout>}
-export function TestimonialsPage(){const{site}=useWorkspaceTheme();const[rows,setRows]=useState([]),enabled=site?.publicSite?.sectionVisibility?.results===true;useEffect(()=>{const timer=window.setTimeout(()=>{if(enabled)fetchPublicTestimonials().then(setRows).catch(()=>{})},0);return()=>window.clearTimeout(timer)},[enabled]);return <PublicLayout><main id="main-content" className="public-inner">{enabled?<><p className="public-kicker">Student perspectives</p><h1>Stories from investors doing the work.</h1>{rows.length?<Testimonials rows={rows}/>:<p className="public-empty">Approved student stories will appear here.</p>}</>:<p className="public-empty">The Results page is not currently published.</p>}</main></PublicLayout>}
-export function ContactPage(){const{site}=useWorkspaceTheme(),p=site?.publicSite||{};return <PublicLayout><main id="main-content" className="public-inner"><p className="public-kicker">Contact</p><h1>Start a conversation with Ellie Coaching.</h1><div className="contact-panel"><div><h2>Program questions</h2><p>Questions before choosing a program? Use the configured contact information below, or submit the secure program application when you are ready.</p>{p.contactEmail?<a href={`mailto:${p.contactEmail}`}>{p.contactEmail}</a>:<span>Email address awaiting configuration</span>}{p.contactPhone?<a href={`tel:${p.contactPhone}`}>{p.contactPhone}</a>:null}</div><div><h2>Social</h2>{p.socialLinks?.length?p.socialLinks.map(link=><a key={link.url} href={link.url} target="_blank" rel="noreferrer">{link.label}<FiExternalLink/></a>):<span>Social links awaiting configuration</span>}</div></div></main></PublicLayout>}
-export function PublicProfilePage(){const{slug}=useParams();const[row,setRow]=useState(null),[error,setError]=useState("");useEffect(()=>{const timer=window.setTimeout(()=>fetchPublicProfile(slug).then(setRow).catch(()=>setError("This profile is private or unavailable.")),0);return()=>window.clearTimeout(timer)},[slug]);return <PublicLayout><main id="main-content" className={`profile-page profile-page--${row?.layout||"executive"}`}>{error?<p className="public-empty">{error}</p>:row?<><header>{row.avatarUrl?<img src={row.avatarUrl} alt={row.displayName}/>:<span>{row.displayName.slice(0,2).toUpperCase()}</span>}<div><p>{row.publicTitle||row.ownerType}</p><h1>{row.displayName}</h1><h2>{row.headline}</h2>{row.publicLocation?<small><FiMapPin/>{row.publicLocation}</small>:null}</div></header>{row.bio?<section><h2>About</h2><p>{row.bio}</p></section>:null}{row.specialties.length?<section><h2>Focus</h2><div className="profile-tags">{row.specialties.map(item=><span key={item}>{item}</span>)}</div></section>:null}{row.goals.length?<section><h2>Goals</h2><div className="profile-tags">{row.goals.map(item=><span key={item}>{item}</span>)}</div></section>:null}{row.experience?<section><h2>Experience</h2><p>{row.experience}</p></section>:null}<section className="profile-links">{row.websiteUrl?<a href={row.websiteUrl}>Website<FiExternalLink/></a>:null}{row.socialLinks.map(link=><a key={link.url} href={link.url}>{link.label}<FiExternalLink/></a>)}{row.cta?.url?<SmartLink className="public-button" to={row.cta.url}>{row.cta.label||"Connect"}</SmartLink>:null}</section></>:<div className="public-loading">Loading profile…</div>}</main></PublicLayout>}
+export function AboutPage() {
+  const { site } = useWorkspaceTheme();
+  return (
+    <PublicLayout>
+      <main id="main-content" className="public-inner">
+        <p className="public-kicker">About Ellie</p>
+        <h1>Experience, perspective, and practical support.</h1>
+        <div className="public-prose">
+          <p>
+            {site?.publicSite?.aboutBody ||
+              "Ellie's complete public biography is ready to be configured in Growth Operator. Ellie Coaching helps multifamily investors develop clearer strategy, stronger operating habits, and the confidence to take informed action."}
+          </p>
+          <h2>Why clients work with Ellie Coaching</h2>
+          <ul>
+            <li>
+              <FiCheck />
+              Business and operator-focused guidance
+            </li>
+            <li>
+              <FiCheck />
+              Practical multifamily investing perspective
+            </li>
+            <li>
+              <FiCheck />
+              Structured accountability and honest next steps
+            </li>
+          </ul>
+        </div>
+      </main>
+    </PublicLayout>
+  );
+}
+export function ProgramsPage() {
+  const { site } = useWorkspaceTheme();
+  return (
+    <PublicLayout>
+      <main id="main-content" className="public-inner">
+        <p className="public-kicker">Coaching programs</p>
+        <h1>Support designed around the work of becoming an operator.</h1>
+        <ProgramCards programs={site?.programs} />
+      </main>
+    </PublicLayout>
+  );
+}
+export function ProgramDetail() {
+  const { slug } = useParams();
+  const [row, setRow] = useState(null),
+    [error, setError] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () =>
+        fetchPublicProgram(slug)
+          .then(setRow)
+          .catch(() => setError("This program is not currently published.")),
+      0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [slug]);
+  if (!row)
+    return (
+      <PublicLayout>
+        <main id="main-content" className="public-inner">
+          {error ? (
+            <p className="public-empty">{error}</p>
+          ) : (
+            <div className="public-loading">Loading program…</div>
+          )}
+        </main>
+      </PublicLayout>
+    );
+  const base = row.cta?.url || applyPath,
+    applyUrl = base.startsWith("/apply")
+      ? `${base}${base.includes("?") ? "&" : "?"}program=${encodeURIComponent(row.slug)}`
+      : base;
+  return (
+    <PublicLayout>
+      <main id="main-content" className="public-inner">
+        <p className="public-kicker">Coaching program</p>
+        <h1>{row.title}</h1>
+        <p className="public-lead">{row.summary}</p>
+        {row.introVideoUrl ? (
+          <video
+            className="public-program-video"
+            src={row.introVideoUrl}
+            controls
+            preload="metadata"
+          />
+        ) : null}
+        <div className="public-prose">
+          <p>{row.description}</p>
+          {row.audience ? (
+            <>
+              <h2>Who it is for</h2>
+              <p>{row.audience}</p>
+            </>
+          ) : null}
+          {row.highlights?.length ? (
+            <>
+              <h2>What to expect</h2>
+              <ul>
+                {row.highlights.map((item) => (
+                  <li key={item}>
+                    <FiCheck />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </div>
+        <SmartLink className="public-button" to={applyUrl}>
+          {row.cta?.label || "Apply to join"}
+        </SmartLink>
+        {row.cta?.supportingText ? <p>{row.cta.supportingText}</p> : null}
+      </main>
+    </PublicLayout>
+  );
+}
+export function TestimonialsPage() {
+  const { site } = useWorkspaceTheme();
+  const [rows, setRows] = useState([]),
+    enabled = site?.publicSite?.sectionVisibility?.results === true;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (enabled)
+        fetchPublicTestimonials()
+          .then(setRows)
+          .catch(() => {});
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [enabled]);
+  return (
+    <PublicLayout>
+      <main id="main-content" className="public-inner">
+        {enabled ? (
+          <>
+            <p className="public-kicker">Student perspectives</p>
+            <h1>Stories from investors doing the work.</h1>
+            {rows.length ? (
+              <Testimonials rows={rows} />
+            ) : (
+              <p className="public-empty">
+                Approved student stories will appear here.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="public-empty">
+            The Results page is not currently published.
+          </p>
+        )}
+      </main>
+    </PublicLayout>
+  );
+}
+export function ContactPage() {
+  const { site } = useWorkspaceTheme(),
+    p = site?.publicSite || {};
+  return (
+    <PublicLayout>
+      <main id="main-content" className="public-inner">
+        <p className="public-kicker">Contact</p>
+        <h1>Start a conversation with Ellie Coaching.</h1>
+        <div className="contact-panel">
+          <div>
+            <h2>Program questions</h2>
+            <p>
+              Questions before choosing a program? Use the configured contact
+              information below, or submit the secure program application when
+              you are ready.
+            </p>
+            {p.contactEmail ? (
+              <a href={`mailto:${p.contactEmail}`}>{p.contactEmail}</a>
+            ) : (
+              <span>Email address awaiting configuration</span>
+            )}
+            {p.contactPhone ? (
+              <a href={`tel:${p.contactPhone}`}>{p.contactPhone}</a>
+            ) : null}
+          </div>
+          <div>
+            <h2>Social</h2>
+            {p.socialLinks?.length ? (
+              p.socialLinks.map((link) => (
+                <a
+                  key={link.url}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {link.label}
+                  <FiExternalLink />
+                </a>
+              ))
+            ) : (
+              <span>Social links awaiting configuration</span>
+            )}
+          </div>
+        </div>
+      </main>
+    </PublicLayout>
+  );
+}
+export function PublicProfilePage() {
+  const { slug } = useParams();
+  const [row, setRow] = useState(null),
+    [error, setError] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () =>
+        fetchPublicProfile(slug)
+          .then(setRow)
+          .catch(() => setError("This profile is private or unavailable.")),
+      0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [slug]);
+  return (
+    <PublicLayout>
+      <main
+        id="main-content"
+        className={`profile-page profile-page--${row?.layout || "executive"}`}
+      >
+        {error ? (
+          <p className="public-empty">{error}</p>
+        ) : row ? (
+          <>
+            <header>
+              {row.avatarUrl ? (
+                <img src={row.avatarUrl} alt={row.displayName} />
+              ) : (
+                <span>{row.displayName.slice(0, 2).toUpperCase()}</span>
+              )}
+              <div>
+                <p>{row.publicTitle || row.ownerType}</p>
+                <h1>{row.displayName}</h1>
+                <h2>{row.headline}</h2>
+                {row.publicLocation ? (
+                  <small>
+                    <FiMapPin />
+                    {row.publicLocation}
+                  </small>
+                ) : null}
+              </div>
+            </header>
+            {row.bio ? (
+              <section>
+                <h2>About</h2>
+                <p>{row.bio}</p>
+              </section>
+            ) : null}
+            {row.specialties.length ? (
+              <section>
+                <h2>Focus</h2>
+                <div className="profile-tags">
+                  {row.specialties.map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+            {row.goals.length ? (
+              <section>
+                <h2>Goals</h2>
+                <div className="profile-tags">
+                  {row.goals.map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+            {row.experience ? (
+              <section>
+                <h2>Experience</h2>
+                <p>{row.experience}</p>
+              </section>
+            ) : null}
+            <section className="profile-links">
+              {row.websiteUrl ? (
+                <a href={row.websiteUrl}>
+                  Website
+                  <FiExternalLink />
+                </a>
+              ) : null}
+              {row.socialLinks.map((link) => (
+                <a key={link.url} href={link.url}>
+                  {link.label}
+                  <FiExternalLink />
+                </a>
+              ))}
+              {row.cta?.url ? (
+                <SmartLink className="public-button" to={row.cta.url}>
+                  {row.cta.label || "Connect"}
+                </SmartLink>
+              ) : null}
+            </section>
+          </>
+        ) : (
+          <div className="public-loading">Loading profile…</div>
+        )}
+      </main>
+    </PublicLayout>
+  );
+}

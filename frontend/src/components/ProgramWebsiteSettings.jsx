@@ -1,20 +1,563 @@
 import { useEffect, useState } from "react";
 import Button from "./Button.jsx";
 import Modal from "./Modal.jsx";
-import { fetchCoachingPrograms, fetchWorkspaceMedia, updateProgramPublicPresentation, uploadProgramVideo } from "../services/api.js";
+import {
+  fetchCoachingPrograms,
+  fetchWorkspaceMedia,
+  updateProgramPublicPresentation,
+  uploadEventImage,
+  uploadProgramVideo,
+} from "../services/api.js";
 
 export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
-  const [programs, setPrograms] = useState([]), [editing, setEditing] = useState(null), [media, setMedia] = useState([]), [showLibrary, setShowLibrary] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState(""), [message, setMessage] = useState("");
-  const load = () => fetchCoachingPrograms({ limit: 200 }).then(setPrograms).catch((err) => setError(err.response?.data?.error || "Unable to load program website settings."));
-  useEffect(() => { const timer = window.setTimeout(load, 0); return () => window.clearTimeout(timer); }, []);
-  const patch = (key, value) => setEditing((row) => ({ ...row, publicPresentation: { ...row.publicPresentation, [key]: value } }));
-  const save = async () => { try { setSaving(true); const saved = await updateProgramPublicPresentation(editing._id, editing.publicPresentation || {}); setPrograms((rows) => rows.map((row) => row._id === saved._id ? saved : row)); setEditing(null); setMessage(`${saved.name} website presentation saved.`); setError(""); onChange?.(); } catch (err) { setError(err.response?.data?.error || "Unable to save program website settings."); } finally { setSaving(false); } };
-  const setVisibility = async (program, visible) => { try { setSaving(true); const saved = await updateProgramPublicPresentation(program._id, { ...program.publicPresentation, status: visible ? "published" : "hidden" }); setPrograms((rows) => rows.map((row) => row._id === saved._id ? saved : row)); onChange?.(); } catch (err) { setError(err.response?.data?.error || "Unable to update program visibility."); } finally { setSaving(false); } };
-  const chooseMedia = async () => { try { const assets = await fetchWorkspaceMedia(); setMedia(assets.filter((asset) => asset.type === "video")); setShowLibrary(true); } catch (err) { setError(err.response?.data?.error || "Unable to load the media library."); } };
-  const upload = async (file) => { if (!file) return; if (!file.type.startsWith("video/") || file.size > 75 * 1024 * 1024) return setError("Choose an MP4, WEBM, or MOV video up to 75 MB."); try { setSaving(true); const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); const asset = await uploadProgramVideo({ file: data, filename: file.name }); setEditing((row) => ({ ...row, publicPresentation: { ...row.publicPresentation, introVideoUrl: asset.url, introVideoPublicId: asset.publicId } })); } catch (err) { setError(err.response?.data?.error || "Unable to upload the video."); } finally { setSaving(false); } };
-  return <section className="website-focused-panel program-website-manager"><header className="website-section-heading"><div><p className="page-eyebrow">Public programs</p><h3>Programs</h3><p>Control which coaching programs visitors can see without changing program delivery settings.</p></div></header>{message ? <p className="discovery-notice">{message}</p> : null}{error ? <p className="form-error">{error}</p> : null}<div className="program-website-list">{programs.map((program) => { const data = program.publicPresentation || {}, visible = program.status === "active" && data.status === "published", state = program.status !== "active" ? "Draft" : visible ? "Published" : "Hidden"; return <article key={program._id}><div className="program-website-summary"><span className={`website-status-chip ${visible ? "is-live" : state === "Draft" ? "is-draft" : ""}`}>{state}</span><h4>{program.name}</h4><dl><div><dt>Public URL</dt><dd>{data.slug ? `/${data.slug}` : "Not set"}</dd></div><div><dt>Visibility</dt><dd>{visible ? "Shown on website" : "Not shown publicly"}</dd></div></dl></div><div className="program-website-actions"><Button variant="outline" onClick={() => setEditing({ ...program, publicPresentation: { ...data } })}>Edit Website Content</Button>{visible ? <a href={`${websiteUrl.replace(/\/$/, "")}/#programs`} target="_blank" rel="noreferrer">View on website ↗</a> : null}<Button variant={visible ? "ghost" : "primary"} disabled={saving || (program.status !== "active" && !visible)} onClick={() => setVisibility(program, !visible)}>{visible ? "Hide" : "Publish"}</Button></div></article>; })}</div>
-    <Modal isOpen={Boolean(editing)} onClose={() => { setEditing(null); setShowLibrary(false); }} title={editing ? `Edit ${editing.name}` : "Edit program"} footer={<div className="modal-action-row"><Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button loading={saving} onClick={save}>Save website presentation</Button></div>}>
-      {editing ? <div className="program-presentation-form"><section className="program-editor-group"><header><span>1</span><div><h4>Publishing</h4><p>Choose whether this active program appears publicly.</p></div></header><label className="website-toggle"><input type="checkbox" checked={editing.publicPresentation?.status === "published"} onChange={(e) => patch("status", e.target.checked ? "published" : "hidden")}/><span><strong>Show on website</strong><small>Only active programs can appear publicly.</small></span></label></section><section className="program-editor-group"><header><span>2</span><div><h4>Public content</h4><p>Write the visitor-facing URL and program introduction.</p></div></header><label>Public URL slug<input value={editing.publicPresentation?.slug || ""} onChange={(e) => patch("slug", e.target.value)} placeholder="6-week-coaching-program"/></label><label>Public headline<input value={editing.publicPresentation?.title || editing.name} onChange={(e) => patch("title", e.target.value)}/></label><label>Public description<textarea rows="6" value={editing.publicPresentation?.description || ""} onChange={(e) => patch("description", e.target.value)}/></label></section><section className="program-editor-group"><header><span>3</span><div><h4>Intro video</h4><p>Add an optional hosted video without exposing technical URLs.</p></div></header><fieldset className="program-video-picker"><legend className="sr-only">Intro video</legend>{editing.publicPresentation?.introVideoUrl ? <div className="program-video-preview"><video src={editing.publicPresentation.introVideoUrl} controls preload="metadata"/><div><Button size="sm" variant="outline" onClick={chooseMedia}>Replace video</Button><Button size="sm" variant="ghost" onClick={() => { patch("introVideoUrl", ""); patch("introVideoPublicId", ""); }}>Remove video</Button></div></div> : <div className="program-video-empty"><p>Add an optional welcome video to the public program presentation.</p><div><label className="website-upload-button">Upload video<input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(e) => upload(e.target.files?.[0])}/></label><Button variant="outline" onClick={chooseMedia}>Choose existing media</Button></div></div>}{showLibrary ? <div className="website-media-library"><strong>Choose existing media</strong>{media.length ? media.map((asset) => <button key={`${asset.contentId}-${asset.publicId || asset.url}`} type="button" onClick={() => { patch("introVideoUrl", asset.url); patch("introVideoPublicId", asset.publicId || ""); setShowLibrary(false); }}><video src={asset.url} preload="metadata"/><span>{asset.title || "Workspace video"}</span></button>) : <p>No reusable videos are in the media library yet.</p>}</div> : null}</fieldset></section><section className="program-editor-group"><header><span>4</span><div><h4>Call to action</h4><p>Set the application button and supporting message.</p></div></header><div className="program-presentation-grid"><label>Button text<input value={editing.publicPresentation?.ctaLabel || "Apply Now"} onChange={(e) => patch("ctaLabel", e.target.value)}/></label><label>CTA supporting text<input value={editing.publicPresentation?.ctaSupportingText || ""} onChange={(e) => patch("ctaSupportingText", e.target.value)}/></label></div></section><section className="program-editor-group"><header><span>5</span><div><h4>Display order</h4><p>Lower numbers appear first on the public website.</p></div></header><label>Display order<input type="number" value={editing.publicPresentation?.sortOrder || 0} onChange={(e) => patch("sortOrder", Number(e.target.value))}/></label></section></div> : null}
-    </Modal>
-  </section>;
+  const [programs, setPrograms] = useState([]),
+    [editing, setEditing] = useState(null),
+    [media, setMedia] = useState([]),
+    [showLibrary, setShowLibrary] = useState(false),
+    [saving, setSaving] = useState(false),
+    [error, setError] = useState(""),
+    [message, setMessage] = useState("");
+  const load = () =>
+    fetchCoachingPrograms({ limit: 200 })
+      .then(setPrograms)
+      .catch((err) =>
+        setError(
+          err.response?.data?.error ||
+            "Unable to load program website settings.",
+        ),
+      );
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const patch = (key, value) =>
+    setEditing((row) => ({
+      ...row,
+      publicPresentation: { ...row.publicPresentation, [key]: value },
+    }));
+  const save = async () => {
+    try {
+      setSaving(true);
+      const saved = await updateProgramPublicPresentation(
+        editing._id,
+        editing.publicPresentation || {},
+      );
+      setPrograms((rows) =>
+        rows.map((row) => (row._id === saved._id ? saved : row)),
+      );
+      setEditing(null);
+      setMessage(`${saved.name} website presentation saved.`);
+      setError("");
+      onChange?.();
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Unable to save program website settings.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  const setVisibility = async (program, visible) => {
+    try {
+      setSaving(true);
+      const saved = await updateProgramPublicPresentation(program._id, {
+        ...program.publicPresentation,
+        status: visible ? "published" : "hidden",
+      });
+      setPrograms((rows) =>
+        rows.map((row) => (row._id === saved._id ? saved : row)),
+      );
+      onChange?.();
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Unable to update program visibility.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  const chooseMedia = async (type = "video") => {
+    try {
+      const assets = await fetchWorkspaceMedia();
+      setMedia(assets.filter((asset) => asset.type === type));
+      setShowLibrary(type);
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Unable to load the media library.",
+      );
+    }
+  };
+  const upload = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("video/") || file.size > 75 * 1024 * 1024)
+      return setError("Choose an MP4, WEBM, or MOV video up to 75 MB.");
+    try {
+      setSaving(true);
+      const data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const asset = await uploadProgramVideo({
+        file: data,
+        filename: file.name,
+      });
+      setEditing((row) => ({
+        ...row,
+        publicPresentation: {
+          ...row.publicPresentation,
+          introVideoUrl: asset.url,
+          introVideoPublicId: asset.publicId,
+        },
+      }));
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to upload the video.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const uploadImage = async (file) => {
+    if (!file) return;
+    if (
+      !/^image\/(png|jpeg|webp)$/.test(file.type) ||
+      file.size > 5 * 1024 * 1024
+    )
+      return setError("Choose a PNG, JPG, or WEBP image up to 5 MB.");
+    try {
+      setSaving(true);
+      const data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const asset = await uploadEventImage({ file: data });
+      patch("imageUrl", asset.url);
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Unable to upload the program image.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <section className="website-focused-panel program-website-manager">
+      <header className="website-section-heading">
+        <div>
+          <p className="page-eyebrow">Public programs</p>
+          <h3>Programs</h3>
+          <p>
+            Control which coaching programs visitors can see without changing
+            program delivery settings.
+          </p>
+        </div>
+      </header>
+      {message ? <p className="discovery-notice">{message}</p> : null}
+      {error ? <p className="form-error">{error}</p> : null}
+      <div className="program-website-list">
+        {programs.map((program) => {
+          const data = program.publicPresentation || {},
+            visible =
+              program.status === "active" && data.status === "published",
+            state =
+              program.status !== "active"
+                ? "Draft"
+                : visible
+                  ? "Published"
+                  : "Hidden";
+          return (
+            <article key={program._id}>
+              <div className="program-website-summary">
+                <span
+                  className={`website-status-chip ${visible ? "is-live" : state === "Draft" ? "is-draft" : ""}`}
+                >
+                  {state}
+                </span>
+                <h4>{program.name}</h4>
+                <dl>
+                  <div>
+                    <dt>Public URL</dt>
+                    <dd>{data.slug ? `/${data.slug}` : "Not set"}</dd>
+                  </div>
+                  <div>
+                    <dt>Visibility</dt>
+                    <dd>
+                      {visible ? "Shown on website" : "Not shown publicly"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <div className="program-website-actions">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setEditing({ ...program, publicPresentation: { ...data } })
+                  }
+                >
+                  Edit Website Content
+                </Button>
+                {visible ? (
+                  <a
+                    href={`${websiteUrl.replace(/\/$/, "")}/#programs`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on website ↗
+                  </a>
+                ) : null}
+                <Button
+                  variant={visible ? "ghost" : "primary"}
+                  disabled={saving || (program.status !== "active" && !visible)}
+                  onClick={() => setVisibility(program, !visible)}
+                >
+                  {visible ? "Hide" : "Publish"}
+                </Button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <Modal
+        isOpen={Boolean(editing)}
+        onClose={() => {
+          setEditing(null);
+          setShowLibrary(false);
+        }}
+        title={editing ? `Edit ${editing.name}` : "Edit program"}
+        footer={
+          <div className="modal-action-row">
+            <Button variant="outline" onClick={() => setEditing(null)}>
+              Cancel
+            </Button>
+            <Button loading={saving} onClick={save}>
+              Save website presentation
+            </Button>
+          </div>
+        }
+      >
+        {editing ? (
+          <div className="program-presentation-form">
+            <section className="program-editor-group">
+              <header>
+                <span>1</span>
+                <div>
+                  <h4>Publishing</h4>
+                  <p>Choose whether this active program appears publicly.</p>
+                </div>
+              </header>
+              <label className="website-toggle">
+                <input
+                  type="checkbox"
+                  checked={editing.publicPresentation?.status === "published"}
+                  onChange={(e) =>
+                    patch("status", e.target.checked ? "published" : "hidden")
+                  }
+                />
+                <span>
+                  <strong>Show on website</strong>
+                  <small>
+                    A public URL, summary, and description are required to
+                    publish.
+                  </small>
+                </span>
+              </label>
+            </section>
+            <section className="program-editor-group">
+              <header>
+                <span>2</span>
+                <div>
+                  <h4>Public content</h4>
+                  <p>Write the complete visitor-facing program information.</p>
+                </div>
+              </header>
+              <label>
+                Public URL slug
+                <input
+                  value={editing.publicPresentation?.slug || ""}
+                  onChange={(e) => patch("slug", e.target.value)}
+                  placeholder="6-week-coaching-program"
+                />
+              </label>
+              <label>
+                Public headline
+                <input
+                  value={editing.publicPresentation?.title || editing.name}
+                  onChange={(e) => patch("title", e.target.value)}
+                />
+              </label>
+              <label>
+                Card summary
+                <textarea
+                  rows="3"
+                  value={editing.publicPresentation?.summary || ""}
+                  onChange={(e) => patch("summary", e.target.value)}
+                />
+              </label>
+              <label>
+                Full description
+                <textarea
+                  rows="6"
+                  value={editing.publicPresentation?.description || ""}
+                  onChange={(e) => patch("description", e.target.value)}
+                />
+              </label>
+              <label>
+                Who it is for
+                <textarea
+                  rows="3"
+                  value={editing.publicPresentation?.audience || ""}
+                  onChange={(e) => patch("audience", e.target.value)}
+                />
+              </label>
+              <label>
+                Curriculum / details (one per line)
+                <textarea
+                  rows="5"
+                  value={(editing.publicPresentation?.curriculum || []).join(
+                    "\n",
+                  )}
+                  onChange={(e) =>
+                    patch(
+                      "curriculum",
+                      e.target.value
+                        .split("\n")
+                        .map((value) => value.trim())
+                        .filter(Boolean),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                Outcomes (one per line)
+                <textarea
+                  rows="5"
+                  value={(editing.publicPresentation?.outcomes || []).join(
+                    "\n",
+                  )}
+                  onChange={(e) =>
+                    patch(
+                      "outcomes",
+                      e.target.value
+                        .split("\n")
+                        .map((value) => value.trim())
+                        .filter(Boolean),
+                    )
+                  }
+                />
+              </label>
+              <fieldset className="program-video-picker">
+                <legend>Program image</legend>
+                {editing.publicPresentation?.imageUrl ? (
+                  <div className="program-video-preview">
+                    <img src={editing.publicPresentation.imageUrl} alt="" />
+                    <div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => chooseMedia("image")}
+                      >
+                        Replace image
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => patch("imageUrl", "")}
+                      >
+                        Remove image
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="program-video-empty">
+                    <div>
+                      <label className="website-upload-button">
+                        Upload image
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(e) => uploadImage(e.target.files?.[0])}
+                        />
+                      </label>
+                      <Button
+                        variant="outline"
+                        onClick={() => chooseMedia("image")}
+                      >
+                        Choose existing image
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {showLibrary === "image" ? (
+                  <div className="website-media-library">
+                    <strong>Choose existing image</strong>
+                    {media.length ? (
+                      media.map((asset) => (
+                        <button
+                          key={asset.url}
+                          type="button"
+                          onClick={() => {
+                            patch("imageUrl", asset.url);
+                            setShowLibrary(false);
+                          }}
+                        >
+                          <img src={asset.url} alt="" />
+                          <span>{asset.title || "Workspace image"}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <p>No reusable images are in the media library yet.</p>
+                    )}
+                  </div>
+                ) : null}
+              </fieldset>
+            </section>
+            <section className="program-editor-group">
+              <header>
+                <span>3</span>
+                <div>
+                  <h4>Intro video</h4>
+                  <p>
+                    Add an optional hosted video without exposing technical
+                    URLs.
+                  </p>
+                </div>
+              </header>
+              <fieldset className="program-video-picker">
+                <legend className="sr-only">Intro video</legend>
+                {editing.publicPresentation?.introVideoUrl ? (
+                  <div className="program-video-preview">
+                    <video
+                      src={editing.publicPresentation.introVideoUrl}
+                      controls
+                      preload="metadata"
+                    />
+                    <div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => chooseMedia("video")}
+                      >
+                        Replace video
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          patch("introVideoUrl", "");
+                          patch("introVideoPublicId", "");
+                        }}
+                      >
+                        Remove video
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="program-video-empty">
+                    <p>
+                      Add an optional welcome video to the public program
+                      presentation.
+                    </p>
+                    <div>
+                      <label className="website-upload-button">
+                        Upload video
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/quicktime"
+                          onChange={(e) => upload(e.target.files?.[0])}
+                        />
+                      </label>
+                      <Button
+                        variant="outline"
+                        onClick={() => chooseMedia("video")}
+                      >
+                        Choose existing media
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {showLibrary === "video" ? (
+                  <div className="website-media-library">
+                    <strong>Choose existing media</strong>
+                    {media.length ? (
+                      media.map((asset) => (
+                        <button
+                          key={`${asset.contentId}-${asset.publicId || asset.url}`}
+                          type="button"
+                          onClick={() => {
+                            patch("introVideoUrl", asset.url);
+                            patch("introVideoPublicId", asset.publicId || "");
+                            setShowLibrary(false);
+                          }}
+                        >
+                          <video src={asset.url} preload="metadata" />
+                          <span>{asset.title || "Workspace video"}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <p>No reusable videos are in the media library yet.</p>
+                    )}
+                  </div>
+                ) : null}
+              </fieldset>
+            </section>
+            <section className="program-editor-group">
+              <header>
+                <span>4</span>
+                <div>
+                  <h4>Call to action</h4>
+                  <p>Set the application button and supporting message.</p>
+                </div>
+              </header>
+              <div className="program-presentation-grid">
+                <label>
+                  Button text
+                  <input
+                    value={editing.publicPresentation?.ctaLabel || "Apply Now"}
+                    onChange={(e) => patch("ctaLabel", e.target.value)}
+                  />
+                </label>
+                <label>
+                  CTA supporting text
+                  <input
+                    value={editing.publicPresentation?.ctaSupportingText || ""}
+                    onChange={(e) => patch("ctaSupportingText", e.target.value)}
+                  />
+                </label>
+                <label className="website-toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editing.publicPresentation?.priceVisible)}
+                    onChange={(e) => patch("priceVisible", e.target.checked)}
+                  />
+                  <span>
+                    <strong>Show configured price</strong>
+                    <small>Uses the canonical Coaching program price.</small>
+                  </span>
+                </label>
+              </div>
+            </section>
+            <section className="program-editor-group">
+              <header>
+                <span>5</span>
+                <div>
+                  <h4>Display order</h4>
+                  <p>Lower numbers appear first on the public website.</p>
+                </div>
+              </header>
+              <label>
+                Display order
+                <input
+                  type="number"
+                  value={editing.publicPresentation?.sortOrder || 0}
+                  onChange={(e) => patch("sortOrder", Number(e.target.value))}
+                />
+              </label>
+            </section>
+          </div>
+        ) : null}
+      </Modal>
+    </section>
+  );
 }
