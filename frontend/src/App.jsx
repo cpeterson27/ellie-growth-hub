@@ -86,8 +86,7 @@ function ProtectedApp() {
       <DashboardLayout>
         <Routes>
           <Route path="/social" element={<Navigate to="/social/accounts" replace />} />
-          <Route path="/social/accounts" element={<SocialWorkspace connectionsOnly />} />
-          <Route path="/profile" element={<MyProfile />} />
+<Route path="/social/accounts" element={<SocialWorkspace connectionsOnly section="accounts" />} />          <Route path="/profile" element={<MyProfile />} />
           <Route path="*" element={<Navigate to="/social/accounts" replace />} />
         </Routes>
       </DashboardLayout>
