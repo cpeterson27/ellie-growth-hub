@@ -105,7 +105,8 @@ function reviewerSurfaceChecks() {
     restrictNewRoleSurface({ method, path, auth }, response, () => resolve({ code: 200 }));
   });
   return Promise.all([
-    check("GET", "/social-workspace/accounts").then(result => assert.equal(result.code, 200)),
+    check("GET", "/social-workspace/accounts").then(result => assert.equal(result.code,200)),
+    check("GET", "/social-workspace/overview").then(result => assert.equal(result.code, 200)),
     check("GET", "/social/meta/oauth/start").then(result => assert.equal(result.code, 200)),
     check("PATCH", "/social/meta/assets").then(result => assert.equal(result.code, 200)),
     ...["/contacts", "/opportunities", "/coaching", "/workspace/members", "/ambassadors", "/integrations", "/conversations", "/analytics", "/social-workspace/inbox"].map(path => check("GET", path).then(result => assert.equal(result.code, 403, path))),
