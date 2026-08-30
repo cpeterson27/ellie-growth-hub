@@ -16,6 +16,11 @@ function ChannelRow({ channel, connection, connections, busy, onConnect, onDisco
   const selectedIds = connection.selectedAssetIds || [];
   const assets = connection.assets || [];
   const selected = assets.filter(asset => selectedIds.includes(asset.id) && (!channel.assetType || asset.type === channel.assetType));
+  const linkedInstagram = channel.provider === "meta" ? assets.filter(asset => asset.type === "instagram_business") : [];
+  const linkedInstagramSummary = linkedInstagram.map(asset => {
+    const identity = socialAssetIdentity(asset);
+    return `${identity.primary}${selectedIds.includes(asset.id) ? " · selected" : " · available"}`;
+  }).join(", ");
   const elsewhere = new Set(connections.filter(row => row.provider !== connection.provider).flatMap(row => row.selectedAssetIds || []));
   const choose = (asset, checked) => onSelectAssets(connection.provider, checked ? [...selectedIds, asset.id] : selectedIds.filter(id => id !== asset.id && !assets.some(row => row.id === id && row.parentId === asset.id)));
   const accountPicker = connection.connected && assets.length > 0 && <fieldset className="social-page-picker" disabled={busy}>
@@ -30,12 +35,12 @@ function ChannelRow({ channel, connection, connections, busy, onConnect, onDisco
         {asset.avatarUrl ? <img className="social-asset-avatar" src={asset.avatarUrl} alt={`${identity.primary} profile`} referrerPolicy="no-referrer"/> : <span className="social-asset-avatar social-asset-initials" aria-hidden="true">{(asset.name || asset.username || "Account").slice(0, 1).toUpperCase()}</span>}
         <span>{identity.primary}<small>{[identity.secondary, ownedElsewhere ? "Already connected through another method — deselect it there to switch" : needsParent ? "Select its Facebook Page first" : selectedIds.includes(asset.id) ? "Selected" : "Available to select", linked ? `Linked Instagram: @${linked.username || linked.name}` : ""].filter(Boolean).join(" · ")}</small></span></label>;
     })}
-    {channel.provider === "meta" && <p>For Instagram-specific work, prefer Connect Instagram. A linked Instagram account stays inactive unless explicitly selected here.</p>}
+    {channel.provider === "meta" && <p>A linked Instagram account is available through this Facebook connection only after you explicitly select it.</p>}
   </fieldset>;
   return <article className={`social-channel ${channel.secondary ? "social-channel--secondary" : ""}`}>
     <div className="social-channel-main">
       <span className={`social-channel-icon social-channel-icon--${channel.provider}`} aria-hidden="true">{Icon ? <Icon/> : "𝕏"}</span>
-      <div className="social-channel-copy"><h3>{channel.name}</h3><p>{connection.connected ? selected.map(asset => { const identity = socialAssetIdentity(asset); return [identity.primary, identity.secondary].filter(Boolean).join(" · "); }).filter(Boolean).join(", ") || connection.account?.name || "Account authorized — choose an account below" : channel.description}</p></div>
+      <div className="social-channel-copy"><h3>{channel.name}</h3><p>{connection.connected ? selected.map(asset => { const identity = socialAssetIdentity(asset); return [identity.primary, identity.secondary].filter(Boolean).join(" · "); }).filter(Boolean).join(", ") || connection.account?.name || "Account authorized — choose an account below" : channel.description}</p>{connection.connected && linkedInstagramSummary && <small>Linked Instagram: {linkedInstagramSummary}</small>}{channel.provider === "instagram" && <small>This direct-login method uses the Instagram Business permission flow. Confirm the professional account shown by Instagram before authorizing.</small>}</div>
       <span className={`social-connection-badge social-connection-badge--${state.tone}`}>{state.label}</span>
       <div className="social-channel-action">{connection.configured ? <Button disabled={busy} onClick={() => onConnect(connection.provider)}>{connection.connected || state.tone === "attention" ? `Reconnect ${channel.name}` : `Connect ${channel.name}`}</Button> : <span className="social-setup-label">Setup required</span>}</div>
     </div>

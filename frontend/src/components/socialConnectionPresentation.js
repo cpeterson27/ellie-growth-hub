@@ -1,6 +1,6 @@
 export const channelDefinitions = [
-  { provider: "meta", name: "Facebook", description: "Connect your Facebook Page", method: "Facebook Login", assetType: "facebook_page" },
-  { provider: "instagram", name: "Instagram", description: "Connect your professional Instagram account", method: "Instagram Login", assetType: "instagram_business" },
+  { provider: "meta", name: "Facebook Page and linked Instagram", description: "Connect a Facebook Page and choose its linked professional Instagram account", method: "Facebook Login for Business", assetType: "facebook_page" },
+  { provider: "instagram", name: "Instagram", description: "Alternative: sign in directly to the professional Instagram account", method: "Direct Instagram Login", assetType: "instagram_business" },
   { provider: "linkedin", name: "LinkedIn", description: "Company and professional publishing", method: "LinkedIn OAuth", secondary: true },
   { provider: "x", name: "X / Twitter", description: "Text publishing after provider setup", method: "OAuth 2.0 with PKCE", secondary: true },
 ];

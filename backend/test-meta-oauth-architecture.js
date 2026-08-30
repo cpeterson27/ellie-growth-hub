@@ -66,7 +66,11 @@ const query = value => ({ select: async () => value, lean: async () => value });
 async function run() {
   try {
     await assert.rejects(oauth.verifyMetaToken("fixture", { apiVersion: "v26.0", clientId: "fb-app", clientSecret: "fixture" }, { get: async () => ({ data: { data: { is_valid: true, app_id: "wrong-app" } } }) }), /invalid authorization/);
-    Membership.findOne = async filter => { assert.equal(filter.workspaceId, "workspace-a"); assert.equal(filter.userId, "owner-a"); return authorized ? {} : null; };
+    Membership.findOne = filter => {
+      assert.equal(filter.workspaceId, "workspace-a"); assert.equal(filter.userId, "owner-a");
+      const membership = authorized ? { workspaceId: { _id: "workspace-a", status: "active" }, userId: "owner-a", status: "active", roles: ["owner"] } : null;
+      return { populate: async () => membership };
+    };
     Connection.findOneAndUpdate = async (filter, update) => {
       assert.equal(filter.workspaceId, "workspace-a");
       const row = { ...stored.get(keyFor(filter)), ...update.$set, ...filter };
