@@ -44,13 +44,13 @@ function restrictNewRoleSurface(req, res, next) {
   const permissions = req.auth.effectivePermissions || [];
   const socialConnectionOnly = permissions.length === 1 && permissions[0] === "social.manage";
   if (socialConnectionOnly) {
-    const allowed = (
-      (req.method === "GET" && req.path === "/social-workspace/accounts")
-      || (req.method === "GET" && /^\/social\/(?:meta|instagram)\/oauth\/(?:status|start)$/.test(req.path))
-      || (req.method === "PATCH" && /^\/social\/(?:meta|instagram)\/assets$/.test(req.path))
-      || (req.method === "POST" && req.path === "/social/instagram/oauth/refresh")
-      || (req.method === "POST" && /^\/social\/(?:meta|instagram)\/oauth\/disconnect$/.test(req.path))
-    );
+   const allowed = (
+  (req.method === "GET" && (req.path === "/social-workspace/accounts" || req.path === "/social-workspace/overview"))
+  || (req.method === "GET" && /^\/social\/(?:meta|instagram)\/oauth\/(?:status|start)$/.test(req.path))
+  || (req.method === "PATCH" && /^\/social\/(?:meta|instagram)\/assets$/.test(req.path))
+  || (req.method === "POST" && req.path === "/social/instagram/oauth/refresh")
+  || (req.method === "POST" && /^\/social\/(?:meta|instagram)\/oauth\/disconnect$/.test(req.path))
+);
     return allowed ? next() : res.status(403).json({ error: "This review account can access connected social accounts only", code: "REVIEWER_SURFACE_FORBIDDEN" });
   }
   const roles = req.auth.roles || [req.auth.role];
