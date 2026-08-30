@@ -54,8 +54,8 @@ for (const value of [
   "Staff login",
   "VideoFeature",
   "Student perspectives",
-  "Your path",
-  "Skool community",
+  "journeyTitle",
+  "communityTitle",
   "team-section",
   "public-skip",
 ])
@@ -87,6 +87,10 @@ for (const value of [
 ])
   assert(admin.includes(value), `admin missing ${value}`);
 assert(theme.includes('setProperty("--workspace-primary"'));
+for (const size of [16, 32, 48, 180, 192, 512])
+  assert(theme.includes(String(size)), `favicon handling missing ${size}px size`);
+assert(theme.includes("apple-touch-icon") && theme.includes("app?.faviconUrl"));
+assert(site.includes("ApplicationButton") && site.includes('embed:"1"'));
 console.log(
   "Public routes, privacy-policy/data-deletion public routing, legal content, responsive breakpoints, accessibility motion controls, workspace tokens and moderation UI contracts passed.",
 );

@@ -35,9 +35,6 @@ const GmailIntegration = lazy(() => import("./pages/GmailIntegration.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation.jsx"));
 const PublicHome = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.PublicHome })));
-const AboutPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.AboutPage })));
-const ProgramsPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.ProgramsPage })));
-const ProgramDetail = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.ProgramDetail })));
 const TestimonialsPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.TestimonialsPage })));
 const ContactPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.ContactPage })));
 const PublicProfilePage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.PublicProfilePage })));
@@ -208,9 +205,9 @@ function App() {
         <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<PublicHome />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/coaching-programs" element={<ProgramsPage />} />
-            <Route path="/coaching-programs/:slug" element={<ProgramDetail />} />
+            <Route path="/about" element={<Navigate replace to="/#about" />} />
+            <Route path="/coaching-programs" element={<Navigate replace to="/#programs" />} />
+            <Route path="/coaching-programs/:slug" element={<Navigate replace to="/#programs" />} />
             <Route path="/testimonials" element={<TestimonialsPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/people/:slug" element={<PublicProfilePage />} />

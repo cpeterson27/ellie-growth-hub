@@ -109,12 +109,12 @@ export default function PublicApplication() {
       ? "Choose the program that fits your goals and tell us a little about where you are today."
       : config.intro;
   const heroLogo =
-    site?.branding?.publicSiteLogoUrl ||
+    config?.heroImageUrl || site?.branding?.publicSiteLogoUrl ||
     (site?.workspace?.slug === "ellie" ? "/elliescoachinglogo.png" : "");
+  const embedded = new URLSearchParams(location.search).get("embed") === "1";
 
-  return (
-    <PublicLayout>
-      <main className="application-page">
+  const content = (
+      <main className={`application-page ${embedded ? "application-page--embedded" : ""}`}>
         <section className="application-hero">
           <div className="application-hero__copy">
             <p className="public-kicker">Program application</p>
@@ -125,7 +125,7 @@ export default function PublicApplication() {
             <div className="application-hero__logo">
               <img
                 src={heroLogo}
-                alt={site?.branding?.publicSiteName || "Ellie Coaching"}
+                alt={config?.heroImageUrl ? "" : site?.branding?.publicSiteName || "Ellie Coaching"}
               />
             </div>
           ) : null}
@@ -293,9 +293,7 @@ export default function PublicApplication() {
                     set("privacyTermsAccepted", event.target.checked)
                   }
                 />
-                I acknowledge the{" "}
-                <a href={config?.privacyUrl || "/privacy"}>Privacy Policy</a>{" "}
-                and <a href={config?.termsUrl || "/terms"}>Terms</a>.
+                <span>I acknowledge the <a href={config?.privacyUrl || "/privacy"} target="_blank" rel="noreferrer">Privacy Policy</a> and <a href={config?.termsUrl || "/terms"} target="_blank" rel="noreferrer">Terms of Service</a>.</span>
               </label>
             </div>
             {error ? <p className="application-error">{error}</p> : null}
@@ -308,6 +306,6 @@ export default function PublicApplication() {
           </form>
         )}
       </main>
-    </PublicLayout>
   );
+  return embedded ? content : <PublicLayout>{content}</PublicLayout>;
 }

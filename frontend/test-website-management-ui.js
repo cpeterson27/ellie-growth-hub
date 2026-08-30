@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { publicSiteUrl } from "./src/utils/publicSiteUrl.js";
 const root = path.dirname(fileURLToPath(import.meta.url)), read = (file) => fs.readFileSync(path.join(root, "src", file), "utf8");
 const settings = read("pages/Settings.jsx"), dashboard = read("components/WebsiteBrandManager.jsx"), programs = read("components/ProgramWebsiteSettings.jsx"), publicAdmin = read("components/PublicSiteAdmin.jsx"), testimonials = read("components/TestimonialManager.jsx"), team = read("components/TeamAccess.jsx"), anchors = read("components/PublicHomepageAnchors.jsx"), css = read("components/WebsiteManagement.css");
+const branding = read("components/WorkspaceBrandingEditor.jsx"), applicationImage = read("components/ApplicationImageSettings.jsx");
 assert(settings.includes('className="account-settings-content"'));
 assert(settings.includes("WebsiteBrandManager"));
 assert(dashboard.includes("View Live Website ↗") && dashboard.includes("websiteUrl"));
@@ -20,6 +21,9 @@ for (const group of ["Publishing", "Public content", "Intro video", "Call to act
 for (const status of ["Published", "Draft", "Hidden"]) assert(programs.includes(status));
 assert(!programs.includes("Intro video URL"));
 assert(publicAdmin.includes('section==="team"') && publicAdmin.includes("Edit public profile"));
+for (const field of ["valuePropositions", "journeySteps", "eventTitle", "communityTitle", "finalCtaTitle", "headingFont", "baseFontSize"]) assert(publicAdmin.includes(field), `website editor missing ${field}`);
+assert(branding.includes("Social profiles") && !branding.includes("Choose workspace asset") && !branding.includes("Compact logo"));
+assert(applicationImage.includes("heroImageUrl") && settings.includes("ApplicationImageSettings"));
 for (const action of ["Add Testimonial", "Save testimonial", "Publish", "Hide", "Feature", "Confirm delete", "Public preview"]) assert(testimonials.includes(action));
 assert(testimonials.includes("uploadEventImage"));
 assert(team.includes("Cancel invitation") && team.includes("Confirm cancellation"));

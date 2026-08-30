@@ -50,6 +50,12 @@ function SmartLink({ to, className, children }) {
     </a>
   );
 }
+function ApplicationButton({ className="public-button", children="Apply", program }) {
+  const [open,setOpen]=useState(false), closeRef=useRef(null);
+  useEffect(()=>{if(!open)return undefined;closeRef.current?.focus();const prior=document.body.style.overflow;document.body.style.overflow="hidden";return()=>{document.body.style.overflow=prior}},[open]);
+  const query=new URLSearchParams({embed:"1",...(program?{program}: {})});
+  return <><button type="button" className={className} onClick={()=>setOpen(true)}>{children}</button>{open?<div className="program-application-modal" role="dialog" aria-modal="true" aria-label="Program application" onKeyDown={event=>event.key==="Escape"&&setOpen(false)}><div><header><div><p className="public-kicker">Program application</p><h2>Start your application</h2></div><button ref={closeRef} type="button" onClick={()=>setOpen(false)} aria-label="Close application"><FiX/></button></header><iframe title="Program application" src={`/apply?${query}`}/></div></div>:null}</>;
+}
 export function PublicLayout({ children }) {
   const { site, loading } = useWorkspaceTheme();
   const [open, setOpen] = useState(false);
@@ -59,7 +65,7 @@ export function PublicLayout({ children }) {
     showResults = site?.publicSite?.sectionVisibility?.results === true,
     close = () => setOpen(false);
   return (
-    <div className="public-site">
+    <div className="public-site" style={{"--public-base-size":`${site?.publicSite?.baseFontSize||16}px`,"--public-heading-scale":site?.publicSite?.headingScale||1,"--public-heading-font":site?.publicSite?.headingFont==="modern"?'Inter,ui-sans-serif,system-ui,sans-serif':'Georgia,"Times New Roman",serif',"--public-body-font":site?.publicSite?.bodyFont==="classic"?'Georgia,"Times New Roman",serif':'Inter,ui-sans-serif,system-ui,sans-serif'}}>
       <a className="public-skip" href="#main-content">
         Skip to content
       </a>
@@ -94,9 +100,7 @@ export function PublicLayout({ children }) {
           <Link className="public-login" to="/login">
             Staff login
           </Link>
-          <Link className="public-button public-button--small" to={applyPath}>
-            Apply
-          </Link>
+          <ApplicationButton className="public-button public-button--small">Apply</ApplicationButton>
         </nav>
       </header>
       {children}
@@ -118,7 +122,7 @@ export function PublicLayout({ children }) {
         <div>
           <strong>Connect</strong>
           <a href="/#contact">Contact</a>
-          <Link to="/apply">Application</Link>
+          <a href="/#programs">Application</a>
           {socials.map((link) => (
             <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
               {link.label}
@@ -294,7 +298,7 @@ function ProgramCards({ programs = [] }) {
             </header>
             <iframe
               title={`Application for ${applying.title}`}
-              src={`/apply?program=${encodeURIComponent(applying.slug || applying.id)}`}
+              src={`/apply?program=${encodeURIComponent(applying.slug || applying.id)}&embed=1`}
             />
           </div>
         </div>
@@ -396,12 +400,7 @@ function VideoFeature({ site }) {
         <h2 id="video-title">{p.introVideoTitle}</h2>
         <p>{p.introVideoCopy}</p>
         <div className="public-actions">
-          <Link className="public-button" to="/apply">
-            Start your application <FiArrowRight />
-          </Link>
-          <Link className="public-text-link" to="/coaching-programs">
-            Explore programs
-          </Link>
+          <ApplicationButton>Start your application <FiArrowRight /></ApplicationButton>
         </div>
       </div>
       {playing ? (
@@ -517,13 +516,7 @@ export function PublicHome() {
             <h1>{p.headline}</h1>
             <p>{p.subheadline}</p>
             <div className="public-actions">
-              <SmartLink
-                className="public-button"
-                to={p.primaryCtaUrl || applyPath}
-              >
-                {p.primaryCtaLabel || "Apply to join"}
-                <FiArrowRight />
-              </SmartLink>
+              <ApplicationButton>{p.primaryCtaLabel || "Apply to join"}<FiArrowRight /></ApplicationButton>
               {p.secondaryCtaLabel && p.secondaryCtaUrl ? (
                 <SmartLink
                   className="public-button public-button--ghost"
@@ -531,35 +524,30 @@ export function PublicHome() {
                 >
                   {p.secondaryCtaLabel}
                 </SmartLink>
-              ) : (
-                <Link className="public-text-link" to="/coaching-programs">
-                  View programs
-                </Link>
-              )}
+              ) : null}
             </div>
           </div>
           <div className="public-hero__mark">
-            <span>Structured programs</span>
+            <span>{p.heroOverline || "Structured programs"}</span>
             {logo ? (
               <img
                 src={logo}
                 alt={p.heroMediaUrl ? "" : site?.branding?.publicSiteName || "Ellie Coaching"}
               />
             ) : null}
-            <small>Real people · practical work · accountable progress</small>
+            <small>{p.heroTagline || "Real people · practical work · accountable progress"}</small>
           </div>
         </section>
         {visibility.video !== false ? <VideoFeature site={site} /> : null}
-        <section className="public-intro">
+        <section className="public-intro" id="about">
           <div>
-            <p className="public-kicker">Why Ellie Coaching</p>
+            <p className="public-kicker">{p.aboutEyebrow || "Why Ellie Coaching"}</p>
             <h2>{p.introTitle}</h2>
           </div>
           <div>
             <p>{p.introBody}</p>
-            <Link to="/about">
-              Learn about the approach <FiArrowRight />
-            </Link>
+            {p.aboutTitle?<h3>{p.aboutTitle}</h3>:null}
+            {p.aboutBody?<p>{p.aboutBody}</p>:null}
           </div>
         </section>
         {visibility.proof !== false && p.trustMetrics?.length ? (
@@ -572,32 +560,7 @@ export function PublicHome() {
             ))}
           </section>
         ) : null}
-        <section className="public-value">
-          <article>
-            <span>01</span>
-            <h3>Practical education</h3>
-            <p>
-              Turn multifamily concepts into decisions and next steps you can
-              actually work through.
-            </p>
-          </article>
-          <article>
-            <span>02</span>
-            <h3>Specialist guidance</h3>
-            <p>
-              Learn with experienced people whose perspectives support different
-              parts of the process.
-            </p>
-          </article>
-          <article>
-            <span>03</span>
-            <h3>Structured progression</h3>
-            <p>
-              Move through a defined program with continuity, accountability,
-              and a clear view of what comes next.
-            </p>
-          </article>
-        </section>
+        <section className="public-value">{(p.valuePropositions||[]).map((row,index)=><article key={`${row.title}-${index}`}><span>{String(index+1).padStart(2,"0")}</span><h3>{row.title}</h3><p>{row.body}</p></article>)}</section>
         {visibility.programs !== false ? (
           <section
             className="public-section public-section--programs"
@@ -605,12 +568,9 @@ export function PublicHome() {
           >
             <header>
               <div>
-                <p className="public-kicker">Programs</p>
-                <h2>Choose the support that meets you where you are.</h2>
+                <p className="public-kicker">{p.programsEyebrow || "Programs"}</p>
+                <h2>{p.programsTitle || "Choose the support that meets you where you are."}</h2>
               </div>
-              <Link to="/coaching-programs">
-                View all programs <FiArrowRight />
-              </Link>
             </header>
             <ProgramCards programs={site?.programs} />
           </section>
@@ -618,22 +578,12 @@ export function PublicHome() {
         {visibility.journey !== false ? (
           <section className="public-process">
             <header>
-              <p className="public-kicker">Your path</p>
-              <h2>From exploring a program to doing the work.</h2>
-              <p>
-                Applying starts a conversation. Enrollment is not automatic or
-                guaranteed.
-              </p>
+              <p className="public-kicker">{p.journeyEyebrow || "Your path"}</p>
+              <h2>{p.journeyTitle || "From exploring a program to doing the work."}</h2>
+              <p>{p.journeyCopy}</p>
             </header>
             <ol>
-              {[
-                "Explore the programs",
-                "Submit a program application",
-                "Speak with Ellie’s team",
-                "Join the appropriate program",
-                "Enter the Skool community",
-                "Work with your coaching team",
-              ].map((step, i) => (
+              {(p.journeySteps||[]).map((step, i) => (
                 <li key={step}>
                   <span>{String(i + 1).padStart(2, "0")}</span>
                   <strong>{step}</strong>
@@ -672,15 +622,15 @@ export function PublicHome() {
               </strong>
             </div>
             <div>
-              <p className="public-kicker">Upcoming training</p>
-              <h2>{site.upcomingEvent.name}</h2>
-              <p>{site.upcomingEvent.summary}</p>
+              <p className="public-kicker">{p.eventEyebrow || "Upcoming training"}</p>
+              <h2>{p.eventTitle || site.upcomingEvent.name}</h2>
+              <p>{p.eventSummary || site.upcomingEvent.summary}</p>
               {site.upcomingEvent.registrationUrl ? (
                 <a
                   className="public-button public-button--dark"
                   href={site.upcomingEvent.registrationUrl}
                 >
-                  Event details <FiArrowRight />
+                  {p.eventCtaLabel || "Event details"} <FiArrowRight />
                 </a>
               ) : null}
             </div>
@@ -718,16 +668,7 @@ export function PublicHome() {
             <p>{p.finalCtaCopy}</p>
           </div>
           <div>
-            <SmartLink
-              className="public-button"
-              to={p.finalCtaUrl || applyPath}
-            >
-              {p.finalCtaLabel || "Apply to join"}
-              <FiArrowRight />
-            </SmartLink>
-            <Link className="public-text-link" to="/coaching-programs">
-              Explore programs
-            </Link>
+            <ApplicationButton>{p.finalCtaLabel || "Apply to join"}<FiArrowRight /></ApplicationButton>
           </div>
         </section>
       </main>

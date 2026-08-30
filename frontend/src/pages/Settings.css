@@ -96,6 +96,7 @@
   line-height: 1.55;
   margin: 0 0 16px;
 }
+.account-settings-content input[type=checkbox]{appearance:auto;height:18px!important;max-width:18px;width:18px!important}.account-settings-content .settings-section label:has(>input[type=checkbox]){align-items:flex-start;display:flex;gap:12px}.account-settings-content .settings-section label:has(>input[type=checkbox]) input{flex:0 0 18px;margin-top:2px}
 
 .settings-preset-actions {
   display: flex;

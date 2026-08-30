@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { fetchPublicSite } from "../services/api.js";
 import WorkspaceThemeContext from "./WorkspaceThemeContextValue.js";
 export function WorkspaceThemeProvider({ children }) {
+  const { pathname } = useLocation();
   const [site, setSite] = useState(null),
     [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -41,10 +43,6 @@ export function WorkspaceThemeProvider({ children }) {
       "--workspace-border",
       b.surfaceMode === "light" ? "#dce2de" : "#2a302c",
     );
-    if (b.faviconUrl) {
-      let link = document.querySelector("link[rel='icon']");
-      if (link) link.href = b.faviconUrl;
-    }
     const app = site?.appBranding;
     if (app) {
       root.style.setProperty("--app-sidebar-background", app.sidebarBackgroundColor);
@@ -54,7 +52,24 @@ export function WorkspaceThemeProvider({ children }) {
       root.style.setProperty("--app-accent", app.accentColor);
       root.style.setProperty("--app-background", app.backgroundColor);
     }
-  }, [site]);
+    const publicRoute = /^\/(?:$|about(?:\/|$)|coaching-programs(?:\/|$)|testimonials(?:\/|$)|contact(?:\/|$)|people(?:\/|$)|privacy(?:-policy)?(?:\/|$)|terms(?:\/|$)|data-deletion(?:\/|$)|apply(?:\/|$)|ref(?:\/|$)|profile\/edit(?:\/|$))/.test(pathname);
+    const favicon = publicRoute ? b.faviconUrl : app?.faviconUrl || b.faviconUrl;
+    const variant = (url, size) => url?.includes("res.cloudinary.com/") && url.includes("/image/upload/") ? url.replace("/image/upload/", `/image/upload/c_fill,w_${size},h_${size},f_png/`) : url;
+    document.querySelectorAll("link[data-workspace-favicon]").forEach((node) => node.remove());
+    if (favicon) {
+      const fallbackIcon = document.querySelector("link[rel='icon']:not([data-workspace-favicon])");
+      if (fallbackIcon) fallbackIcon.href = variant(favicon, 32);
+      [["icon",16],["icon",32],["icon",48],["icon",192],["icon",512],["apple-touch-icon",180]].forEach(([rel,size]) => {
+        const link = document.createElement("link");
+        link.rel = rel;
+        link.href = variant(favicon, size);
+        link.sizes = `${size}x${size}`;
+        link.type = "image/png";
+        link.dataset.workspaceFavicon = "true";
+        document.head.appendChild(link);
+      });
+    }
+  }, [site, pathname]);
   const value = useMemo(() => ({ site, loading }), [site, loading]);
   return (
     <WorkspaceThemeContext.Provider value={value}>

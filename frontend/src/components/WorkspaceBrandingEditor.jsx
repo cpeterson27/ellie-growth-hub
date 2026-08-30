@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Button from "./Button.jsx";
-import { fetchWorkspaceMedia, uploadEventImage } from "../services/api.js";
+import { uploadEventImage } from "../services/api.js";
 
 const ASSETS = [
   [
@@ -27,15 +27,17 @@ const APP_ASSETS = [
     "Optional variant for dark headers and sidebars.",
   ],
   [
-    "compactLogoUrl",
-    "Compact logo",
-    "Optional mark for narrow and collapsed navigation.",
-  ],
-  [
     "faviconUrl",
     "App favicon",
     "Shown in the browser tab while staff are working.",
   ],
+];
+const SOCIALS = [
+  ["Facebook", "https://facebook.com/"],
+  ["Instagram", "https://instagram.com/"],
+  ["LinkedIn", "https://linkedin.com/"],
+  ["X", "https://x.com/"],
+  ["YouTube", "https://youtube.com/"],
 ];
 
 function contrastRatio(a, b) {
@@ -51,7 +53,7 @@ function contrastRatio(a, b) {
   return (one + 0.05) / (two + 0.05);
 }
 
-function AssetField({ label, help, value, onChange, media, onUpload, busy }) {
+function AssetField({ label, help, value, onChange, onUpload, busy }) {
   const [advanced, setAdvanced] = useState(false);
   return (
     <article className="brand-asset-field">
@@ -71,20 +73,6 @@ function AssetField({ label, help, value, onChange, media, onUpload, busy }) {
               onChange={(event) => onUpload(event.target.files?.[0])}
             />
           </label>
-          <select
-            aria-label={`Choose existing asset for ${label}`}
-            value=""
-            onChange={(event) =>
-              event.target.value && onChange(event.target.value)
-            }
-          >
-            <option value="">Choose workspace asset</option>
-            {media.map((asset) => (
-              <option key={asset.url} value={asset.url}>
-                {asset.title || asset.filename || "Workspace image"}
-              </option>
-            ))}
-          </select>
           {value ? (
             <button type="button" onClick={() => onChange("")}>
               Remove
@@ -119,15 +107,7 @@ export default function WorkspaceBrandingEditor({
   saving,
   setError,
 }) {
-  const [media, setMedia] = useState([]),
-    [uploading, setUploading] = useState("");
-  useEffect(() => {
-    fetchWorkspaceMedia()
-      .then((rows) =>
-        setMedia((rows || []).filter((row) => row.type === "image")),
-      )
-      .catch(() => setMedia([]));
-  }, []);
+  const [uploading, setUploading] = useState("");
   const patchPublic = (key, value) =>
     setConfig((current) => ({
       ...current,
@@ -143,6 +123,11 @@ export default function WorkspaceBrandingEditor({
       ...current,
       publicSite: { ...current.publicSite, [key]: value },
     }));
+  const patchSocial = (label, url) => {
+    const current = config.publicSite?.socialLinks || [];
+    const others = current.filter((item) => item.label.toLowerCase() !== label.toLowerCase());
+    patchSite("socialLinks", url.trim() ? [...others, { label, url }] : others);
+  };
   const upload = async (scope, key, file) => {
     if (!file) return;
     if (
@@ -164,10 +149,6 @@ export default function WorkspaceBrandingEditor({
         : scope === "publicSite"
           ? patchSite
           : patchApp)(key, asset.url);
-      setMedia((rows) => [
-        { ...asset, type: "image", title: file.name },
-        ...rows.filter((row) => row.url !== asset.url),
-      ]);
     } catch (error) {
       setError(error.response?.data?.error || "Unable to upload this image.");
     } finally {
@@ -208,7 +189,6 @@ export default function WorkspaceBrandingEditor({
               label={label}
               help={help}
               value={brand[key] || ""}
-              media={media}
               busy={uploading === `branding.${key}`}
               onChange={(value) => patchPublic(key, value)}
               onUpload={(file) => upload("branding", key, file)}
@@ -218,7 +198,6 @@ export default function WorkspaceBrandingEditor({
             label="Brand feature / hero image"
             help="Optional visitor-facing image used in the homepage hero."
             value={config.publicSite?.heroMediaUrl || ""}
-            media={media}
             busy={uploading === "publicSite.heroMediaUrl"}
             onChange={(value) => patchSite("heroMediaUrl", value)}
             onUpload={(file) => upload("publicSite", "heroMediaUrl", file)}
@@ -270,6 +249,13 @@ export default function WorkspaceBrandingEditor({
           )}
           <button type="button">Primary action</button>
         </div>
+        <div className="social-profile-editor">
+          <header><h4>Social profiles</h4><p>Add the profiles visitors can open from your public website.</p></header>
+          {SOCIALS.map(([label, placeholder]) => {
+            const item = (config.publicSite?.socialLinks || []).find((row) => row.label.toLowerCase() === label.toLowerCase());
+            return <label key={label}><strong>{label}</strong><input type="url" value={item?.url || ""} placeholder={placeholder} onChange={(event) => patchSocial(label, event.target.value)} /><span className={`social-profile-state ${item?.url ? "is-on" : ""}`}>{item?.url ? "Displayed" : "Hidden"}</span></label>;
+          })}
+        </div>
       </section>
       <section>
         <header>
@@ -287,7 +273,6 @@ export default function WorkspaceBrandingEditor({
               label={label}
               help={help}
               value={app[key] || ""}
-              media={media}
               busy={uploading === `appBranding.${key}`}
               onChange={(value) => patchApp(key, value)}
               onUpload={(file) => upload("appBranding", key, file)}
