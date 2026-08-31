@@ -215,8 +215,12 @@ export default function Outreach() {
     try {
       setSaving(true);
       setError("");
-      await generateOutreach(selected._id);
+      const result = await generateOutreach(selected._id);
       await loadItems(selected);
+      const routing = Object.entries(result.routingSummary || {});
+      setNotice(routing.length
+        ? `Draft routing complete: ${routing.map(([label, count]) => `${count} ${label}`).join(" · ")}. Review is still required before sending.`
+        : "Draft refresh complete. Review is still required before sending.");
     } catch (err) {
       setError(err.response?.data?.error || "Unable to generate outreach.");
     } finally {

@@ -73,6 +73,23 @@ function matchReasons(contact, audiences = []) {
   return reasons;
 }
 
+function selectAutomaticAudienceTemplate(contact = {}, audienceTemplates = []) {
+  const normalizedProfiles = (contact.audienceProfiles || [])
+    .map((profile) => String(profile).toLowerCase().trim());
+  return audienceTemplates
+    .map((candidate, index) => {
+      const label = String(candidate.label || "").toLowerCase().trim();
+      const reasons = matchReasons(contact, [candidate.label]);
+      return {
+        ...candidate,
+        routingScore: (normalizedProfiles.includes(label) ? 100 : 0) + (reasons[0]?.terms?.length || 0),
+        routingIndex: index,
+      };
+    })
+    .filter((candidate) => candidate.routingScore > 0)
+    .sort((left, right) => right.routingScore - left.routingScore || left.routingIndex - right.routingIndex)[0] || null;
+}
+
 function connectionPriority(contact, campaign) {
   let score = 0;
   const reasons = [];
@@ -178,6 +195,7 @@ module.exports = {
   assignCampaignMatches,
   getCampaignMatches,
   matchReasons,
+  selectAutomaticAudienceTemplate,
   searchableText,
   connectionPriority,
   getConnectionPriorities,

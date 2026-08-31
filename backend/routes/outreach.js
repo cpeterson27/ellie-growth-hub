@@ -9,7 +9,7 @@ const EmailSuppression = require("../models/EmailSuppression");
 const { renderEmailContent, sendEmail, sendTestEmail } = require("../services/email");
 const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 const { requireRole } = require("../middleware/auth");
-const { matchReasons } = require("../services/campaignAudienceService");
+const { selectAutomaticAudienceTemplate } = require("../services/campaignAudienceService");
 
 const {
   generateOutreachDraft,
@@ -337,6 +337,7 @@ router.post("/generate", async (req,res)=>{
     let updatedCount = 0;
     let skippedExisting = 0;
     let skippedMissingEmail = 0;
+    const routingSummary = {};
 
 
 
@@ -390,19 +391,7 @@ router.post("/generate", async (req,res)=>{
 
       };
 
-      const normalizedProfiles = (cleanedContact.audienceProfiles || [])
-        .map((profile) => String(profile).toLowerCase().trim());
-      const automaticTemplate = audienceTemplates
-        .map((candidate) => {
-          const reasons = matchReasons(cleanedContact, [candidate.label]);
-          const exactProfile = normalizedProfiles.includes(String(candidate.label).toLowerCase().trim());
-          return {
-            ...candidate,
-            score: (exactProfile ? 100 : 0) + (reasons[0]?.terms?.length || 0),
-          };
-        })
-        .filter((candidate) => candidate.score > 0)
-        .sort((left, right) => right.score - left.score)[0];
+      const automaticTemplate = selectAutomaticAudienceTemplate(cleanedContact, audienceTemplates);
       const overrideKey = String(cleanedContact.campaignTemplateOverrides?.[String(campaign._id)] || "auto");
       const routedTemplate = overrideKey === "general"
         ? null
@@ -412,6 +401,7 @@ router.post("/generate", async (req,res)=>{
       const recipientTemplate = routedTemplate?.template || generalTemplate;
       const recipientAudienceKey = overrideKey === "general" ? "general" : routedTemplate?.key || "general";
       const recipientAudienceLabel = overrideKey === "general" ? "Main campaign template" : routedTemplate?.label || "Main campaign template";
+      routingSummary[recipientAudienceLabel] = (routingSummary[recipientAudienceLabel] || 0) + 1;
       campaign.content = {
         subject: recipientTemplate.subject,
         body: recipientTemplate.body,
@@ -558,7 +548,9 @@ router.post("/generate", async (req,res)=>{
 
       skippedExisting,
 
-      skippedMissingEmail
+      skippedMissingEmail,
+
+      routingSummary
 
     });
 
