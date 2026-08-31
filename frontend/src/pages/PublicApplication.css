@@ -71,6 +71,8 @@
   max-width: 100%;
   padding: 14px;
 }
+.application-referral span{font-weight:500;color:var(--public-muted)}
+.application-referral small{display:block;margin-top:8px;color:var(--public-muted);font-size:.88rem;font-weight:500;line-height:1.5}
 .application-grid textarea {
   min-height: 105px;
   resize: vertical;

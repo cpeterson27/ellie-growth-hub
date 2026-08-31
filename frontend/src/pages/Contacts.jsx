@@ -16,6 +16,8 @@ import {
   CONTACT_TEMPLATE_HEADERS,
   downloadContactTemplate,
   normalizeContactRows,
+  isUsableLinkedinConnectionRow,
+  createOwnerConfirmedVerificationResults,
 } from "../utils/contactImport.js";
 import {
   fetchContacts,
@@ -1343,7 +1345,7 @@ export default function Contacts() {
         const looksLikeLinkedinExport = ["First Name", "Last Name", "Person Linkedin Url", "Connected On"].filter((header) => normalizedHeaders.includes(header)).length >= 3;
         const resolvedSource = source === "csv" && looksLikeLinkedinExport ? "linkedin_csv" : source;
         setImportSource(resolvedSource);
-        const rows = normalizedData.map((row) =>
+        const preparedRows = normalizedData.map((row) =>
           Object.fromEntries(
             Object.entries(row).map(([key, value]) => {
               const cleaned = String(value ?? "").trim();
@@ -1362,6 +1364,10 @@ export default function Contacts() {
             }),
           ),
         );
+        const rows = looksLikeLinkedinExport
+          ? preparedRows.filter(isUsableLinkedinConnectionRow)
+          : preparedRows;
+        const ignoredRows = preparedRows.length - rows.length;
         const valid = rows.filter(
           (row) => row.Name || row["First Name"] || row["Last Name"],
         ).length;
@@ -1384,6 +1390,7 @@ export default function Contacts() {
           missingName: rows.length - valid,
           missingEmail: emails,
           malformed: errors.length,
+          ignoredRows,
         });
         setImportError(
           errors.length ? "Some rows have malformed column counts." : "",
@@ -1571,7 +1578,9 @@ export default function Contacts() {
           "Primary Email Verification Source":
             result.reason === "imported_email_status"
                 ? "csv_import_status"
-                : "emailable",
+                : result.reason === "owner_confirmation"
+                  ? "owner_confirmation"
+                  : "emailable",
         };
       }
       const tags = [
@@ -1685,6 +1694,8 @@ export default function Contacts() {
       },
     ]),
   );
+  const ownerConfirmedVerificationResults =
+    createOwnerConfirmedVerificationResults(emailsToVerify);
   // Source verification is only evidence for rows that actually contain a
   // recognized status. Do not silently treat blank statuses as an intentional
   // verification skip just because another row in the same CSV is verified.
@@ -1696,6 +1707,8 @@ export default function Contacts() {
   const effectiveVerificationResults =
     emailVerificationMode === "source"
       ? sourceVerificationResults
+      : emailVerificationMode === "owner"
+        ? ownerConfirmedVerificationResults
       : emailVerificationMode === "skip"
         ? skippedVerificationResults
         : verificationResults;
@@ -3254,7 +3267,8 @@ export default function Contacts() {
               {previewStats?.valid || 0}; missing usable name:{" "}
               {previewStats?.missingName || 0}; missing email:{" "}
               {previewStats?.missingEmail || 0}; malformed:{" "}
-              {previewStats?.malformed || 0}.
+              {previewStats?.malformed || 0}; ignored non-contact rows:{" "}
+              {previewStats?.ignoredRows || 0}.
             </p>
             <p className={`import-source-detection ${importSource === "linkedin_csv" ? "is-linkedin" : ""}`}>
               <strong>Detected source:</strong>{" "}
@@ -3451,6 +3465,27 @@ export default function Contacts() {
                     </label>
                   ) : null}
                   <label
+                    className={emailVerificationMode === "owner" ? "active" : ""}
+                  >
+                    <input
+                      type="radio"
+                      name="email-verification-mode"
+                      value="owner"
+                      checked={emailVerificationMode === "owner"}
+                      onChange={() => {
+                        setEmailVerificationMode("owner");
+                        setVerificationProgress(null);
+                      }}
+                    />
+                    <span>
+                      <strong>I confirm these addresses are verified</strong>
+                      <small>
+                        Uses no verification credits. Choose this only when you
+                        have already verified every address in this file.
+                      </small>
+                    </span>
+                  </label>
+                  <label
                     className={emailVerificationMode === "skip" ? "active" : ""}
                   >
                     <input
@@ -3508,7 +3543,9 @@ export default function Contacts() {
                   <p className="source-verification-note">
                     {emailVerificationMode === "source"
                       ? "Using the verification statuses already included in this CSV."
-                      : "No external verification will run. These addresses will be saved as unverified and cannot be emailed."}
+                      : emailVerificationMode === "owner"
+                        ? "Owner confirmation selected. Valid addresses will be saved as verified and can generate campaign drafts after campaign assignment."
+                        : "No external verification will run. These addresses will be saved as unverified and cannot be emailed."}
                   </p>
                 )}
                 {verificationProgress ? (

@@ -19,6 +19,7 @@ const initial = {
   goals: "",
   desiredStartTimeline: "",
   message: "",
+  referralCode: "",
   smsConsent: false,
   marketingEmailConsent: false,
   privacyTermsAccepted: false,
@@ -31,14 +32,20 @@ export default function PublicApplication() {
   const { code } = useParams();
   const { site } = useWorkspaceTheme();
   const [config, setConfig] = useState(null);
-  const [form, setForm] = useState(initial);
+  const [form, setForm] = useState(() => {
+    const query = new URLSearchParams(location.search);
+    return {
+      ...initial,
+      referralCode: query.get("ref") || query.get("referral") || code || "",
+    };
+  });
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
   const [saving, setSaving] = useState(false);
   const attribution = useMemo(() => {
     const query = new URLSearchParams(location.search);
     return {
-      referralCode: query.get("ref") || code || "",
+      referralCode: query.get("ref") || query.get("referral") || code || "",
       trackedLinkToken: query.get("go_link") || "",
       utm: {
         source: query.get("utm_source") || "",
@@ -87,6 +94,7 @@ export default function PublicApplication() {
       const result = await submitPublicApplication({
         ...form,
         ...attribution,
+        referralCode: form.referralCode || attribution.referralCode,
         idempotencyKey,
       });
       setDone(result.data.message);
@@ -200,6 +208,19 @@ export default function PublicApplication() {
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="wide application-referral">
+                Referral code or referral link <span>(optional)</span>
+                <input
+                  autoComplete="off"
+                  placeholder="Enter the code or paste the link you received"
+                  value={form.referralCode}
+                  onChange={(event) => set("referralCode", event.target.value)}
+                />
+                <small>
+                  If an ambassador or coach shared Ellie’s Coaching with you,
+                  enter their code or link so we can give them credit.
+                </small>
               </label>
               <label className="wide">
                 {config?.questionLabels?.investingExperience ||

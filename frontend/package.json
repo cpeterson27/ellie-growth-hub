@@ -18,6 +18,7 @@
     "test:organization-logo-ui": "node test-organization-logo-ui.js",
     "test:website-management-ui": "node test-website-management-ui.js",
     "test:public-application-ui": "node test-public-application-ui.js",
+    "test:contact-import-linkedin": "node test-contact-import-linkedin.js",
     "test:coaching-history-ui": "node test-coaching-history-ui.js",
     "test:referrals-commissions-ui": "node test-referrals-commissions-ui.js",
     "test:google-calendar-ui": "node test-google-calendar-ui.js",

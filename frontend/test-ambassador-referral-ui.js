@@ -17,7 +17,7 @@ assert.match(admin, /Changing the referral code may invalidate previously shared
 assert.match(admin, /Community or group URL \(optional\)/);
 assert.match(admin, /codeChanged && !confirmedChange/);
 assert.doesNotMatch(team, /name="referralCode"/);
-assert.match(team, /generates a unique referral code from the ambassador.s name/i);
+assert.match(team, /generates a unique referral code from\s+the ambassador(?:'|’)s name/i);
 assert.match(team, /Community or group URL \(optional\)/);
 assert.match(styles, /@media\(max-width:700px\)/);
 assert.match(styles, /grid-template-columns:1fr/);

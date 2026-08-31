@@ -4,7 +4,7 @@ const PEOPLE_ALIASES = {
   "last name": "Last Name", lastname: "Last Name",
   title: "Title", "job title": "Title", position: "Title", role: "Title",
   company: "Company Name", "company name": "Company Name", organization: "Company Name", "account name": "Company Name",
-  email: "Email", "work email": "Email", "business email": "Email",
+  email: "Email", "email address": "Email", "work email": "Email", "business email": "Email",
   "email status": "Email Status", "email verification status": "Email Status",
   phone: "Phone", "phone number": "Phone", "work direct phone": "Work Direct Phone", "mobile phone": "Mobile Phone",
   linkedin: "Person Linkedin Url", url: "Person Linkedin Url", "linkedin url": "Person Linkedin Url", "person linkedin url": "Person Linkedin Url",
@@ -26,6 +26,25 @@ export function normalizeContactRows(rows = []) {
     const cleaned = cleanHeader(header);
     return [PEOPLE_ALIASES[cleaned.toLowerCase()] || cleaned, String(value ?? "").trim()];
   })));
+}
+
+export function isUsableLinkedinConnectionRow(row = {}) {
+  const name = String(row.Name || `${row["First Name"] || ""} ${row["Last Name"] || ""}`).trim();
+  const profileUrl = String(row["Person Linkedin Url"] || "").trim();
+  return Boolean(name && /^https:\/\/(?:www\.)?linkedin\.com\/in\//i.test(profileUrl));
+}
+
+export function createOwnerConfirmedVerificationResults(emails = []) {
+  return Object.fromEntries(
+    emails
+      .map((email) => String(email || "").trim().toLowerCase())
+      .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      .map((email) => [email, {
+        email,
+        state: "deliverable",
+        reason: "owner_confirmation",
+      }]),
+  );
 }
 
 export function downloadContactTemplate() {
