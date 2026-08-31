@@ -539,13 +539,14 @@ export function PublicHome() {
           </div>
         </section>
         {visibility.video !== false ? <VideoFeature site={site} /> : null}
-        <section className="public-intro" id="about">
-          <div>
+        <section className={`public-intro ${p.aboutImageUrl ? "has-image" : ""}`} id="about">
+          <div className="public-intro__heading">
             <p className="public-kicker">{p.aboutEyebrow || "Why Ellie Coaching"}</p>
             <h2>{p.introTitle}</h2>
+            {p.introBody ? <p>{p.introBody}</p> : null}
           </div>
-          <div>
-            <p>{p.introBody}</p>
+          {p.aboutImageUrl ? <figure className="public-intro__portrait"><img src={p.aboutImageUrl} alt="Ellie Baxter" /></figure> : null}
+          <div className="public-intro__story">
             {p.aboutTitle?<h3>{p.aboutTitle}</h3>:null}
             {p.aboutBody?<p>{p.aboutBody}</p>:null}
           </div>

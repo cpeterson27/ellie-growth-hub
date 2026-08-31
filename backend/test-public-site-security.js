@@ -86,9 +86,9 @@ const siteService = fs.readFileSync(
 assert(/status:\s*"approved",\s*featured:\s*true/.test(siteService));
 assert(publicRoute.includes('status:"published"'));
 assert(publicRoute.includes("profileProjection"));
-assert(management.includes('userId:req.auth.user._id,status:"active"'));
-assert(!management.includes("req.body.userId"));
-assert(management.includes('ownerType:"student"'));
+assert(/userId:\s*req\.auth\.user\._id,\s*status:\s*"active"/.test(management));
+assert(/workspaceId:\s*req\.auth\.workspaceId,\s*userId:\s*req\.body\.userId,\s*status:\s*"active"/.test(management));
+assert(/ownerType:\s*"student"/.test(management));
 assert(management.includes("issueToken"));
 assert(server.includes('req.path.startsWith("/public/")'));
 assert(server.includes('app.use("/api/public-management"'));

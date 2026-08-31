@@ -20,10 +20,17 @@ assert(programs.includes("Edit Website Content") && programs.includes("Choose ex
 for (const group of ["Publishing", "Public content", "Intro video", "Call to action", "Display order"]) assert(programs.includes(group));
 for (const status of ["Published", "Draft", "Hidden"]) assert(programs.includes(status));
 assert(!programs.includes("Intro video URL"));
-assert(publicAdmin.includes('section==="team"') && publicAdmin.includes("Edit public profile"));
+assert(/section\s*===\s*"team"/.test(publicAdmin) && publicAdmin.includes("Edit public profile"));
 for (const field of ["valuePropositions", "journeySteps", "eventTitle", "communityTitle", "finalCtaTitle", "headingFont", "baseFontSize"]) assert(publicAdmin.includes(field), `website editor missing ${field}`);
 assert(branding.includes("Social profiles") && !branding.includes("Choose workspace asset") && !branding.includes("Compact logo"));
 assert(applicationImage.includes("heroImageUrl") && settings.includes("ApplicationImageSettings"));
+assert(branding.includes("About Ellie photo") && branding.includes("aboutImageUrl"));
+assert(publicAdmin.includes('<option value="team">Team member</option>'));
+assert(publicAdmin.includes("Chief Technology Operator"));
+assert(publicAdmin.includes("fetchWorkspaceMembers"));
+assert(publicAdmin.includes("uploadHomepageVideo") && publicAdmin.includes("uploadProgramVideo"));
+assert(publicAdmin.includes("Upload image") && publicAdmin.includes("uploadProfilePhoto"));
+assert(publicAdmin.includes("Advanced video and image URLs"));
 for (const action of ["Add Testimonial", "Save testimonial", "Publish", "Hide", "Feature", "Confirm delete", "Public preview"]) assert(testimonials.includes(action));
 assert(testimonials.includes("uploadEventImage"));
 assert(team.includes("Cancel invitation") && team.includes("Confirm cancellation"));

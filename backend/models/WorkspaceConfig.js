@@ -41,7 +41,7 @@ const workspaceConfigSchema = new mongoose.Schema({
   },
   publicSite: {
     published: { type: Boolean, default: false }, headline: { type: String, default: "", maxlength: 300 }, subheadline: { type: String, default: "", maxlength: 1200 },
-    introTitle: { type: String, default: "", maxlength: 300 }, introBody: { type: String, default: "", maxlength: 5000 }, aboutBody: { type: String, default: "", maxlength: 12000 },
+    introTitle: { type: String, default: "", maxlength: 300 }, introBody: { type: String, default: "", maxlength: 5000 }, aboutBody: { type: String, default: "", maxlength: 12000 }, aboutImageUrl: { type: String, default: "", maxlength: 1000 },
     eyebrow: { type: String, default: "", maxlength: 160 }, heroMediaUrl: { type: String, default: "", maxlength: 1000 },
     introVideoUrl: { type: String, default: "", maxlength: 1000 }, introVideoPosterUrl: { type: String, default: "", maxlength: 1000 }, introVideoEyebrow: { type: String, default: "", maxlength: 160 }, introVideoTitle: { type: String, default: "", maxlength: 300 }, introVideoCopy: { type: String, default: "", maxlength: 1200 },
     primaryCtaLabel: { type: String, default: "Apply Now", maxlength: 80 }, primaryCtaUrl: { type: String, default: "/apply", maxlength: 1000 },

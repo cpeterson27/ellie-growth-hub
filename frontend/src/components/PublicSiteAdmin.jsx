@@ -2,42 +2,1420 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "./Button.jsx";
 import WorkspaceBrandingEditor from "./WorkspaceBrandingEditor.jsx";
-import { createManagedProfile, createManagedTestimonial, createStudentProfileEditToken, fetchCoaches, fetchCoachingPrograms, fetchContacts, fetchManagedProfiles, fetchManagedTestimonials, fetchPublicManagementConfig, updateManagedProfile, updateManagedTestimonial, updateProgramPublicPresentation, updatePublicManagementConfig } from "../services/api.js";
+import {
+  createManagedProfile,
+  createManagedTestimonial,
+  createStudentProfileEditToken,
+  fetchCoaches,
+  fetchCoachingPrograms,
+  fetchContacts,
+  fetchManagedProfiles,
+  fetchManagedTestimonials,
+  fetchPublicManagementConfig,
+  fetchWorkspaceMembers,
+  updateManagedProfile,
+  updateManagedTestimonial,
+  updateProgramPublicPresentation,
+  updatePublicManagementConfig,
+  uploadEventImage,
+  uploadProgramVideo,
+} from "../services/api.js";
 import "./PublicSiteAdmin.css";
 
-const blankTestimonial={displayName:"",headline:"",body:"",videoUrl:"",consentConfirmed:true,status:"pending",featured:false};
-const blankProfile={ownerType:"coach",coachProfileId:"",contactId:"",slug:"",displayName:"",publicTitle:"",headline:"",bio:"",avatarUrl:"",specialties:[],featured:false,sortOrder:0};
-const visibilityLabels={video:"Intro video",proof:"Trust metrics",programs:"Programs",journey:"Student journey",team:"Team",testimonials:"Testimonials",results:"Show Results page",event:"Upcoming event",community:"Skool/community"};
-const lines=value=>(value||[]).join("\n");
-const list=value=>String(value||"").split("\n").map(item=>item.trim()).filter(Boolean);
-const socialText=value=>(value||[]).map(link=>`${link.label}|${link.url}`).join("\n");
-const socialLinks=value=>String(value||"").split("\n").map(row=>{const i=row.indexOf("|");return i<0?null:{label:row.slice(0,i).trim(),url:row.slice(i+1).trim()}}).filter(Boolean);
-const metricText=value=>(value||[]).map(row=>`${row.value}|${row.label}`).join("\n");
-const metrics=value=>String(value||"").split("\n").map(row=>{const i=row.indexOf("|");return i<0?null:{value:row.slice(0,i).trim(),label:row.slice(i+1).trim()}}).filter(Boolean);
+const blankTestimonial = {
+  displayName: "",
+  headline: "",
+  body: "",
+  videoUrl: "",
+  consentConfirmed: true,
+  status: "pending",
+  featured: false,
+};
+const blankProfile = {
+  ownerType: "coach",
+  coachProfileId: "",
+  contactId: "",
+  userId: "",
+  slug: "",
+  displayName: "",
+  publicTitle: "",
+  headline: "",
+  bio: "",
+  avatarUrl: "",
+  specialties: [],
+  featured: false,
+  sortOrder: 0,
+};
+const visibilityLabels = {
+  video: "Intro video",
+  proof: "Trust metrics",
+  programs: "Programs",
+  journey: "Student journey",
+  team: "Team",
+  testimonials: "Testimonials",
+  results: "Show Results page",
+  event: "Upcoming event",
+  community: "Skool/community",
+};
+const lines = (value) => (value || []).join("\n");
+const list = (value) =>
+  String(value || "")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+const socialText = (value) =>
+  (value || []).map((link) => `${link.label}|${link.url}`).join("\n");
+const socialLinks = (value) =>
+  String(value || "")
+    .split("\n")
+    .map((row) => {
+      const i = row.indexOf("|");
+      return i < 0
+        ? null
+        : { label: row.slice(0, i).trim(), url: row.slice(i + 1).trim() };
+    })
+    .filter(Boolean);
+const metricText = (value) =>
+  (value || []).map((row) => `${row.value}|${row.label}`).join("\n");
+const metrics = (value) =>
+  String(value || "")
+    .split("\n")
+    .map((row) => {
+      const i = row.indexOf("|");
+      return i < 0
+        ? null
+        : { value: row.slice(0, i).trim(), label: row.slice(i + 1).trim() };
+    })
+    .filter(Boolean);
 
-export default function PublicSiteAdmin({section="website"}){
-  const[tab,setTab]=useState(section==="team"?"team":"brand"),[config,setConfig]=useState(null),[testimonials,setTestimonials]=useState([]),[programs,setPrograms]=useState([]),[profiles,setProfiles]=useState([]),[coaches,setCoaches]=useState([]),[contacts,setContacts]=useState([]),[testimonial,setTestimonial]=useState(blankTestimonial),[profile,setProfile]=useState(blankProfile),[message,setMessage]=useState(""),[error,setError]=useState(""),[saving,setSaving]=useState(false),[editingProfileId,setEditingProfileId]=useState("");
-  const load=async()=>{try{const[c,t,p,pr,co,ct]=await Promise.all([fetchPublicManagementConfig(),fetchManagedTestimonials(),fetchCoachingPrograms({limit:200}),fetchManagedProfiles(),fetchCoaches({limit:200}),fetchContacts({limit:200})]);setConfig(c);setTestimonials(t);setPrograms(p);setProfiles(pr);setCoaches(co);setContacts(ct.contacts||ct||[])}catch(err){setError(err.response?.data?.error||"Unable to load public-site settings.")}};
-  useEffect(()=>{const timer=window.setTimeout(load,0);return()=>window.clearTimeout(timer)},[]);
-  const saveConfig=async()=>{try{setSaving(true);setError("");setConfig(await updatePublicManagementConfig(config));setMessage("Public website settings saved.")}catch(err){setError(err.response?.data?.error||"Unable to save public-site settings.")}finally{setSaving(false)}};
-  const patchPublic=(key,value)=>setConfig(current=>({...current,publicSite:{...current.publicSite,[key]:value}}));
-  const patchVisibility=(key,value)=>patchPublic("sectionVisibility",{...config.publicSite.sectionVisibility,[key]:value});
-  const addTestimonial=async()=>{try{const saved=await createManagedTestimonial(testimonial);setTestimonials(rows=>[saved,...rows]);setTestimonial(blankTestimonial)}catch(err){setError(err.response?.data?.error||"Unable to create testimonial.")}};
-  const decide=async(row,status,extra={})=>{const saved=await updateManagedTestimonial(row._id,{status,...extra});setTestimonials(rows=>rows.map(item=>item._id===saved._id?saved:item))};
-  const saveProgram=async program=>{try{const saved=await updateProgramPublicPresentation(program._id,program.publicPresentation||{});setPrograms(rows=>rows.map(row=>row._id===saved._id?saved:row));setMessage("Program public details saved.")}catch(err){setError(err.response?.data?.error||"Unable to save program.")}};
-  const addProfile=async()=>{try{const saved=await createManagedProfile(profile);setProfiles(rows=>[...rows,saved]);setProfile(blankProfile)}catch(err){setError(err.response?.data?.error||"Unable to create profile.")}};
-  const saveProfile=async row=>{try{const saved=await updateManagedProfile(row._id,row);setProfiles(rows=>rows.map(item=>item._id===saved._id?saved:item));setMessage(`${saved.displayName} public profile saved.`)}catch(err){setError(err.response?.data?.error||"Unable to save profile.")}};
-  const patchProfile=(id,key,value)=>setProfiles(rows=>rows.map(row=>row._id===id?{...row,[key]:value}:row));
-  const patchValue=(index,key,value)=>patchPublic("valuePropositions",(config.publicSite.valuePropositions||[]).map((row,i)=>i===index?{...row,[key]:value}:row));
-  const token=async row=>{const result=await createStudentProfileEditToken(row._id);setMessage(`Student edit link (copy now): ${window.location.origin}${result.editPath}`)};
-  if(!config)return <div className="public-admin">{error || "Loading Website & Brand…"}</div>;
-  return <div className="website-focused-panel public-admin">{section==="website"?<header><div><p className="page-eyebrow">Website settings</p><h3>Homepage &amp; branding</h3><p>Manage the website identity, homepage content, navigation and visible sections.</p></div></header>:<header className="website-section-heading"><div><p className="page-eyebrow">Public profiles</p><h3>Team &amp; Coaches</h3><p>Choose who appears on the website. Workspace access is managed separately in Team &amp; Access.</p></div><Button onClick={()=>{setProfile(blankProfile);setEditingProfileId("new")}}>Add public profile</Button></header>}{error?<p className="form-error">{error}</p>:null}{message?<p className="discovery-notice">{message}</p>:null}{section==="website"?<nav aria-label="Website settings sections">{["brand","homepage","video","sections"].map(item=><button type="button" className={tab===item?"is-active":""} key={item} onClick={()=>setTab(item)}>{item==="brand"?"Branding":item==="video"?"Homepage video":item==="sections"?"Visible sections":"Homepage"}</button>)}</nav>:null}
-    {tab==="brand"?<WorkspaceBrandingEditor config={config} setConfig={setConfig} onSave={saveConfig} saving={saving} setError={setError}/>:null}
-    {tab==="homepage"?<section className="website-content-editor"><div className="website-editor-group"><header><span>01</span><div><h4>Hero</h4><p>The first message visitors see.</p></div></header><label className="website-toggle"><input type="checkbox" checked={config.publicSite.published} onChange={e=>patchPublic("published",e.target.checked)}/><span><strong>Website published</strong><small>Make the public homepage visible.</small></span></label><div className="public-admin__grid"><label>Eyebrow<input value={config.publicSite.eyebrow||""} onChange={e=>patchPublic("eyebrow",e.target.value)}/></label><label>Logo overline<input value={config.publicSite.heroOverline||""} onChange={e=>patchPublic("heroOverline",e.target.value)}/></label><label className="wide">Headline<input value={config.publicSite.headline||""} onChange={e=>patchPublic("headline",e.target.value)}/></label><label className="wide">Supporting statement<textarea value={config.publicSite.subheadline||""} onChange={e=>patchPublic("subheadline",e.target.value)}/></label><label className="wide">Logo supporting line<input value={config.publicSite.heroTagline||""} onChange={e=>patchPublic("heroTagline",e.target.value)}/></label><label>Application button label<input value={config.publicSite.primaryCtaLabel||""} onChange={e=>patchPublic("primaryCtaLabel",e.target.value)}/></label></div></div><div className="website-editor-group"><header><span>02</span><div><h4>Introduction &amp; About</h4><p>Keep the full story on the homepage.</p></div></header><div className="public-admin__grid"><label>Introduction title<input value={config.publicSite.introTitle||""} onChange={e=>patchPublic("introTitle",e.target.value)}/></label><label>About eyebrow<input value={config.publicSite.aboutEyebrow||""} onChange={e=>patchPublic("aboutEyebrow",e.target.value)}/></label><label className="wide">Introduction copy<textarea value={config.publicSite.introBody||""} onChange={e=>patchPublic("introBody",e.target.value)}/></label><label className="wide">About title<input value={config.publicSite.aboutTitle||""} onChange={e=>patchPublic("aboutTitle",e.target.value)}/></label><label className="wide">About Ellie<textarea value={config.publicSite.aboutBody||""} onChange={e=>patchPublic("aboutBody",e.target.value)}/></label></div></div><div className="website-editor-group"><header><span>03</span><div><h4>Typography</h4><p>Control the website fonts and overall scale.</p></div></header><div className="public-admin__grid"><label>Heading style<select value={config.publicSite.headingFont||"editorial"} onChange={e=>patchPublic("headingFont",e.target.value)}><option value="editorial">Editorial serif</option><option value="classic">Classic serif</option><option value="modern">Modern sans serif</option></select></label><label>Body style<select value={config.publicSite.bodyFont||"modern"} onChange={e=>patchPublic("bodyFont",e.target.value)}><option value="modern">Modern sans serif</option><option value="classic">Classic serif</option></select></label><label>Base font size: {config.publicSite.baseFontSize||16}px<input type="range" min="14" max="20" value={config.publicSite.baseFontSize||16} onChange={e=>patchPublic("baseFontSize",Number(e.target.value))}/></label><label>Heading scale: {Math.round((config.publicSite.headingScale||1)*100)}%<input type="range" min="0.8" max="1.2" step="0.05" value={config.publicSite.headingScale||1} onChange={e=>patchPublic("headingScale",Number(e.target.value))}/></label></div></div><div className="website-editor-group"><header><span>04</span><div><h4>Contact, social &amp; footer</h4><p>Public contact and profile links.</p></div></header><div className="public-admin__grid"><label>Contact email<input value={config.publicSite.contactEmail||""} onChange={e=>patchPublic("contactEmail",e.target.value)}/></label><label>Contact phone<input value={config.publicSite.contactPhone||""} onChange={e=>patchPublic("contactPhone",e.target.value)}/></label><label className="wide">Footer text<input value={config.publicSite.footerText||""} onChange={e=>patchPublic("footerText",e.target.value)}/></label><label className="wide">Social profiles — one per line: Name|URL<textarea value={socialText(config.publicSite.socialLinks)} onChange={e=>patchPublic("socialLinks",socialLinks(e.target.value))}/><small>Example: Instagram|https://instagram.com/yourname</small></label></div></div><footer className="website-editor-save"><Button loading={saving} onClick={saveConfig}>Save homepage</Button></footer></section>:null}
-    {tab==="video"?<section><p className="public-admin__help">YouTube, Vimeo, or a direct HTTPS video is supported. Audio never autoplays on the homepage.</p><div className="public-admin__grid"><label>Intro video URL<input value={config.publicSite.introVideoUrl||""} onChange={e=>patchPublic("introVideoUrl",e.target.value)}/></label><label>Poster/background image URL<input value={config.publicSite.introVideoPosterUrl||""} onChange={e=>patchPublic("introVideoPosterUrl",e.target.value)}/></label><label>Video eyebrow<input value={config.publicSite.introVideoEyebrow||""} onChange={e=>patchPublic("introVideoEyebrow",e.target.value)}/></label><label className="wide">Video title<input value={config.publicSite.introVideoTitle||""} onChange={e=>patchPublic("introVideoTitle",e.target.value)}/></label><label className="wide">Video supporting copy<textarea value={config.publicSite.introVideoCopy||""} onChange={e=>patchPublic("introVideoCopy",e.target.value)}/></label></div><Button loading={saving} onClick={saveConfig}>Save video settings</Button></section>:null}
-    {tab==="sections"?<section className="website-content-editor"><div className="public-admin__checks">{Object.entries(visibilityLabels).map(([key,label])=><label className="website-toggle" key={key}><input type="checkbox" checked={config.publicSite.sectionVisibility?.[key]!==false} onChange={e=>patchVisibility(key,e.target.checked)}/><span>{label}</span></label>)}</div><div className="website-editor-group"><header><span>01</span><div><h4>Why choose Ellie’s Coaching</h4><p>Edit the three value cards shown on the homepage.</p></div></header>{(config.publicSite.valuePropositions||[]).map((row,index)=><div className="public-admin__grid value-editor" key={index}><label>Card {index+1} title<input value={row.title||""} onChange={e=>patchValue(index,"title",e.target.value)}/></label><label className="wide">Description<textarea value={row.body||""} onChange={e=>patchValue(index,"body",e.target.value)}/></label></div>)}</div><div className="website-editor-group"><header><span>02</span><div><h4>Programs section</h4><p>Programs stay on the homepage.</p></div></header><div className="public-admin__grid"><label>Eyebrow<input value={config.publicSite.programsEyebrow||""} onChange={e=>patchPublic("programsEyebrow",e.target.value)}/></label><label className="wide">Headline<input value={config.publicSite.programsTitle||""} onChange={e=>patchPublic("programsTitle",e.target.value)}/></label></div></div><div className="website-editor-group"><header><span>03</span><div><h4>Student journey</h4><p>Edit “Your path” and every step.</p></div></header><div className="public-admin__grid"><label>Eyebrow<input value={config.publicSite.journeyEyebrow||""} onChange={e=>patchPublic("journeyEyebrow",e.target.value)}/></label><label className="wide">Headline<input value={config.publicSite.journeyTitle||""} onChange={e=>patchPublic("journeyTitle",e.target.value)}/></label><label className="wide">Supporting copy<textarea value={config.publicSite.journeyCopy||""} onChange={e=>patchPublic("journeyCopy",e.target.value)}/></label><label className="wide">Journey steps — one per line<textarea value={lines(config.publicSite.journeySteps)} onChange={e=>patchPublic("journeySteps",list(e.target.value))}/></label></div></div><div className="website-editor-group"><header><span>04</span><div><h4>Upcoming event</h4><p>The date and registration URL come from Events; these fields control homepage wording.</p></div></header><div className="public-admin__grid"><label>Eyebrow<input value={config.publicSite.eventEyebrow||""} onChange={e=>patchPublic("eventEyebrow",e.target.value)}/></label><label>Button label<input value={config.publicSite.eventCtaLabel||""} onChange={e=>patchPublic("eventCtaLabel",e.target.value)}/></label><label className="wide">Optional title override<input value={config.publicSite.eventTitle||""} onChange={e=>patchPublic("eventTitle",e.target.value)}/></label><label className="wide">Optional description override<textarea value={config.publicSite.eventSummary||""} onChange={e=>patchPublic("eventSummary",e.target.value)}/></label></div></div><div className="website-editor-group"><header><span>05</span><div><h4>Community</h4><p>Explain the post-enrollment community clearly.</p></div></header><div className="public-admin__grid"><label>Community title<input value={config.publicSite.communityTitle||""} onChange={e=>patchPublic("communityTitle",e.target.value)}/></label><label className="wide">Community explanation<textarea value={config.publicSite.communityBody||""} onChange={e=>patchPublic("communityBody",e.target.value)}/></label></div></div><div className="website-editor-group"><header><span>06</span><div><h4>Final application call to action</h4><p>The application opens as a modal on the homepage.</p></div></header><div className="public-admin__grid"><label>Eyebrow<input value={config.publicSite.finalCtaEyebrow||""} onChange={e=>patchPublic("finalCtaEyebrow",e.target.value)}/></label><label>Button label<input value={config.publicSite.finalCtaLabel||""} onChange={e=>patchPublic("finalCtaLabel",e.target.value)}/></label><label className="wide">Headline<input value={config.publicSite.finalCtaTitle||""} onChange={e=>patchPublic("finalCtaTitle",e.target.value)}/></label><label className="wide">Supporting copy<textarea value={config.publicSite.finalCtaCopy||""} onChange={e=>patchPublic("finalCtaCopy",e.target.value)}/></label></div></div><div className="website-editor-group"><header><span>07</span><div><h4>Proof</h4><p>Only publish approved, factual metrics.</p></div></header><label>Trust metrics — one per line: Value|Label<textarea value={metricText(config.publicSite.trustMetrics)} onChange={e=>patchPublic("trustMetrics",metrics(e.target.value))}/></label></div><footer className="website-editor-save"><Button loading={saving} onClick={saveConfig}>Save homepage sections</Button></footer></section>:null}
-    {tab==="programs"?<section className="public-admin__rows"><p>Manage program delivery and pricing in Coaching. Choose how each program appears on your website here.</p><Link to="/coaching/programs">Manage programs</Link>{programs.map(program=><article key={program._id}><h3>{program.name}</h3><div className="public-admin__grid"><label>Public slug<input value={program.publicPresentation?.slug||""} onChange={e=>setPrograms(rows=>rows.map(row=>row._id===program._id?{...row,publicPresentation:{...row.publicPresentation,slug:e.target.value}}:row))}/></label><label>Publication<select value={program.publicPresentation?.status||"hidden"} onChange={e=>setPrograms(rows=>rows.map(row=>row._id===program._id?{...row,publicPresentation:{...row.publicPresentation,status:e.target.value}}:row))}><option value="hidden">Hidden</option><option value="published">Published</option></select></label><label className="wide">Public title<input value={program.publicPresentation?.title||""} onChange={e=>setPrograms(rows=>rows.map(row=>row._id===program._id?{...row,publicPresentation:{...row.publicPresentation,title:e.target.value}}:row))}/></label><label className="wide">Summary<textarea value={program.publicPresentation?.summary||""} onChange={e=>setPrograms(rows=>rows.map(row=>row._id===program._id?{...row,publicPresentation:{...row.publicPresentation,summary:e.target.value}}:row))}/></label><label className="wide">Who it is for<textarea value={program.publicPresentation?.audience||""} onChange={e=>setPrograms(rows=>rows.map(row=>row._id===program._id?{...row,publicPresentation:{...row.publicPresentation,audience:e.target.value}}:row))}/></label><label className="wide">Highlights — one per line<textarea value={lines(program.publicPresentation?.highlights)} onChange={e=>setPrograms(rows=>rows.map(row=>row._id===program._id?{...row,publicPresentation:{...row.publicPresentation,highlights:list(e.target.value)}}:row))}/></label><label><input type="checkbox" checked={Boolean(program.publicPresentation?.priceVisible)} onChange={e=>setPrograms(rows=>rows.map(row=>row._id===program._id?{...row,publicPresentation:{...row.publicPresentation,priceVisible:e.target.checked}}:row))}/>Show configured price</label></div><Button onClick={()=>saveProgram(program)}>Save program presentation</Button></article>)}</section>:null}
-    {tab==="testimonials"?<section><div className="public-admin__grid"><label>Name<input value={testimonial.displayName} onChange={e=>setTestimonial({...testimonial,displayName:e.target.value})}/></label><label>Headline<input value={testimonial.headline} onChange={e=>setTestimonial({...testimonial,headline:e.target.value})}/></label><label className="wide">Testimonial<textarea value={testimonial.body} onChange={e=>setTestimonial({...testimonial,body:e.target.value})}/></label><label>Video URL<input value={testimonial.videoUrl} onChange={e=>setTestimonial({...testimonial,videoUrl:e.target.value})}/></label><Button disabled={!testimonial.displayName||!testimonial.body} onClick={addTestimonial}>Create pending testimonial</Button></div><div className="public-admin__rows">{testimonials.map(row=><article key={row._id}><strong>{row.displayName}</strong><em>{row.status}{row.featured?" · featured":""}</em><p>{row.body}</p><div><Button size="sm" onClick={()=>decide(row,"approved")}>Approve</Button><Button size="sm" variant="outline" onClick={()=>decide(row,"rejected")}>Reject</Button><Button size="sm" variant="outline" disabled={row.status!=="approved"} onClick={()=>decide(row,"approved",{featured:!row.featured})}>{row.featured?"Unfeature":"Feature"}</Button></div></article>)}</div></section>:null}
-    {tab==="team"?<section className="public-profile-manager">{editingProfileId==="new"?<div className="public-profile-editor"><h4>Add a public profile</h4><div className="public-admin__grid"><label>Profile type<select value={profile.ownerType} onChange={e=>setProfile({...profile,ownerType:e.target.value})}><option value="coach">Coach/team member</option><option value="student">Student</option></select></label>{profile.ownerType==="coach"?<label>Coach<select value={profile.coachProfileId} onChange={e=>setProfile({...profile,coachProfileId:e.target.value})}><option value="">Select coach</option>{coaches.map(row=><option key={row._id} value={row._id}>{row.displayName}</option>)}</select></label>:<label>Student Contact<select value={profile.contactId} onChange={e=>setProfile({...profile,contactId:e.target.value})}><option value="">Select Contact</option>{contacts.map(row=><option key={row._id} value={row._id}>{row.name}</option>)}</select></label>}<label>Public URL slug<input value={profile.slug} onChange={e=>setProfile({...profile,slug:e.target.value})}/></label><label>Public name<input value={profile.displayName} onChange={e=>setProfile({...profile,displayName:e.target.value})}/></label></div><div className="public-profile-actions"><Button disabled={!profile.slug||(!profile.coachProfileId&&!profile.contactId)} onClick={async()=>{await addProfile();setEditingProfileId("")}}>Add profile</Button><Button variant="outline" onClick={()=>setEditingProfileId("")}>Cancel</Button></div></div>:null}<div className="public-profile-list">{profiles.map(row=><article key={row._id}><div className="public-profile-summary">{row.avatarUrl?<img src={row.avatarUrl} alt=""/>:<span>{row.displayName?.slice(0,1)||"?"}</span>}<div><strong>{row.displayName}</strong><small>{row.publicTitle||row.ownerType}</small></div><em className={row.status==="published"?"is-live":""}>{row.status==="published"?"Published":"Draft"}</em><div className="public-profile-actions"><Button size="sm" variant="outline" onClick={()=>setEditingProfileId(editingProfileId===row._id?"":row._id)}>{editingProfileId===row._id?"Close":"Edit public profile"}</Button>{row.status==="published"?<a href={`/#team`} target="_blank" rel="noreferrer">View on website ↗</a>:<Button size="sm" onClick={()=>{patchProfile(row._id,"status","published");setEditingProfileId(row._id)}}>Publish</Button>}</div></div>{editingProfileId===row._id?<div className="public-profile-editor"><div className="public-admin__grid"><label><input type="checkbox" checked={row.status==="published"} onChange={e=>patchProfile(row._id,"status",e.target.checked?"published":"draft")}/> Show on website</label><label>Public name<input value={row.displayName||""} onChange={e=>patchProfile(row._id,"displayName",e.target.value)}/></label><label>Title<input value={row.publicTitle||""} onChange={e=>patchProfile(row._id,"publicTitle",e.target.value)}/></label><label>Photo URL<input value={row.avatarUrl||""} onChange={e=>patchProfile(row._id,"avatarUrl",e.target.value)}/></label><label>Display order<input type="number" value={row.sortOrder||0} onChange={e=>patchProfile(row._id,"sortOrder",Number(e.target.value))}/></label><label>Public slug<input value={row.slug||""} onChange={e=>patchProfile(row._id,"slug",e.target.value)}/></label><label className="wide">Bio<textarea value={row.bio||""} onChange={e=>patchProfile(row._id,"bio",e.target.value)}/></label><label className="wide">Specialties — one per line<textarea value={lines(row.specialties)} onChange={e=>patchProfile(row._id,"specialties",list(e.target.value))}/></label></div><div className="public-profile-actions"><Button size="sm" onClick={()=>saveProfile(row)}>Save public profile</Button>{row.ownerType==="student"?<Button size="sm" variant="outline" onClick={()=>token(row)}>Create private edit link</Button>:null}</div></div>:null}</article>)}</div></section>:null}
-  </div>;
+export default function PublicSiteAdmin({ section = "website" }) {
+  const [tab, setTab] = useState(section === "team" ? "team" : "brand"),
+    [config, setConfig] = useState(null),
+    [testimonials, setTestimonials] = useState([]),
+    [programs, setPrograms] = useState([]),
+    [profiles, setProfiles] = useState([]),
+    [coaches, setCoaches] = useState([]),
+    [contacts, setContacts] = useState([]),
+    [members, setMembers] = useState([]),
+    [testimonial, setTestimonial] = useState(blankTestimonial),
+    [profile, setProfile] = useState(blankProfile),
+    [message, setMessage] = useState(""),
+    [error, setError] = useState(""),
+    [saving, setSaving] = useState(false),
+    [uploading, setUploading] = useState(""),
+    [editingProfileId, setEditingProfileId] = useState("");
+  const load = async () => {
+    try {
+      const [c, t, p, pr, co, ct, wm] = await Promise.all([
+        fetchPublicManagementConfig(),
+        fetchManagedTestimonials(),
+        fetchCoachingPrograms({ limit: 200 }),
+        fetchManagedProfiles(),
+        fetchCoaches({ limit: 200 }),
+        fetchContacts({ limit: 200 }),
+        fetchWorkspaceMembers(),
+      ]);
+      setConfig(c);
+      setTestimonials(t);
+      setPrograms(p);
+      setProfiles(pr);
+      setCoaches(co);
+      setContacts(ct.contacts || ct || []);
+      setMembers((wm.members || []).filter((row) => row.status === "active"));
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Unable to load public-site settings.",
+      );
+    }
+  };
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const saveConfig = async () => {
+    try {
+      setSaving(true);
+      setError("");
+      setConfig(await updatePublicManagementConfig(config));
+      setMessage("Public website settings saved.");
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Unable to save public-site settings.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  const patchPublic = (key, value) =>
+    setConfig((current) => ({
+      ...current,
+      publicSite: { ...current.publicSite, [key]: value },
+    }));
+  const patchVisibility = (key, value) =>
+    patchPublic("sectionVisibility", {
+      ...config.publicSite.sectionVisibility,
+      [key]: value,
+    });
+  const fileData = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  const uploadSiteImage = async (file, key, label = "image") => {
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024)
+      return setError("Choose a PNG, JPG, or WEBP image up to 5 MB.");
+    try {
+      setUploading(key);
+      setError("");
+      const asset = await uploadEventImage({ file: await fileData(file), filename: file.name });
+      patchPublic(key, asset.url);
+      setMessage(`${label} uploaded. Save to publish the change.`);
+    } catch (err) {
+      setError(err.response?.data?.error || `Unable to upload the ${label.toLowerCase()}.`);
+    } finally {
+      setUploading("");
+    }
+  };
+  const uploadHomepageVideo = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("video/") || file.size > 75 * 1024 * 1024)
+      return setError("Choose an MP4, WEBM, or MOV video up to 75 MB.");
+    try {
+      setUploading("introVideoUrl");
+      setError("");
+      const asset = await uploadProgramVideo({ file: await fileData(file), filename: file.name });
+      patchPublic("introVideoUrl", asset.url);
+      setMessage("Homepage video uploaded. Save to publish the change.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to upload the homepage video.");
+    } finally {
+      setUploading("");
+    }
+  };
+  const uploadProfilePhoto = async (id, file) => {
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024)
+      return setError("Choose a PNG, JPG, or WEBP profile photo up to 5 MB.");
+    try {
+      setUploading(`profile-${id}`);
+      const asset = await uploadEventImage({ file: await fileData(file), filename: file.name });
+      patchProfile(id, "avatarUrl", asset.url);
+      setMessage("Profile photo uploaded. Save the public profile to publish it.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to upload the profile photo.");
+    } finally {
+      setUploading("");
+    }
+  };
+  const addTestimonial = async () => {
+    try {
+      const saved = await createManagedTestimonial(testimonial);
+      setTestimonials((rows) => [saved, ...rows]);
+      setTestimonial(blankTestimonial);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to create testimonial.");
+    }
+  };
+  const decide = async (row, status, extra = {}) => {
+    const saved = await updateManagedTestimonial(row._id, { status, ...extra });
+    setTestimonials((rows) =>
+      rows.map((item) => (item._id === saved._id ? saved : item)),
+    );
+  };
+  const saveProgram = async (program) => {
+    try {
+      const saved = await updateProgramPublicPresentation(
+        program._id,
+        program.publicPresentation || {},
+      );
+      setPrograms((rows) =>
+        rows.map((row) => (row._id === saved._id ? saved : row)),
+      );
+      setMessage("Program public details saved.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to save program.");
+    }
+  };
+  const addProfile = async () => {
+    try {
+      const saved = await createManagedProfile(profile);
+      setProfiles((rows) => [...rows, saved]);
+      setProfile(blankProfile);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to create profile.");
+    }
+  };
+  const saveProfile = async (row) => {
+    try {
+      const saved = await updateManagedProfile(row._id, row);
+      setProfiles((rows) =>
+        rows.map((item) => (item._id === saved._id ? saved : item)),
+      );
+      setMessage(`${saved.displayName} public profile saved.`);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to save profile.");
+    }
+  };
+  const patchProfile = (id, key, value) =>
+    setProfiles((rows) =>
+      rows.map((row) => (row._id === id ? { ...row, [key]: value } : row)),
+    );
+  const patchValue = (index, key, value) =>
+    patchPublic(
+      "valuePropositions",
+      (config.publicSite.valuePropositions || []).map((row, i) =>
+        i === index ? { ...row, [key]: value } : row,
+      ),
+    );
+  const token = async (row) => {
+    const result = await createStudentProfileEditToken(row._id);
+    setMessage(
+      `Student edit link (copy now): ${window.location.origin}${result.editPath}`,
+    );
+  };
+  if (!config)
+    return (
+      <div className="public-admin">{error || "Loading Website & Brand…"}</div>
+    );
+  return (
+    <div className="website-focused-panel public-admin">
+      {section === "website" ? (
+        <header>
+          <div>
+            <p className="page-eyebrow">Website settings</p>
+            <h3>Homepage &amp; branding</h3>
+            <p>
+              Manage the website identity, homepage content, navigation and
+              visible sections.
+            </p>
+          </div>
+        </header>
+      ) : (
+        <header className="website-section-heading">
+          <div>
+            <p className="page-eyebrow">Public profiles</p>
+            <h3>Team &amp; Coaches</h3>
+            <p>
+              Choose who appears on the website. Workspace access is managed
+              separately in Team &amp; Access.
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              setProfile(blankProfile);
+              setEditingProfileId("new");
+            }}
+          >
+            Add public profile
+          </Button>
+        </header>
+      )}
+      {error ? <p className="form-error">{error}</p> : null}
+      {message ? <p className="discovery-notice">{message}</p> : null}
+      {section === "website" ? (
+        <nav aria-label="Website settings sections">
+          {["brand", "homepage", "video", "sections"].map((item) => (
+            <button
+              type="button"
+              className={tab === item ? "is-active" : ""}
+              key={item}
+              onClick={() => setTab(item)}
+            >
+              {item === "brand"
+                ? "Branding"
+                : item === "video"
+                  ? "Homepage video"
+                  : item === "sections"
+                    ? "Visible sections"
+                    : "Homepage"}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+      {tab === "brand" ? (
+        <WorkspaceBrandingEditor
+          config={config}
+          setConfig={setConfig}
+          onSave={saveConfig}
+          saving={saving}
+          setError={setError}
+        />
+      ) : null}
+      {tab === "homepage" ? (
+        <section className="website-content-editor">
+          <div className="website-editor-group">
+            <header>
+              <span>01</span>
+              <div>
+                <h4>Hero</h4>
+                <p>The first message visitors see.</p>
+              </div>
+            </header>
+            <label className="website-toggle">
+              <input
+                type="checkbox"
+                checked={config.publicSite.published}
+                onChange={(e) => patchPublic("published", e.target.checked)}
+              />
+              <span>
+                <strong>Website published</strong>
+                <small>Make the public homepage visible.</small>
+              </span>
+            </label>
+            <div className="public-admin__grid">
+              <label>
+                Eyebrow
+                <input
+                  value={config.publicSite.eyebrow || ""}
+                  onChange={(e) => patchPublic("eyebrow", e.target.value)}
+                />
+              </label>
+              <label>
+                Logo overline
+                <input
+                  value={config.publicSite.heroOverline || ""}
+                  onChange={(e) => patchPublic("heroOverline", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Headline
+                <input
+                  value={config.publicSite.headline || ""}
+                  onChange={(e) => patchPublic("headline", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Supporting statement
+                <textarea
+                  value={config.publicSite.subheadline || ""}
+                  onChange={(e) => patchPublic("subheadline", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Logo supporting line
+                <input
+                  value={config.publicSite.heroTagline || ""}
+                  onChange={(e) => patchPublic("heroTagline", e.target.value)}
+                />
+              </label>
+              <label>
+                Application button label
+                <input
+                  value={config.publicSite.primaryCtaLabel || ""}
+                  onChange={(e) =>
+                    patchPublic("primaryCtaLabel", e.target.value)
+                  }
+                />
+              </label>
+            </div>
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>02</span>
+              <div>
+                <h4>Introduction &amp; About</h4>
+                <p>Keep the full story on the homepage.</p>
+              </div>
+            </header>
+            <div className="public-admin__grid">
+              <label>
+                Introduction title
+                <input
+                  value={config.publicSite.introTitle || ""}
+                  onChange={(e) => patchPublic("introTitle", e.target.value)}
+                />
+              </label>
+              <label>
+                About eyebrow
+                <input
+                  value={config.publicSite.aboutEyebrow || ""}
+                  onChange={(e) => patchPublic("aboutEyebrow", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Introduction copy
+                <textarea
+                  value={config.publicSite.introBody || ""}
+                  onChange={(e) => patchPublic("introBody", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                About title
+                <input
+                  value={config.publicSite.aboutTitle || ""}
+                  onChange={(e) => patchPublic("aboutTitle", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                About Ellie
+                <textarea
+                  value={config.publicSite.aboutBody || ""}
+                  onChange={(e) => patchPublic("aboutBody", e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>03</span>
+              <div>
+                <h4>Typography</h4>
+                <p>Control the website fonts and overall scale.</p>
+              </div>
+            </header>
+            <div className="public-admin__grid">
+              <label>
+                Heading style
+                <select
+                  value={config.publicSite.headingFont || "editorial"}
+                  onChange={(e) => patchPublic("headingFont", e.target.value)}
+                >
+                  <option value="editorial">Editorial serif</option>
+                  <option value="classic">Classic serif</option>
+                  <option value="modern">Modern sans serif</option>
+                </select>
+              </label>
+              <label>
+                Body style
+                <select
+                  value={config.publicSite.bodyFont || "modern"}
+                  onChange={(e) => patchPublic("bodyFont", e.target.value)}
+                >
+                  <option value="modern">Modern sans serif</option>
+                  <option value="classic">Classic serif</option>
+                </select>
+              </label>
+              <label>
+                Base font size: {config.publicSite.baseFontSize || 16}px
+                <input
+                  type="range"
+                  min="14"
+                  max="20"
+                  value={config.publicSite.baseFontSize || 16}
+                  onChange={(e) =>
+                    patchPublic("baseFontSize", Number(e.target.value))
+                  }
+                />
+              </label>
+              <label>
+                Heading scale:{" "}
+                {Math.round((config.publicSite.headingScale || 1) * 100)}%
+                <input
+                  type="range"
+                  min="0.8"
+                  max="1.2"
+                  step="0.05"
+                  value={config.publicSite.headingScale || 1}
+                  onChange={(e) =>
+                    patchPublic("headingScale", Number(e.target.value))
+                  }
+                />
+              </label>
+            </div>
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>04</span>
+              <div>
+                <h4>Contact, social &amp; footer</h4>
+                <p>Public contact and profile links.</p>
+              </div>
+            </header>
+            <div className="public-admin__grid">
+              <label>
+                Contact email
+                <input
+                  value={config.publicSite.contactEmail || ""}
+                  onChange={(e) => patchPublic("contactEmail", e.target.value)}
+                />
+              </label>
+              <label>
+                Contact phone
+                <input
+                  value={config.publicSite.contactPhone || ""}
+                  onChange={(e) => patchPublic("contactPhone", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Footer text
+                <input
+                  value={config.publicSite.footerText || ""}
+                  onChange={(e) => patchPublic("footerText", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Social profiles — one per line: Name|URL
+                <textarea
+                  value={socialText(config.publicSite.socialLinks)}
+                  onChange={(e) =>
+                    patchPublic("socialLinks", socialLinks(e.target.value))
+                  }
+                />
+                <small>Example: Instagram|https://instagram.com/yourname</small>
+              </label>
+            </div>
+          </div>
+          <footer className="website-editor-save">
+            <Button loading={saving} onClick={saveConfig}>
+              Save homepage
+            </Button>
+          </footer>
+        </section>
+      ) : null}
+      {tab === "video" ? (
+        <section className="homepage-media-editor">
+          <p className="public-admin__help">
+            Upload your video and poster image here. YouTube, Vimeo, and direct
+            HTTPS links remain available as an advanced option. Audio never autoplays.
+          </p>
+          <div className="homepage-media-uploads">
+            <article>
+              <div className="homepage-media-preview is-video">
+                {config.publicSite.introVideoPosterUrl ? <img src={config.publicSite.introVideoPosterUrl} alt="Homepage video poster" /> : <span>Video</span>}
+              </div>
+              <div><h4>Homepage video</h4><p>MP4, WEBM, or MOV up to 75 MB.</p><label className="website-upload-button">{uploading === "introVideoUrl" ? "Uploading…" : config.publicSite.introVideoUrl ? "Replace video" : "Upload video"}<input disabled={Boolean(uploading)} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => uploadHomepageVideo(event.target.files?.[0])} /></label></div>
+            </article>
+            <article>
+              <div className="homepage-media-preview">{config.publicSite.introVideoPosterUrl ? <img src={config.publicSite.introVideoPosterUrl} alt="" /> : <span>Poster</span>}</div>
+              <div><h4>Poster image</h4><p>Shown before the visitor plays the video.</p><label className="website-upload-button">{uploading === "introVideoPosterUrl" ? "Uploading…" : config.publicSite.introVideoPosterUrl ? "Replace image" : "Upload image"}<input disabled={Boolean(uploading)} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadSiteImage(event.target.files?.[0], "introVideoPosterUrl", "Poster image")} /></label></div>
+            </article>
+          </div>
+          <div className="public-admin__grid">
+            <details className="wide homepage-media-advanced"><summary>Advanced video and image URLs</summary><div className="public-admin__grid"><label>Intro video URL<input value={config.publicSite.introVideoUrl || ""} onChange={(e) => patchPublic("introVideoUrl", e.target.value)} /></label><label>Poster/background image URL<input value={config.publicSite.introVideoPosterUrl || ""} onChange={(e) => patchPublic("introVideoPosterUrl", e.target.value)} /></label></div></details>
+            <label>
+              Video eyebrow
+              <input
+                value={config.publicSite.introVideoEyebrow || ""}
+                onChange={(e) =>
+                  patchPublic("introVideoEyebrow", e.target.value)
+                }
+              />
+            </label>
+            <label className="wide">
+              Video title
+              <input
+                value={config.publicSite.introVideoTitle || ""}
+                onChange={(e) => patchPublic("introVideoTitle", e.target.value)}
+              />
+            </label>
+            <label className="wide">
+              Video supporting copy
+              <textarea
+                value={config.publicSite.introVideoCopy || ""}
+                onChange={(e) => patchPublic("introVideoCopy", e.target.value)}
+              />
+            </label>
+          </div>
+          <Button loading={saving} onClick={saveConfig}>
+            Save video settings
+          </Button>
+        </section>
+      ) : null}
+      {tab === "sections" ? (
+        <section className="website-content-editor">
+          <div className="public-admin__checks">
+            {Object.entries(visibilityLabels).map(([key, label]) => (
+              <label className="website-toggle" key={key}>
+                <input
+                  type="checkbox"
+                  checked={config.publicSite.sectionVisibility?.[key] !== false}
+                  onChange={(e) => patchVisibility(key, e.target.checked)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>01</span>
+              <div>
+                <h4>Why choose Ellie’s Coaching</h4>
+                <p>Edit the three value cards shown on the homepage.</p>
+              </div>
+            </header>
+            {(config.publicSite.valuePropositions || []).map((row, index) => (
+              <div className="public-admin__grid value-editor" key={index}>
+                <label>
+                  Card {index + 1} title
+                  <input
+                    value={row.title || ""}
+                    onChange={(e) => patchValue(index, "title", e.target.value)}
+                  />
+                </label>
+                <label className="wide">
+                  Description
+                  <textarea
+                    value={row.body || ""}
+                    onChange={(e) => patchValue(index, "body", e.target.value)}
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>02</span>
+              <div>
+                <h4>Programs section</h4>
+                <p>Programs stay on the homepage.</p>
+              </div>
+            </header>
+            <div className="public-admin__grid">
+              <label>
+                Eyebrow
+                <input
+                  value={config.publicSite.programsEyebrow || ""}
+                  onChange={(e) =>
+                    patchPublic("programsEyebrow", e.target.value)
+                  }
+                />
+              </label>
+              <label className="wide">
+                Headline
+                <input
+                  value={config.publicSite.programsTitle || ""}
+                  onChange={(e) => patchPublic("programsTitle", e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>03</span>
+              <div>
+                <h4>Student journey</h4>
+                <p>Edit “Your path” and every step.</p>
+              </div>
+            </header>
+            <div className="public-admin__grid">
+              <label>
+                Eyebrow
+                <input
+                  value={config.publicSite.journeyEyebrow || ""}
+                  onChange={(e) =>
+                    patchPublic("journeyEyebrow", e.target.value)
+                  }
+                />
+              </label>
+              <label className="wide">
+                Headline
+                <input
+                  value={config.publicSite.journeyTitle || ""}
+                  onChange={(e) => patchPublic("journeyTitle", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Supporting copy
+                <textarea
+                  value={config.publicSite.journeyCopy || ""}
+                  onChange={(e) => patchPublic("journeyCopy", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Journey steps — one per line
+                <textarea
+                  value={lines(config.publicSite.journeySteps)}
+                  onChange={(e) =>
+                    patchPublic("journeySteps", list(e.target.value))
+                  }
+                />
+              </label>
+            </div>
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>04</span>
+              <div>
+                <h4>Upcoming event</h4>
+                <p>
+                  The date and registration URL come from Events; these fields
+                  control homepage wording.
+                </p>
+              </div>
+            </header>
+            <div className="public-admin__grid">
+              <label>
+                Eyebrow
+                <input
+                  value={config.publicSite.eventEyebrow || ""}
+                  onChange={(e) => patchPublic("eventEyebrow", e.target.value)}
+                />
+              </label>
+              <label>
+                Button label
+                <input
+                  value={config.publicSite.eventCtaLabel || ""}
+                  onChange={(e) => patchPublic("eventCtaLabel", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Optional title override
+                <input
+                  value={config.publicSite.eventTitle || ""}
+                  onChange={(e) => patchPublic("eventTitle", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Optional description override
+                <textarea
+                  value={config.publicSite.eventSummary || ""}
+                  onChange={(e) => patchPublic("eventSummary", e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>05</span>
+              <div>
+                <h4>Community</h4>
+                <p>Explain the post-enrollment community clearly.</p>
+              </div>
+            </header>
+            <div className="public-admin__grid">
+              <label>
+                Community title
+                <input
+                  value={config.publicSite.communityTitle || ""}
+                  onChange={(e) =>
+                    patchPublic("communityTitle", e.target.value)
+                  }
+                />
+              </label>
+              <label className="wide">
+                Community explanation
+                <textarea
+                  value={config.publicSite.communityBody || ""}
+                  onChange={(e) => patchPublic("communityBody", e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>06</span>
+              <div>
+                <h4>Final application call to action</h4>
+                <p>The application opens as a modal on the homepage.</p>
+              </div>
+            </header>
+            <div className="public-admin__grid">
+              <label>
+                Eyebrow
+                <input
+                  value={config.publicSite.finalCtaEyebrow || ""}
+                  onChange={(e) =>
+                    patchPublic("finalCtaEyebrow", e.target.value)
+                  }
+                />
+              </label>
+              <label>
+                Button label
+                <input
+                  value={config.publicSite.finalCtaLabel || ""}
+                  onChange={(e) => patchPublic("finalCtaLabel", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Headline
+                <input
+                  value={config.publicSite.finalCtaTitle || ""}
+                  onChange={(e) => patchPublic("finalCtaTitle", e.target.value)}
+                />
+              </label>
+              <label className="wide">
+                Supporting copy
+                <textarea
+                  value={config.publicSite.finalCtaCopy || ""}
+                  onChange={(e) => patchPublic("finalCtaCopy", e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+          <div className="website-editor-group">
+            <header>
+              <span>07</span>
+              <div>
+                <h4>Proof</h4>
+                <p>Only publish approved, factual metrics.</p>
+              </div>
+            </header>
+            <label>
+              Trust metrics — one per line: Value|Label
+              <textarea
+                value={metricText(config.publicSite.trustMetrics)}
+                onChange={(e) =>
+                  patchPublic("trustMetrics", metrics(e.target.value))
+                }
+              />
+            </label>
+          </div>
+          <footer className="website-editor-save">
+            <Button loading={saving} onClick={saveConfig}>
+              Save homepage sections
+            </Button>
+          </footer>
+        </section>
+      ) : null}
+      {tab === "programs" ? (
+        <section className="public-admin__rows">
+          <p>
+            Manage program delivery and pricing in Coaching. Choose how each
+            program appears on your website here.
+          </p>
+          <Link to="/coaching/programs">Manage programs</Link>
+          {programs.map((program) => (
+            <article key={program._id}>
+              <h3>{program.name}</h3>
+              <div className="public-admin__grid">
+                <label>
+                  Public slug
+                  <input
+                    value={program.publicPresentation?.slug || ""}
+                    onChange={(e) =>
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  slug: e.target.value,
+                                },
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  Publication
+                  <select
+                    value={program.publicPresentation?.status || "hidden"}
+                    onChange={(e) =>
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  status: e.target.value,
+                                },
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="hidden">Hidden</option>
+                    <option value="published">Published</option>
+                  </select>
+                </label>
+                <label className="wide">
+                  Public title
+                  <input
+                    value={program.publicPresentation?.title || ""}
+                    onChange={(e) =>
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  title: e.target.value,
+                                },
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label className="wide">
+                  Summary
+                  <textarea
+                    value={program.publicPresentation?.summary || ""}
+                    onChange={(e) =>
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  summary: e.target.value,
+                                },
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label className="wide">
+                  Who it is for
+                  <textarea
+                    value={program.publicPresentation?.audience || ""}
+                    onChange={(e) =>
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  audience: e.target.value,
+                                },
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label className="wide">
+                  Highlights — one per line
+                  <textarea
+                    value={lines(program.publicPresentation?.highlights)}
+                    onChange={(e) =>
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  highlights: list(e.target.value),
+                                },
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(program.publicPresentation?.priceVisible)}
+                    onChange={(e) =>
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  priceVisible: e.target.checked,
+                                },
+                              }
+                            : row,
+                        ),
+                      )
+                    }
+                  />
+                  Show configured price
+                </label>
+              </div>
+              <Button onClick={() => saveProgram(program)}>
+                Save program presentation
+              </Button>
+            </article>
+          ))}
+        </section>
+      ) : null}
+      {tab === "testimonials" ? (
+        <section>
+          <div className="public-admin__grid">
+            <label>
+              Name
+              <input
+                value={testimonial.displayName}
+                onChange={(e) =>
+                  setTestimonial({
+                    ...testimonial,
+                    displayName: e.target.value,
+                  })
+                }
+              />
+            </label>
+            <label>
+              Headline
+              <input
+                value={testimonial.headline}
+                onChange={(e) =>
+                  setTestimonial({ ...testimonial, headline: e.target.value })
+                }
+              />
+            </label>
+            <label className="wide">
+              Testimonial
+              <textarea
+                value={testimonial.body}
+                onChange={(e) =>
+                  setTestimonial({ ...testimonial, body: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Video URL
+              <input
+                value={testimonial.videoUrl}
+                onChange={(e) =>
+                  setTestimonial({ ...testimonial, videoUrl: e.target.value })
+                }
+              />
+            </label>
+            <Button
+              disabled={!testimonial.displayName || !testimonial.body}
+              onClick={addTestimonial}
+            >
+              Create pending testimonial
+            </Button>
+          </div>
+          <div className="public-admin__rows">
+            {testimonials.map((row) => (
+              <article key={row._id}>
+                <strong>{row.displayName}</strong>
+                <em>
+                  {row.status}
+                  {row.featured ? " · featured" : ""}
+                </em>
+                <p>{row.body}</p>
+                <div>
+                  <Button size="sm" onClick={() => decide(row, "approved")}>
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => decide(row, "rejected")}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={row.status !== "approved"}
+                    onClick={() =>
+                      decide(row, "approved", { featured: !row.featured })
+                    }
+                  >
+                    {row.featured ? "Unfeature" : "Feature"}
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {tab === "team" ? (
+        <section className="public-profile-manager">
+          {editingProfileId === "new" ? (
+            <div className="public-profile-editor">
+              <h4>Add a public profile</h4>
+              <div className="public-admin__grid">
+                <label>
+                  Profile type
+                  <select
+                    value={profile.ownerType}
+                    onChange={(e) =>
+                      setProfile({ ...profile, ownerType: e.target.value })
+                    }
+                  >
+                    <option value="coach">Coach</option>
+                    <option value="team">Team member</option>
+                    <option value="student">Student</option>
+                  </select>
+                </label>
+                {profile.ownerType === "coach" ? (
+                  <label>
+                    Coach
+                    <select
+                      value={profile.coachProfileId}
+                      onChange={(e) =>
+                        setProfile({
+                          ...profile,
+                          coachProfileId: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">Select coach</option>
+                      {coaches.map((row) => (
+                        <option key={row._id} value={row._id}>
+                          {row.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : profile.ownerType === "team" ? (
+                  <label>
+                    Workspace team member
+                    <select
+                      value={profile.userId}
+                      onChange={(e) => {
+                        const member = members.find(
+                          (row) => String(row.userId) === e.target.value,
+                        );
+                        const displayName =
+                          member?.name ||
+                          [member?.firstName, member?.lastName]
+                            .filter(Boolean)
+                            .join(" ");
+                        setProfile({
+                          ...profile,
+                          userId: e.target.value,
+                          displayName: profile.displayName || displayName || "",
+                          slug:
+                            profile.slug ||
+                            String(displayName || "")
+                              .toLowerCase()
+                              .replace(/[^a-z0-9]+/g, "-")
+                              .replace(/^-|-$/g, ""),
+                        });
+                      }}
+                    >
+                      <option value="">Select team member</option>
+                      {members.map((row) => (
+                        <option key={row.userId} value={row.userId}>
+                          {row.name || row.email}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label>
+                    Student Contact
+                    <select
+                      value={profile.contactId}
+                      onChange={(e) =>
+                        setProfile({ ...profile, contactId: e.target.value })
+                      }
+                    >
+                      <option value="">Select Contact</option>
+                      {contacts.map((row) => (
+                        <option key={row._id} value={row._id}>
+                          {row.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <label>
+                  Public URL slug
+                  <input
+                    value={profile.slug}
+                    onChange={(e) =>
+                      setProfile({ ...profile, slug: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Public name
+                  <input
+                    value={profile.displayName}
+                    onChange={(e) =>
+                      setProfile({ ...profile, displayName: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Public role or title
+                  <input
+                    value={profile.publicTitle}
+                    placeholder="Chief Technology Operator"
+                    onChange={(e) =>
+                      setProfile({ ...profile, publicTitle: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              <div className="public-profile-actions">
+                <Button
+                  disabled={
+                    !profile.slug ||
+                    (profile.ownerType === "coach" && !profile.coachProfileId) ||
+                    (profile.ownerType === "team" && !profile.userId) ||
+                    (profile.ownerType === "student" && !profile.contactId)
+                  }
+                  onClick={async () => {
+                    await addProfile();
+                    setEditingProfileId("");
+                  }}
+                >
+                  Add profile
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingProfileId("")}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          <div className="public-profile-list">
+            {profiles.map((row) => (
+              <article key={row._id}>
+                <div className="public-profile-summary">
+                  {row.avatarUrl ? (
+                    <img src={row.avatarUrl} alt="" />
+                  ) : (
+                    <span>{row.displayName?.slice(0, 1) || "?"}</span>
+                  )}
+                  <div>
+                    <strong>{row.displayName}</strong>
+                    <small>{row.publicTitle || row.ownerType}</small>
+                  </div>
+                  <em className={row.status === "published" ? "is-live" : ""}>
+                    {row.status === "published" ? "Published" : "Draft"}
+                  </em>
+                  <div className="public-profile-actions">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setEditingProfileId(
+                          editingProfileId === row._id ? "" : row._id,
+                        )
+                      }
+                    >
+                      {editingProfileId === row._id
+                        ? "Close"
+                        : "Edit public profile"}
+                    </Button>
+                    {row.status === "published" ? (
+                      <a href={`/#team`} target="_blank" rel="noreferrer">
+                        View on website ↗
+                      </a>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          patchProfile(row._id, "status", "published");
+                          setEditingProfileId(row._id);
+                        }}
+                      >
+                        Publish
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {editingProfileId === row._id ? (
+                  <div className="public-profile-editor">
+                    <div className="public-admin__grid">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={row.status === "published"}
+                          onChange={(e) =>
+                            patchProfile(
+                              row._id,
+                              "status",
+                              e.target.checked ? "published" : "draft",
+                            )
+                          }
+                        />{" "}
+                        Show on website
+                      </label>
+                      <label>
+                        Public name
+                        <input
+                          value={row.displayName || ""}
+                          onChange={(e) =>
+                            patchProfile(row._id, "displayName", e.target.value)
+                          }
+                        />
+                      </label>
+                      <label>
+                        Title
+                        <input
+                          value={row.publicTitle || ""}
+                          onChange={(e) =>
+                            patchProfile(row._id, "publicTitle", e.target.value)
+                          }
+                        />
+                      </label>
+                      <div className="public-profile-photo-field">
+                        <strong>Profile photo</strong>
+                        <span className="public-profile-photo-control">
+                          {row.avatarUrl ? <img src={row.avatarUrl} alt="" /> : <i>{row.displayName?.slice(0, 1) || "?"}</i>}
+                          <span><label className="website-upload-button">{uploading === `profile-${row._id}` ? "Uploading…" : row.avatarUrl ? "Replace photo" : "Upload photo"}<input disabled={Boolean(uploading)} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadProfilePhoto(row._id, event.target.files?.[0])} /></label>{row.avatarUrl ? <button type="button" className="brand-remove" onClick={() => patchProfile(row._id, "avatarUrl", "")}>Remove</button> : null}</span>
+                        </span>
+                      </div>
+                      <label>
+                        Display order
+                        <input
+                          type="number"
+                          value={row.sortOrder || 0}
+                          onChange={(e) =>
+                            patchProfile(
+                              row._id,
+                              "sortOrder",
+                              Number(e.target.value),
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        Public slug
+                        <input
+                          value={row.slug || ""}
+                          onChange={(e) =>
+                            patchProfile(row._id, "slug", e.target.value)
+                          }
+                        />
+                      </label>
+                      <label className="wide">
+                        Bio
+                        <textarea
+                          value={row.bio || ""}
+                          onChange={(e) =>
+                            patchProfile(row._id, "bio", e.target.value)
+                          }
+                        />
+                      </label>
+                      <label className="wide">
+                        Specialties — one per line
+                        <textarea
+                          value={lines(row.specialties)}
+                          onChange={(e) =>
+                            patchProfile(
+                              row._id,
+                              "specialties",
+                              list(e.target.value),
+                            )
+                          }
+                        />
+                      </label>
+                    </div>
+                    <div className="public-profile-actions">
+                      <Button size="sm" onClick={() => saveProfile(row)}>
+                        Save public profile
+                      </Button>
+                      {row.ownerType === "student" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => token(row)}
+                        >
+                          Create private edit link
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
 }

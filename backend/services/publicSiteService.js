@@ -247,6 +247,7 @@ function sanitizedConfig(workspace, config) {
         5000,
       ),
       aboutBody: String(p.aboutBody || "").slice(0, 12000),
+      aboutImageUrl: safeUrl(p.aboutImageUrl),
       heroMediaUrl: safeUrl(p.heroMediaUrl),
       introVideoUrl: safeUrl(p.introVideoUrl),
       introVideoPosterUrl: safeUrl(p.introVideoPosterUrl),

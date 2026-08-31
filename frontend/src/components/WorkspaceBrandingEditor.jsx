@@ -202,6 +202,14 @@ export default function WorkspaceBrandingEditor({
             onChange={(value) => patchSite("heroMediaUrl", value)}
             onUpload={(file) => upload("publicSite", "heroMediaUrl", file)}
           />
+          <AssetField
+            label="About Ellie photo"
+            help="Shown beside the About Ellie story on the homepage. A vertical or square portrait works best."
+            value={config.publicSite?.aboutImageUrl || ""}
+            busy={uploading === "publicSite.aboutImageUrl"}
+            onChange={(value) => patchSite("aboutImageUrl", value)}
+            onUpload={(file) => upload("publicSite", "aboutImageUrl", file)}
+          />
         </div>
         <div className="brand-color-grid">
           <label>

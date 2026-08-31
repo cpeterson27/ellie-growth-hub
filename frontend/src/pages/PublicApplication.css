@@ -57,6 +57,7 @@
   gap: 9px;
 }
 .application-consent label{align-items:flex-start;display:flex;gap:12px}.application-consent input[type="checkbox"]{appearance:auto;flex:0 0 18px;height:18px;margin:2px 0 0;width:18px}.application-consent span{display:inline;min-width:0}.application-consent a{display:inline;white-space:normal}
+.application-consent{gap:18px;margin:28px 0;padding-top:24px}.application-consent label{min-height:0;padding:0}.application-consent+button{margin-top:6px}
 .application-grid .wide {
   grid-column: 1/-1;
 }

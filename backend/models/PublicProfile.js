@@ -1,3 +1,105 @@
-const mongoose=require("mongoose");const workspacePlugin=require("../tenancy/workspacePlugin");
-const link={_id:false,label:{type:String,maxlength:60},url:{type:String,maxlength:1000}};
-const schema=new mongoose.Schema({workspaceId:{type:mongoose.Schema.Types.ObjectId,ref:"Workspace",required:true,index:true},ownerType:{type:String,enum:["coach","student"],required:true},coachProfileId:{type:mongoose.Schema.Types.ObjectId,ref:"CoachProfile",default:null},contactId:{type:mongoose.Schema.Types.ObjectId,ref:"Contact",default:null},userId:{type:mongoose.Schema.Types.ObjectId,ref:"User",default:null},slug:{type:String,required:true,trim:true,lowercase:true,maxlength:120},displayName:{type:String,required:true,trim:true,maxlength:160},publicTitle:{type:String,default:"",maxlength:160},headline:{type:String,default:"",maxlength:300},bio:{type:String,default:"",maxlength:8000},avatarUrl:{type:String,default:"",maxlength:1000},publicLocation:{type:String,default:"",maxlength:200},specialties:{type:[String],default:[]},goals:{type:[String],default:[]},experience:{type:String,default:"",maxlength:5000},socialLinks:{type:[link],default:[]},websiteUrl:{type:String,default:"",maxlength:1000},cta:{label:{type:String,default:"",maxlength:80},url:{type:String,default:"",maxlength:1000}},layout:{type:String,enum:["executive","profile","minimal"],default:"executive"},accentToken:{type:String,enum:["brand","green","charcoal"],default:"brand"},sectionOrder:{type:[String],default:["about","specialties","goals","experience","links"]},featured:{type:Boolean,default:false},sortOrder:{type:Number,default:0},status:{type:String,enum:["draft","published","suspended"],default:"draft",index:true},publishedAt:{type:Date,default:null},moderatedBy:{type:mongoose.Schema.Types.ObjectId,ref:"User",default:null}},{timestamps:true,collection:"public_profiles"});schema.index({workspaceId:1,slug:1},{unique:true});schema.index({workspaceId:1,ownerType:1,coachProfileId:1},{unique:true,partialFilterExpression:{coachProfileId:{$type:"objectId"}}});schema.index({workspaceId:1,ownerType:1,contactId:1},{unique:true,partialFilterExpression:{contactId:{$type:"objectId"}}});schema.plugin(workspacePlugin);module.exports=mongoose.model("PublicProfile",schema);
+const mongoose = require("mongoose");
+const workspacePlugin = require("../tenancy/workspacePlugin");
+const link = {
+  _id: false,
+  label: { type: String, maxlength: 60 },
+  url: { type: String, maxlength: 1000 },
+};
+const schema = new mongoose.Schema(
+  {
+    workspaceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Workspace",
+      required: true,
+      index: true,
+    },
+    ownerType: {
+      type: String,
+      enum: ["coach", "team", "student"],
+      required: true,
+    },
+    coachProfileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CoachProfile",
+      default: null,
+    },
+    contactId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contact",
+      default: null,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    slug: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      maxlength: 120,
+    },
+    displayName: { type: String, required: true, trim: true, maxlength: 160 },
+    publicTitle: { type: String, default: "", maxlength: 160 },
+    headline: { type: String, default: "", maxlength: 300 },
+    bio: { type: String, default: "", maxlength: 8000 },
+    avatarUrl: { type: String, default: "", maxlength: 1000 },
+    publicLocation: { type: String, default: "", maxlength: 200 },
+    specialties: { type: [String], default: [] },
+    goals: { type: [String], default: [] },
+    experience: { type: String, default: "", maxlength: 5000 },
+    socialLinks: { type: [link], default: [] },
+    websiteUrl: { type: String, default: "", maxlength: 1000 },
+    cta: {
+      label: { type: String, default: "", maxlength: 80 },
+      url: { type: String, default: "", maxlength: 1000 },
+    },
+    layout: {
+      type: String,
+      enum: ["executive", "profile", "minimal"],
+      default: "executive",
+    },
+    accentToken: {
+      type: String,
+      enum: ["brand", "green", "charcoal"],
+      default: "brand",
+    },
+    sectionOrder: {
+      type: [String],
+      default: ["about", "specialties", "goals", "experience", "links"],
+    },
+    featured: { type: Boolean, default: false },
+    sortOrder: { type: Number, default: 0 },
+    status: {
+      type: String,
+      enum: ["draft", "published", "suspended"],
+      default: "draft",
+      index: true,
+    },
+    publishedAt: { type: Date, default: null },
+    moderatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+  },
+  { timestamps: true, collection: "public_profiles" },
+);
+schema.index({ workspaceId: 1, slug: 1 }, { unique: true });
+schema.index(
+  { workspaceId: 1, ownerType: 1, coachProfileId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { coachProfileId: { $type: "objectId" } },
+  },
+);
+schema.index(
+  { workspaceId: 1, ownerType: 1, contactId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { contactId: { $type: "objectId" } },
+  },
+);
+schema.plugin(workspacePlugin);
+module.exports = mongoose.model("PublicProfile", schema);
