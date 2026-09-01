@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchContacts, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, updateCampaignRegistrationLinks, updateCampaignSchedule, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchContacts, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, updateCampaignSchedule, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
@@ -43,6 +43,8 @@ export default function CampaignWorkspace() {
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateHistoryOpen, setTemplateHistoryOpen] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateDirty, setTemplateDirty] = useState(false);
+  const [templateNotice, setTemplateNotice] = useState("");
   const [emailPreview, setEmailPreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
@@ -75,6 +77,8 @@ export default function CampaignWorkspace() {
     if (!id) return;
     fetchCampaignEmailTemplate(id, templateAudience).then(({ template, versions }) => {
       setEmailTemplate(template);
+      setTemplateDirty(false);
+      setTemplateNotice("");
       setTemplateVersions(versions || []);
     }).catch(() => {});
   }, [id, templateAudience]);
@@ -151,42 +155,50 @@ export default function CampaignWorkspace() {
     }
   };
 
-  const updateTemplateField = (field, value) => setEmailTemplate((current) => ({ ...current, [field]: value, status: "draft" }));
+  const updateTemplateField = (field, value) => {
+    setEmailTemplate((current) => ({ ...current, [field]: value }));
+    setTemplateDirty(true);
+    setTemplateNotice("");
+  };
+  const updateAdditionalButton = (index, field, value) => {
+    setEmailTemplate((current) => ({
+      ...current,
+      additionalButtons: (current.additionalButtons || []).map((button, buttonIndex) => buttonIndex === index ? { ...button, [field]: value } : button),
+    }));
+    setTemplateDirty(true);
+    setTemplateNotice("");
+  };
+  const addEmailButton = () => {
+    setEmailTemplate((current) => ({ ...current, additionalButtons: [...(current.additionalButtons || []), { label: "", url: "" }] }));
+    setTemplateDirty(true);
+  };
+  const removeEmailButton = (index) => {
+    setEmailTemplate((current) => ({ ...current, additionalButtons: (current.additionalButtons || []).filter((_, buttonIndex) => buttonIndex !== index) }));
+    setTemplateDirty(true);
+  };
   const loadHistoricalTemplate = (version) => {
     setEmailTemplate({
       subject: version.subject || "",
       body: version.body || "",
       callToAction: version.callToAction || "",
       callToActionUrl: version.callToActionUrl || "",
+      additionalButtons: version.additionalButtons || [],
       topic: version.topic || emailTemplate?.topic || "event_invitations",
       status: "draft",
       currentVersion: emailTemplate?.currentVersion || 0,
     });
     setTemplateHistoryOpen(false);
     setEmailPreview(null);
-  };
-  const updateMeetupButton = (field, value) => setCampaign((current) => ({
-    ...current,
-    registrationLinks: {
-      ...current.registrationLinks,
-      meetup: { ...current.registrationLinks?.meetup, [field]: value },
-    },
-  }));
-  const saveButtonLinks = async () => {
-    const updated = await updateCampaignRegistrationLinks(id, {
-      eventbriteUrl: campaign.registrationLinks?.eventbrite?.url || "",
-      meetupUrl: campaign.registrationLinks?.meetup?.enabled ? campaign.registrationLinks?.meetup?.url || "" : "",
-      meetupLabel: campaign.registrationLinks?.meetup?.label || "View on Meetup",
-    });
-    setCampaign(updated);
+    setTemplateDirty(true);
   };
   const saveTemplate = async () => {
     try {
       setTemplateSaving(true);
       setError("");
-      await saveButtonLinks();
       const audienceLabel = templateAudience === "general" ? "All Deal to Close contacts" : RESEARCH_EMAIL_AUDIENCES.find((item) => item.key === templateAudience)?.label || campaign.audience?.[Number(templateAudience.replace("audience-", ""))] || "";
       setEmailTemplate(await saveCampaignEmailTemplate(id, { ...emailTemplate, audienceKey: templateAudience, audienceLabel }));
+      setTemplateDirty(false);
+      setTemplateNotice("Draft saved.");
     } catch (err) {
       setError(err.response?.data?.error || "Unable to save the campaign email.");
     } finally {
@@ -197,11 +209,12 @@ export default function CampaignWorkspace() {
     try {
       setTemplateSaving(true);
       setError("");
-      await saveButtonLinks();
       const audienceLabel = templateAudience === "general" ? "All Deal to Close contacts" : RESEARCH_EMAIL_AUDIENCES.find((item) => item.key === templateAudience)?.label || campaign.audience?.[Number(templateAudience.replace("audience-", ""))] || "";
       await saveCampaignEmailTemplate(id, { ...emailTemplate, audienceKey: templateAudience, audienceLabel });
       const result = await approveCampaignEmailTemplate(id, templateAudience);
       setEmailTemplate(result.template);
+      setTemplateDirty(false);
+      setTemplateNotice("Template approved.");
       setTemplateVersions((current) => [result.version, ...current]);
     } catch (err) {
       setError(err.response?.data?.error || "Unable to approve the campaign email.");
@@ -219,9 +232,6 @@ export default function CampaignWorkspace() {
         logoUrl: campaign.brand?.logoUrl || "",
         flyerUrl: campaign.brand?.flyerUrl || "",
         accentColor: campaign.brand?.accentColor || "#173f36",
-        meetupEnabled: campaign.registrationLinks?.meetup?.enabled === true,
-        meetupUrl: campaign.registrationLinks?.meetup?.url || "",
-        meetupLabel: campaign.registrationLinks?.meetup?.label || "View on Meetup",
         previewContactId,
       }));
     } catch (err) {
@@ -236,7 +246,7 @@ export default function CampaignWorkspace() {
     const timer = window.setTimeout(() => previewTemplate({ silent: true }), 450);
     return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, emailTemplate, previewContactId, campaign?.brand, campaign?.registrationLinks]);
+  }, [id, emailTemplate, previewContactId, campaign?.brand]);
   if (loading) return <div className="page-dashboard"><p>Loading campaign…</p></div>;
   if (error || !campaign) return <div className="page-dashboard"><p className="form-error">{error || "Campaign not found."}</p><Button variant="outline" onClick={() => navigate("/campaigns")}>Back to Campaigns</Button></div>;
 
@@ -286,13 +296,13 @@ export default function CampaignWorkspace() {
         {activeSection === "email" ? <DashboardCard title="Email campaign studio">
           {emailTemplate ? <div className="campaign-template-editor">
             <div className="campaign-email-controls">
-              <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Approved · version ${emailTemplate.currentVersion}` : "Unsaved changes"}</strong></div>
+              <div className="campaign-template-editor__status"><span className={`campaign-status-dot ${!templateDirty && emailTemplate.status === "approved" ? "is-approved" : ""}`} /> <strong>{templateDirty ? "Unsaved changes" : emailTemplate.status === "approved" ? `Approved · version ${emailTemplate.currentVersion}` : "Draft saved"}</strong>{templateNotice ? <small role="status">{templateNotice}</small> : null}</div>
               <div className="campaign-routing-explainer" aria-label="You do not assign contacts here. Growth Operator routes each contact automatically."><strong>Automatic recipient routing</strong><span>Growth Operator chooses the approved template for each contact.</span></div>
               <label aria-description="Individual overrides are optional."><span>Template you are editing</span><select value={templateAudience} onChange={(event) => setTemplateAudience(event.target.value)}><option value="general">Main template · automatic fallback</option><optgroup label="Research audiences">{RESEARCH_EMAIL_AUDIENCES.map((audience) => <option value={audience.key} key={audience.key}>{audience.label}</option>)}</optgroup>{(campaign.audience || []).length ? <optgroup label="Campaign audiences">{campaign.audience.map((audience, index) => <option value={`audience-${index}`} key={`${audience}-${index}`}>{audience}</option>)}</optgroup> : null}</select></label>
               <label><span>Subject</span><input value={emailTemplate.subject} onChange={(event) => updateTemplateField("subject", event.target.value)} /></label>
               <label><span>Message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
-              <div className="campaign-field-row"><label><span>Button text</span><input value={emailTemplate.callToAction || ""} onChange={(event) => updateTemplateField("callToAction", event.target.value)} placeholder="Register now" /></label><label><span>Button link</span><input type="url" value={emailTemplate.callToActionUrl || ""} onChange={(event) => updateTemplateField("callToActionUrl", event.target.value)} placeholder="https://" /></label></div>
-              <details className="campaign-email-options"><summary>Additional email options</summary><div className="campaign-secondary-button"><label className="campaign-secondary-button__toggle"><input type="checkbox" checked={campaign.registrationLinks?.meetup?.enabled === true} onChange={(event) => updateMeetupButton("enabled", event.target.checked)} /><span>Include Meetup button</span></label>{campaign.registrationLinks?.meetup?.enabled ? <><label><span>Meetup button text</span><input value={campaign.registrationLinks?.meetup?.label || "View on Meetup"} onChange={(event) => updateMeetupButton("label", event.target.value)} /></label><label><span>Meetup button link</span><input type="url" value={campaign.registrationLinks?.meetup?.url || ""} onChange={(event) => updateMeetupButton("url", event.target.value)} /></label></> : null}</div><p className="campaign-template-help">Personalization: {"{{firstName}}"}, {"{{company}}"}, {"{{campaignName}}"}, {"{{eventDate}}"}, {"{{eventLink}}"}</p></details>
+              <section className="campaign-email-buttons"><header><div><span>Email buttons</span><small>Buttons appear together beneath the email.</small></div><Button variant="outline" size="sm" disabled={(emailTemplate.additionalButtons || []).length >= 4} onClick={addEmailButton}>+ Add button</Button></header><div className="campaign-email-button-grid"><article><strong>Primary button</strong><label><span>Button text</span><input value={emailTemplate.callToAction || ""} onChange={(event) => updateTemplateField("callToAction", event.target.value)} placeholder="Register now" /></label><label><span>Button link</span><input type="url" value={emailTemplate.callToActionUrl || ""} onChange={(event) => updateTemplateField("callToActionUrl", event.target.value)} placeholder="https://" /></label></article>{(emailTemplate.additionalButtons || []).map((button, index) => <article key={`${index}-${button.url}`}><header><strong>Button {index + 2}</strong><button type="button" onClick={() => removeEmailButton(index)}>Remove</button></header><label><span>Button text</span><input value={button.label || ""} onChange={(event) => updateAdditionalButton(index, "label", event.target.value)} placeholder="View on Meetup" /></label><label><span>Button link</span><input type="url" value={button.url || ""} onChange={(event) => updateAdditionalButton(index, "url", event.target.value)} placeholder="https://" /></label></article>)}</div></section>
+              <details className="campaign-email-options"><summary>Personalization fields</summary><p className="campaign-template-help">{"{{firstName}}"}, {"{{company}}"}, {"{{campaignName}}"}, {"{{eventDate}}"}, {"{{eventLink}}"}</p></details>
               <label><span>Preview recipient</span><select value={previewContactId} onChange={(event) => setPreviewContactId(event.target.value)}><option value="">Example contact</option>{previewContacts.map((contact) => <option key={contact._id} value={contact._id}>{contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed contact"}{contact.company ? ` · ${contact.company}` : ""}</option>)}</select></label>
               <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
             </div>

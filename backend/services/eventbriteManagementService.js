@@ -177,6 +177,13 @@ async function updateManagedEvent(localEventId, input) {
     );
   }
 
+  if (input.startDate !== undefined) {
+    await Campaign.updateMany(
+      { eventId: localEvent._id },
+      { $set: { startDate: localEvent.startDate } },
+    );
+  }
+
   return externalId ? syncEvent(localEvent._id) : localEvent;
 }
 

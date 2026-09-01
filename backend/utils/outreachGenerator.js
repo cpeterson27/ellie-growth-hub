@@ -55,6 +55,12 @@ function emailButton(url, label, backgroundColor) {
 </table>`.trim();
 }
 
+function emailButtonRow(buttons = [], backgroundColor = "#000000") {
+  const validButtons = buttons.filter((button) => button?.url && button?.label);
+  if (!validButtons.length) return "";
+  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:18px 0 0;"><tr>${validButtons.map((button) => `<td style="padding:0 10px 10px 0;vertical-align:top;">${emailButton(button.url, button.label, button.backgroundColor || backgroundColor)}</td>`).join("")}</tr></table>`;
+}
+
 function fillTemplate(value = "", variables = {}) {
   const filled = Object.entries(variables).reduce(
     (output, [key, replacement]) => output.replaceAll(`{{${key}}}`, String(replacement || "")),
@@ -129,17 +135,17 @@ function generateOutreachDraft(contact, campaign) {
   const meetupLink =
     campaign.registrationLinks?.meetup?.url || "";
 
-  const meetupText = meetupLink
-    ? `\nAlso listed on Meetup:\n${meetupLink}\n`
-    : "";
-
-  const meetupHtml = meetupLink
-    ? emailButton(
-      meetupLink,
-      campaign.registrationLinks?.meetup?.label || "View on Meetup",
-      "#e0393e",
-    )
-    : "";
+  const additionalButtons = Array.isArray(campaign.content?.additionalButtons)
+    ? campaign.content.additionalButtons.filter((button) => button?.label && button?.url)
+    : [];
+  if (meetupLink && !additionalButtons.some((button) => button.url === meetupLink)) {
+    additionalButtons.push({ label: campaign.registrationLinks?.meetup?.label || "View on Meetup", url: meetupLink });
+  }
+  const emailButtons = [
+    ...(eventLink ? [{ label: campaign.content?.callToAction || "Learn more", url: eventLink }] : []),
+    ...additionalButtons,
+  ];
+  const meetupText = additionalButtons.map((button) => `\n${button.label}:\n${button.url}\n`).join("");
 
 
   const flyerUrl = campaign.brand?.flyerUrl || campaign.brand?.logoUrl || (
@@ -148,6 +154,7 @@ function generateOutreachDraft(contact, campaign) {
       : "https://res.cloudinary.com/de1vvqtp3/image/upload/v1784844473/deal-to-close-flyer.png_bmxmbw.png"
   );
   const brandLogoUrl = campaign.brand?.flyerUrl ? campaign.brand?.logoUrl || "" : "";
+  const brandWebsiteUrl = String(campaign.brand?.websiteUrl || "").trim();
   const eventDate = formatEventDate(campaign.startDate) || "Saturday, September 12, 2026";
 
 
@@ -211,10 +218,10 @@ Ellie's Coaching
 <html>
 <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
 ${brandLogoUrl ? `<img src="${escapeHtml(brandLogoUrl)}" alt="${escapeHtml(campaignName)} logo" style="display:block;max-width:180px;max-height:72px;height:auto;width:auto;object-fit:contain;margin:0 0 24px;">` : ""}
+${brandWebsiteUrl ? `<p style="margin:0 0 20px;"><a href="${escapeHtml(brandWebsiteUrl)}" target="_blank" style="color:#315f52;text-decoration:underline;">${escapeHtml(brandWebsiteUrl.replace(/^https?:\/\//i, "").replace(/\/$/, ""))}</a></p>` : ""}
 ${textToHtml(applyCanonicalEventDate(fillTemplate(savedBody, variables), eventDate, campaignName))}
 ${flyerUrl ? `<img src="${escapeHtml(flyerUrl)}" alt="${escapeHtml(campaign.programName || campaignName)}" style="display:block;width:100%;max-width:600px;height:auto;border-radius:8px;margin:28px 0;">` : ""}
-${emailButton(eventLink, campaign.content?.callToAction || "Learn more", "#000000")}
-${meetupHtml}
+${emailButtonRow(emailButtons, campaign.brand?.accentColor || "#173f36")}
 </body>
 </html>
 `.trim() : `
@@ -254,9 +261,7 @@ ${escapeHtml(eventDate)}<br>
 </p>
 
 
-${emailButton(eventLink, "Reserve Your Spot", "#000000")}
-
-${meetupHtml}
+${emailButtonRow(emailButtons, campaign.brand?.accentColor || "#173f36")}
 
 <p>
 Would you be open to discussing a potential partnership?

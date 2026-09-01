@@ -9,6 +9,10 @@ const campaignTemplateVersionSchema = new mongoose.Schema(
     body: { type: String, required: true, maxlength: 30000 },
     callToAction: { type: String, default: "", trim: true, maxlength: 120 },
     callToActionUrl: { type: String, default: "", trim: true, maxlength: 1000 },
+    additionalButtons: [{
+      label: { type: String, required: true, trim: true, maxlength: 120 },
+      url: { type: String, required: true, trim: true, maxlength: 1000 },
+    }],
     topic: {
       type: String,
       enum: ["event_invitations", "program_offers", "educational_newsletter"],

@@ -41,6 +41,7 @@ function effectiveTemplate(campaign) {
     body,
     callToAction: saved.callToAction || content.callToAction || "Learn more",
     callToActionUrl: saved.callToActionUrl || content.callToActionUrl || "",
+    additionalButtons: Array.isArray(saved.additionalButtons) ? saved.additionalButtons : [],
     topic: saved.topic || (campaign.campaignKind === "program" ? "program_offers" : "event_invitations"),
     status: saved.status || "draft",
     currentVersion: saved.currentVersion || 0,

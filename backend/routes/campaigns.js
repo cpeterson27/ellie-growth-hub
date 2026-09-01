@@ -31,6 +31,19 @@ function normalizeRegistrationUrl(provider, value) {
   return parsed.toString();
 }
 
+function normalizeEmailButtons(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 4).map((button) => {
+    const label = String(button?.label || "").trim();
+    const url = String(button?.url || "").trim();
+    if (!label && !url) return null;
+    if (!label || !url) throw new Error("Every email button needs both text and a link.");
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Email button links must use http or https.");
+    return { label, url: parsed.toString() };
+  }).filter(Boolean);
+}
+
 
 // ==================================
 // GET ALL CAMPAIGNS
@@ -164,7 +177,7 @@ router.get("/:id/email-template", async (req, res) => {
   const audienceTemplate = audienceKey === "general" ? null : campaign.emailAudienceTemplates?.[audienceKey] || defaultResearchAudienceTemplate(audienceKey, campaign);
   const versions = await CampaignTemplateVersion.find({ campaignId: campaign._id })
     .sort({ version: -1 })
-    .select("version subject body callToAction callToActionUrl topic approvedAt approvedByUserId createdAt")
+    .select("version subject body callToAction callToActionUrl additionalButtons topic approvedAt approvedByUserId createdAt")
     .lean();
   const usage = await Outreach.aggregate([
     { $match: { campaignId: campaign._id, status: { $in: ["sent", "replied"] } } },
@@ -193,6 +206,11 @@ router.get("/:id/email-template", async (req, res) => {
       formatEventDate(campaign.startDate),
       campaign.name,
     ),
+    additionalButtons: Array.isArray(selectedTemplate.additionalButtons) && selectedTemplate.additionalButtons.length
+      ? selectedTemplate.additionalButtons
+      : campaign.registrationLinks?.meetup?.enabled && campaign.registrationLinks?.meetup?.url
+        ? [{ label: campaign.registrationLinks.meetup.label || "View on Meetup", url: campaign.registrationLinks.meetup.url }]
+        : [],
   };
   return res.json({ template, versions: versionHistory });
 });
@@ -207,6 +225,9 @@ router.post("/:id/email-template/preview", async (req, res) => {
     body: String(req.body?.body || effectiveTemplate(campaign).body).trim(),
     callToAction: String(req.body?.callToAction || effectiveTemplate(campaign).callToAction).trim(),
     callToActionUrl: String(req.body?.callToActionUrl || effectiveTemplate(campaign).callToActionUrl).trim(),
+    additionalButtons: Array.isArray(req.body?.additionalButtons)
+      ? normalizeEmailButtons(req.body.additionalButtons)
+      : effectiveTemplate(campaign).additionalButtons || [],
   };
   const previewCampaign = campaign.toObject();
   previewCampaign.content = template;
@@ -274,6 +295,9 @@ router.put("/:id/email-template", requireRole("owner", "admin", "member"), async
       body,
       callToAction: String(req.body?.callToAction || "").trim(),
       callToActionUrl: String(req.body?.callToActionUrl || "").trim(),
+      additionalButtons: Array.isArray(req.body?.additionalButtons)
+        ? normalizeEmailButtons(req.body.additionalButtons)
+        : [],
       topic: req.body?.topic || (campaign.campaignKind === "program" ? "program_offers" : "event_invitations"),
       status: "draft",
       currentVersion: campaign.emailTemplate?.currentVersion || 0,
@@ -312,6 +336,7 @@ router.post("/:id/email-template/approve", requireRole("owner", "admin"), async 
     body: template.body,
     callToAction: template.callToAction,
     callToActionUrl: template.callToActionUrl,
+    additionalButtons: template.additionalButtons || [],
     topic: template.topic,
     approvedByUserId: req.auth.user._id,
     approvedAt: new Date(),
