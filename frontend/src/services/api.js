@@ -302,6 +302,9 @@ export const updateCampaignRegistrationLinks = (campaignId, links) =>
 export const updateCampaignBrand = (campaignId, brand) =>
   api.patch(`/campaigns/${campaignId}/brand`, brand).then((res) => res.data);
 
+export const updateCampaignSchedule = (campaignId, startDate) =>
+  api.patch(`/campaigns/${campaignId}/schedule`, { startDate }).then((res) => res.data);
+
 export const fetchCampaignEmailTemplate = (campaignId, audienceKey = "general") =>
   api.get(`/campaigns/${campaignId}/email-template`, { params: { audienceKey } }).then((res) => res.data);
 

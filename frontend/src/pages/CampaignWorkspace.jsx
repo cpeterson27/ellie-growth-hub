@@ -2,13 +2,23 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button.jsx";
 import DashboardCard from "../components/DashboardCard.jsx";
-import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchContacts, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, updateCampaignRegistrationLinks, uploadEventImage } from "../services/api.js";
+import { approveCampaignEmailTemplate, assignCampaignAudience, fetchCampaign, fetchCampaignEmailTemplate, fetchContacts, fetchImageUploadStatus, previewCampaignAudience, previewCampaignEmailTemplate, saveCampaignEmailTemplate, updateCampaignBrand, updateCampaignRegistrationLinks, updateCampaignSchedule, uploadEventImage } from "../services/api.js";
 import "./CampaignWorkspace.css";
 import "./CampaignAudience.css";
 import "./CampaignRegistration.css";
 
 const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Evergreen";
 const formatMoney = (value) => Number(value || 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const dateInputValue = (value) => value ? new Date(value).toISOString().slice(0, 10) : "";
+const normalizeBrandAssets = (row) => {
+  const brand = row?.brand || {};
+  return {
+    ...row,
+    brand: brand.flyerUrl
+      ? brand
+      : { ...brand, flyerUrl: brand.logoUrl || "", logoUrl: "" },
+  };
+};
 const RESEARCH_EMAIL_AUDIENCES = [
   { key: "research-qualified-investor", label: "Qualified professional / investor" },
   { key: "research-sec-fund-executive", label: "SEC fund executive" },
@@ -26,12 +36,16 @@ export default function CampaignWorkspace() {
   const [matchingAudience, setMatchingAudience] = useState(false);
   const [matchPage, setMatchPage] = useState(1);
   const [brandSaving, setBrandSaving] = useState(false);
+  const [brandNotice, setBrandNotice] = useState("");
+  const [scheduleSaving, setScheduleSaving] = useState(false);
   const [imageUpload, setImageUpload] = useState({ configured: false, loaded: false });
   const [emailTemplate, setEmailTemplate] = useState(null);
   const [templateVersions, setTemplateVersions] = useState([]);
   const [templateHistoryOpen, setTemplateHistoryOpen] = useState(false);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [emailPreview, setEmailPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const [previewContacts, setPreviewContacts] = useState([]);
   const [previewContactId, setPreviewContactId] = useState("");
   const [templateAudience, setTemplateAudience] = useState("general");
@@ -43,7 +57,7 @@ export default function CampaignWorkspace() {
       return () => window.clearTimeout(missingId);
     }
     fetchCampaign(id)
-      .then(setCampaign)
+      .then((row) => setCampaign(normalizeBrandAssets(row)))
       .catch((err) => setError(err.response?.data?.error || "Unable to load campaign."))
       .finally(() => setLoading(false));
   }, [id]);
@@ -89,10 +103,11 @@ export default function CampaignWorkspace() {
     brand: { ...current.brand, [field]: value },
   }));
 
-  const uploadLogo = async (file) => {
+  const uploadBrandAsset = async (field, file) => {
     if (!file) return;
     try {
       setBrandSaving(true);
+      setBrandNotice("");
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -100,8 +115,8 @@ export default function CampaignWorkspace() {
         reader.readAsDataURL(file);
       });
       const uploaded = await uploadEventImage({ file: dataUrl, filename: file.name });
-      const updated = await updateCampaignBrand(id, { ...campaign.brand, logoUrl: uploaded.url });
-      setCampaign(updated);
+      updateBrandField(field, uploaded.url);
+      setBrandNotice(field === "flyerUrl" ? "New flyer ready to save." : "New logo ready to save.");
     } catch (err) {
       setError(err.response?.data?.error || "Unable to upload the program logo.");
     } finally {
@@ -112,11 +127,27 @@ export default function CampaignWorkspace() {
   const saveBrand = async () => {
     try {
       setBrandSaving(true);
-      setCampaign(await updateCampaignBrand(id, campaign.brand || {}));
+      setBrandNotice("");
+      setCampaign(normalizeBrandAssets(await updateCampaignBrand(id, campaign.brand || {})));
+      setBrandNotice(`${isProgram ? "Program" : "Event"} brand saved.`);
     } catch (err) {
       setError(err.response?.data?.error || "Unable to save the program brand.");
     } finally {
       setBrandSaving(false);
+    }
+  };
+  const saveSchedule = async () => {
+    try {
+      setScheduleSaving(true);
+      setBrandNotice("");
+      setCampaign(normalizeBrandAssets(await updateCampaignSchedule(id, campaign.startDate)));
+      const refreshed = await fetchCampaignEmailTemplate(id, templateAudience);
+      setEmailTemplate(refreshed.template);
+      setBrandNotice("Event date saved. Every campaign template now uses the updated date.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to save the event date.");
+    } finally {
+      setScheduleSaving(false);
     }
   };
 
@@ -178,23 +209,34 @@ export default function CampaignWorkspace() {
       setTemplateSaving(false);
     }
   };
-  const previewTemplate = async () => {
+  const previewTemplate = async ({ silent = false } = {}) => {
     try {
-      setTemplateSaving(true);
-      setError("");
+      if (!silent) setTemplateSaving(true);
+      setPreviewLoading(true);
+      setPreviewError("");
       setEmailPreview(await previewCampaignEmailTemplate(id, {
         ...emailTemplate,
+        logoUrl: campaign.brand?.logoUrl || "",
+        flyerUrl: campaign.brand?.flyerUrl || "",
+        accentColor: campaign.brand?.accentColor || "#173f36",
         meetupEnabled: campaign.registrationLinks?.meetup?.enabled === true,
         meetupUrl: campaign.registrationLinks?.meetup?.url || "",
         meetupLabel: campaign.registrationLinks?.meetup?.label || "View on Meetup",
         previewContactId,
       }));
     } catch (err) {
-      setError(err.response?.data?.error || "Unable to prepare the email preview.");
+      setPreviewError(err.response?.data?.error || "The live preview could not be refreshed.");
     } finally {
-      setTemplateSaving(false);
+      if (!silent) setTemplateSaving(false);
+      setPreviewLoading(false);
     }
   };
+  useEffect(() => {
+    if (!id || !emailTemplate || !campaign) return undefined;
+    const timer = window.setTimeout(() => previewTemplate({ silent: true }), 450);
+    return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, emailTemplate, previewContactId, campaign?.brand, campaign?.registrationLinks]);
   if (loading) return <div className="page-dashboard"><p>Loading campaign…</p></div>;
   if (error || !campaign) return <div className="page-dashboard"><p className="form-error">{error || "Campaign not found."}</p><Button variant="outline" onClick={() => navigate("/campaigns")}>Back to Campaigns</Button></div>;
 
@@ -241,33 +283,20 @@ export default function CampaignWorkspace() {
           {campaign.description ? <p className="campaign-workspace__description">{campaign.description}</p> : null}
         </DashboardCard> : null}
 
-        {activeSection === "email" ? <DashboardCard title="Campaign master email">
+        {activeSection === "email" ? <DashboardCard title="Email campaign studio">
           {emailTemplate ? <div className="campaign-template-editor">
-            <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Saved version ${emailTemplate.currentVersion}` : "Editing master template"}</strong></div>
-            <div className="campaign-routing-explainer"><strong>Automatic recipient routing</strong><p>You do not assign contacts here. When you generate drafts, Growth Operator selects the best approved template for every person using their saved audience profile, title, company, industry, tags, keywords, lists, and notes. If there is no reliable match, it safely uses the main template.</p></div>
-            <label><span>Template you are editing</span><select value={templateAudience} onChange={(event) => setTemplateAudience(event.target.value)}><option value="general">Main template · automatic fallback</option><optgroup label="Discovery and public-research leads">{RESEARCH_EMAIL_AUDIENCES.map((audience) => <option value={audience.key} key={audience.key}>{audience.label}</option>)}</optgroup>{(campaign.audience || []).length ? <optgroup label="Campaign audiences">{campaign.audience.map((audience, index) => <option value={`audience-${index}`} key={`${audience}-${index}`}>{audience}</option>)}</optgroup> : null}</select><small>Use this menu only to edit and approve reusable templates. Individual overrides are optional and are never required for normal imports.</small></label>
-            <div className="campaign-flyer-editor">
-              <span>Email flyer</span>
-              {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.name} flyer`} /> : null}
-              {imageUpload.configured ? <label className="campaign-file-button">Choose or replace flyer<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label> : <p className="image-hosting-note">Add the rotated Cloudinary URL to the Render backend environment to enable direct upload.</p>}
-              <small>The flyer is placed above the registration buttons in every email.</small>
+            <div className="campaign-email-controls">
+              <div className="campaign-template-editor__status"><span className={`campaign-status-dot is-${emailTemplate.status}`} /> <strong>{emailTemplate.status === "approved" ? `Approved · version ${emailTemplate.currentVersion}` : "Unsaved changes"}</strong></div>
+              <div className="campaign-routing-explainer" aria-label="You do not assign contacts here. Growth Operator routes each contact automatically."><strong>Automatic recipient routing</strong><span>Growth Operator chooses the approved template for each contact.</span></div>
+              <label aria-description="Individual overrides are optional."><span>Template you are editing</span><select value={templateAudience} onChange={(event) => setTemplateAudience(event.target.value)}><option value="general">Main template · automatic fallback</option><optgroup label="Research audiences">{RESEARCH_EMAIL_AUDIENCES.map((audience) => <option value={audience.key} key={audience.key}>{audience.label}</option>)}</optgroup>{(campaign.audience || []).length ? <optgroup label="Campaign audiences">{campaign.audience.map((audience, index) => <option value={`audience-${index}`} key={`${audience}-${index}`}>{audience}</option>)}</optgroup> : null}</select></label>
+              <label><span>Subject</span><input value={emailTemplate.subject} onChange={(event) => updateTemplateField("subject", event.target.value)} /></label>
+              <label><span>Message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
+              <div className="campaign-field-row"><label><span>Button text</span><input value={emailTemplate.callToAction || ""} onChange={(event) => updateTemplateField("callToAction", event.target.value)} placeholder="Register now" /></label><label><span>Button link</span><input type="url" value={emailTemplate.callToActionUrl || ""} onChange={(event) => updateTemplateField("callToActionUrl", event.target.value)} placeholder="https://" /></label></div>
+              <details className="campaign-email-options"><summary>Additional email options</summary><div className="campaign-secondary-button"><label className="campaign-secondary-button__toggle"><input type="checkbox" checked={campaign.registrationLinks?.meetup?.enabled === true} onChange={(event) => updateMeetupButton("enabled", event.target.checked)} /><span>Include Meetup button</span></label>{campaign.registrationLinks?.meetup?.enabled ? <><label><span>Meetup button text</span><input value={campaign.registrationLinks?.meetup?.label || "View on Meetup"} onChange={(event) => updateMeetupButton("label", event.target.value)} /></label><label><span>Meetup button link</span><input type="url" value={campaign.registrationLinks?.meetup?.url || ""} onChange={(event) => updateMeetupButton("url", event.target.value)} /></label></> : null}</div><p className="campaign-template-help">Personalization: {"{{firstName}}"}, {"{{company}}"}, {"{{campaignName}}"}, {"{{eventDate}}"}, {"{{eventLink}}"}</p></details>
+              <label><span>Preview recipient</span><select value={previewContactId} onChange={(event) => setPreviewContactId(event.target.value)}><option value="">Example contact</option>{previewContacts.map((contact) => <option key={contact._id} value={contact._id}>{contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed contact"}{contact.company ? ` · ${contact.company}` : ""}</option>)}</select></label>
+              <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
             </div>
-            <label><span>Master subject</span><input value={emailTemplate.subject} onChange={(event) => updateTemplateField("subject", event.target.value)} /></label>
-            <label><span>Master message</span><textarea rows="14" value={emailTemplate.body} onChange={(event) => updateTemplateField("body", event.target.value)} /></label>
-            <label><span>Button text</span><input value={emailTemplate.callToAction || ""} onChange={(event) => updateTemplateField("callToAction", event.target.value)} placeholder="Register now" /></label>
-            <label><span>Button link</span><input type="url" value={emailTemplate.callToActionUrl || ""} onChange={(event) => updateTemplateField("callToActionUrl", event.target.value)} placeholder="https://" /></label>
-            <div className="campaign-secondary-button">
-              <label className="campaign-secondary-button__toggle"><input type="checkbox" checked={campaign.registrationLinks?.meetup?.enabled === true} onChange={(event) => updateMeetupButton("enabled", event.target.checked)} /><span>Include a second Meetup button</span></label>
-              {campaign.registrationLinks?.meetup?.enabled ? <>
-                <label><span>Meetup button text</span><input value={campaign.registrationLinks?.meetup?.label || "View on Meetup"} onChange={(event) => updateMeetupButton("label", event.target.value)} /></label>
-                <label><span>Meetup button link</span><input type="url" value={campaign.registrationLinks?.meetup?.url || ""} onChange={(event) => updateMeetupButton("url", event.target.value)} placeholder="https://www.meetup.com/..." /></label>
-              </> : null}
-            </div>
-            <p className="campaign-template-help">Use {"{{firstName}}"}, {"{{company}}"}, {"{{campaignName}}"}, {"{{programName}}"}, and {"{{eventLink}}"} for personalization.</p>
-            <label><span>Preview as an assigned contact</span><select value={previewContactId} onChange={(event) => setPreviewContactId(event.target.value)}><option value="">Example contact and company</option>{previewContacts.map((contact) => <option key={contact._id} value={contact._id}>{contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed contact"}{contact.company ? ` · ${contact.company}` : " · company missing"}</option>)}</select><small>The preview uses this contact’s saved first name and company. It does not send an email.</small></label>
-            <div className="campaign-auto-footer"><strong>Added automatically to every sent email</strong><span>Your business name and postal address from Settings</span><span className="campaign-unsubscribe-preview">Unsubscribe from campaign emails</span></div>
-            <div className="campaign-template-editor__actions"><Button variant="outline" loading={templateSaving} onClick={previewTemplate}>Preview complete email</Button><Button variant="outline" loading={templateSaving} onClick={saveTemplate}>Save draft</Button><Button loading={templateSaving} onClick={approveTemplate}>Approve new version</Button></div>
-            {emailPreview ? <div className="campaign-email-preview"><div><strong>Previewing:</strong> {emailPreview.previewRecipient?.name} · {emailPreview.previewRecipient?.company || "company missing"}<br/><strong>Subject:</strong> {emailPreview.subject}<button type="button" onClick={() => setEmailPreview(null)}>Close preview</button></div><iframe title="Complete campaign email preview" srcDoc={emailPreview.html} sandbox="allow-popups allow-popups-to-escape-sandbox" /></div> : null}
+            <aside className="campaign-live-preview"><header><div><span>Live preview</span><strong>{emailPreview?.subject || "Preparing preview…"}</strong></div>{previewLoading ? <small>Updating…</small> : <small>Up to date</small>}</header>{previewError ? <p className="form-error">{previewError}</p> : null}{emailPreview ? <iframe title="Live campaign email preview" srcDoc={emailPreview.html} sandbox="allow-popups allow-popups-to-escape-sandbox" /> : <div className="campaign-preview-placeholder">Building your email preview…</div>}</aside>
             {templateVersions.length ? <section className="campaign-template-history">
               <button type="button" className="campaign-template-history__toggle" onClick={() => setTemplateHistoryOpen((open) => !open)}>
                 <span><strong>Template history</strong><small>{templateVersions.length} saved version{templateVersions.length === 1 ? "" : "s"} · sent copies are preserved</small></span>
@@ -286,14 +315,15 @@ export default function CampaignWorkspace() {
 
         {activeSection === "email" ? <DashboardCard title={isProgram ? "Program brand" : "Event brand"}>
           <div className="program-brand-editor">
-            {campaign.brand?.logoUrl ? <img src={campaign.brand.logoUrl} alt={`${campaign.programName || campaign.name} logo`} /> : <div className="program-brand-placeholder">Add the program logo</div>}
-            <label><span>Logo image URL</span><input type="url" value={campaign.brand?.logoUrl || ""} placeholder="https://your-site.com/logo.png" onChange={(event) => updateBrandField("logoUrl", event.target.value)} /></label>
-            {imageUpload.configured ? <label><span>Or upload a new logo</span><input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} /></label> : <p className="image-hosting-note"><strong>Direct file upload is optional and not connected.</strong> For the fastest setup, paste an existing hosted image URL above. Cloudinary is only needed if you want Growth Operator to upload files for you.</p>}
-            <label><span>Program website</span><input type="url" value={campaign.brand?.websiteUrl || ""} placeholder="https://" onChange={(event) => updateBrandField("websiteUrl", event.target.value)} /></label>
-            <label><span>Brand color</span><input type="color" value={campaign.brand?.accentColor || "#173f36"} onChange={(event) => updateBrandField("accentColor", event.target.value)} /></label>
-            <Button loading={brandSaving} onClick={saveBrand}>Save program brand</Button>
+            {!isProgram ? <section className="campaign-date-card"><div><span>Event date</span><strong>{formatDate(campaign.startDate)}</strong></div><input aria-label="Event date" type="date" value={dateInputValue(campaign.startDate)} onChange={(event) => setCampaign((current) => ({ ...current, startDate: `${event.target.value}T12:00:00.000Z` }))} /><Button variant="outline" loading={scheduleSaving} onClick={saveSchedule}>Save date</Button></section> : null}
+            <div className="campaign-brand-assets">
+              <section className="campaign-asset-card"><header><span>Email flyer</span><small>Full-size image inside the email</small></header>{campaign.brand?.flyerUrl ? <img src={campaign.brand.flyerUrl} alt={`${campaign.name} flyer`} /> : <div className="program-brand-placeholder">No flyer selected</div>}{imageUpload.configured ? <label className="campaign-file-button">Replace flyer<input type="file" accept="image/*" onChange={(event) => uploadBrandAsset("flyerUrl", event.target.files?.[0])} /></label> : null}</section>
+              <section className="campaign-asset-card"><header><span>{isProgram ? "Program" : "Event"} logo</span><small>Compact brand mark above the email</small></header>{campaign.brand?.logoUrl ? <img className="is-logo" src={campaign.brand.logoUrl} alt={`${campaign.programName || campaign.name} logo`} /> : <div className="program-brand-placeholder">No logo selected</div>}{imageUpload.configured ? <label className="campaign-file-button">Choose logo<input type="file" accept="image/*" onChange={(event) => uploadBrandAsset("logoUrl", event.target.files?.[0])} /></label> : null}</section>
+            </div>
+            <div className="campaign-brand-fields"><label><span>Website</span><input type="url" value={campaign.brand?.websiteUrl || ""} placeholder="https://" onChange={(event) => updateBrandField("websiteUrl", event.target.value)} /></label><label><span>Accent color</span><input type="color" value={campaign.brand?.accentColor || "#173f36"} onChange={(event) => updateBrandField("accentColor", event.target.value)} /></label></div>
+            {!imageUpload.configured ? <p className="image-hosting-note">Image upload is not configured for this workspace.</p> : null}
+            <div className="campaign-brand-save"><Button loading={brandSaving} onClick={saveBrand}>Save {isProgram ? "program" : "event"} brand</Button>{brandNotice ? <p role="status">{brandNotice}</p> : null}</div>
           </div>
-          <p className="campaign-workspace__empty">This logo and color are reused in every email for this {isProgram ? "program" : "event"}. Replace the asset here whenever the campaign branding changes.</p>
         </DashboardCard> : null}
 
         {activeSection === "overview" && !isProgram && <DashboardCard title="Registration channels">

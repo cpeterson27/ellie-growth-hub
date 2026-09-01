@@ -5,7 +5,7 @@ const CampaignTemplateVersion = require("../models/CampaignTemplateVersion");
 const Event = require("../models/Event");
 const Outreach = require("../models/Outreach");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
-const { generateOutreachDraft } = require("../utils/outreachGenerator");
+const { applyCanonicalEventDate, formatEventDate, generateOutreachDraft } = require("../utils/outreachGenerator");
 const { getCampaignTemplate } = require("../services/campaignTemplates");
 const ContentBrief = require("../models/ContentBrief");
 const { assignCampaignMatches, getCampaignMatches } = require("../services/campaignAudienceService");
@@ -185,7 +185,16 @@ router.get("/:id/email-template", async (req, res) => {
       lastSentAt: used?.lastSentAt || null,
     };
   });
-  return res.json({ template: audienceTemplate || effectiveTemplate(campaign), versions: versionHistory });
+  const selectedTemplate = audienceTemplate || effectiveTemplate(campaign);
+  const template = {
+    ...selectedTemplate,
+    body: applyCanonicalEventDate(
+      selectedTemplate.body,
+      formatEventDate(campaign.startDate),
+      campaign.name,
+    ),
+  };
+  return res.json({ template, versions: versionHistory });
 });
 
 router.post("/:id/email-template/preview", async (req, res) => {
@@ -201,6 +210,14 @@ router.post("/:id/email-template/preview", async (req, res) => {
   };
   const previewCampaign = campaign.toObject();
   previewCampaign.content = template;
+  previewCampaign.brand = {
+    ...previewCampaign.brand,
+    logoUrl: String(req.body?.logoUrl ?? previewCampaign.brand?.logoUrl ?? "").trim(),
+    flyerUrl: String(req.body?.flyerUrl ?? previewCampaign.brand?.flyerUrl ?? previewCampaign.brand?.logoUrl ?? "").trim(),
+    accentColor: /^#[0-9a-f]{6}$/i.test(String(req.body?.accentColor || ""))
+      ? req.body.accentColor
+      : previewCampaign.brand?.accentColor,
+  };
   if (req.body?.meetupEnabled !== undefined || req.body?.meetupUrl !== undefined) {
     previewCampaign.registrationLinks = {
       ...previewCampaign.registrationLinks,
@@ -321,6 +338,7 @@ router.patch("/:id/brand", async (req, res) => {
       { $set: {
         brand: {
           logoUrl: String(req.body?.logoUrl || "").trim(),
+          flyerUrl: String(req.body?.flyerUrl || "").trim(),
           websiteUrl: String(req.body?.websiteUrl || "").trim(),
           accentColor,
         },
@@ -331,6 +349,32 @@ router.patch("/:id/brand", async (req, res) => {
     res.json(campaign);
   } catch (error) {
     res.status(400).json({ error: "Unable to save campaign branding." });
+  }
+});
+
+router.patch("/:id/schedule", requireRole("owner", "admin"), async (req, res) => {
+  try {
+    const startDate = new Date(req.body?.startDate);
+    if (Number.isNaN(startDate.getTime())) return res.status(400).json({ error: "Choose a valid event date." });
+    const campaign = await Campaign.findById(req.params.id);
+    if (!campaign) return res.status(404).json({ error: "Campaign not found." });
+    const previousStart = campaign.startDate ? new Date(campaign.startDate) : null;
+    campaign.startDate = startDate;
+    await campaign.save();
+    if (campaign.eventId) {
+      const event = await Event.findById(campaign.eventId);
+      if (event) {
+        const duration = previousStart && event.endDate
+          ? Math.max(0, new Date(event.endDate).getTime() - previousStart.getTime())
+          : 0;
+        event.startDate = startDate;
+        if (duration) event.endDate = new Date(startDate.getTime() + duration);
+        await event.save();
+      }
+    }
+    return res.json(campaign);
+  } catch {
+    return res.status(400).json({ error: "Unable to save the event date." });
   }
 });
 

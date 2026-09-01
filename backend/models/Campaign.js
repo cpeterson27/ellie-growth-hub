@@ -28,6 +28,7 @@ const campaignSchema = new mongoose.Schema(
   templateKey: { type: String, default: "event_investor" },
   brand: {
     logoUrl: { type: String, default: "" },
+    flyerUrl: { type: String, default: "" },
     websiteUrl: { type: String, default: "" },
     accentColor: { type: String, default: "#173f36" },
   },

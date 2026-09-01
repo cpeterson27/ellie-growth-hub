@@ -15,7 +15,7 @@ We would love to explore a partnership opportunity with you and see if this even
 Event Details:
 
 Deal to Close: Multifamily Bootcamp
-Saturday, August 22, 2026
+{{eventDate}}
 8:00 AM - 4:00 PM PST
 
 Would you be open to discussing a potential partnership?

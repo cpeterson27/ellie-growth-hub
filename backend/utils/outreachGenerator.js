@@ -73,6 +73,27 @@ function textToHtml(value = "") {
     .join("\n");
 }
 
+function formatEventDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function applyCanonicalEventDate(value, eventDate, campaignName = "") {
+  let output = String(value || "").replaceAll("{{eventDate}}", eventDate || "");
+  if (eventDate && /deal\s*to\s*close/i.test(campaignName)) {
+    output = output.replace(/Saturday,\s*(?:August\s+22|September\s+12),\s*2026/gi, eventDate);
+  }
+  return output;
+}
+
 
 // ======================================
 // GENERATE OUTREACH DRAFT
@@ -121,11 +142,13 @@ function generateOutreachDraft(contact, campaign) {
     : "";
 
 
-  const flyerUrl = campaign.brand?.logoUrl || (
+  const flyerUrl = campaign.brand?.flyerUrl || campaign.brand?.logoUrl || (
     campaign.campaignKind === "program"
       ? ""
       : "https://res.cloudinary.com/de1vvqtp3/image/upload/v1784844473/deal-to-close-flyer.png_bmxmbw.png"
   );
+  const brandLogoUrl = campaign.brand?.flyerUrl ? campaign.brand?.logoUrl || "" : "";
+  const eventDate = formatEventDate(campaign.startDate) || "Saturday, September 12, 2026";
 
 
   const fallbackEmailDraft = `
@@ -142,7 +165,7 @@ We would love to explore a partnership opportunity with you and see if this even
 Event Details:
 
 Deal to Close: Multifamily Bootcamp
-Saturday, August 22, 2026
+{{eventDate}}
 8:00 AM - 4:00 PM PST
 
 Register Here:
@@ -168,13 +191,14 @@ Ellie's Coaching
     community: cleanName(contact.companyNameForEmails || contact.company || "your community"),
     organizationName: cleanName(contact.companyNameForEmails || contact.company || "your community"),
     organization: cleanName(contact.companyNameForEmails || contact.company || "your community"),
+    eventDate,
   };
   const savedSubject = String(campaign.content?.subject || "").trim();
   const savedBody = String(campaign.content?.body || "").trim();
   const hasSavedSubject = savedSubject && savedSubject !== "Event Campaign";
   const hasSavedBody = savedBody && savedBody !== "Campaign created for event promotion.";
   const subject = fillTemplate(hasSavedSubject ? savedSubject : `Partner With ${campaignName}`, variables);
-  let emailDraft = fillTemplate(hasSavedBody ? savedBody : fallbackEmailDraft, variables);
+  let emailDraft = applyCanonicalEventDate(fillTemplate(hasSavedBody ? savedBody : fallbackEmailDraft, variables), eventDate, campaignName);
   if (eventLink && !emailDraft.includes(eventLink)) {
     emailDraft = `${emailDraft}\n\n${campaign.content?.callToAction || "Learn more"}:\n${eventLink}`;
   }
@@ -186,7 +210,8 @@ Ellie's Coaching
 <!DOCTYPE html>
 <html>
 <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;">
-${textToHtml(fillTemplate(savedBody, variables))}
+${brandLogoUrl ? `<img src="${escapeHtml(brandLogoUrl)}" alt="${escapeHtml(campaignName)} logo" style="display:block;max-width:180px;max-height:72px;height:auto;width:auto;object-fit:contain;margin:0 0 24px;">` : ""}
+${textToHtml(applyCanonicalEventDate(fillTemplate(savedBody, variables), eventDate, campaignName))}
 ${flyerUrl ? `<img src="${escapeHtml(flyerUrl)}" alt="${escapeHtml(campaign.programName || campaignName)}" style="display:block;width:100%;max-width:600px;height:auto;border-radius:8px;margin:28px 0;">` : ""}
 ${emailButton(eventLink, campaign.content?.callToAction || "Learn more", "#000000")}
 ${meetupHtml}
@@ -224,7 +249,7 @@ style="width:100%;max-width:600px;border-radius:8px;"
 
 <p>
 <strong>Deal to Close: Multifamily Bootcamp</strong><br>
-Saturday, August 22, 2026<br>
+${escapeHtml(eventDate)}<br>
 8:00 AM - 4:00 PM PST
 </p>
 
@@ -300,5 +325,7 @@ Ellie's Coaching
 
 
 module.exports = {
+  applyCanonicalEventDate,
+  formatEventDate,
   generateOutreachDraft,
 };
