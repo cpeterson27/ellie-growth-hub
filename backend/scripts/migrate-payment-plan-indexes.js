@@ -7,7 +7,7 @@ const definitions = [
   { collection: "payment_plans", key: { publicAccessTokenHash: 1 }, options: { unique: true, name: "payment_plan_public_token" }, group: { publicAccessTokenHash: "$publicAccessTokenHash" } },
   { collection: "payment_installments", key: { workspaceId: 1, paymentPlanId: 1, installmentNumber: 1 }, options: { unique: true, name: "plan_installment_number" }, group: { workspaceId: "$workspaceId", paymentPlanId: "$paymentPlanId", installmentNumber: "$installmentNumber" } },
   { collection: "payment_installments", key: { workspaceId: 1, idempotencyKey: 1 }, options: { unique: true, name: "workspace_installment_idempotency" }, group: { workspaceId: "$workspaceId", idempotencyKey: "$idempotencyKey" } },
-  { collection: "payment_transactions", key: { workspaceId: 1, paymentInstallmentId: 1 }, options: { unique: true, name: "workspace_payment_installment_transaction", partialFilterExpression: { paymentInstallmentId: { $type: "objectId" } } }, group: { workspaceId: "$workspaceId", paymentInstallmentId: "$paymentInstallmentId" }, match: { paymentInstallmentId: { $type: "objectId" } } },
+  { collection: "payment_transactions", key: { workspaceId: 1, paymentInstallmentId: 1 }, options: { unique: true, name: "installment_payment_transaction", partialFilterExpression: { paymentInstallmentId: { $type: "objectId" } } }, group: { workspaceId: "$workspaceId", paymentInstallmentId: "$paymentInstallmentId" }, match: { paymentInstallmentId: { $type: "objectId" } } },
 ];
 
 async function run() {
