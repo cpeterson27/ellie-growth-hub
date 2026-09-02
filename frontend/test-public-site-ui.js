@@ -10,6 +10,7 @@ const app = source("App.jsx"),
   css = source("pages/PublicSite.css"),
   editors = source("pages/ProfileEditors.jsx"),
   admin = source("components/PublicSiteAdmin.jsx"),
+  programManager = source("components/ProgramWebsiteSettings.jsx"),
   theme = source("context/WorkspaceThemeContext.jsx");
 for (const route of [
   'path="/"',
@@ -95,13 +96,26 @@ assert(site.includes("aboutImageUrl") && site.includes("public-meet-photo"));
 assert(css.includes("public-rise") && css.includes("community-section__word"));
 assert(css.includes("public-accelerator-row") && /repeat\(3,\s*1fr\)/.test(css));
 assert(css.includes("public-program-row") && /repeat\(4,\s*1fr\)/.test(css));
-assert(site.includes("program.section === \"accelerator\""));
 assert(site.includes("Number(program.price?.amount || 0) >= 10000"));
 assert(site.includes("popularId === String(program.id)"));
 assert(admin.includes("Website section"));
 assert(admin.includes("High Performance Accelerators"));
 assert(admin.includes("Intensive Programs"));
 assert(admin.includes("Mark as Most Popular"));
+for (const value of [
+  "Arrange your programs",
+  'draggable={!saving}',
+  "saveOrder",
+  "Save program order",
+  "orderDirty",
+  "High-value accelerators stay on top",
+  "Move ${program.name} earlier",
+  "Move ${program.name} later",
+  "High Performance Accelerators",
+  "Intensive 6-Week Programs",
+  "Show “Most Popular”",
+])
+  assert(programManager.includes(value), `program manager missing ${value}`);
 assert(site.includes('const [expanded, setExpanded] = useState("")'));
 assert(site.includes('current === String(program.id) ? "" : String(program.id)'));
 assert(site.includes("public-program-apply"));
@@ -114,6 +128,8 @@ assert(css.includes('[data-public-theme="dark"]'));
 assert(css.includes(".program-application-modal"));
 assert(css.includes("position: fixed"));
 assert(css.includes("public-accelerator-card.is-featured"));
+assert(css.includes("public-hero-btn-primary") && css.includes("background: var(--public-accent)"));
+assert(css.includes("public-accelerator-row.has-expanded"));
 assert(!site.includes("<p>{program.summary}</p>"));
 assert(!site.includes("Skip to content"));
 console.log(

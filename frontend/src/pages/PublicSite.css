@@ -1530,6 +1530,130 @@
   backdrop-filter: blur(6px);
 }
 
+/* Final curriculum alignment pass. Collapsed cards share a row height; opening
+   one program never stretches its neighbors. */
+.public-hero-btn-primary {
+  border-color: var(--public-accent);
+  background: var(--public-accent);
+  color: #071006;
+}
+
+.public-hero-btn-primary:hover,
+.public-hero-btn-primary:focus-visible {
+  background: color-mix(in srgb, var(--public-accent) 86%, #fff);
+}
+
+.public-hero__play {
+  display: grid;
+  padding: 0;
+  place-items: center;
+}
+
+.public-hero__play svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+}
+
+.public-accelerator-row,
+.public-program-row {
+  align-items: stretch;
+  grid-auto-rows: 1fr;
+}
+
+.public-accelerator-row.has-expanded,
+.public-program-row.has-expanded {
+  align-items: start;
+  grid-auto-rows: auto;
+}
+
+.public-accelerator-card,
+.public-program-card {
+  height: 100%;
+}
+
+.public-accelerator-row.has-expanded .public-accelerator-card,
+.public-program-row.has-expanded .public-program-card {
+  height: auto;
+}
+
+.public-accelerator-content,
+.public-program-content {
+  height: 100%;
+}
+
+.public-accelerator-title {
+  min-height: 2.4em;
+}
+
+.public-program-title {
+  min-height: 3.75em;
+  max-height: 3.75em;
+  overflow: hidden;
+}
+
+.public-program-card:not(.is-expanded) .public-program-content {
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.public-accelerator-card:not(.is-expanded) .public-accelerator-content {
+  min-height: 288px;
+  box-sizing: border-box;
+}
+
+.public-hero__video {
+  filter: none;
+}
+
+.public-hero__video:disabled {
+  opacity: 1;
+}
+
+.public-hero__play,
+.public-hero__video:disabled .public-hero__play {
+  background: var(--public-accent);
+  color: #071006;
+  opacity: 1;
+}
+
+.public-program-card.is-expanded .public-program-title {
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.public-hero-tags,
+.public-hero-tag {
+  color: var(--public-accent);
+}
+
+.public-site[data-public-theme="dark"] .public-apply-btn {
+  border-color: var(--public-accent);
+  background: var(--public-accent);
+  color: #071006;
+}
+
+.public-site[data-public-theme="dark"] .public-apply-btn:hover,
+.public-site[data-public-theme="dark"] .public-apply-btn:focus-visible {
+  background: color-mix(in srgb, var(--public-accent) 86%, #fff);
+}
+
+.public-site[data-public-theme="light"] .public-apply-btn {
+  border-color: #0b0b0c;
+  background: #0b0b0c;
+  color: #fff;
+}
+
+
+.public-site[data-public-theme="light"] .public-apply-btn:hover,
+.public-site[data-public-theme="light"] .public-apply-btn:focus-visible {
+  border-color: #0b0b0c;
+  background: #0b0b0c;
+  color: #fff;
+}
+
 .program-application-modal > div {
   display: grid;
   width: min(1080px, 100%);

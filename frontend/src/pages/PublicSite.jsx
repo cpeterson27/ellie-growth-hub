@@ -175,17 +175,9 @@ function ProgramCards({ programs = [] }) {
   const orderedPrograms = [...programs].sort(
     (left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0),
   );
-  const explicitlyAccelerated = orderedPrograms.filter(
-    (program) => program.section === "accelerator",
-  );
-  const inferredAccelerated = orderedPrograms.filter(
+  const featured = orderedPrograms.filter(
     (program) => Number(program.price?.amount || 0) >= 10000,
   );
-  const featured = explicitlyAccelerated.length
-    ? explicitlyAccelerated
-    : inferredAccelerated.length
-      ? inferredAccelerated
-      : orderedPrograms.slice(0, 3);
   const featuredIds = new Set(featured.map((program) => String(program.id)));
   const intensive = orderedPrograms.filter(
     (program) => !featuredIds.has(String(program.id)),
@@ -205,7 +197,7 @@ function ProgramCards({ programs = [] }) {
     <>
       <div className="public-curriculum-group">
         <div className="public-curriculum-label">HIGH PERFORMANCE ACCELERATORS</div>
-        <div className="public-accelerator-row">
+        <div className={`public-accelerator-row${featured.some((program) => expanded === String(program.id)) ? " has-expanded" : ""}`}>
           {featured.map((program) => (
             <article className={`public-accelerator-card${expanded === String(program.id) ? " is-expanded" : ""}${popularId === String(program.id) ? " is-featured" : ""}`} key={program.id}>
               <div className="public-accelerator-img-wrap">
@@ -235,7 +227,7 @@ function ProgramCards({ programs = [] }) {
       {intensive.length > 0 && (
         <div className="public-curriculum-group">
           <div className="public-curriculum-label">INTENSIVE 6-WEEK PROGRAMS</div>
-          <div className="public-program-row">
+          <div className={`public-program-row${intensive.some((program) => expanded === String(program.id)) ? " has-expanded" : ""}`}>
             {intensive.map((program) => (
               <article className={`public-program-card${expanded === String(program.id) ? " is-expanded" : ""}`} key={program.id}>
                 <div className="public-program-img-wrap">
