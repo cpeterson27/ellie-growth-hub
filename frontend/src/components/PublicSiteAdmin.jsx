@@ -959,6 +959,48 @@ export default function PublicSiteAdmin({ section = "website" }) {
                     <option value="published">Published</option>
                   </select>
                 </label>
+                <label>
+                  Website section
+                  <select
+                    value={program.publicPresentation?.section || "intensive"}
+                    onChange={(e) =>
+                      setPrograms((rows) => rows.map((row) => row._id === program._id ? {
+                        ...row,
+                        publicPresentation: { ...row.publicPresentation, section: e.target.value },
+                      } : row))
+                    }
+                  >
+                    <option value="accelerator">High Performance Accelerators</option>
+                    <option value="intensive">Intensive Programs</option>
+                  </select>
+                </label>
+                <label>
+                  Display order
+                  <input
+                    type="number"
+                    min="0"
+                    value={program.publicPresentation?.sortOrder || 0}
+                    onChange={(e) =>
+                      setPrograms((rows) => rows.map((row) => row._id === program._id ? {
+                        ...row,
+                        publicPresentation: { ...row.publicPresentation, sortOrder: Number(e.target.value) },
+                      } : row))
+                    }
+                  />
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(program.publicPresentation?.featured)}
+                    onChange={(e) =>
+                      setPrograms((rows) => rows.map((row) => row._id === program._id ? {
+                        ...row,
+                        publicPresentation: { ...row.publicPresentation, featured: e.target.checked },
+                      } : row))
+                    }
+                  />
+                  Mark as Most Popular
+                </label>
                 <label className="wide">
                   Public title
                   <input

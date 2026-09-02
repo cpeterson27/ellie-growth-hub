@@ -4,6 +4,7 @@
   min-height: 700px;
   padding: 80px clamp(24px, 7vw, 80px) 100px;
 }
+
 .application-page--embedded{max-width:100%;min-height:0;padding:30px}.application-page--embedded .application-hero{grid-template-columns:minmax(0,1.15fr) minmax(220px,.55fr)}.application-page--embedded .application-hero h1{font-size:clamp(2.2rem,5vw,4.3rem)}.application-page--embedded .application-hero__logo{min-height:260px}.application-page--embedded form{margin-top:32px}
 .application-hero {
   align-items: center;

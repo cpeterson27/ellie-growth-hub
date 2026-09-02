@@ -51,13 +51,13 @@ for (const value of [
   "featuredTestimonials",
   "upcomingEvent",
   "ProgramCards",
-  "Staff login",
+  "Testimonials",
+  ">Login</Link>",
   "HeroVideoTile",
   "Student perspectives",
   "journeyTitle",
   "communityTitle",
   "team-section",
-  "public-skip",
 ])
   assert(site.includes(value), `public site missing ${value}`);
 for (const value of ["prefers-reduced-motion", "--workspace-accent"])
@@ -91,19 +91,31 @@ for (const size of [16, 32, 48, 180, 192, 512])
   assert(theme.includes(String(size)), `favicon handling missing ${size}px size`);
 assert(theme.includes("apple-touch-icon") && theme.includes("app?.faviconUrl"));
 assert(site.includes("ApplicationButton") && site.includes('embed:"1"'));
-assert(site.includes("aboutImageUrl") && site.includes("public-intro__portrait"));
+assert(site.includes("aboutImageUrl") && site.includes("public-meet-photo"));
 assert(css.includes("public-rise") && css.includes("community-section__word"));
-assert(css.includes("grid-template-rows: auto 1fr"));
-assert(css.includes("program-list--featured") && /repeat\(3,\s*minmax\(0,\s*1fr\)\)/.test(css));
+assert(css.includes("public-accelerator-row") && /repeat\(3,\s*1fr\)/.test(css));
+assert(css.includes("public-program-row") && /repeat\(4,\s*1fr\)/.test(css));
+assert(site.includes("program.section === \"accelerator\""));
+assert(site.includes("Number(program.price?.amount || 0) >= 10000"));
+assert(site.includes("popularId === String(program.id)"));
+assert(admin.includes("Website section"));
+assert(admin.includes("High Performance Accelerators"));
+assert(admin.includes("Intensive Programs"));
+assert(admin.includes("Mark as Most Popular"));
 assert(site.includes('const [expanded, setExpanded] = useState("")'));
 assert(site.includes('current === String(program.id) ? "" : String(program.id)'));
-assert(site.includes("<p>{program.description}</p>"));
+assert(site.includes("public-program-apply"));
+assert(site.includes("program.description || program.summary"));
 assert(site.includes("program.price?.amount != null"));
 assert(site.includes("data-public-theme={theme}"));
 assert(site.includes("allowThemeToggle") && site.includes("public-theme-toggle"));
 assert(css.includes('[data-public-theme="light"]'));
 assert(css.includes('[data-public-theme="dark"]'));
+assert(css.includes(".program-application-modal"));
+assert(css.includes("position: fixed"));
+assert(css.includes("public-accelerator-card.is-featured"));
 assert(!site.includes("<p>{program.summary}</p>"));
+assert(!site.includes("Skip to content"));
 console.log(
   "Public routes, privacy-policy/data-deletion public routing, legal content, responsive breakpoints, accessibility motion controls, workspace tokens and moderation UI contracts passed.",
 );

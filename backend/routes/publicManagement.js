@@ -318,6 +318,8 @@ router.patch("/programs/:id", admin, async (req, res) => {
       ctaUrl: service.safeUrl(input.ctaUrl || "/apply", { relative: true }),
       ctaSupportingText: String(input.ctaSupportingText || "").slice(0, 500),
       status: input.status === "published" ? "published" : "hidden",
+      section: input.section === "accelerator" ? "accelerator" : "intensive",
+      featured: input.featured === true,
       sortOrder: Number(input.sortOrder) || 0,
     };
     await program.save();

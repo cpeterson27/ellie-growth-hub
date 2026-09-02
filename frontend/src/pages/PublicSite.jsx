@@ -22,8 +22,17 @@ import "./PublicSite.css";
 import "./PublicEnhancements.css";
 
 const applyPath = "/apply";
+function EditorialHeading({ text, accent }) {
+  const value = String(text || "");
+  const phrase = String(accent || "").trim();
+  const index = phrase ? value.toLowerCase().indexOf(phrase.toLowerCase()) : -1;
+  if (index < 0) return value;
+  return <>{value.slice(0, index)}<em>{value.slice(index, index + phrase.length)}</em>{value.slice(index + phrase.length)}</>;
+}
 function Brand({ site, theme }) {
-  const themeLogo = site?.workspace?.slug === "ellie"
+  const workspaceName = String(site?.workspace?.name || site?.branding?.publicSiteName || ""),
+    isEllieWorkspace = site?.workspace?.slug === "ellie" || /ellie(?:'|’)?s? coaching/i.test(workspaceName),
+    themeLogo = isEllieWorkspace
       ? theme === "light"
         ? "/elliescoachinglogo-dark.png"
         : "/elliescoachinglogo-white.png"
@@ -35,10 +44,7 @@ function Brand({ site, theme }) {
       href="/#home"
       aria-label={`${site?.branding?.publicSiteName || "Ellie's Coaching"} home`}
     >
-      <img
-        src={logo}
-        alt={site?.branding?.publicSiteName || "Ellie's Coaching"}
-      />
+      {logo ? <img src={logo} alt={site?.branding?.publicSiteName || workspaceName || "Workspace logo"} /> : <span>{workspaceName || "Growth Operator"}</span>}
     </a>
   );
 }
@@ -71,11 +77,8 @@ export function PublicLayout({ children }) {
     showResults = site?.publicSite?.sectionVisibility?.results === true,
     close = () => setOpen(false);
   return (
-    <div className="public-site" data-public-theme={theme} style={{"--public-base-size":`${site?.publicSite?.baseFontSize||16}px`,"--public-heading-scale":site?.publicSite?.headingScale||1,"--public-heading-font":site?.publicSite?.headingFont==="modern"?'Inter,ui-sans-serif,system-ui,sans-serif':'Georgia,"Times New Roman",serif',"--public-body-font":site?.publicSite?.bodyFont==="classic"?'Georgia,"Times New Roman",serif':'Inter,ui-sans-serif,system-ui,sans-serif'}}>
-      <a className="public-skip" href="#main-content">
-        Skip to content
-      </a>
-      <header className="public-nav">
+    <div className="public-site" data-public-theme={theme} style={{"--public-base-size":`${site?.publicSite?.baseFontSize||16}px`,"--public-heading-scale":site?.publicSite?.headingScale||1,"--public-heading-font":site?.publicSite?.headingFont==="modern"?'"DM Sans",ui-sans-serif,system-ui,sans-serif':'"Instrument Serif",Georgia,serif',"--public-body-font":site?.publicSite?.bodyFont==="classic"?'"Instrument Serif",Georgia,serif':'"DM Sans",ui-sans-serif,system-ui,sans-serif'}}>
+      <header className="public-header">
         <Brand site={site} theme={theme} />
         <button
           className="public-menu"
@@ -87,19 +90,11 @@ export function PublicLayout({ children }) {
           {open ? <FiX /> : <FiMenu />}
         </button>
         <nav id="public-navigation" className={open ? "is-open" : ""}>
-          <a onClick={close} href="/#about">
-            Why Ellie
-          </a>
-          <a onClick={close} href="/#programs">
-            Programs
-          </a>
-          <a onClick={close} href="/#journey">
-            The path
-          </a>
-          {showResults ? <Link to="/testimonials">Results</Link> : null}
-          <Link className="public-login" to="/login">
-            Staff login
-          </Link>
+          <a onClick={close} href="/#about">Why Ellie</a>
+          <a onClick={close} href="/#programs">Programs</a>
+          <a onClick={close} href="/#journey">The path</a>
+          <Link to="/testimonials">Testimonials</Link>
+          <Link className="public-login" to="/login">Login</Link>
           {site?.publicSite?.allowThemeToggle ? (
             <button
               className="public-theme-toggle"
@@ -112,49 +107,50 @@ export function PublicLayout({ children }) {
               {theme === "light" ? <FiMoon /> : <FiSun />}
             </button>
           ) : null}
-          <ApplicationButton className="public-button public-button--small">Apply to join</ApplicationButton>
+          <ApplicationButton className="public-apply-btn">Apply to join</ApplicationButton>
         </nav>
       </header>
       {children}
       <footer className="public-footer">
-        <div className="public-footer__brand">
-          <Brand site={site} theme={theme} />
-          <p>
-            {site?.publicSite?.footerText ||
-              "Multifamily coaching for investors ready to operate with intention."}
-          </p>
+        <div className="public-footer-top">
+          <div className="public-footer-brand">
+            <Brand site={site} theme={theme} />
+            <p>{site?.publicSite?.footerText || "Multifamily coaching for investors ready to operate with intention."}</p>
+          </div>
+          <div className="public-footer-col">
+            <div className="public-footer-label">EXPLORE</div>
+            <a href="/#programs">Programs</a>
+            <a href="/#about">About</a>
+            <a href="/#team">Team</a>
+            {showResults ? <Link to="/testimonials">Results</Link> : null}
+          </div>
+          <div className="public-footer-col">
+            <div className="public-footer-label">CONNECT</div>
+            <a href="/#contact">Contact</a>
+            <a href="/#programs">Application</a>
+            {socials.map((link) => (
+              <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
+                {link.label}
+              </a>
+            ))}
+          </div>
+          <div className="public-footer-col">
+            <div className="public-footer-label">COMPANY</div>
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Terms</Link>
+            <Link to="/data-deletion">Data deletion</Link>
+            <Link to="/login">Staff login</Link>
+          </div>
         </div>
-        <div>
-          <strong>Explore</strong>
-          <a href="/#programs">Programs</a>
-          <a href="/#about">About</a>
-          <a href="/#team">Team</a>
-          {showResults ? <Link to="/testimonials">Results</Link> : null}
+        <div className="public-footer-bottom">
+          <small>
+            © {new Date().getFullYear()}{" "}
+            {site?.branding?.publicSiteName || "Ellie's Coaching"}.{" "}
+            {site?.branding?.poweredByGrowthOperator
+              ? "Powered by Growth Operator."
+              : "All rights reserved."}
+          </small>
         </div>
-        <div>
-          <strong>Connect</strong>
-          <a href="/#contact">Contact</a>
-          <a href="/#programs">Application</a>
-          {socials.map((link) => (
-            <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
-              {link.label}
-            </a>
-          ))}
-        </div>
-        <div>
-          <strong>Company</strong>
-          <Link to="/privacy">Privacy</Link>
-          <Link to="/terms">Terms</Link>
-          <Link to="/data-deletion">Data deletion</Link>
-          <Link to="/login">Staff login</Link>
-        </div>
-        <small>
-          © {new Date().getFullYear()}{" "}
-          {site?.branding?.publicSiteName || "Ellie's Coaching"}.{" "}
-          {site?.branding?.poweredByGrowthOperator
-            ? "Powered by Growth Operator."
-            : "All rights reserved."}
-        </small>
       </footer>
     </div>
   );
@@ -165,92 +161,112 @@ function ProgramCards({ programs = [] }) {
     [applying, setApplying] = useState(null),
     closeRef = useRef(null);
   useEffect(() => {
-    if (applying) closeRef.current?.focus();
+    if (!applying) return undefined;
+    closeRef.current?.focus();
+    const prior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prior;
+    };
   }, [applying]);
   if (!programs.length)
     return <p className="public-empty">No programs are currently published.</p>;
-  const renderCards = (rows, className) => (
-      <div className={`program-list ${className}`}>
-        {rows.map((program) => (
-          <article className="program-card" key={program.id}>
-            {program.imageUrl ? (
-              <img
-                className="program-card__image"
-                src={program.imageUrl}
-                alt={`${program.title} program`}
-                loading="lazy"
-              />
-            ) : (
-              <div className="program-card__image program-card__image--empty" aria-hidden="true">
-                Program image
-              </div>
-            )}
-            <div className="program-card__body">
-              <p className="public-kicker">
-                Coaching program
-                {program.duration?.value ? ` · ${program.duration.value} ${program.duration.unit}` : ""}
-              </p>
-              <h3>{program.title}</h3>
-              {program.summary ? <p className="program-card__summary">{program.summary}</p> : null}
-              <dl className="program-card__facts">
-                <div>
-                  <dt>Duration</dt>
-                  <dd>{program.duration?.value ? `${program.duration.value} ${program.duration.unit}` : "Contact us"}</dd>
-                </div>
-                <div>
-                  <dt>Investment</dt>
-                  <dd>{program.price?.amount != null ? new Intl.NumberFormat("en-US", { style: "currency", currency: program.price.currency || "USD", maximumFractionDigits: 0 }).format(program.price.amount) : "Contact us"}</dd>
-                </div>
-              </dl>
-              <div className="program-card__actions">
-                <button
-                  type="button"
-                  className="public-text-link"
-                  aria-expanded={expanded === String(program.id)}
-                  aria-controls={`program-details-${program.id}`}
-                  onClick={() =>
-                    setExpanded((current) =>
-                      current === String(program.id) ? "" : String(program.id),
-                    )
-                  }
-                >
-                  {expanded === String(program.id)
-                    ? "Hide details"
-                    : "View details"}
-                </button>
-                <button
-                  type="button"
-                  className="public-button public-button--small"
-                  onClick={() => setApplying(program)}
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-            {expanded === String(program.id) ? (
-              <div
-                className="program-card__details"
-                id={`program-details-${program.id}`}
-              >
-                <p>{program.description}</p>
-              </div>
-            ) : null}
-          </article>
-        ))}
-      </div>
-    );
+
+  const orderedPrograms = [...programs].sort(
+    (left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0),
+  );
+  const explicitlyAccelerated = orderedPrograms.filter(
+    (program) => program.section === "accelerator",
+  );
+  const inferredAccelerated = orderedPrograms.filter(
+    (program) => Number(program.price?.amount || 0) >= 10000,
+  );
+  const featured = explicitlyAccelerated.length
+    ? explicitlyAccelerated
+    : inferredAccelerated.length
+      ? inferredAccelerated
+      : orderedPrograms.slice(0, 3);
+  const featuredIds = new Set(featured.map((program) => String(program.id)));
+  const intensive = orderedPrograms.filter(
+    (program) => !featuredIds.has(String(program.id)),
+  );
+  const explicitlyPopular = featured.find((program) => program.isFeatured);
+  const popularId = String(
+    explicitlyPopular?.id || featured[Math.floor(featured.length / 2)]?.id || "",
+  );
+  const formatLabel = (program) => {
+    const text = `${program.title || ""} ${program.summary || ""}`;
+    if (/one[- ]on[- ]one|1[- ]on[- ]1/i.test(text)) return "ONE-ON-ONE";
+    if (/bootcamp/i.test(text)) return "BOOTCAMP";
+    return "COACHING";
+  };
+
   return (
     <>
-      <div className="program-catalog__group">
-        <p className="program-catalog__label">High performance accelerators</p>
-        {renderCards(programs.slice(0, 3), "program-list--featured")}
-      </div>
-      {programs.length > 3 ? (
-        <div className="program-catalog__group">
-          <p className="program-catalog__label">Intensive coaching programs</p>
-          {renderCards(programs.slice(3), "program-list--intensive")}
+      <div className="public-curriculum-group">
+        <div className="public-curriculum-label">HIGH PERFORMANCE ACCELERATORS</div>
+        <div className="public-accelerator-row">
+          {featured.map((program) => (
+            <article className={`public-accelerator-card${expanded === String(program.id) ? " is-expanded" : ""}${popularId === String(program.id) ? " is-featured" : ""}`} key={program.id}>
+              <div className="public-accelerator-img-wrap">
+                {program.imageUrl ? <img className="public-accelerator-img" src={program.imageUrl} alt={`${program.title} program`} loading="lazy" /> : <div className="public-program-image-empty" aria-hidden="true">Program image</div>}
+                {popularId === String(program.id) && <div className="public-accelerator-badge">MOST POPULAR</div>}
+              </div>
+              <div className="public-accelerator-content">
+                <div className="public-accelerator-meta">
+                  {program.duration?.value || ""} {program.duration?.unit || ""}{program.duration?.value ? " · " : ""}{formatLabel(program)}
+                </div>
+                <div className="public-accelerator-title">{program.title}</div>
+                {expanded === String(program.id) ? <div className="public-accelerator-desc" id={`program-details-${program.id}`}>{program.description || program.summary}</div> : null}
+                <div className="public-accelerator-footer">
+                  <span className="public-accelerator-price">
+                    {program.price?.amount != null
+                      ? new Intl.NumberFormat("en-US", { style: "currency", currency: program.price.currency || "USD", maximumFractionDigits: 0 }).format(program.price.amount)
+                      : "Contact us"}
+                  </span>
+                  <button type="button" className="public-text-link" aria-expanded={expanded === String(program.id)} aria-controls={`program-details-${program.id}`} onClick={() => setExpanded((current) => current === String(program.id) ? "" : String(program.id))}>{expanded === String(program.id) ? "Hide details" : "Learn more"}</button>
+                </div>
+                {expanded === String(program.id) ? <button type="button" className="public-program-apply" onClick={() => setApplying(program)}>Apply to program <FiArrowRight /></button> : null}
+              </div>
+            </article>
+          ))}
         </div>
-      ) : null}
+      </div>
+      {intensive.length > 0 && (
+        <div className="public-curriculum-group">
+          <div className="public-curriculum-label">INTENSIVE 6-WEEK PROGRAMS</div>
+          <div className="public-program-row">
+            {intensive.map((program) => (
+              <article className={`public-program-card${expanded === String(program.id) ? " is-expanded" : ""}`} key={program.id}>
+                <div className="public-program-img-wrap">
+                  {program.imageUrl ? <img className="public-program-img" src={program.imageUrl} alt={`${program.title} program`} loading="lazy" /> : <div className="public-program-image-empty" aria-hidden="true">Program image</div>}
+                </div>
+                <div className="public-program-content">
+                  <div className="public-program-title">{program.title}</div>
+                  {expanded === String(program.id) ? <div className="public-program-desc" id={`program-details-${program.id}`}>{program.description || program.summary}</div> : null}
+                  <div className="public-program-details">
+                    <span className="public-program-price">
+                      {program.price?.amount != null
+                        ? new Intl.NumberFormat("en-US", { style: "currency", currency: program.price.currency || "USD", maximumFractionDigits: 0 }).format(program.price.amount)
+                        : "Contact us"}
+                    </span>
+                    <button
+                      type="button"
+                      className="public-text-link"
+                      aria-expanded={expanded === String(program.id)}
+                      aria-controls={`program-details-${program.id}`}
+                      onClick={() => setExpanded((current) => current === String(program.id) ? "" : String(program.id))}
+                    >
+                      {expanded === String(program.id) ? "Hide details" : "Learn more"}
+                    </button>
+                  </div>
+                  {expanded === String(program.id) ? <button type="button" className="public-program-apply" onClick={() => setApplying(program)}>Apply to program <FiArrowRight /></button> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
       {applying ? (
         <div
           className="program-application-modal"
@@ -430,174 +446,178 @@ export function PublicHome() {
   const { site } = useWorkspaceTheme();
   const p = site?.publicSite || {},
     visibility = p.sectionVisibility || {},
-    heroImage = p.heroMediaUrl || "";
+    heroImage = p.heroMediaUrl || "",
+    heroEyebrow = /experts/i.test(String(p.eyebrow || "")) ? p.eyebrow : `${p.eyebrow || "Multifamily investing · coaching · execution"} · Experts · Education`;
   return (
     <PublicLayout>
-      <main id="main-content" className="public-home-reference">
-        <section className="public-hero">
-          <div className="public-hero__copy">
-            <p className="public-kicker">
-              {p.eyebrow || "Multifamily investing · coaching · execution"}
-            </p>
-            <h1>{p.headline}</h1>
-            <p>{p.subheadline}</p>
-            <div className="public-actions">
-              <a className="public-button" href="#programs">Explore programs</a>
-              {p.secondaryCtaLabel && p.secondaryCtaUrl ? (
-                <SmartLink
-                  className="public-button public-button--ghost"
-                  to={p.secondaryCtaUrl}
-                >
-                  {p.secondaryCtaLabel}
-                </SmartLink>
-              ) : null}
+      <main id="main-content" className="public-home-wrap">
+        <section className="public-hero-section">
+          <div className="public-hero-left">
+            <div className="public-hero-tags">
+              <span className="public-hero-tag">{heroEyebrow}</span>
+            </div>
+            <h1 className="public-hero-headline">
+              <EditorialHeading text={p.headline} accent="Discipline" />
+            </h1>
+            <div className="public-hero-subhead">{p.subheadline}</div>
+            <div className="public-hero-actions">
+              <a className="public-hero-btn-primary" href="#programs">Explore programs</a>
+              <SmartLink
+                className="public-hero-btn-secondary"
+                to={p.secondaryCtaUrl || "/#about"}
+              >
+                {p.secondaryCtaLabel || "Meet the founder"}
+              </SmartLink>
             </div>
             {visibility.video !== false ? <HeroVideoTile site={site} /> : null}
           </div>
-          <div className="public-hero__mark">
-            {heroImage ? (
-              <img
-                src={heroImage}
-                alt=""
-              />
-            ) : <div className="public-hero__image-placeholder" aria-hidden="true" />}
-            <small>“{p.heroTagline || "Learn OPM, raise capital, and build freedom."}”<b>— Ellie Baxter</b></small>
+          <div className="public-hero-right">
+            <div className="public-hero-img-box">
+              {heroImage ? (
+                <img className="public-hero-img" src={heroImage} alt="" />
+              ) : <div className="public-hero-image-placeholder" aria-hidden="true" />}
+              <div className="public-hero-quote-box">
+                <span className="public-hero-quote">
+                  "{p.heroTagline || "Learn OPM, raise capital, and build freedom."}"
+                </span>
+                <small>— ELLIE BAXTER</small>
+              </div>
+            </div>
           </div>
         </section>
-        <section className="reference-values">
-          <header>
-            <div><p className="public-kicker">Why Ellie Coaching</p><h2>{p.introTitle}</h2></div>
-            <p>{p.introBody}</p>
-          </header>
-          <div className="public-value">{(p.valuePropositions||[]).map((row,index)=><article key={`${row.title}-${index}`}><span>{String(index+1).padStart(2,"0")}</span><h3>{row.title}</h3><p>{row.body}</p></article>)}</div>
-        </section>
-        <section className={`public-intro ${p.aboutImageUrl ? "has-image" : ""}`} id="about">
-          {p.aboutImageUrl ? <figure className="public-intro__portrait"><img src={p.aboutImageUrl} alt="Ellie Baxter" /></figure> : null}
-          <div className="public-intro__heading">
-            <p className="public-kicker">{p.aboutEyebrow || "Experience · perspective · support"}</p>
-            {p.aboutTitle?<h2>{p.aboutTitle}</h2>:null}
-            {p.aboutBody?<p>{p.aboutBody}</p>:null}
+
+        <section className="public-why-section" id="about">
+          <div className="public-why-title-block">
+            <span className="public-why-label">WHY ELLIE COACHING</span>
+            <h2 className="public-why-title">
+              <EditorialHeading text={p.introTitle} accent="real operators" />
+            </h2>
+            <div className="public-why-desc">{p.introBody}</div>
           </div>
-        </section>
-        {visibility.proof !== false && p.trustMetrics?.length ? (
-          <section className="proof-strip" aria-label="Ellie Coaching facts">
-            {p.trustMetrics.map((metric) => (
-              <div key={`${metric.value}-${metric.label}`}>
-                <strong>{metric.value}</strong>
-                <span>{metric.label}</span>
+          <div className="public-why-features">
+            {(p.valuePropositions || []).map((row, index) => (
+              <div className="public-why-feature" key={`${row.title}-${index}`}>
+                <div className="public-why-feature-num">{String(index + 1).padStart(2, "0")}</div>
+                <div className="public-why-feature-title">{row.title}</div>
+                <div className="public-why-feature-desc">{row.body}</div>
               </div>
             ))}
-          </section>
-        ) : null}
-        {visibility.programs !== false ? (
-          <section
-            className="public-section public-section--programs"
-            id="programs"
-          >
-            <header>
-              <div>
-                <p className="public-kicker">{p.programsEyebrow || "Programs"}</p>
-                <h2><em>The</em> Curriculum</h2>
-                <p>{p.programsTitle || "Choose the support that meets you where you are."}</p>
+          </div>
+        </section>
+
+        <section className="public-meet-section">
+          <div className="public-meet-grid">
+            <div className="public-meet-photo-area">
+              {p.aboutImageUrl ? (
+                <img src={p.aboutImageUrl} className="public-meet-photo" alt="Ellie Baxter" />
+              ) : (
+                <div className="public-meet-placeholder" aria-hidden="true">EB</div>
+              )}
+            </div>
+            <div className="public-meet-bio-area">
+              <div className="public-meet-tags">{p.aboutEyebrow || "EXPERIENCE. PERSPECTIVE. SUPPORT."}</div>
+              <h3 className="public-meet-title">{p.aboutTitle || "Meet Ellie Baxter"}</h3>
+              <div className="public-meet-desc">{p.aboutBody}</div>
+              <div className="public-meet-quote-box">
+                <span className="public-meet-quote">
+                  "Successful investing is not about chasing shortcuts. It’s about playing the infinite game, surrounding yourself with like-minded people, and consistently doing the work."
+                </span>
               </div>
-            </header>
-            <ProgramCards programs={site?.programs} />
-          </section>
-        ) : null}
-        {visibility.journey !== false ? (
-          <section className="public-process" id="journey">
-            <header>
-              <p className="public-kicker">{p.journeyEyebrow || "Your path"}</p>
-              <h2>{p.journeyTitle || "From exploring a program to doing the work."}</h2>
-              <p>{p.journeyCopy}</p>
-            </header>
-            <ol>
-              {(p.journeySteps||[]).map((step, i) => (
-                <li key={step}>
-                  <span>{String(i + 1).padStart(2, "0")}</span>
-                  <strong>{step}</strong>
-                </li>
-              ))}
-            </ol>
-          </section>
-        ) : null}
-        {visibility.team !== false ? <Team rows={site?.team} /> : null}
-        {visibility.testimonials !== false &&
-        site?.featuredTestimonials?.length ? (
-          <section className="public-section results-section">
-            <header>
-              <div>
-                <p className="public-kicker">Student perspectives</p>
-                <h2>Progress, told by people doing the work.</h2>
-              </div>
-              <Link to="/testimonials">
-                View all results <FiArrowRight />
-              </Link>
-            </header>
+            </div>
+          </div>
+        </section>
+
+        {visibility.team !== false ? <Team rows={site?.team || []} /> : null}
+
+        {visibility.testimonials !== false && site?.featuredTestimonials?.length ? (
+          <section className="public-section public-testimonials" id="results">
+            <p className="public-kicker">Student perspectives</p>
+            <h2>Progress shared by the people doing the work.</h2>
             <Testimonials rows={site.featuredTestimonials} />
           </section>
         ) : null}
-        {visibility.event !== false && site?.upcomingEvent ? (
-          <section className="public-event">
-            <div className="public-event__date">
-              <span>
-                {new Date(site.upcomingEvent.startDate).toLocaleDateString(
-                  undefined,
-                  { month: "short" },
-                )}
-              </span>
-              <strong>
-                {new Date(site.upcomingEvent.startDate).getDate()}
-              </strong>
+
+        {visibility.programs !== false ? (
+          <section className="public-curriculum-section" id="programs">
+            <div className="public-curriculum-header">
+              <h2 className="public-curriculum-title">The <em className="public-curriculum-accent">Curriculum</em></h2>
+              <div className="public-curriculum-desc">
+                {p.programsTitle || "Choose the support that meets you where you are. Structured programs designed for every stage of your multifamily journey."}
+              </div>
             </div>
-            <div>
-              <p className="public-kicker">{p.eventEyebrow || "Upcoming training"}</p>
-              <h2>{p.eventTitle || site.upcomingEvent.name}</h2>
-              <p>{p.eventSummary || site.upcomingEvent.summary}</p>
-              {site.upcomingEvent.registrationUrl ? (
-                <a
-                  className="public-button public-button--dark"
-                  href={site.upcomingEvent.registrationUrl}
-                >
-                  {p.eventCtaLabel || "Event details"} <FiArrowRight />
-                </a>
-              ) : null}
+            <ProgramCards programs={site?.programs} />
+          </section>
+        ) : null}
+
+        {visibility.journey !== false ? (
+          <section className="public-path-section" id="journey">
+            <div className="public-path-left">
+              <span className="public-path-label">YOUR PATH TO MASTERY</span>
+              <h2 className="public-path-title">{p.journeyTitle || "Your Path to Mastery"}</h2>
+              <div className="public-path-desc">{p.journeyCopy}</div>
+              <ApplicationButton className="public-path-btn">Start Your Application</ApplicationButton>
+            </div>
+            <div className="public-path-right">
+              <ol className="public-path-steps">
+                {(p.journeySteps || []).map((step, i) => (
+                  <li className="public-path-step" key={step}>
+                    <span className="public-path-step-num">{String(i + 1).padStart(2, "0")}</span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
             </div>
           </section>
         ) : null}
-        {visibility.community !== false &&
-        p.communityTitle &&
-        p.communityBody ? (
+
+        {visibility.event !== false && site?.upcomingEvent ? (
+          <section className="public-training-section">
+            <div className="public-training-date">
+              <span className="public-training-date-num">
+                {new Date(site.upcomingEvent.startDate).toLocaleDateString(undefined, { month: "short" }).toUpperCase()}
+              </span>
+              <span className="public-training-date-day">
+                {new Date(site.upcomingEvent.startDate).getDate()}
+              </span>
+            </div>
+            <div className="public-training-info">
+              <div className="public-training-label">{p.eventEyebrow || "UPCOMING TRAINING"}</div>
+              <div className="public-training-title">{p.eventTitle || site.upcomingEvent.name}</div>
+              <div className="public-training-desc">{p.eventSummary || site.upcomingEvent.summary}</div>
+            </div>
+            {site.upcomingEvent.registrationUrl && (
+              <a
+                className="public-training-btn"
+                href={site.upcomingEvent.registrationUrl}
+              >
+                {p.eventCtaLabel || "Event Details"}
+              </a>
+            )}
+          </section>
+        ) : null}
+
+        {visibility.community !== false && p.communityTitle && p.communityBody ? (
           <section className="community-section">
-            <p className="community-section__word" aria-hidden="true">
-              COMMUNITY
-            </p>
+            <p className="community-section__word" aria-hidden="true">COMMUNITY</p>
             <div>
               <p className="public-kicker">After enrollment</p>
               <h2>{p.communityTitle}</h2>
               <p>{p.communityBody}</p>
-              {p.communityCtaLabel && p.communityCtaUrl ? (
-                <SmartLink className="public-text-link" to={p.communityCtaUrl}>
-                  {p.communityCtaLabel}
-                  <FiArrowRight />
-                </SmartLink>
-              ) : null}
+              {p.communityCtaLabel && p.communityCtaUrl ? <SmartLink className="public-text-link" to={p.communityCtaUrl}>{p.communityCtaLabel}<FiArrowRight /></SmartLink> : null}
             </div>
           </section>
         ) : null}
-        <section className="public-final">
-          <div>
-            <p className="public-kicker">
-              {p.finalCtaEyebrow || "Ready for your next move?"}
-            </p>
-            <h2>
-              {p.finalCtaTitle ||
-                "Choose the program that fits your goals and apply to become a student."}
+
+        <section className="public-final-section">
+          <div className="public-final-content">
+            <p className="public-kicker">{p.finalCtaEyebrow || "Ready for your next move?"}</p>
+            <h2 className="public-final-title">
+              {p.finalCtaTitle || "Choose the program that fits your goals and apply to become a student."}
             </h2>
-            <p>{p.finalCtaCopy}</p>
+            <p className="public-final-copy">{p.finalCtaCopy}</p>
           </div>
-          <div>
-            <ApplicationButton>{p.finalCtaLabel || "Apply to join"}<FiArrowRight /></ApplicationButton>
+          <div className="public-final-action">
+            <ApplicationButton>{p.finalCtaLabel || "Apply to join"} <FiArrowRight /></ApplicationButton>
           </div>
         </section>
       </main>

@@ -449,6 +449,8 @@ function programProjection(item) {
       ).slice(0, 500),
     },
     sortOrder: item.publicPresentation.sortOrder,
+    section: item.publicPresentation.section || "",
+    isFeatured: Boolean(item.publicPresentation.featured),
   };
 }
 function testimonialProjection(item) {
