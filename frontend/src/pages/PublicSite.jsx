@@ -166,13 +166,31 @@ function ProgramCards({ programs = [] }) {
               <img
                 className="program-card__image"
                 src={program.imageUrl}
-                alt=""
+                alt={`${program.title} program`}
                 loading="lazy"
               />
-            ) : null}
+            ) : (
+              <div className="program-card__image program-card__image--empty" aria-hidden="true">
+                Program image
+              </div>
+            )}
             <div className="program-card__body">
-              <p className="public-kicker">Coaching program</p>
+              <p className="public-kicker">
+                Coaching program
+                {program.duration?.value ? ` · ${program.duration.value} ${program.duration.unit}` : ""}
+              </p>
               <h3>{program.title}</h3>
+              {program.summary ? <p className="program-card__summary">{program.summary}</p> : null}
+              <dl className="program-card__facts">
+                <div>
+                  <dt>Duration</dt>
+                  <dd>{program.duration?.value ? `${program.duration.value} ${program.duration.unit}` : "Contact us"}</dd>
+                </div>
+                <div>
+                  <dt>Investment</dt>
+                  <dd>{program.price?.amount != null ? new Intl.NumberFormat("en-US", { style: "currency", currency: program.price.currency || "USD", maximumFractionDigits: 0 }).format(program.price.amount) : "Contact us"}</dd>
+                </div>
+              </dl>
               <div className="program-card__actions">
                 <button
                   type="button"
@@ -204,10 +222,6 @@ function ProgramCards({ programs = [] }) {
                 id={`program-details-${program.id}`}
               >
                 <p>{program.description}</p>
-                <div className="program-card__facts">
-                  {program.duration?.value ? <span>{program.duration.value} {program.duration.unit}</span> : null}
-                  {program.price?.amount != null ? <strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: program.price.currency || "USD", maximumFractionDigits: 0 }).format(program.price.amount)}</strong> : null}
-                </div>
               </div>
             ) : null}
           </article>
