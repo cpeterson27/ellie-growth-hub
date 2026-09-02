@@ -6,8 +6,10 @@ import {
   FiExternalLink,
   FiMapPin,
   FiMenu,
+  FiMoon,
   FiPlay,
   FiStar,
+  FiSun,
   FiX,
 } from "react-icons/fi";
 import useWorkspaceTheme from "../context/useWorkspaceTheme.js";
@@ -20,12 +22,13 @@ import "./PublicSite.css";
 import "./PublicEnhancements.css";
 
 const applyPath = "/apply";
-function Brand({ site }) {
-  const logo =
-    site?.branding?.publicSiteLogoUrl ||
-    (site?.branding?.surfaceMode === "light"
-      ? "/elliescoachinglogo-dark.png"
-      : "/elliescoachinglogo-white.png");
+function Brand({ site, theme }) {
+  const themeLogo = site?.workspace?.slug === "ellie"
+      ? theme === "light"
+        ? "/elliescoachinglogo-dark.png"
+        : "/elliescoachinglogo-white.png"
+      : "",
+    logo = themeLogo || site?.branding?.publicSiteLogoUrl;
   return (
     <a
       className="public-brand"
@@ -58,19 +61,22 @@ function ApplicationButton({ className="public-button", children="Apply", progra
 }
 export function PublicLayout({ children }) {
   const { site, loading } = useWorkspaceTheme();
-  const [open, setOpen] = useState(false);
+  const configuredTheme = site?.branding?.surfaceMode === "light" ? "light" : "dark";
+  const [open, setOpen] = useState(false),
+    [visitorTheme, setVisitorTheme] = useState(null),
+    theme = visitorTheme || configuredTheme;
   if (loading)
     return <div className="public-loading">Opening Ellie&apos;s Coaching…</div>;
   const socials = site?.publicSite?.socialLinks || [],
     showResults = site?.publicSite?.sectionVisibility?.results === true,
     close = () => setOpen(false);
   return (
-    <div className="public-site" style={{"--public-base-size":`${site?.publicSite?.baseFontSize||16}px`,"--public-heading-scale":site?.publicSite?.headingScale||1,"--public-heading-font":site?.publicSite?.headingFont==="modern"?'Inter,ui-sans-serif,system-ui,sans-serif':'Georgia,"Times New Roman",serif',"--public-body-font":site?.publicSite?.bodyFont==="classic"?'Georgia,"Times New Roman",serif':'Inter,ui-sans-serif,system-ui,sans-serif'}}>
+    <div className="public-site" data-public-theme={theme} style={{"--public-base-size":`${site?.publicSite?.baseFontSize||16}px`,"--public-heading-scale":site?.publicSite?.headingScale||1,"--public-heading-font":site?.publicSite?.headingFont==="modern"?'Inter,ui-sans-serif,system-ui,sans-serif':'Georgia,"Times New Roman",serif',"--public-body-font":site?.publicSite?.bodyFont==="classic"?'Georgia,"Times New Roman",serif':'Inter,ui-sans-serif,system-ui,sans-serif'}}>
       <a className="public-skip" href="#main-content">
         Skip to content
       </a>
       <header className="public-nav">
-        <Brand site={site} />
+        <Brand site={site} theme={theme} />
         <button
           className="public-menu"
           onClick={() => setOpen((v) => !v)}
@@ -82,31 +88,37 @@ export function PublicLayout({ children }) {
         </button>
         <nav id="public-navigation" className={open ? "is-open" : ""}>
           <a onClick={close} href="/#about">
-            About
+            Why Ellie
           </a>
           <a onClick={close} href="/#programs">
             Programs
           </a>
-          <a onClick={close} href="/#team">
-            Team
-          </a>
-          <a onClick={close} href="/#testimonials">
-            Testimonials
+          <a onClick={close} href="/#journey">
+            The path
           </a>
           {showResults ? <Link to="/testimonials">Results</Link> : null}
-          <a onClick={close} href="/#contact">
-            Contact
-          </a>
           <Link className="public-login" to="/login">
             Staff login
           </Link>
-          <ApplicationButton className="public-button public-button--small">Apply</ApplicationButton>
+          {site?.publicSite?.allowThemeToggle ? (
+            <button
+              className="public-theme-toggle"
+              type="button"
+              onClick={() =>
+                setVisitorTheme(theme === "light" ? "dark" : "light")
+              }
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+            >
+              {theme === "light" ? <FiMoon /> : <FiSun />}
+            </button>
+          ) : null}
+          <ApplicationButton className="public-button public-button--small">Apply to join</ApplicationButton>
         </nav>
       </header>
       {children}
       <footer className="public-footer">
         <div className="public-footer__brand">
-          <Brand site={site} />
+          <Brand site={site} theme={theme} />
           <p>
             {site?.publicSite?.footerText ||
               "Multifamily coaching for investors ready to operate with intention."}
@@ -157,10 +169,9 @@ function ProgramCards({ programs = [] }) {
   }, [applying]);
   if (!programs.length)
     return <p className="public-empty">No programs are currently published.</p>;
-  return (
-    <>
-      <div className="program-list">
-        {programs.map((program) => (
+  const renderCards = (rows, className) => (
+      <div className={`program-list ${className}`}>
+        {rows.map((program) => (
           <article className="program-card" key={program.id}>
             {program.imageUrl ? (
               <img
@@ -227,6 +238,19 @@ function ProgramCards({ programs = [] }) {
           </article>
         ))}
       </div>
+    );
+  return (
+    <>
+      <div className="program-catalog__group">
+        <p className="program-catalog__label">High performance accelerators</p>
+        {renderCards(programs.slice(0, 3), "program-list--featured")}
+      </div>
+      {programs.length > 3 ? (
+        <div className="program-catalog__group">
+          <p className="program-catalog__label">Intensive coaching programs</p>
+          {renderCards(programs.slice(3), "program-list--intensive")}
+        </div>
+      ) : null}
       {applying ? (
         <div
           className="program-application-modal"
@@ -315,7 +339,7 @@ function embedUrl(value) {
   }
   return "";
 }
-function VideoFeature({ site }) {
+function HeroVideoTile({ site }) {
   const p = site?.publicSite || {};
   const [playing, setPlaying] = useState(false),
     closeRef = useRef(null),
@@ -325,75 +349,24 @@ function VideoFeature({ site }) {
   }, [playing]);
   if (!p.introVideoUrl && !p.introVideoPosterUrl) return null;
   return (
-    <section className="video-feature" aria-labelledby="video-title">
-      <div
-        className="video-feature__media"
-        style={
-          p.introVideoPosterUrl
-            ? {
-                backgroundImage: `linear-gradient(90deg,rgba(4,7,5,.2),rgba(4,7,5,.74)),url(${p.introVideoPosterUrl})`,
-              }
-            : undefined
-        }
+    <>
+      <button
+        type="button"
+        className="public-hero__video"
+        style={p.introVideoPosterUrl ? { backgroundImage: `linear-gradient(#0002,#0002),url(${p.introVideoPosterUrl})` } : undefined}
+        onClick={() => p.introVideoUrl && setPlaying(true)}
+        disabled={!p.introVideoUrl}
       >
-        <button
-          type="button"
-          className="video-play"
-          onClick={() => setPlaying(true)}
-          disabled={!p.introVideoUrl}
-          aria-label={
-            p.introVideoUrl
-              ? `Play ${p.introVideoTitle || "intro video"}`
-              : "Intro video coming soon"
-          }
-        >
-          <FiPlay />
-          <span>{p.introVideoUrl ? "Play film" : "Video coming soon"}</span>
-        </button>
-      </div>
-      <div className="video-feature__copy">
-        <p className="public-kicker">{p.introVideoEyebrow || "Meet Ellie"}</p>
-        <h2 id="video-title">{p.introVideoTitle}</h2>
-        <p>{p.introVideoCopy}</p>
-        <div className="public-actions">
-          <ApplicationButton>Start your application <FiArrowRight /></ApplicationButton>
-        </div>
-      </div>
+        <span className="public-hero__play"><FiPlay /></span>
+        <small>Watch · {p.introVideoTitle || "Welcome to Ellie’s Coaching"}</small>
+      </button>
       {playing ? (
-        <div
-          className="video-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label={p.introVideoTitle || "Ellie Coaching introduction"}
-          onKeyDown={(event) => event.key === "Escape" && setPlaying(false)}
-        >
-          <button
-            ref={closeRef}
-            onClick={() => setPlaying(false)}
-            aria-label="Close video"
-          >
-            <FiX />
-          </button>
-          <div>
-            {embed ? (
-              <iframe
-                src={embed}
-                title={p.introVideoTitle || "Ellie Coaching introduction"}
-                allow="autoplay; encrypted-media; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <video
-                src={p.introVideoUrl}
-                poster={p.introVideoPosterUrl}
-                controls
-                autoPlay
-              />
-            )}
-          </div>
+        <div className="video-modal" role="dialog" aria-modal="true" aria-label={p.introVideoTitle || "Ellie Coaching introduction"} onKeyDown={(event) => event.key === "Escape" && setPlaying(false)}>
+          <button ref={closeRef} onClick={() => setPlaying(false)} aria-label="Close video"><FiX /></button>
+          <div>{embed ? <iframe src={embed} title={p.introVideoTitle || "Ellie Coaching introduction"} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /> : <video src={p.introVideoUrl} poster={p.introVideoPosterUrl} controls autoPlay />}</div>
         </div>
       ) : null}
-    </section>
+    </>
   );
 }
 function Portrait({ person }) {
@@ -457,13 +430,10 @@ export function PublicHome() {
   const { site } = useWorkspaceTheme();
   const p = site?.publicSite || {},
     visibility = p.sectionVisibility || {},
-    logo =
-      p.heroMediaUrl ||
-      site?.branding?.publicSiteLogoUrl ||
-      (site?.workspace?.slug === "ellie" ? "/elliescoachinglogo.png" : "");
+    heroImage = p.heroMediaUrl || "";
   return (
     <PublicLayout>
-      <main id="main-content">
+      <main id="main-content" className="public-home-reference">
         <section className="public-hero">
           <div className="public-hero__copy">
             <p className="public-kicker">
@@ -472,7 +442,7 @@ export function PublicHome() {
             <h1>{p.headline}</h1>
             <p>{p.subheadline}</p>
             <div className="public-actions">
-              <ApplicationButton>{p.primaryCtaLabel || "Apply to join"}<FiArrowRight /></ApplicationButton>
+              <a className="public-button" href="#programs">Explore programs</a>
               {p.secondaryCtaLabel && p.secondaryCtaUrl ? (
                 <SmartLink
                   className="public-button public-button--ghost"
@@ -482,28 +452,30 @@ export function PublicHome() {
                 </SmartLink>
               ) : null}
             </div>
+            {visibility.video !== false ? <HeroVideoTile site={site} /> : null}
           </div>
           <div className="public-hero__mark">
-            <span>{p.heroOverline || "Structured programs"}</span>
-            {logo ? (
+            {heroImage ? (
               <img
-                src={logo}
-                alt={p.heroMediaUrl ? "" : site?.branding?.publicSiteName || "Ellie Coaching"}
+                src={heroImage}
+                alt=""
               />
-            ) : null}
-            <small>{p.heroTagline || "Real people · practical work · accountable progress"}</small>
+            ) : <div className="public-hero__image-placeholder" aria-hidden="true" />}
+            <small>“{p.heroTagline || "Learn OPM, raise capital, and build freedom."}”<b>— Ellie Baxter</b></small>
           </div>
         </section>
-        {visibility.video !== false ? <VideoFeature site={site} /> : null}
+        <section className="reference-values">
+          <header>
+            <div><p className="public-kicker">Why Ellie Coaching</p><h2>{p.introTitle}</h2></div>
+            <p>{p.introBody}</p>
+          </header>
+          <div className="public-value">{(p.valuePropositions||[]).map((row,index)=><article key={`${row.title}-${index}`}><span>{String(index+1).padStart(2,"0")}</span><h3>{row.title}</h3><p>{row.body}</p></article>)}</div>
+        </section>
         <section className={`public-intro ${p.aboutImageUrl ? "has-image" : ""}`} id="about">
-          <div className="public-intro__heading">
-            <p className="public-kicker">{p.aboutEyebrow || "Why Ellie Coaching"}</p>
-            <h2>{p.introTitle}</h2>
-            {p.introBody ? <p>{p.introBody}</p> : null}
-          </div>
           {p.aboutImageUrl ? <figure className="public-intro__portrait"><img src={p.aboutImageUrl} alt="Ellie Baxter" /></figure> : null}
-          <div className="public-intro__story">
-            {p.aboutTitle?<h3>{p.aboutTitle}</h3>:null}
+          <div className="public-intro__heading">
+            <p className="public-kicker">{p.aboutEyebrow || "Experience · perspective · support"}</p>
+            {p.aboutTitle?<h2>{p.aboutTitle}</h2>:null}
             {p.aboutBody?<p>{p.aboutBody}</p>:null}
           </div>
         </section>
@@ -517,7 +489,6 @@ export function PublicHome() {
             ))}
           </section>
         ) : null}
-        <section className="public-value">{(p.valuePropositions||[]).map((row,index)=><article key={`${row.title}-${index}`}><span>{String(index+1).padStart(2,"0")}</span><h3>{row.title}</h3><p>{row.body}</p></article>)}</section>
         {visibility.programs !== false ? (
           <section
             className="public-section public-section--programs"
@@ -526,14 +497,15 @@ export function PublicHome() {
             <header>
               <div>
                 <p className="public-kicker">{p.programsEyebrow || "Programs"}</p>
-                <h2>{p.programsTitle || "Choose the support that meets you where you are."}</h2>
+                <h2><em>The</em> Curriculum</h2>
+                <p>{p.programsTitle || "Choose the support that meets you where you are."}</p>
               </div>
             </header>
             <ProgramCards programs={site?.programs} />
           </section>
         ) : null}
         {visibility.journey !== false ? (
-          <section className="public-process">
+          <section className="public-process" id="journey">
             <header>
               <p className="public-kicker">{p.journeyEyebrow || "Your path"}</p>
               <h2>{p.journeyTitle || "From exploring a program to doing the work."}</h2>

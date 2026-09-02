@@ -21,10 +21,12 @@ for (const group of ["Publishing", "Public content", "Intro video", "Display ord
 for (const removedField of ["Public URL slug", "Card summary", "Who it is for", "Curriculum / details", "Call to action"]) assert(!programs.includes(removedField));
 assert(programs.includes("presentationForEditing") && programs.includes("program.internalSummary"));
 assert(programs.includes("Workspace media library") && programs.includes("programAssets"));
+assert(programs.includes("persistProgramImage") && programs.includes("image saved to the public website"));
 for (const status of ["Published", "Draft", "Hidden"]) assert(programs.includes(status));
 assert(!programs.includes("Intro video URL"));
 assert(/section\s*===\s*"team"/.test(publicAdmin) && publicAdmin.includes("Edit public profile"));
 for (const field of ["valuePropositions", "journeySteps", "eventTitle", "communityTitle", "finalCtaTitle", "headingFont", "baseFontSize"]) assert(publicAdmin.includes(field), `website editor missing ${field}`);
+assert(publicAdmin.includes("allowThemeToggle") && publicAdmin.includes("Let visitors switch themes"));
 assert(branding.includes("Social profiles") && !branding.includes("Choose workspace asset") && !branding.includes("Compact logo"));
 assert(applicationImage.includes("heroImageUrl") && settings.includes("ApplicationImageSettings"));
 assert(branding.includes("About Ellie photo") && branding.includes("aboutImageUrl"));

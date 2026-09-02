@@ -49,6 +49,25 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
       ...row,
       publicPresentation: { ...row.publicPresentation, [key]: value },
     }));
+  const persistProgramImage = async (imageUrl) => {
+    const saved = await updateProgramPublicPresentation(editing._id, {
+      ...(editing.publicPresentation || {}),
+      imageUrl,
+      summary: editing.publicPresentation?.description || "",
+      priceVisible: true,
+    });
+    setPrograms((rows) =>
+      rows.map((row) => (row._id === saved._id ? saved : row)),
+    );
+    setEditing(presentationForEditing(saved));
+    setMessage(
+      imageUrl
+        ? `${saved.name} image saved to the public website.`
+        : `${saved.name} image removed from the public website.`,
+    );
+    setError("");
+    onChange?.();
+  };
   const save = async () => {
     try {
       setSaving(true);
@@ -167,7 +186,7 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
         reader.readAsDataURL(file);
       });
       const asset = await uploadEventImage({ file: data });
-      patch("imageUrl", asset.url);
+      await persistProgramImage(asset.url);
     } catch (err) {
       setError(
         err.response?.data?.error || "Unable to upload the program image.",
@@ -336,7 +355,20 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => patch("imageUrl", "")}
+                        disabled={saving}
+                        onClick={async () => {
+                          try {
+                            setSaving(true);
+                            await persistProgramImage("");
+                          } catch (err) {
+                            setError(
+                              err.response?.data?.error ||
+                                "Unable to remove the program image.",
+                            );
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
                       >
                         Remove image
                       </Button>
@@ -371,9 +403,20 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
                         <button
                           key={asset.url}
                           type="button"
-                          onClick={() => {
-                            patch("imageUrl", asset.url);
-                            setShowLibrary(false);
+                          disabled={saving}
+                          onClick={async () => {
+                            try {
+                              setSaving(true);
+                              await persistProgramImage(asset.url);
+                              setShowLibrary(false);
+                            } catch (err) {
+                              setError(
+                                err.response?.data?.error ||
+                                  "Unable to save the program image.",
+                              );
+                            } finally {
+                              setSaving(false);
+                            }
                           }}
                         >
                           <img src={asset.url} alt="" />

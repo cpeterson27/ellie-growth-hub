@@ -52,7 +52,7 @@ for (const value of [
   "upcomingEvent",
   "ProgramCards",
   "Staff login",
-  "VideoFeature",
+  "HeroVideoTile",
   "Student perspectives",
   "journeyTitle",
   "communityTitle",
@@ -98,6 +98,10 @@ assert(site.includes('const [expanded, setExpanded] = useState("")'));
 assert(site.includes('current === String(program.id) ? "" : String(program.id)'));
 assert(site.includes("<p>{program.description}</p>"));
 assert(site.includes("program.price?.amount != null"));
+assert(site.includes("data-public-theme={theme}"));
+assert(site.includes("allowThemeToggle") && site.includes("public-theme-toggle"));
+assert(css.includes('[data-public-theme="light"]'));
+assert(css.includes('[data-public-theme="dark"]'));
 assert(!site.includes("<p>{program.summary}</p>"));
 console.log(
   "Public routes, privacy-policy/data-deletion public routing, legal content, responsive breakpoints, accessibility motion controls, workspace tokens and moderation UI contracts passed.",

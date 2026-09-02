@@ -199,7 +199,10 @@ export const startSquareOAuth = () => api.get("/payments/square/oauth/start").th
 export const refreshSquareConnection = () => api.post("/payments/square/refresh").then((res) => res.data);
 export const disconnectSquareConnection = () => api.post("/payments/square/disconnect").then((res) => res.data);
 export const fetchPaymentTransactions = (params = {}) => api.get("/payments/transactions", { params }).then((res) => res.data.transactions);
-export const createPaymentCheckout = (values, idempotencyKey = crypto.randomUUID()) => api.post("/payments/checkout", values, { headers: { "Idempotency-Key": idempotencyKey } }).then((res) => res.data.transaction);
+export const createPaymentCheckout = (values, idempotencyKey = crypto.randomUUID()) => api.post("/payments/checkout", values, { headers: { "Idempotency-Key": idempotencyKey } }).then((res) => res.data);
+export const createApplicationPaymentRequest = (applicationId, values, idempotencyKey = crypto.randomUUID()) => api.post(`/payments/applications/${applicationId}/payment-request`, values, { headers: { "Idempotency-Key": idempotencyKey } }).then((res) => res.data);
+export const fetchPublicPaymentRequest = (token) => api.get(`/payments/public/${encodeURIComponent(token)}`).then((res) => res.data.request);
+export const beginPublicPaymentCheckout = (token) => api.post(`/payments/public/${encodeURIComponent(token)}/checkout`).then((res) => res.data);
 export const refundPaymentTransaction = (id, values, idempotencyKey = crypto.randomUUID()) => api.post(`/payments/transactions/${id}/refunds`, values, { headers: { "Idempotency-Key": idempotencyKey } }).then((res) => res.data.transaction);
 export const updatePaymentSettings = (values) => api.patch("/payments/settings", values).then((res) => res.data.settings);
 export const createCoachingProgram = (values) =>

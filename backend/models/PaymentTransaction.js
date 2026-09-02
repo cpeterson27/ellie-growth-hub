@@ -17,7 +17,7 @@ const schema = new mongoose.Schema({
   workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", required: true, index: true },
   provider: { type: String, enum: ["square"], default: "square", required: true },
   kind: { type: String, enum: ["full", "deposit", "recurring"], default: "full" },
-  status: { type: String, enum: ["pending", "requires_action", "paid", "partially_refunded", "refunded", "failed", "canceled", "disputed"], default: "pending", index: true },
+  status: { type: String, enum: ["pending", "requires_action", "paid", "partially_refunded", "refunded", "failed", "canceled", "expired", "disputed"], default: "pending", index: true },
   amountMinor: { type: Number, required: true, min: 1 },
   totalAmountMinor: { type: Number, required: true, min: 1 },
   remainingBalanceMinor: { type: Number, required: true, min: 0 },
@@ -28,6 +28,9 @@ const schema = new mongoose.Schema({
   externalOrderId: { type: String, default: "" },
   externalPaymentId: { type: String, default: "" },
   checkoutUrl: { type: String, default: "", maxlength: 2000 },
+  publicAccessTokenHash: { type: String, default: "", select: false },
+  publicAccessExpiresAt: { type: Date, default: null, index: true },
+  checkoutStartedAt: { type: Date, default: null },
   contactId: { type: mongoose.Schema.Types.ObjectId, ref: "Contact", default: null, index: true },
   coachingApplicationId: { type: mongoose.Schema.Types.ObjectId, ref: "CoachingApplication", default: null },
   coachingProgramId: { type: mongoose.Schema.Types.ObjectId, ref: "CoachingProgram", default: null },
@@ -46,6 +49,7 @@ const schema = new mongoose.Schema({
 schema.index({ workspaceId: 1, provider: 1, idempotencyKey: 1 }, { unique: true });
 schema.index({ provider: 1, externalCheckoutId: 1 }, { unique: true, partialFilterExpression: { externalCheckoutId: { $type: "string", $gt: "" } } });
 schema.index({ provider: 1, externalPaymentId: 1 }, { unique: true, partialFilterExpression: { externalPaymentId: { $type: "string", $gt: "" } } });
+schema.index({ publicAccessTokenHash: 1 }, { unique: true, partialFilterExpression: { publicAccessTokenHash: { $type: "string", $gt: "" } } });
 schema.index({ workspaceId: 1, createdAt: -1 });
 schema.plugin(workspacePlugin);
 module.exports = mongoose.model("PaymentTransaction", schema);

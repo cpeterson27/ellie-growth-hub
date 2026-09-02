@@ -10,6 +10,14 @@ assert.equal(ellie.branding.accentColor, "#8bc53f");
 assert.equal(ellie.publicSite.published, true);
 assert.notEqual(other.branding.primaryColor, ellie.branding.primaryColor);
 assert.equal(other.publicSite.published, false);
+assert.equal(ellie.publicSite.allowThemeToggle, false);
+assert.equal(
+  service.sanitizedConfig(
+    { slug: "ellie", name: "Ellie" },
+    { publicSite: { allowThemeToggle: true } },
+  ).publicSite.allowThemeToggle,
+  true,
+);
 assert.equal(
   ellie.publicSite.introVideoTitle,
   "Start with the people behind the program.",

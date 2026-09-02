@@ -39,6 +39,7 @@ const TestimonialsPage = lazy(() => import("./pages/PublicSite.jsx").then((modul
 const ContactPage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.ContactPage })));
 const PublicProfilePage = lazy(() => import("./pages/PublicSite.jsx").then((module) => ({ default: module.PublicProfilePage })));
 const PublicApplication = lazy(() => import("./pages/PublicApplication.jsx"));
+const PublicPaymentRequest = lazy(() => import("./pages/PublicPaymentRequest.jsx"));
 const PrivacyPage = lazy(() => import("./pages/PublicLegal.jsx").then((module) => ({ default: module.PrivacyPage })));
 const TermsPage = lazy(() => import("./pages/PublicLegal.jsx").then((module) => ({ default: module.TermsPage })));
 const DataDeletionPage = lazy(() => import("./pages/PublicLegal.jsx").then((module) => ({ default: module.DataDeletionPage })));
@@ -218,6 +219,7 @@ function App() {
             <Route path="/data-deletion" element={<DataDeletionPage />} />
             <Route path="/apply" element={<PublicApplication />} />
             <Route path="/ref/:code" element={<PublicApplication />} />
+            <Route path="/payment/:token" element={<PublicPaymentRequest />} />
             <Route path="/profile/edit/:token" element={<StudentProfileEditor />} />
             <Route path="/login" element={<Login />} />
             <Route path="/accept-invitation/:token" element={<AcceptInvitation />} />

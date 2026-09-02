@@ -462,11 +462,42 @@ export default function PublicSiteAdmin({ section = "website" }) {
             <header>
               <span>03</span>
               <div>
-                <h4>Typography</h4>
-                <p>Control the website fonts and overall scale.</p>
+                <h4>Appearance &amp; typography</h4>
+                <p>Choose the public theme, visitor controls, fonts, and scale.</p>
               </div>
             </header>
             <div className="public-admin__grid">
+              <label>
+                Website theme
+                <select
+                  value={config.branding?.surfaceMode === "light" ? "light" : "dark"}
+                  onChange={(e) =>
+                    setConfig((current) => ({
+                      ...current,
+                      branding: {
+                        ...current.branding,
+                        surfaceMode: e.target.value,
+                      },
+                    }))
+                  }
+                >
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </label>
+              <label className="website-toggle">
+                <input
+                  type="checkbox"
+                  checked={config.publicSite.allowThemeToggle === true}
+                  onChange={(e) =>
+                    patchPublic("allowThemeToggle", e.target.checked)
+                  }
+                />
+                <span>
+                  <strong>Let visitors switch themes</strong>
+                  <small>Show a light/dark control in the public navigation.</small>
+                </span>
+              </label>
               <label>
                 Heading style
                 <select
