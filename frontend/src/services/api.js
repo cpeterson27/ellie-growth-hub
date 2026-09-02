@@ -203,6 +203,12 @@ export const createPaymentCheckout = (values, idempotencyKey = crypto.randomUUID
 export const createApplicationPaymentRequest = (applicationId, values, idempotencyKey = crypto.randomUUID()) => api.post(`/payments/applications/${applicationId}/payment-request`, values, { headers: { "Idempotency-Key": idempotencyKey } }).then((res) => res.data);
 export const fetchPublicPaymentRequest = (token) => api.get(`/payments/public/${encodeURIComponent(token)}`).then((res) => res.data.request);
 export const beginPublicPaymentCheckout = (token) => api.post(`/payments/public/${encodeURIComponent(token)}/checkout`).then((res) => res.data);
+export const fetchPublicPaymentPlan = (token) => api.get(`/payments/plans/public/${encodeURIComponent(token)}`).then((res) => res.data.plan);
+export const beginPublicInstallmentCheckout = (token, number) => api.post(`/payments/plans/public/${encodeURIComponent(token)}/installments/${number}/checkout`).then((res) => res.data);
+export const fetchPaymentPlans = () => api.get("/payments/plans").then((res) => res.data.plans || []);
+export const createApplicationPaymentPlan = (applicationId, values) => api.post(`/payments/applications/${applicationId}/payment-plan`, values).then((res) => res.data);
+export const cancelPaymentPlan = (planId) => api.post(`/payments/plans/${planId}/cancel`).then((res) => res.data.plan);
+export const fetchPaymentPlanShareLink = (planId) => api.get(`/payments/plans/${planId}/share-link`).then((res) => res.data.publicPaymentPlanUrl);
 export const refundPaymentTransaction = (id, values, idempotencyKey = crypto.randomUUID()) => api.post(`/payments/transactions/${id}/refunds`, values, { headers: { "Idempotency-Key": idempotencyKey } }).then((res) => res.data.transaction);
 export const updatePaymentSettings = (values) => api.patch("/payments/settings", values).then((res) => res.data.settings);
 export const createCoachingProgram = (values) =>

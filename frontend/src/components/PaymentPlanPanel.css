@@ -1,0 +1,39 @@
+.payment-schedule {
+  border: 1px solid #d8e0dc;
+  border-radius: 14px;
+  display: grid;
+  overflow: hidden;
+}
+.payment-schedule__summary {
+  align-items: center;
+  background: #f5f8f6;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+}
+.payment-schedule__summary span { color: var(--text-muted, #66736f); }
+.payment-schedule__row {
+  align-items: end;
+  border-top: 1px solid #e1e6e3;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(90px, 0.6fr) repeat(2, minmax(130px, 1fr));
+  padding: 0.8rem 1rem;
+}
+.payment-schedule__row > span { font-weight: 800; padding-bottom: 0.75rem; }
+.payment-request-link {
+  align-items: end;
+  background: #f5f8f6;
+  border: 1px solid #d8e0dc;
+  border-radius: 12px;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 1rem;
+}
+@media (max-width: 560px) {
+  .payment-schedule__row, .payment-request-link { grid-template-columns: 1fr; }
+  .payment-schedule__summary { align-items: flex-start; flex-direction: column; }
+  .payment-schedule__row > span { padding-bottom: 0; }
+}

@@ -110,20 +110,40 @@ function defaults(workspace) {
           aboutEyebrow: "Why Ellie Coaching",
           aboutTitle: "Experience, perspective, and practical support.",
           valuePropositions: [
-            { title: "Practical education", body: "Turn multifamily concepts into decisions and next steps you can actually work through." },
-            { title: "Specialist guidance", body: "Learn with experienced people whose perspectives support different parts of the process." },
-            { title: "Structured progression", body: "Move through a defined program with continuity, accountability, and a clear view of what comes next." },
+            {
+              title: "Practical education",
+              body: "Turn multifamily concepts into decisions and next steps you can actually work through.",
+            },
+            {
+              title: "Specialist guidance",
+              body: "Learn with experienced people whose perspectives support different parts of the process.",
+            },
+            {
+              title: "Structured progression",
+              body: "Move through a defined program with continuity, accountability, and a clear view of what comes next.",
+            },
           ],
           programsEyebrow: "Programs",
           programsTitle: "Choose the support that meets you where you are.",
           journeyEyebrow: "Your path",
           journeyTitle: "From exploring a program to doing the work.",
-          journeyCopy: "Applying starts a conversation. Enrollment is not automatic or guaranteed.",
-          journeySteps: ["Explore the programs", "Submit a program application", "Speak with Ellie’s team", "Join the appropriate program", "Enter the Skool community", "Work with your coaching team"],
+          journeyCopy:
+            "Applying starts a conversation. Enrollment is not automatic or guaranteed.",
+          journeySteps: [
+            "Explore the programs",
+            "Submit a program application",
+            "Speak with Ellie’s team",
+            "Join the appropriate program",
+            "Enter the Skool community",
+            "Work with your coaching team",
+          ],
           eventEyebrow: "Upcoming training",
           eventCtaLabel: "Event details",
           allowThemeToggle: false,
-          headingFont: "editorial", bodyFont: "modern", baseFontSize: 16, headingScale: 1,
+          headingFont: "editorial",
+          bodyFont: "modern",
+          baseFontSize: 16,
+          headingScale: 1,
           sectionVisibility: visibility,
           trustMetrics: [],
           footerText:
@@ -156,7 +176,24 @@ function defaults(workspace) {
           finalCtaUrl: "",
           communityTitle: "",
           communityBody: "",
-          heroOverline: "", heroTagline: "", aboutEyebrow: "About", aboutTitle: "", valuePropositions: [], programsEyebrow: "Programs", programsTitle: "", journeyEyebrow: "Your path", journeyTitle: "", journeyCopy: "", journeySteps: [], eventEyebrow: "Upcoming", eventCtaLabel: "Event details", allowThemeToggle: false, headingFont: "editorial", bodyFont: "modern", baseFontSize: 16, headingScale: 1,
+          heroOverline: "",
+          heroTagline: "",
+          aboutEyebrow: "About",
+          aboutTitle: "",
+          valuePropositions: [],
+          programsEyebrow: "Programs",
+          programsTitle: "",
+          journeyEyebrow: "Your path",
+          journeyTitle: "",
+          journeyCopy: "",
+          journeySteps: [],
+          eventEyebrow: "Upcoming",
+          eventCtaLabel: "Event details",
+          allowThemeToggle: false,
+          headingFont: "editorial",
+          bodyFont: "modern",
+          baseFontSize: 16,
+          headingScale: 1,
           sectionVisibility: visibility,
           trustMetrics: [],
           footerText: "",
@@ -195,10 +232,7 @@ function sanitizedConfig(workspace, config) {
   return {
     workspace: { name: workspace.name, slug: workspace.slug },
     branding: {
-      logoUrl: safeUrl(
-        b.logoUrl || base.branding.logoUrl,
-        { relative: true },
-      ),
+      logoUrl: safeUrl(b.logoUrl || base.branding.logoUrl, { relative: true }),
       faviconUrl: safeUrl(b.faviconUrl, { relative: true }),
       primaryColor: safeColor(b.primaryColor, base.branding.primaryColor),
       accentColor: safeColor(b.accentColor, base.branding.accentColor),
@@ -209,16 +243,16 @@ function sanitizedConfig(workspace, config) {
         b.publicSiteName || base.branding.publicSiteName,
       ).slice(0, 160),
       publicSiteLogoUrl: safeUrl(
-        b.publicSiteLogoUrl ||
-          b.logoUrl ||
-          base.branding.publicSiteLogoUrl,
+        b.publicSiteLogoUrl || b.logoUrl || base.branding.publicSiteLogoUrl,
         { relative: true },
       ),
       poweredByGrowthOperator:
         b.poweredByGrowthOperator ?? base.branding.poweredByGrowthOperator,
     },
     appBranding: {
-      logoUrl: safeUrl(a.logoUrl || config?.organizationLogoUrl || "", { relative: true }),
+      logoUrl: safeUrl(a.logoUrl || config?.organizationLogoUrl || "", {
+        relative: true,
+      }),
       logoLightUrl: safeUrl(a.logoLightUrl || "", { relative: true }),
       logoDarkUrl: safeUrl(a.logoDarkUrl || "", { relative: true }),
       compactLogoUrl: safeUrl(a.compactLogoUrl || "", { relative: true }),
@@ -229,7 +263,9 @@ function sanitizedConfig(workspace, config) {
       primaryActionColor: safeColor(a.primaryActionColor, "#16624f"),
       accentColor: safeColor(a.accentColor, "#8bc53f"),
       backgroundColor: safeColor(a.backgroundColor, "#f5f7f6"),
-      surfaceMode: ["light", "dark", "system"].includes(a.surfaceMode) ? a.surfaceMode : "light",
+      surfaceMode: ["light", "dark", "system"].includes(a.surfaceMode)
+        ? a.surfaceMode
+        : "light",
     },
     publicSite: {
       published: p.published ?? base.publicSite.published,
@@ -292,24 +328,67 @@ function sanitizedConfig(workspace, config) {
       ).slice(0, 3000),
       communityCtaLabel: String(p.communityCtaLabel || "").slice(0, 80),
       communityCtaUrl: safeUrl(p.communityCtaUrl || "", { relative: true }),
-      heroOverline: String(p.heroOverline || base.publicSite.heroOverline || "").slice(0, 160),
-      heroTagline: String(p.heroTagline || base.publicSite.heroTagline || "").slice(0, 300),
-      aboutEyebrow: String(p.aboutEyebrow || base.publicSite.aboutEyebrow || "").slice(0, 160),
-      aboutTitle: String(p.aboutTitle || base.publicSite.aboutTitle || "").slice(0, 300),
-      valuePropositions: (Array.isArray(p.valuePropositions) && p.valuePropositions.length ? p.valuePropositions : base.publicSite.valuePropositions || []).slice(0, 6).map((row) => ({ title: String(row?.title || "").trim().slice(0, 160), body: String(row?.body || "").trim().slice(0, 800) })).filter((row) => row.title && row.body),
-      programsEyebrow: String(p.programsEyebrow || base.publicSite.programsEyebrow || "").slice(0, 160),
-      programsTitle: String(p.programsTitle || base.publicSite.programsTitle || "").slice(0, 300),
-      journeyEyebrow: String(p.journeyEyebrow || base.publicSite.journeyEyebrow || "").slice(0, 160),
-      journeyTitle: String(p.journeyTitle || base.publicSite.journeyTitle || "").slice(0, 300),
-      journeyCopy: String(p.journeyCopy || base.publicSite.journeyCopy || "").slice(0, 1200),
-      journeySteps: strings(p.journeySteps?.length ? p.journeySteps : base.publicSite.journeySteps, 10),
-      eventEyebrow: String(p.eventEyebrow || base.publicSite.eventEyebrow || "").slice(0, 160),
+      heroOverline: String(
+        p.heroOverline || base.publicSite.heroOverline || "",
+      ).slice(0, 160),
+      heroTagline: String(
+        p.heroTagline || base.publicSite.heroTagline || "",
+      ).slice(0, 300),
+      aboutEyebrow: String(
+        p.aboutEyebrow || base.publicSite.aboutEyebrow || "",
+      ).slice(0, 160),
+      aboutTitle: String(
+        p.aboutTitle || base.publicSite.aboutTitle || "",
+      ).slice(0, 300),
+      valuePropositions: (Array.isArray(p.valuePropositions) &&
+      p.valuePropositions.length
+        ? p.valuePropositions
+        : base.publicSite.valuePropositions || []
+      )
+        .slice(0, 6)
+        .map((row) => ({
+          title: String(row?.title || "")
+            .trim()
+            .slice(0, 160),
+          body: String(row?.body || "")
+            .trim()
+            .slice(0, 800),
+        }))
+        .filter((row) => row.title && row.body),
+      programsEyebrow: String(
+        p.programsEyebrow || base.publicSite.programsEyebrow || "",
+      ).slice(0, 160),
+      programsTitle: String(
+        p.programsTitle || base.publicSite.programsTitle || "",
+      ).slice(0, 300),
+      journeyEyebrow: String(
+        p.journeyEyebrow || base.publicSite.journeyEyebrow || "",
+      ).slice(0, 160),
+      journeyTitle: String(
+        p.journeyTitle || base.publicSite.journeyTitle || "",
+      ).slice(0, 300),
+      journeyCopy: String(
+        p.journeyCopy || base.publicSite.journeyCopy || "",
+      ).slice(0, 1200),
+      journeySteps: strings(
+        p.journeySteps?.length ? p.journeySteps : base.publicSite.journeySteps,
+        10,
+      ),
+      eventEyebrow: String(
+        p.eventEyebrow || base.publicSite.eventEyebrow || "",
+      ).slice(0, 160),
       eventTitle: String(p.eventTitle || "").slice(0, 300),
       eventSummary: String(p.eventSummary || "").slice(0, 1200),
-      eventCtaLabel: String(p.eventCtaLabel || base.publicSite.eventCtaLabel || "Event details").slice(0, 80),
+      eventCtaLabel: String(
+        p.eventCtaLabel || base.publicSite.eventCtaLabel || "Event details",
+      ).slice(0, 80),
       allowThemeToggle: p.allowThemeToggle === true,
-      headingFont: ["editorial", "modern", "classic"].includes(p.headingFont) ? p.headingFont : "editorial",
-      bodyFont: ["modern", "classic"].includes(p.bodyFont) ? p.bodyFont : "modern",
+      headingFont: ["editorial", "modern", "classic"].includes(p.headingFont)
+        ? p.headingFont
+        : "editorial",
+      bodyFont: ["modern", "classic"].includes(p.bodyFont)
+        ? p.bodyFont
+        : "modern",
       baseFontSize: Math.min(20, Math.max(14, Number(p.baseFontSize) || 16)),
       headingScale: Math.min(1.2, Math.max(0.8, Number(p.headingScale) || 1)),
       sectionVisibility: Object.fromEntries(
@@ -352,7 +431,8 @@ function programProjection(item) {
     slug: item.publicPresentation.slug,
     title: item.publicPresentation.title || item.name,
     summary: item.publicPresentation.summary || item.internalSummary || "",
-    description: item.publicPresentation.description || item.internalSummary || "",
+    description:
+      item.publicPresentation.description || item.internalSummary || "",
     duration: item.duration,
     price: item.defaultPrice?.amount != null ? item.defaultPrice : null,
     highlights: strings(item.publicPresentation.highlights, 20),

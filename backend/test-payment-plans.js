@@ -1,0 +1,23 @@
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const { equalSchedule, validateSchedule } = require("./services/paymentPlanService");
+
+const root = __dirname;
+const source = (file) => fs.readFileSync(path.join(root, file), "utf8");
+assert.deepStrictEqual(equalSchedule(10000, 3), [3334, 3333, 3333]);
+assert.deepStrictEqual(equalSchedule(179900, 4).reduce((sum, value) => sum + value, 0), 179900);
+assert.strictEqual(validateSchedule({ totalAmountMinor: 10000, installmentCount: 2, installments: [{ amountMinor: 5000, dueAt: "2026-09-10" }, { amountMinor: 5000, dueAt: "2026-10-10" }] }).length, 2);
+assert.throws(() => validateSchedule({ totalAmountMinor: 10000, installmentCount: 2, installments: [{ amountMinor: 4000, dueAt: "2026-09-10" }, { amountMinor: 5000, dueAt: "2026-10-10" }] }), /published program price/);
+assert.throws(() => validateSchedule({ totalAmountMinor: 10000, installmentCount: 2, installments: [{ amountMinor: 5000, dueAt: "2026-10-10" }, { amountMinor: 5000, dueAt: "2026-09-10" }] }), /chronological/);
+const routes = source("routes/payments.js"), service = source("services/paymentPlanService.js"), payment = source("services/paymentService.js"), server = source("server.js");
+assert.match(routes, /requireCapability\("payments\.manage"\)/);
+assert.match(routes, /plans\/public\/.*installments/);
+assert.match(service, /publicAccessTokenHash/);
+assert.match(service, /encryptCredentials\(\{ token: publicToken \}\)/);
+assert.match(service, /published program price/);
+assert.match(payment, /await paymentPlanService\.syncTransaction\(transaction\)/);
+assert.match(payment, /transaction\.paymentPlanId/);
+assert.match(server, /payments\/plans\/public/);
+assert.doesNotMatch(service, /cardNumber|cvv|cardNonce/i);
+console.log("Payment plan tests passed");

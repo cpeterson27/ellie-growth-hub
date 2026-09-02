@@ -160,7 +160,7 @@ connectDatabase(mongoUri)
       const publicCoachingZoomRoute = req.path === "/coaching/zoom/oauth/callback" || req.path === "/coaching/zoom/webhook";
       const publicSkoolAdapterRoute = req.path === "/coaching/skool/adapter/events";
       const publicSocialCallback = /^\/social\/(?:linkedin|meta|instagram|x)\/oauth\/callback$/.test(req.path) || req.path === "/social/meta/deauthorize";
-      const publicPaymentRoute = req.path === "/payments/square/oauth/callback" || req.path === "/payments/square/webhook" || req.path.startsWith("/payments/public/");
+      const publicPaymentRoute = req.path === "/payments/square/oauth/callback" || req.path === "/payments/square/webhook" || req.path.startsWith("/payments/public/") || req.path.startsWith("/payments/plans/public/");
       return publicRequest || publicMeetupCallback || publicSocialCallback || publicPaymentRoute || publicCoachingCalendarCallback || publicCoachingZoomRoute || publicSkoolAdapterRoute ? next() : requireAuth(req, res, next);
     });
     app.use("/api", restrictNewRoleSurface);

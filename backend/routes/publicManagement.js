@@ -176,7 +176,7 @@ router.get("/applications", admin, async (req, res) => {
     .sort({ submittedAt: -1 })
     .limit(500)
     .populate("contactId", "name email phone")
-    .populate("coachingProgramId", "name")
+    .populate("coachingProgramId", "name defaultPrice")
     .populate("assignedUserId", "name email")
     .lean();
   res.json({ success: true, data: rows });

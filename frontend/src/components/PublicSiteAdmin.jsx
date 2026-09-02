@@ -411,6 +411,12 @@ export default function PublicSiteAdmin({ section = "website" }) {
                 />
               </label>
             </div>
+            <div className="homepage-media-uploads homepage-media-uploads--inline">
+              <article>
+                <div className="homepage-media-preview">{config.publicSite.heroMediaUrl ? <img src={config.publicSite.heroMediaUrl} alt="Current homepage hero" /> : <span>Hero image</span>}</div>
+                <div><h4>Homepage hero image</h4><p>The large building or brand image beside the opening headline.</p><label className="website-upload-button">{uploading === "heroMediaUrl" ? "Uploading…" : config.publicSite.heroMediaUrl ? "Replace image" : "Upload image"}<input disabled={Boolean(uploading)} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadSiteImage(event.target.files?.[0], "heroMediaUrl", "Homepage hero image")} /></label></div>
+              </article>
+            </div>
           </div>
           <div className="website-editor-group">
             <header>
@@ -456,6 +462,12 @@ export default function PublicSiteAdmin({ section = "website" }) {
                   onChange={(e) => patchPublic("aboutBody", e.target.value)}
                 />
               </label>
+            </div>
+            <div className="homepage-media-uploads homepage-media-uploads--inline">
+              <article>
+                <div className="homepage-media-preview homepage-media-preview--portrait">{config.publicSite.aboutImageUrl ? <img src={config.publicSite.aboutImageUrl} alt="Current About Ellie portrait" /> : <span>Portrait</span>}</div>
+                <div><h4>About Ellie photo</h4><p>A vertical portrait works best in the homepage founder section.</p><label className="website-upload-button">{uploading === "aboutImageUrl" ? "Uploading…" : config.publicSite.aboutImageUrl ? "Replace photo" : "Upload photo"}<input disabled={Boolean(uploading)} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadSiteImage(event.target.files?.[0], "aboutImageUrl", "About Ellie photo")} /></label></div>
+              </article>
             </div>
           </div>
           <div className="website-editor-group">

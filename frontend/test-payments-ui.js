@@ -8,4 +8,9 @@ assert(component.includes("window.location.assign(data.authorizationUrl)")); ass
 const publicPage = fs.readFileSync(new URL("./src/pages/PublicPaymentRequest.jsx", import.meta.url), "utf8");
 for (const text of ["Amount due now", "Continue to secure Square checkout", "verified confirmation", "Growth Operator does not receive your card number"]) assert(publicPage.includes(text), `Missing public payment UI: ${text}`);
 assert(publicPage.includes("beginPublicPaymentCheckout"));
+const planPanel = fs.readFileSync(new URL("./src/components/PaymentPlanPanel.jsx", import.meta.url), "utf8");
+const publicPlan = fs.readFileSync(new URL("./src/pages/PublicPaymentPlan.jsx", import.meta.url), "utf8");
+for (const text of ["Create a split payment plan", "Equal payments", "Custom amounts", "First payment due", "Payment schedule", "Copy link", "Cancel"]) assert(planPanel.includes(text), `Missing payment-plan UI: ${text}`);
+for (const text of ["Secure program payment plan", "Original investment", "Remaining", "Pay with Square", "verified confirmation"]) assert(publicPlan.includes(text), `Missing public payment-plan UI: ${text}`);
+assert(publicPlan.includes("beginPublicInstallmentCheckout"));
 console.log("Payment Settings application flow, public checkout handoff, refund, responsive, and navigation UI checks passed.");
