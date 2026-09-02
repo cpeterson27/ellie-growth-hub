@@ -49,6 +49,7 @@ const publicManagementRouter = require("./routes/publicManagement");
 const meetupRouter = require("./routes/meetup");
 const platformRouter = require("./routes/platform");
 const aiRouter = require("./routes/ai");
+const paymentsRouter = require("./routes/payments");
 const { requireAuth } = require("./middleware/auth");
 const { restrictNewRoleSurface } = require("./middleware/authorization");
 const { startResearchMonitorRunner } = require("./services/researchMonitorService");
@@ -76,7 +77,7 @@ app.use((req, res, next) => req.path.startsWith("/api/chat/widget/") ? publicCha
 app.use(express.json({
   limit: "12mb",
   verify(req, _res, buffer) {
-    if (req.originalUrl === "/api/webhooks/resend" || req.originalUrl === "/api/webhooks/meta" || req.originalUrl === "/api/webhooks/instagram" || req.originalUrl === "/api/coaching/zoom/webhook" || req.originalUrl === "/api/coaching/skool/adapter/events") {
+    if (req.originalUrl === "/api/webhooks/resend" || req.originalUrl === "/api/webhooks/meta" || req.originalUrl === "/api/webhooks/instagram" || req.originalUrl === "/api/coaching/zoom/webhook" || req.originalUrl === "/api/coaching/skool/adapter/events" || req.originalUrl === "/api/payments/square/webhook") {
       req.rawBody = buffer.toString("utf8");
     }
   },
@@ -159,7 +160,8 @@ connectDatabase(mongoUri)
       const publicCoachingZoomRoute = req.path === "/coaching/zoom/oauth/callback" || req.path === "/coaching/zoom/webhook";
       const publicSkoolAdapterRoute = req.path === "/coaching/skool/adapter/events";
       const publicSocialCallback = /^\/social\/(?:linkedin|meta|instagram|x)\/oauth\/callback$/.test(req.path) || req.path === "/social/meta/deauthorize";
-      return publicRequest || publicMeetupCallback || publicSocialCallback || publicCoachingCalendarCallback || publicCoachingZoomRoute || publicSkoolAdapterRoute ? next() : requireAuth(req, res, next);
+      const publicPaymentRoute = req.path === "/payments/square/oauth/callback" || req.path === "/payments/square/webhook";
+      return publicRequest || publicMeetupCallback || publicSocialCallback || publicPaymentRoute || publicCoachingCalendarCallback || publicCoachingZoomRoute || publicSkoolAdapterRoute ? next() : requireAuth(req, res, next);
     });
     app.use("/api", restrictNewRoleSurface);
 
@@ -200,6 +202,7 @@ connectDatabase(mongoUri)
     app.use("/api/workspace", workspaceRouter);
     app.use("/api/platform", platformRouter);
     app.use("/api/ai", aiRouter);
+    app.use("/api/payments", paymentsRouter);
     app.use("/api/unsubscribe", unsubscribeRouter);
     app.use("/api/business-index", businessIndexRouter);
     app.use("/api/mcp-access-tokens", mcpAccessRouter);

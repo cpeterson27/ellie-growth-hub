@@ -15,6 +15,7 @@ const campaign = {
   brand: {
     logoUrl: "https://cdn.example.com/event-logo.png",
     flyerUrl: "https://cdn.example.com/event-flyer.png",
+    websiteUrl: "elliescoaching.com",
   },
 };
 
@@ -25,7 +26,9 @@ assert.doesNotMatch(draft.emailDraft, /August 22/);
 assert.equal(draft.flyerUrl, campaign.brand.flyerUrl);
 assert.match(draft.htmlBody, /event-logo\.png/);
 assert.match(draft.htmlBody, /event-flyer\.png/);
-assert.ok(draft.htmlBody.indexOf("event-logo.png") < draft.htmlBody.indexOf("event-flyer.png"));
+assert.ok(draft.htmlBody.indexOf("event-logo.png") > draft.htmlBody.indexOf("event-flyer.png"));
+assert.ok(draft.htmlBody.indexOf("elliescoaching.com") > draft.htmlBody.indexOf("event-flyer.png"));
+assert.match(draft.htmlBody, /href="https:\/\/elliescoaching\.com"/);
 assert.equal(
   applyCanonicalEventDate("Saturday, August 22, 2026 and {{eventDate}}", "Saturday, September 12, 2026", campaign.name),
   "Saturday, September 12, 2026 and Saturday, September 12, 2026",

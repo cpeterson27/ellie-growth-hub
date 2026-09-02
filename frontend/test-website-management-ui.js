@@ -17,7 +17,10 @@ assert.equal((dashboard.match(/<h2>Website &amp; Brand<\/h2>/g) || []).length, 1
 for (const label of ["Programs", "Team &amp; Coaches", "Testimonials", "Website settings", "Results page"]) assert(dashboard.includes(label));
 for (const section of ["overview", "website", "programs", "team", "testimonials", "results"]) assert(dashboard.includes(`"${section}"`));
 assert(programs.includes("Edit Website Content") && programs.includes("Choose existing media") && programs.includes("Upload video"));
-for (const group of ["Publishing", "Public content", "Intro video", "Call to action", "Display order"]) assert(programs.includes(group));
+for (const group of ["Publishing", "Public content", "Intro video", "Display order"]) assert(programs.includes(group));
+for (const removedField of ["Public URL slug", "Card summary", "Who it is for", "Curriculum / details", "Call to action"]) assert(!programs.includes(removedField));
+assert(programs.includes("presentationForEditing") && programs.includes("program.internalSummary"));
+assert(programs.includes("Workspace media library") && programs.includes("programAssets"));
 for (const status of ["Published", "Draft", "Hidden"]) assert(programs.includes(status));
 assert(!programs.includes("Intro video URL"));
 assert(/section\s*===\s*"team"/.test(publicAdmin) && publicAdmin.includes("Edit public profile"));

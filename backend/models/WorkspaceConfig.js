@@ -104,6 +104,9 @@ const workspaceConfigSchema = new mongoose.Schema({
     confidenceThreshold: { type: Number, default: 0.78, min: 0, max: 1 },
     allowedIntents: { type: [String], default: ["general_question", "program_interest", "pricing_question", "application_interest", "coaching_interest", "buying_intent", "objection", "support", "partnership", "human_requested", "unknown"] },
   },
+  payments: {
+    autoEnrollOnVerifiedPayment: { type: Boolean, default: false },
+  },
   automationPolicy: {
     enabled: { type: Boolean, default: false },
     dryRun: { type: Boolean, default: true },

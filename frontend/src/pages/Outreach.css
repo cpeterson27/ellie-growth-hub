@@ -54,7 +54,7 @@
 }
 .outreach-header__actions {
   display: grid;
-  grid-template-columns: repeat(3, max-content);
+  grid-template-columns: repeat(2, max-content);
   align-items: center;
   gap: 0.5rem;
 }

@@ -17,6 +17,20 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
     [saving, setSaving] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
+  const presentationForEditing = (program) => {
+    const current = program.publicPresentation || {};
+    const description = current.description || current.summary || program.internalSummary || "";
+    return {
+      ...program,
+      publicPresentation: {
+        ...current,
+        title: current.title || program.name,
+        description,
+        summary: description,
+        priceVisible: true,
+      },
+    };
+  };
   const load = () =>
     fetchCoachingPrograms({ limit: 200 })
       .then(setPrograms)
@@ -40,7 +54,11 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
       setSaving(true);
       const saved = await updateProgramPublicPresentation(
         editing._id,
-        editing.publicPresentation || {},
+        {
+          ...(editing.publicPresentation || {}),
+          summary: editing.publicPresentation?.description || "",
+          priceVisible: true,
+        },
       );
       setPrograms((rows) =>
         rows.map((row) => (row._id === saved._id ? saved : row)),
@@ -78,8 +96,24 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
   };
   const chooseMedia = async (type = "video") => {
     try {
-      const assets = await fetchWorkspaceMedia();
-      setMedia(assets.filter((asset) => asset.type === type));
+      const contentAssets = await fetchWorkspaceMedia();
+      const programAssets = programs.flatMap((program) => {
+        const presentation = program.publicPresentation || {};
+        return [
+          presentation.imageUrl
+            ? { type: "image", url: presentation.imageUrl, title: `${program.name} image` }
+            : null,
+          presentation.introVideoUrl
+            ? { type: "video", url: presentation.introVideoUrl, publicId: presentation.introVideoPublicId || "", title: `${program.name} video` }
+            : null,
+        ].filter(Boolean);
+      });
+      const unique = new Map(
+        [...programAssets, ...contentAssets]
+          .filter((asset) => asset.type === type && asset.url)
+          .map((asset) => [asset.url, asset]),
+      );
+      setMedia([...unique.values()]);
       setShowLibrary(type);
     } catch (err) {
       setError(
@@ -178,8 +212,8 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
                 <h4>{program.name}</h4>
                 <dl>
                   <div>
-                    <dt>Public URL</dt>
-                    <dd>{data.slug ? `/${data.slug}` : "Not set"}</dd>
+                    <dt>Price</dt>
+                    <dd>{program.defaultPrice?.amount != null ? new Intl.NumberFormat("en-US", { style: "currency", currency: program.defaultPrice.currency || "USD", maximumFractionDigits: 0 }).format(program.defaultPrice.amount) : "Not set"}</dd>
                   </div>
                   <div>
                     <dt>Visibility</dt>
@@ -193,7 +227,7 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
                 <Button
                   variant="outline"
                   onClick={() =>
-                    setEditing({ ...program, publicPresentation: { ...data } })
+                    setEditing(presentationForEditing(program))
                   }
                 >
                   Edit Website Content
@@ -258,8 +292,7 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
                 <span>
                   <strong>Show on website</strong>
                   <small>
-                    A public URL, summary, and description are required to
-                    publish.
+                    A program name and description are required to publish.
                   </small>
                 </span>
               </label>
@@ -273,78 +306,18 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
                 </div>
               </header>
               <label>
-                Public URL slug
-                <input
-                  value={editing.publicPresentation?.slug || ""}
-                  onChange={(e) => patch("slug", e.target.value)}
-                  placeholder="6-week-coaching-program"
-                />
-              </label>
-              <label>
-                Public headline
+                Program name shown on the website
                 <input
                   value={editing.publicPresentation?.title || editing.name}
                   onChange={(e) => patch("title", e.target.value)}
                 />
               </label>
               <label>
-                Card summary
+                Program description
                 <textarea
-                  rows="3"
-                  value={editing.publicPresentation?.summary || ""}
-                  onChange={(e) => patch("summary", e.target.value)}
-                />
-              </label>
-              <label>
-                Full description
-                <textarea
-                  rows="6"
+                  rows="9"
                   value={editing.publicPresentation?.description || ""}
                   onChange={(e) => patch("description", e.target.value)}
-                />
-              </label>
-              <label>
-                Who it is for
-                <textarea
-                  rows="3"
-                  value={editing.publicPresentation?.audience || ""}
-                  onChange={(e) => patch("audience", e.target.value)}
-                />
-              </label>
-              <label>
-                Curriculum / details (one per line)
-                <textarea
-                  rows="5"
-                  value={(editing.publicPresentation?.curriculum || []).join(
-                    "\n",
-                  )}
-                  onChange={(e) =>
-                    patch(
-                      "curriculum",
-                      e.target.value
-                        .split("\n")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    )
-                  }
-                />
-              </label>
-              <label>
-                Outcomes (one per line)
-                <textarea
-                  rows="5"
-                  value={(editing.publicPresentation?.outcomes || []).join(
-                    "\n",
-                  )}
-                  onChange={(e) =>
-                    patch(
-                      "outcomes",
-                      e.target.value
-                        .split("\n")
-                        .map((value) => value.trim())
-                        .filter(Boolean),
-                    )
-                  }
                 />
               </label>
               <fieldset className="program-video-picker">
@@ -391,7 +364,8 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
                 )}
                 {showLibrary === "image" ? (
                   <div className="website-media-library">
-                    <strong>Choose existing image</strong>
+                    <strong>Workspace media library</strong>
+                    <p>Images already used by your programs or content appear here. Upload a new image above to add something new.</p>
                     {media.length ? (
                       media.map((asset) => (
                         <button
@@ -505,42 +479,6 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
             <section className="program-editor-group">
               <header>
                 <span>4</span>
-                <div>
-                  <h4>Call to action</h4>
-                  <p>Set the application button and supporting message.</p>
-                </div>
-              </header>
-              <div className="program-presentation-grid">
-                <label>
-                  Button text
-                  <input
-                    value={editing.publicPresentation?.ctaLabel || "Apply Now"}
-                    onChange={(e) => patch("ctaLabel", e.target.value)}
-                  />
-                </label>
-                <label>
-                  CTA supporting text
-                  <input
-                    value={editing.publicPresentation?.ctaSupportingText || ""}
-                    onChange={(e) => patch("ctaSupportingText", e.target.value)}
-                  />
-                </label>
-                <label className="website-toggle">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(editing.publicPresentation?.priceVisible)}
-                    onChange={(e) => patch("priceVisible", e.target.checked)}
-                  />
-                  <span>
-                    <strong>Show configured price</strong>
-                    <small>Uses the canonical Coaching program price.</small>
-                  </span>
-                </label>
-              </div>
-            </section>
-            <section className="program-editor-group">
-              <header>
-                <span>5</span>
                 <div>
                   <h4>Display order</h4>
                   <p>Lower numbers appear first on the public website.</p>

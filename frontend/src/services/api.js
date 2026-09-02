@@ -194,6 +194,14 @@ export const updateCoachStatus = (coachId, status) =>
 
 export const fetchCoachingPrograms = (params = {}) =>
   api.get("/coaching/programs", { params }).then((res) => res.data.data);
+export const fetchPaymentConnection = () => api.get("/payments/connection").then((res) => res.data);
+export const startSquareOAuth = () => api.get("/payments/square/oauth/start").then((res) => res.data);
+export const refreshSquareConnection = () => api.post("/payments/square/refresh").then((res) => res.data);
+export const disconnectSquareConnection = () => api.post("/payments/square/disconnect").then((res) => res.data);
+export const fetchPaymentTransactions = (params = {}) => api.get("/payments/transactions", { params }).then((res) => res.data.transactions);
+export const createPaymentCheckout = (values, idempotencyKey = crypto.randomUUID()) => api.post("/payments/checkout", values, { headers: { "Idempotency-Key": idempotencyKey } }).then((res) => res.data.transaction);
+export const refundPaymentTransaction = (id, values, idempotencyKey = crypto.randomUUID()) => api.post(`/payments/transactions/${id}/refunds`, values, { headers: { "Idempotency-Key": idempotencyKey } }).then((res) => res.data.transaction);
+export const updatePaymentSettings = (values) => api.patch("/payments/settings", values).then((res) => res.data.settings);
 export const createCoachingProgram = (values) =>
   api.post("/coaching/programs", values).then((res) => res.data.data);
 export const updateCoachingProgram = (programId, values) =>
@@ -752,6 +760,9 @@ export const replaceBouncedOutreachEmail = (id, email, confirmDirectSource = fal
 
 export const approveAllOutreach = (campaignId) =>
   api.patch("/outreach/bulk/approve", { campaignId }).then((res) => res.data);
+
+export const deletePendingOutreach = (campaignId) =>
+  api.delete("/outreach/bulk/pending", { data: { campaignId } }).then((res) => res.data);
 
 export const recordCampaignConsent = (campaignId, details) =>
   api.post("/outreach/record-consent", { campaignId, ...details }).then((res) => res.data);

@@ -7,6 +7,7 @@ import DashboardCard from "../components/DashboardCard.jsx";
 import Modal from "../components/Modal.jsx";
 import {
   approveAllOutreach,
+  deletePendingOutreach,
   fetchCampaigns,
   fetchOutreach,
   fetchOutreachPreview,
@@ -83,6 +84,7 @@ export default function Outreach() {
   const [emailCorrectionError, setEmailCorrectionError] = useState("");
   const [replacementSendError, setReplacementSendError] = useState("");
   const [approveAllOpen, setApproveAllOpen] = useState(false);
+  const [deletePendingOpen, setDeletePendingOpen] = useState(false);
   const [bulkCorrecting, setBulkCorrecting] = useState(false);
   const correctionFileRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -252,6 +254,21 @@ export default function Outreach() {
       setError(
         err.response?.data?.error || "Unable to approve pending drafts.",
       );
+    } finally {
+      setSaving(false);
+    }
+  };
+  const deleteAllPending = async () => {
+    if (!selected || !counts.pending) return;
+    try {
+      setSaving(true);
+      setError("");
+      const result = await deletePendingOutreach(selected._id);
+      setDeletePendingOpen(false);
+      setItems((current) => current.filter((item) => item.status !== "pending"));
+      setNotice(result.message || "Pending drafts deleted.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to delete pending drafts.");
     } finally {
       setSaving(false);
     }
@@ -432,6 +449,13 @@ export default function Outreach() {
             onClick={() => setApproveAllOpen(true)}
           >
             Approve pending · {counts.pending || 0}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!counts.pending || saving}
+            onClick={() => setDeletePendingOpen(true)}
+          >
+            Delete pending · {counts.pending || 0}
           </Button>
           <Button loading={saving} onClick={send}>
             <FiMail />
@@ -747,6 +771,20 @@ export default function Outreach() {
           Approval does not send email. You will still need to click{" "}
           <strong>Send approved</strong> separately.
         </p>
+      </Modal>
+      <Modal
+        isOpen={deletePendingOpen}
+        onClose={() => !saving && setDeletePendingOpen(false)}
+        title="Delete all pending drafts?"
+        footer={
+          <>
+            <Button variant="outline" disabled={saving} onClick={() => setDeletePendingOpen(false)}>Keep drafts</Button>
+            <Button variant="danger" loading={saving} onClick={deleteAllPending}>Delete {counts.pending || 0} drafts</Button>
+          </>
+        }
+      >
+        <p>This permanently deletes only the unsent drafts waiting for review in <strong>{selected?.name || "this campaign"}</strong>.</p>
+        <p>Approved, sent, delivered, and replied-to emails are not touched.</p>
       </Modal>
     </div>
   );

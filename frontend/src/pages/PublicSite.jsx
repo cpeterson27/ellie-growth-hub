@@ -173,23 +173,6 @@ function ProgramCards({ programs = [] }) {
             <div className="program-card__body">
               <p className="public-kicker">Coaching program</p>
               <h3>{program.title}</h3>
-              <p>{program.summary}</p>
-              <div className="program-card__facts">
-                {program.duration?.value ? (
-                  <span>
-                    {program.duration.value} {program.duration.unit}
-                  </span>
-                ) : null}
-                {program.price?.amount != null ? (
-                  <strong>
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: program.price.currency || "USD",
-                      maximumFractionDigits: 0,
-                    }).format(program.price.amount)}
-                  </strong>
-                ) : null}
-              </div>
               <div className="program-card__actions">
                 <button
                   type="button"
@@ -221,51 +204,10 @@ function ProgramCards({ programs = [] }) {
                 id={`program-details-${program.id}`}
               >
                 <p>{program.description}</p>
-                {program.audience ? (
-                  <>
-                    <h4>Who it is for</h4>
-                    <p>{program.audience}</p>
-                  </>
-                ) : null}
-                {program.curriculum?.length ? (
-                  <>
-                    <h4>Curriculum</h4>
-                    <ul>
-                      {program.curriculum.map((item) => (
-                        <li key={item}>
-                          <FiCheck />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null}
-                {program.outcomes?.length ? (
-                  <>
-                    <h4>Outcomes</h4>
-                    <ul>
-                      {program.outcomes.map((item) => (
-                        <li key={item}>
-                          <FiCheck />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null}
-                {program.highlights?.length ? (
-                  <>
-                    <h4>What to expect</h4>
-                    <ul>
-                      {program.highlights.map((item) => (
-                        <li key={item}>
-                          <FiCheck />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null}
+                <div className="program-card__facts">
+                  {program.duration?.value ? <span>{program.duration.value} {program.duration.unit}</span> : null}
+                  {program.price?.amount != null ? <strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: program.price.currency || "USD", maximumFractionDigits: 0 }).format(program.price.amount)}</strong> : null}
+                </div>
               </div>
             ) : null}
           </article>

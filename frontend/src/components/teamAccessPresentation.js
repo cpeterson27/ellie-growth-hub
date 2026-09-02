@@ -12,6 +12,7 @@ export const accessGroups = [
   ["Calendar & Zoom", [["calendar.manage_own", "Manage own calendar"], ["calendar.manage_workspace", "Manage workspace calendars"], ["zoom.manage_own", "Manage own Zoom"], ["zoom.manage_workspace", "Manage workspace Zoom"]]],
   ["Analytics", [["analytics.view", "View analytics"]]],
   ["Integrations", [["integrations.manage", "Manage integrations"]]],
+  ["Payments", [["payments.view", "View payment activity"], ["payments.manage", "Connect Square, create payment links, and manage refunds"]]],
   ["Automations", [["automations.manage", "Manage workspace automations"]]],
   ["Jarvis", [["jarvis.manage", "Use and manage Jarvis"]]],
   ["Team Management", [["team.view", "View team"], ["team.manage", "Manage non-Owner team access and invitations"]]],

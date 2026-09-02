@@ -596,6 +596,20 @@ router.patch("/bulk/approve", async (req, res) => {
   }
 });
 
+router.delete("/bulk/pending", requireRole("owner", "admin"), async (req, res) => {
+  try {
+    const { campaignId } = req.body || {};
+    if (!campaignId) return res.status(400).json({ error: "campaignId required" });
+    const result = await Outreach.deleteMany({ campaignId, status: "pending" });
+    return res.json({
+      deletedCount: result.deletedCount || 0,
+      message: `${result.deletedCount || 0} pending draft${result.deletedCount === 1 ? "" : "s"} deleted`,
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Unable to delete pending drafts" });
+  }
+});
+
 router.patch("/:id/approve", async(req,res)=>{
 
   try {

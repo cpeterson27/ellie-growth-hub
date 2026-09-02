@@ -93,7 +93,12 @@ assert(theme.includes("apple-touch-icon") && theme.includes("app?.faviconUrl"));
 assert(site.includes("ApplicationButton") && site.includes('embed:"1"'));
 assert(site.includes("aboutImageUrl") && site.includes("public-intro__portrait"));
 assert(css.includes("public-rise") && css.includes("community-section__word"));
-assert(css.includes("grid-auto-rows:1fr") && css.includes("height:100%"));
+assert(css.includes("grid-auto-rows:auto") && css.includes("align-self:start"));
+assert(site.includes('const [expanded, setExpanded] = useState("")'));
+assert(site.includes('current === String(program.id) ? "" : String(program.id)'));
+assert(site.includes("<p>{program.description}</p>"));
+assert(site.includes("program.price?.amount != null"));
+assert(!site.includes("<p>{program.summary}</p>"));
 console.log(
   "Public routes, privacy-policy/data-deletion public routing, legal content, responsive breakpoints, accessibility motion controls, workspace tokens and moderation UI contracts passed.",
 );

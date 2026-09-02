@@ -352,7 +352,7 @@ function programProjection(item) {
     summary: item.publicPresentation.summary || item.internalSummary || "",
     description: item.publicPresentation.description || item.internalSummary || "",
     duration: item.duration,
-    price: item.publicPresentation.priceVisible ? item.defaultPrice : null,
+    price: item.defaultPrice?.amount != null ? item.defaultPrice : null,
     highlights: strings(item.publicPresentation.highlights, 20),
     outcomes: strings(item.publicPresentation.outcomes, 20),
     curriculum: strings(item.publicPresentation.curriculum, 30),

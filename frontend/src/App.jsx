@@ -149,6 +149,7 @@ function ProtectedApp() {
           <Route path="/settings/team" element={<Settings />} />
           <Route path="/settings/communications/invitations" element={<Settings />} />
           <Route path="/settings/privacy" element={<Settings />} />
+          <Route path="/settings/payments" element={<Settings />} />
           <Route path="/ambassadors/manage" element={<AmbassadorAdmin />} />
           <Route path="/ambassadors/welcome-template" element={<Navigate to="/automations/content-template" replace />} />
           <Route path="/automations/content-template" element={<AmbassadorWelcomeSettings />} />

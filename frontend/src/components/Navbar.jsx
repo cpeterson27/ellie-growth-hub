@@ -110,7 +110,7 @@ export default function Navbar({ onMenuClick }) {
           <p className="navbar__eyebrow"><span>{displayedWorkspaceName}</span><i />{pageMeta[0]}</p>
           <h1 className="navbar__title">{pageMeta[1]}</h1>
         </div>
-        <div className="navbar__mobile-brand"><strong>{session?.workspace?.name || "Growth Operator"}</strong><span>{pageMeta[0]}</span></div>
+        <div className="navbar__mobile-brand"><strong>{session?.workspace?.name || "Growth Operator"}</strong><span>{pageMeta[1]}</span></div>
         {!isCoach ? <label className="initiative-switcher">
           <span>Current campaign</span>
           <select value={selectedId} onChange={(event) => changeInitiative(event.target.value)}>

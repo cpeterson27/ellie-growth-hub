@@ -275,10 +275,11 @@ router.patch("/programs/:id", admin, async (req, res) => {
     });
     if (!program) return res.status(404).json({ error: "Program not found" });
     const input = req.body || {},
-      slug = String(input.slug || "")
+      slug = String(input.slug || program.publicPresentation?.slug || program.name)
         .trim()
-        .toLowerCase(),
-      summary = String(input.summary || "").trim(),
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, ""),
       description = String(input.description || "").trim();
     if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))
       return res
@@ -287,19 +288,19 @@ router.patch("/programs/:id", admin, async (req, res) => {
           error:
             "Use a lowercase program slug with letters, numbers, and hyphens",
         });
-    if (input.status === "published" && (!slug || !summary || !description))
+    if (input.status === "published" && (!slug || !description))
       return res
         .status(400)
         .json({
           error:
-            "Add a public URL slug, summary, and description before publishing.",
+            "Add a program name and description before publishing.",
         });
     program.publicPresentation = {
       slug,
       title: String(input.title || program.name).slice(0, 180),
-      summary: summary.slice(0, 1200),
+      summary: description.slice(0, 1200),
       description: description.slice(0, 12000),
-      priceVisible: Boolean(input.priceVisible),
+      priceVisible: true,
       highlights: (Array.isArray(input.highlights) ? input.highlights : [])
         .map(String)
         .slice(0, 20),
