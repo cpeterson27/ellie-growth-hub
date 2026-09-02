@@ -1115,13 +1115,15 @@
 
 /* Image-first program catalogue with pricing visible before expansion. */
 .program-card__image--empty{align-items:center;background:color-mix(in srgb,var(--workspace-surface) 72%,var(--workspace-border) 28%);color:var(--workspace-muted);display:flex;justify-content:center}
-.program-card__body{min-height:360px}
-.program-card:not(:has(.program-card__details)) .program-card__body{min-height:360px}
+.program-list:not(:has(.program-card__details)){align-items:stretch;grid-auto-rows:1fr}
+.program-list:not(:has(.program-card__details)) .program-card{height:100%}
+.program-card__body{min-height:340px;padding:20px 28px 28px;width:100%}
+.program-card:not(:has(.program-card__details)) .program-card__body{min-height:340px}
 .program-card__summary{display:-webkit-box!important;min-height:5.25em;-webkit-box-orient:vertical;-webkit-line-clamp:3!important;overflow:hidden}
-.program-card__facts{align-items:start;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:auto}
+.program-card__facts{align-items:start;display:grid;gap:32px;grid-template-columns:repeat(2,max-content);justify-content:space-between;margin-top:auto;width:100%}
 .program-card__facts div{min-width:0}
 .program-card__facts dt{color:var(--workspace-muted);font-size:.78rem;margin-bottom:5px}
 .program-card__facts dd{color:var(--workspace-text);font-size:1.05rem;margin:0;overflow-wrap:anywhere}
-.program-card__actions{justify-content:space-between}
+.program-card__actions{justify-content:space-between;width:100%}
 .program-card__details{background:color-mix(in srgb,var(--workspace-surface) 88%,var(--workspace-accent) 12%)}
-@media(max-width:680px){.program-card__body,.program-card:not(:has(.program-card__details)) .program-card__body{min-height:0}.program-card__summary{min-height:0}.program-card__actions{align-items:center;flex-direction:row}.program-card__actions .public-button{justify-content:center}}
+@media(max-width:680px){.program-card__body,.program-card:not(:has(.program-card__details)) .program-card__body{min-height:0;padding:18px 22px 22px}.program-card__summary{min-height:0}.program-card__facts{gap:20px;grid-template-columns:repeat(2,minmax(0,1fr))}.program-card__actions{align-items:center;flex-direction:row}.program-card__actions .public-button{justify-content:center}}
