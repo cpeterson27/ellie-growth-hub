@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const axios = require("axios");
 const SocialConnection = require("../models/SocialConnection");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
+const SocialOAuthState = require("../models/SocialOAuthState");
 const { encryptCredentials, decryptCredentials } = require("../utils/credentialEncryption");
 const { effectivePermissions } = require("../authorization/capabilities");
 
@@ -18,10 +19,39 @@ function splitScopes(value) {
   return String(value || "").split(/[\s,]+/).map((item) => item.trim()).filter(Boolean);
 }
 
+function linkedinApiVersion() {
+  const value = required("LINKEDIN_API_VERSION");
+  if (!/^\d{6}$/.test(value)) throw new Error("LINKEDIN_API_VERSION must use YYYYMM format");
+  return value;
+}
+
 function safeProviderError(error, fallback = "Meta authorization could not be verified") {
   const status = Number(error?.response?.status || error?.status || 0);
   const providerCode = String(error?.response?.data?.error?.code || "").replace(/[^0-9A-Za-z_.-]/g, "").slice(0, 40);
   return [fallback, status ? `HTTP ${status}` : "", providerCode ? `provider code ${providerCode}` : ""].filter(Boolean).join(" · ");
+}
+
+function safeProviderDiagnostic(error) {
+  const providerError = error?.response?.data?.error || error?.cause?.response?.data?.error || {};
+  const clean = (value, limit = 240) => String(value || "")
+    .replace(/https?:\/\/\S+/gi, "[redacted-url]")
+    .replace(/\b(?:access_token|code|client_secret|signed_request)\s*[=:]\s*[^\s,;]+/gi, "$1=[redacted]")
+    .replace(/\b(?:IG|EA)[A-Za-z0-9_-]{12,}\b/g, "[redacted-credential]")
+    .replace(/[\r\n\t]+/g, " ").trim().slice(0, limit);
+  return {
+    operation: clean(error?.oauthOperation || error?.cause?.oauthOperation || "instagram_oauth", 60),
+    httpStatus: Number(error?.response?.status || error?.cause?.response?.status || 0) || undefined,
+    providerCode: clean(providerError.code, 40) || undefined,
+    providerSubcode: clean(providerError.error_subcode, 40) || undefined,
+    providerType: clean(providerError.type, 80) || undefined,
+    providerMessage: clean(providerError.message) || undefined,
+    traceId: clean(providerError.fbtrace_id, 100) || undefined,
+  };
+}
+
+async function instagramOAuthOperation(operation, callback) {
+  try { return await callback(); }
+  catch (error) { error.oauthOperation = operation; throw error; }
 }
 
 function config(provider) {
@@ -32,8 +62,8 @@ function config(provider) {
     clientId: required("LINKEDIN_CLIENT_ID"),
     clientSecret: required("LINKEDIN_CLIENT_SECRET"),
     redirectUri: required("LINKEDIN_REDIRECT_URI"),
-    scopes: splitScopes(process.env.LINKEDIN_OAUTH_SCOPES || "openid profile email"),
-    apiVersion: String(process.env.LINKEDIN_API_VERSION || "").trim(),
+    scopes: splitScopes(process.env.LINKEDIN_OAUTH_SCOPES || "openid profile email rw_organization_admin w_organization_social"),
+    apiVersion: linkedinApiVersion(),
   };
   return {
     clientId: required("META_APP_ID"),
@@ -56,6 +86,40 @@ function createState({ provider, workspaceId, userId }) {
   const payload = Buffer.from(JSON.stringify({ provider, workspaceId: String(workspaceId), userId: String(userId), nonce: crypto.randomBytes(18).toString("hex"), expiresAt: Date.now() + 10 * 60 * 1000 })).toString("base64url");
   const signature = crypto.createHmac("sha256", stateKey()).update(payload).digest("base64url");
   return `${payload}.${signature}`;
+}
+
+function stateNonceHash(nonce) {
+  return crypto.createHash("sha256").update(String(nonce || "")).digest("hex");
+}
+
+async function createAuthorizationRequest(provider, auth, dependencies = {}) {
+  const authorization = authorizationUrl(provider, auth);
+  const parsed = new URL(authorization);
+  const state = verifyState(parsed.searchParams.get("state"), provider);
+  if (!state) throw new Error("Social connection state could not be created");
+  await (dependencies.SocialOAuthState || SocialOAuthState).create({
+    provider,
+    workspaceId: state.workspaceId,
+    userId: state.userId,
+    nonceHash: stateNonceHash(state.nonce),
+    expiresAt: new Date(state.expiresAt),
+  });
+  return authorization;
+}
+
+async function consumeState(rawState, provider, dependencies = {}) {
+  const state = verifyState(rawState, provider);
+  if (!state) throw new Error("Social connection request expired or is invalid");
+  const record = await (dependencies.SocialOAuthState || SocialOAuthState).findOneAndUpdate({
+    provider,
+    workspaceId: state.workspaceId,
+    userId: state.userId,
+    nonceHash: stateNonceHash(state.nonce),
+    consumedAt: null,
+    expiresAt: { $gt: new Date() },
+  }, { $set: { consumedAt: new Date() } }, { new: true });
+  if (!record) throw new Error("Social connection request was already used or expired");
+  return state;
 }
 
 function verifyState(rawState, expectedProvider) {
@@ -102,31 +166,44 @@ function authorizationUrl(provider, auth) {
   return url.toString();
 }
 
-async function linkedinAssets(accessToken, providerConfig) {
-  if (!providerConfig.apiVersion) return [];
+async function linkedinAssets(accessToken, providerConfig, http = axios) {
   try {
-    const response = await axios.get("https://api.linkedin.com/rest/organizationAcls", {
+    const response = await http.get("https://api.linkedin.com/rest/organizationAcls", {
       params: { q: "roleAssignee", role: "ADMINISTRATOR", state: "APPROVED" },
       headers: { Authorization: `Bearer ${accessToken}`, "LinkedIn-Version": providerConfig.apiVersion, "X-Restli-Protocol-Version": "2.0.0" },
       timeout: 15000,
     });
-    return (response.data?.elements || []).map((item) => ({ id: String(item.organization || "").replace("urn:li:organization:", ""), name: "LinkedIn organization", type: "linkedin_organization", permissions: [item.role].filter(Boolean) })).filter((item) => item.id);
+    const access = (response.data?.elements || []).map((item) => ({ id: String(item.organization || "").replace("urn:li:organization:", ""), permissions: [item.role].filter(Boolean) })).filter((item) => item.id);
+    const assets = [];
+    for (const item of access) {
+      let organization = {};
+      try {
+        const detail = await http.get(`https://api.linkedin.com/rest/organizations/${encodeURIComponent(item.id)}`, {
+          params: { fields: "id,localizedName,vanityName" },
+          headers: { Authorization: `Bearer ${accessToken}`, "LinkedIn-Version": providerConfig.apiVersion, "X-Restli-Protocol-Version": "2.0.0" },
+          timeout: 15000,
+        });
+        organization = detail.data || {};
+      } catch { /* The organization remains selectable by a safe generic label. */ }
+      assets.push({ id: item.id, name: organization.localizedName || organization.vanityName || `LinkedIn organization ${item.id.slice(-4)}`, username: organization.vanityName || "", type: "linkedin_organization", permissions: item.permissions });
+    }
+    return assets;
   } catch { return []; }
 }
 
-async function exchangeLinkedIn(code) {
+async function exchangeLinkedIn(code, http = axios) {
   const providerConfig = config("linkedin");
-  const tokenResponse = await axios.post("https://www.linkedin.com/oauth/v2/accessToken", new URLSearchParams({ grant_type: "authorization_code", code, client_id: providerConfig.clientId, client_secret: providerConfig.clientSecret, redirect_uri: providerConfig.redirectUri }).toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000 });
+  const tokenResponse = await http.post("https://www.linkedin.com/oauth/v2/accessToken", new URLSearchParams({ grant_type: "authorization_code", code, client_id: providerConfig.clientId, client_secret: providerConfig.clientSecret, redirect_uri: providerConfig.redirectUri }).toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000 });
   const accessToken = tokenResponse.data?.access_token;
   if (!accessToken) throw new Error("LinkedIn did not return an access token");
-  const profileResponse = await axios.get("https://api.linkedin.com/v2/userinfo", { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 15000 });
+  const profileResponse = await http.get("https://api.linkedin.com/v2/userinfo", { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 15000 });
   const profile = profileResponse.data || {};
   return {
     credentials: { accessToken },
     scopes: splitScopes(tokenResponse.data?.scope || providerConfig.scopes.join(" ")),
     expiresAt: tokenResponse.data?.expires_in ? new Date(Date.now() + Number(tokenResponse.data.expires_in) * 1000) : null,
     account: { id: String(profile.sub || ""), name: profile.name || "LinkedIn member", email: profile.email || "" },
-    assets: await linkedinAssets(accessToken, providerConfig),
+    assets: await linkedinAssets(accessToken, providerConfig, http),
   };
 }
 
@@ -216,8 +293,7 @@ async function resolveSocialOAuthMembership(state, models = { WorkspaceMembershi
 
 async function exchangeCode(provider, code, rawState, dependencies = {}) {
   if (!PROVIDERS.has(provider)) throw new Error("Unsupported social provider");
-  const state = verifyState(rawState, provider);
-  if (!state) throw new Error("Social connection request expired or is invalid");
+  const state = await consumeState(rawState, provider, dependencies);
   await resolveSocialOAuthMembership(state, dependencies.models || { WorkspaceMembership });
   const exchange = dependencies.exchangeProvider || (provider === "linkedin" ? exchangeLinkedIn : provider === "instagram" ? exchangeInstagram : provider === "x" ? (value) => exchangeX(value, rawState) : exchangeMeta);
   const result = await exchange(code);
@@ -248,7 +324,7 @@ function publicConnection(connection, provider) {
     lastVerifiedAt: connection?.lastVerifiedAt || null,
     lastError: connection?.lastError || "",
     authorizationNotice: connection && connection.status !== "disconnected" ? (!require("./socialConnectionHealth").usable(connection) ? "Authorization needs attention. Reconnect before using this account." : require("./socialConnectionHealth").expiresSoon(connection) ? "Authorization expires within seven days. Refresh Instagram authorization or reconnect your account." : "") : "",
-    disconnectNotice: provider === "instagram" ? "Disconnect removes access from Growth Operator locally. To revoke the authorization at Instagram, also remove this app in Instagram's Apps and websites settings." : "",
+    disconnectNotice: provider === "instagram" ? "Disconnect removes access from Growth Operator locally. To revoke the authorization at Instagram, also remove this app in Instagram's Apps and websites settings." : provider === "linkedin" ? "Disconnect removes the encrypted LinkedIn authorization from Growth Operator. You can also remove Growth Operator from LinkedIn's permitted services." : "",
   };
 }
 
@@ -365,11 +441,10 @@ async function refreshInstagram(workspaceId, http = axios) {
   const refreshed = await http.get("https://graph.instagram.com/refresh_access_token", { params: { grant_type: "ig_refresh_token", access_token: credentials.accessToken }, timeout: 15000 });
   if (!refreshed.data?.access_token || !(Number(refreshed.data.expires_in) > 0)) throw new Error("Instagram did not confirm refreshed authorization");
   const token = refreshed.data.access_token;
-  const [profile, permissions] = await Promise.all([
-    http.get(`https://graph.instagram.com/${settings.apiVersion}/me`, { params: { fields: "user_id,username", access_token: token }, timeout: 15000 }),
-    http.get(`https://graph.instagram.com/${settings.apiVersion}/me/permissions`, { params: { access_token: token }, timeout: 15000 }),
-  ]);
-  if (String(profile.data?.user_id || profile.data?.id || "") !== String(connection.providerAccount.id)) throw new Error("Instagram authorization identity mismatch");
+  const accountId = String(connection.providerAccount.id || "");
+  const profile = await instagramOAuthOperation("instagram_profile_verification", () => http.get(`https://graph.instagram.com/${settings.apiVersion}/${encodeURIComponent(accountId)}`, { params: { fields: "id,username", access_token: token }, timeout: 15000 }));
+  const permissions = await instagramOAuthOperation("instagram_permission_verification", () => http.get(`https://graph.instagram.com/${settings.apiVersion}/me/permissions`, { params: { access_token: token }, timeout: 15000 }));
+  if (String(profile.data?.id || "") !== accountId) throw new Error("Instagram authorization identity mismatch");
   const rows = permissions.data?.data || [];
   const updated = await SocialConnection.findOneAndUpdate({ _id: connection._id, workspaceId, provider: "instagram", status: "connected", credentialsEncrypted: connection.credentialsEncrypted }, { $set: {
     credentialsEncrypted: encryptCredentials({ ...credentials, accessToken: token, refreshedAt: new Date().toISOString() }),
@@ -394,18 +469,16 @@ async function exchangeX(code, rawState, http = axios) {
 }
 async function exchangeInstagram(code, http = axios) {
   const settings = config("instagram");
-  const response = await http.post("https://api.instagram.com/oauth/access_token", new URLSearchParams({ client_id: settings.clientId, client_secret: settings.clientSecret, grant_type: "authorization_code", redirect_uri: settings.redirectUri, code }).toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000 });
+  const response = await instagramOAuthOperation("instagram_code_exchange", () => http.post("https://api.instagram.com/oauth/access_token", new URLSearchParams({ client_id: settings.clientId, client_secret: settings.clientSecret, grant_type: "authorization_code", redirect_uri: settings.redirectUri, code }).toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000 }));
   const initial = response.data?.data?.[0] || response.data;
   if (!initial?.access_token || !initial.user_id) throw new Error("Instagram did not return account authorization");
-  const token = await http.get("https://graph.instagram.com/access_token", { params: { grant_type: "ig_exchange_token", client_secret: settings.clientSecret, access_token: initial.access_token }, timeout: 15000 });
+  const token = await instagramOAuthOperation("instagram_long_lived_token_exchange", () => http.get("https://graph.instagram.com/access_token", { params: { grant_type: "ig_exchange_token", client_secret: settings.clientSecret, access_token: initial.access_token }, timeout: 15000 }));
   if (!token.data?.access_token) throw new Error("Instagram long-lived authorization unavailable");
   const accessToken = token.data.access_token;
-  const [profile, permissionResponse] = await Promise.all([
-    http.get(`https://graph.instagram.com/${settings.apiVersion}/me`, { params: { fields: "user_id,username", access_token: accessToken }, timeout: 15000 }),
-    http.get(`https://graph.instagram.com/${settings.apiVersion}/me/permissions`, { params: { access_token: accessToken }, timeout: 15000 }),
-  ]);
-  const accountId = String(profile.data?.user_id || profile.data?.id || "");
-  if (accountId !== String(initial.user_id)) throw new Error("Instagram authorization identity mismatch");
+  const accountId = String(initial.user_id);
+  const profile = await instagramOAuthOperation("instagram_profile_verification", () => http.get(`https://graph.instagram.com/${settings.apiVersion}/${encodeURIComponent(accountId)}`, { params: { fields: "id,username", access_token: accessToken }, timeout: 15000 }));
+  const permissionResponse = await instagramOAuthOperation("instagram_permission_verification", () => http.get(`https://graph.instagram.com/${settings.apiVersion}/me/permissions`, { params: { access_token: accessToken }, timeout: 15000 }));
+  if (String(profile.data?.id || "") !== accountId) throw new Error("Instagram authorization identity mismatch");
   const rows = permissionResponse.data?.data || [];
   return { credentials: { accessToken }, scopes: rows.filter(row => row.status === "granted").map(row => row.permission), declinedScopes: rows.filter(row => row.status !== "granted").map(row => row.permission), account: { id: accountId, name: profile.data.username || "Instagram professional account" }, authorization: { valid: true, userId: accountId, verifiedAt: new Date() }, expiresAt: new Date(Date.now() + Number(token.data.expires_in || 3600) * 1000), assets: [{ id: accountId, name: profile.data.username || "Instagram", username: profile.data.username || "", type: "instagram_business" }] };
 }
@@ -422,4 +495,4 @@ async function provisionInstagramSubscriptions(connection, selected, http = axio
   }
   return results;
 }
-module.exports = { discoverPages, subscriptionFields, refreshInstagram, authorizationUrl, configured, disconnect, exchangeCode, exchangeMeta, exchangeInstagram, exchangeX, metaPermissions, provisionMetaSubscriptions, provisionInstagramSubscriptions, removeMetaSubscriptions, resolveSocialOAuthMembership, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };
+module.exports = { createAuthorizationRequest, consumeState, discoverPages, subscriptionFields, refreshInstagram, authorizationUrl, configured, disconnect, exchangeCode, exchangeLinkedIn, exchangeMeta, exchangeInstagram, exchangeX, linkedinAssets, metaPermissions, provisionMetaSubscriptions, removeMetaSubscriptions, resolveSocialOAuthMembership, safeProviderDiagnostic, safeProviderError, selectAssets, status, verifyMetaToken, verifyState };

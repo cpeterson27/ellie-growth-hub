@@ -20,7 +20,7 @@ function ChannelRow({ channel, connection, connections, busy, onConnect, onDisco
   const elsewhere = new Set(connections.filter(row => row.provider !== connection.provider).flatMap(row => row.selectedAssetIds || []));
   const choose = (asset, checked) => onSelectAssets(connection.provider, checked ? [...selectedIds, asset.id] : selectedIds.filter(id => id !== asset.id && !assets.some(row => row.id === id && row.parentId === asset.id)));
   const accountPicker = connection.connected && assets.length > 0 && <fieldset className="social-page-picker" disabled={busy}>
-    <legend>{channel.provider === "meta" ? "Choose the Facebook Page Growth Operator should manage" : "Choose your professional account"}</legend>
+    <legend>{channel.provider === "meta" ? "Choose the Facebook Page Growth Operator should manage" : channel.provider === "linkedin" ? "Choose the LinkedIn Page Growth Operator should manage" : "Choose your professional account"}</legend>
     <p>Only selected accounts are used. Discovering an account does not activate it.</p>
     {assets.map(asset => {
       const ownedElsewhere = elsewhere.has(asset.id);
@@ -51,9 +51,9 @@ function ChannelRow({ channel, connection, connections, busy, onConnect, onDisco
     </div>
     {connection.connected && <div className="social-connected-assets">{visibleAssets.length ? visibleAssets.map(asset => { const identity = socialAssetIdentity(asset); const isSelected = selectedIds.includes(asset.id); return <div className="social-connected-asset" key={asset.id}>
       {asset.avatarUrl ? <img className="social-asset-avatar" src={asset.avatarUrl} alt={`${identity.primary} profile`} referrerPolicy="no-referrer"/> : <span className="social-asset-avatar social-asset-initials" aria-hidden="true">{(asset.name || asset.username || "Account").slice(0, 1).toUpperCase()}</span>}
-      <span><strong>{asset.type === "facebook_page" ? "Facebook" : "Instagram"}</strong><span>{identity.primary}</span>{identity.secondary && <small>{identity.secondary}</small>}</span>
+      <span><strong>{asset.type === "facebook_page" ? "Facebook" : asset.type === "linkedin_organization" ? "LinkedIn" : asset.type === "x_account" ? "X" : "Instagram"}</strong><span>{identity.primary}</span>{identity.secondary && <small>{identity.secondary}</small>}</span>
       <span className={`social-asset-state ${isSelected ? "social-asset-state--selected" : ""}`}>{isSelected ? "Connected" : "Available"}</span>
-    </div>; }) : <p className="social-empty-assets">Account authorized — choose an account in Manage connection.</p>}</div>}
+    </div>; }) : <p className="social-empty-assets">{channel.provider === "linkedin" ? "No manageable LinkedIn Pages were returned. Confirm that you administer a LinkedIn Page and that organization access is approved, then reconnect." : "Account authorized — choose an account in Manage connection."}</p>}</div>}
     {connection.connected && !selected.length && accountPicker}
     <details className="social-connection-details"><summary>{connection.connected ? "Connection details" : "Connection details"}</summary>
       {connection.authorizationNotice && <p role="status">{connection.authorizationNotice}</p>}

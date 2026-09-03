@@ -38,11 +38,11 @@ router.get("/:provider/oauth/status", async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
-router.get("/:provider/oauth/start", requireCapability("social.manage"), (req, res) => {
+router.get("/:provider/oauth/start", requireCapability("social.manage"), async (req, res) => {
   const id = provider(req, res);
   if (!id) return;
   try {
-    return res.json({ authorizationUrl: socialOAuth.authorizationUrl(id, req.auth) });
+    return res.json({ authorizationUrl: await socialOAuth.createAuthorizationRequest(id, req.auth) });
   } catch (error) {
     return res.status(400).json({ error: error.message || "Social OAuth is not configured" });
   }
@@ -58,7 +58,7 @@ router.get("/:provider/oauth/callback", async (req, res) => {
     return res.redirect(frontendRedirect({ social: id, status: "connected" }));
   } catch (error) {
     const safeError = socialOAuth.safeProviderError(error, "Social connection failed");
-    console.error(`[social oauth] ${id} callback failed: ${safeError}`);
+    console.error(`[social oauth] ${id} callback failed`, socialOAuth.safeProviderDiagnostic(error));
     return res.redirect(frontendRedirect({ social: id, status: "failed", message: safeError }));
   }
 });

@@ -91,6 +91,7 @@ async function signedStateAndCompletionChecks() {
   assert.equal(oauth.verifyState(`${expiredPayload}.${expiredSignature}`, "meta"), null);
   let storedFilter;
   await oauth.exchangeCode("meta", "mock-code", signedState, {
+    SocialOAuthState: { async findOneAndUpdate() { return { consumedAt: new Date() }; } },
     models: { WorkspaceMembership: { findOne: () => membershipQuery({ workspaceId: { _id: "review", status: "active" }, userId: "reviewer", role: "viewer", roles: ["viewer"], status: "active", permissionOverrides: { allow: ["social.manage"], deny: CAPABILITIES.filter(item => item !== "social.manage") } }) } },
     exchangeProvider: async () => ({ credentials: { accessToken: "mock-token" }, scopes: ["instagram_business_basic"], assets: [{ id: "ig-1", username: "review", name: "Review IG", avatarUrl: "https://images.example.test/review.jpg" }] }),
     SocialConnection: { async findOneAndUpdate(value) { storedFilter = value; return { _id: "connection" }; } },
@@ -173,6 +174,11 @@ function loggingAndSafetyChecks() {
   assert.equal(safe.includes("secret"), false);
   assert.match(safe, /HTTP 400/);
   assert.match(safe, /190/);
+  const diagnostic = oauth.safeProviderDiagnostic({ oauthOperation: "instagram_profile_verification", response: { status: 400, data: { error: { code: 100, type: "IGApiException", message: "Bad access_token=secret-user-token at https://graph.instagram.com/v26.0/me", fbtrace_id: "trace-1" } } } });
+  assert.equal(diagnostic.operation, "instagram_profile_verification");
+  assert.equal(diagnostic.providerCode, "100");
+  assert.equal(JSON.stringify(diagnostic).includes("secret-user-token"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("graph.instagram.com"), false);
   const route = fs.readFileSync(path.join(__dirname, "routes/social.js"), "utf8");
   const webhook = fs.readFileSync(path.join(__dirname, "routes/webhooks.js"), "utf8");
   const publishing = fs.readFileSync(path.join(__dirname, "services/socialPublishingService.js"), "utf8");

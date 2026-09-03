@@ -5,6 +5,7 @@ const oauth = require("./services/socialOAuthService");
 const settings = require("./services/socialProviderConfig");
 const Connection = require("./models/SocialConnection");
 const Membership = require("./models/WorkspaceMembership");
+const SocialOAuthState = require("./models/SocialOAuthState");
 const health = require("./services/socialConnectionHealth");
 const notifyOwners = health.notifyOwners;
 health.notifyOwners = async () => {}; // Notification persistence tested separately, no database.
@@ -60,10 +61,11 @@ assert.deepEqual(Connection.schema.path("provider").enumValues, [...settings.SOC
 assert.equal(Connection.schema.path("credentialsEncrypted").options.select, false);
 
 const stored = new Map(); let authorized = true; const calls = [];
-const originals = { get: axios.get, post: axios.post, delete: axios.delete, findOne: Connection.findOne, update: Connection.findOneAndUpdate, membership: Membership.findOne };
+const originals = { get: axios.get, post: axios.post, delete: axios.delete, findOne: Connection.findOne, update: Connection.findOneAndUpdate, membership: Membership.findOne, consumeState: SocialOAuthState.findOneAndUpdate };
 const keyFor = filter => `${filter.workspaceId}:${filter.provider}`;
 const query = value => ({ select: async () => value, lean: async () => value });
 async function run() {
+  SocialOAuthState.findOneAndUpdate = async () => ({ consumedAt: new Date() });
   try {
     await assert.rejects(oauth.verifyMetaToken("fixture", { apiVersion: "v26.0", clientId: "fb-app", clientSecret: "fixture" }, { get: async () => ({ data: { data: { is_valid: true, app_id: "wrong-app" } } }) }), /invalid authorization/);
     Membership.findOne = filter => {
@@ -94,7 +96,10 @@ async function run() {
       }
       if (u.hostname === "graph.instagram.com") {
         if (address.endsWith("/access_token")) return { data: { access_token: "ig-long", expires_in: 3600 } };
-        if (address.endsWith("/me")) return { data: { user_id: "ig-user", username: "fixture" } };
+        if (address.endsWith("/ig-user")) {
+          assert.equal(options.params.fields, "id,username");
+          return { data: { id: "ig-user", username: "fixture" } };
+        }
         if (address.endsWith("/me/permissions")) return { data: { data: [{ permission: "instagram_business_basic", status: "granted" }, { permission: "instagram_business_content_publish", status: "declined" }] } };
         if (address.endsWith("/subscribed_apps")) return { data: { data: [{ id: "ig-app", subscribed_fields: oauth.subscriptionFields({ type: "instagram_business" }) }] } };
       }
@@ -126,6 +131,24 @@ async function run() {
     }
     assert.equal(stored.get("workspace-a:meta").assets.length, 2);
     assert.deepEqual(stored.get("workspace-a:instagram").scopes, ["instagram_business_basic"]);
+    const providerCode100 = Object.assign(new Error("provider rejected profile fields"), { response: { status: 400, data: { error: { code: 100, error_subcode: 33, type: "IGApiException", message: "Tried accessing nonexisting field (user_id) on node type (IGUser)", fbtrace_id: "safe-trace" } } } });
+    await assert.rejects(oauth.exchangeInstagram("mock-code", {
+      post: async () => ({ data: { access_token: "ig-short", user_id: "ig-user" } }),
+      get: async address => {
+        if (address.endsWith("/access_token")) return { data: { access_token: "ig-long", expires_in: 3600 } };
+        if (address.endsWith("/ig-user")) throw providerCode100;
+        throw new Error("Unexpected request after provider failure");
+      },
+    }), error => {
+      const diagnostic = oauth.safeProviderDiagnostic(error);
+      assert.equal(diagnostic.operation, "instagram_profile_verification");
+      assert.equal(diagnostic.providerCode, "100");
+      assert.equal(diagnostic.providerSubcode, "33");
+      assert.equal(diagnostic.providerType, "IGApiException");
+      assert.equal(diagnostic.traceId, "safe-trace");
+      assert.match(diagnostic.providerMessage, /nonexisting field/);
+      return true;
+    });
     authorized = false; const count = calls.length;
     await assert.rejects(oauth.exchangeCode("meta", "code", fb.searchParams.get("state")), /permission/);
     assert.equal(calls.length, count);
@@ -136,6 +159,6 @@ async function run() {
       assert(!stored.get(`workspace-a:${provider}`).credentialsEncrypted);
     }
     console.log("Meta OAuth architecture passed: Business config, both URLs/callbacks, signed state, invalid config/scopes, encrypted upsert, workspace permissions, account discovery/status, subscriptions and local disconnect. All provider requests mocked.");
-  } finally { axios.get = originals.get; axios.post = originals.post; axios.delete = originals.delete; Connection.findOne = originals.findOne; Connection.findOneAndUpdate = originals.update; Membership.findOne = originals.membership; }
+  } finally { axios.get = originals.get; axios.post = originals.post; axios.delete = originals.delete; Connection.findOne = originals.findOne; Connection.findOneAndUpdate = originals.update; Membership.findOne = originals.membership; SocialOAuthState.findOneAndUpdate = originals.consumeState; }
 }
 run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { health.notifyOwners = notifyOwners; });

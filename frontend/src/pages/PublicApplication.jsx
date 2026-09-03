@@ -329,4 +329,4 @@ export default function PublicApplication() {
       </main>
   );
   return embedded ? content : <PublicLayout>{content}</PublicLayout>;
-}
+} 

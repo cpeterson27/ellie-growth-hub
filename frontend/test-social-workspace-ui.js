@@ -24,6 +24,7 @@ assert(workspace.includes("Connected Accounts could not load"));
 assert(workspace.includes('oauthStatus === "connected"') && workspace.includes('oauthStatus === "denied"') && workspace.includes('oauthStatus === "failed"'));
 const connectedAccounts = read("./src/components/SocialConnectedAccounts.jsx");
 for (const value of ["socialAssetIdentity", "identity.primary", "identity.secondary", "asset.avatarUrl", "social-asset-initials"]) assert(connectedAccounts.includes(value));
+for (const value of ["Choose the LinkedIn Page Growth Operator should manage", "No manageable LinkedIn Pages were returned", "LinkedIn"]) assert(connectedAccounts.includes(value));
 const sidebar = read("./src/components/Sidebar.jsx"), navbar = read("./src/components/Navbar.jsx");
 assert(sidebar.includes("socialConnectionOnly ? {}") && sidebar.includes('session?.workspace?.name || "Growth Operator"'));
 assert(navbar.includes("displayedWorkspaceName") && navbar.includes("socialConnectionOnly ? session?.workspace?.name"));

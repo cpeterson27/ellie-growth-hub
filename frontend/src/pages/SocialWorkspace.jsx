@@ -51,8 +51,10 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
     [detail, setDetail] = useState(null),
     [busy, setBusy] = useState(false);
   const oauthStatus = connectionsOnly ? params.get("status") : "";
-  const oauthNotice = oauthStatus === "connected" ? "Facebook connected. Choose the Facebook Page and linked Instagram professional account Growth Operator should use." : "";
-  const oauthError = oauthStatus === "denied" ? "Facebook authorization was cancelled. Choose Connect Facebook when you are ready to try again." : oauthStatus === "failed" ? params.get("message") || "Facebook connection failed. Try Connect Facebook again or ask the app administrator to verify Meta configuration." : "";
+  const oauthProvider = params.get("social") || "social account";
+  const providerName = oauthProvider === "meta" ? "Facebook + Instagram" : oauthProvider === "linkedin" ? "LinkedIn" : oauthProvider === "instagram" ? "Instagram" : oauthProvider === "x" ? "X" : "Social account";
+  const oauthNotice = oauthStatus === "connected" ? `${providerName} connected. Choose the account Growth Operator should use.` : "";
+  const oauthError = oauthStatus === "denied" ? `${providerName} authorization was cancelled. You can connect it when you are ready.` : oauthStatus === "failed" ? params.get("message") || `${providerName} connection failed. Try again or ask the app administrator to verify provider configuration.` : "";
   useEffect(() => {
     let active = true;
     if (section === "inbox" && threadId)
