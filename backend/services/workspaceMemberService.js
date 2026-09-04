@@ -106,6 +106,56 @@ async function publicFrontendUrl(workspaceId, models) {
     .replace(/\/$/, "");
 }
 
+async function workspaceLaunchReadiness(workspaceId, models) {
+  const [workspace, config] = await Promise.all([
+    models.Workspace.findById(workspaceId).select("publicHosts").lean(),
+    models.WorkspaceConfig.findOne({ workspaceId, key: "primary" })
+      .select("invitationIdentity publicSite")
+      .lean(),
+  ]);
+  const publicHost = (workspace?.publicHosts || [])
+    .map((host) =>
+      String(host || "")
+        .trim()
+        .toLowerCase(),
+    )
+    .find((host) => host && !host.startsWith("www."));
+  const items = [
+    {
+      key: "domain",
+      label: "Public domain",
+      ready: Boolean(publicHost),
+      detail: publicHost
+        ? `Using ${publicHost}`
+        : "Add a public website domain before sending invitations.",
+      path: "/businesses",
+    },
+    {
+      key: "senderEmail",
+      label: "Sender email",
+      ready: Boolean(config?.invitationIdentity?.senderEmail),
+      detail: config?.invitationIdentity?.senderEmail
+        ? `Configured as ${config.invitationIdentity.senderEmail}`
+        : "Set an invitation sender email in Organization Profile.",
+      path: "/settings/communications/invitations",
+    },
+    {
+      key: "website",
+      label: "Website",
+      ready: config?.publicSite?.published === true,
+      detail:
+        config?.publicSite?.published === true
+          ? "Public site is published"
+          : "Publish the public website before sending invitations.",
+      path: "/settings/website",
+    },
+  ];
+  const missing = items
+    .filter((item) => !item.ready)
+    .map(({ ready, ...item }) => ({ ...item, state: "needs_setup" }));
+  return { ready: missing.length === 0, missing };
+}
+
 function personIdentity(input) {
   const clean = (value) =>
     String(value || "")
@@ -667,18 +717,35 @@ async function sendInvitation(
   if (body !== undefined) invitation.body = String(body).slice(0, 10000);
   if (!invitation.subject || !invitation.body)
     throw new Error("Invitation subject and message are required");
+  const readiness = await workspaceLaunchReadiness(workspaceId, models);
+  if (!readiness.ready) {
+    const error = new Error(
+      "Finish workspace setup before sending invitations.",
+    );
+    error.code = "WORKSPACE_LAUNCH_READY_REQUIRED";
+    error.details = readiness.missing;
+    error.detail = readiness.missing
+      .map((item) => `${item.label}: ${item.detail}`)
+      .join(" ");
+    throw error;
+  }
   const token = crypto.randomBytes(32).toString("base64url");
-  const [workspace, config, inviter] = await Promise.all([
+  const [workspace, config, inviter, recipient] = await Promise.all([
     models.Workspace.findById(workspaceId).select("name").lean(),
     workspaceConfigFor(workspaceId, models),
     models.User.findById(invitation.invitedBy).select("name").lean(),
+    models.User.findById(invitation.userId).select("name email").lean(),
   ]);
+  if (recipient?.name) invitation.name = recipient.name;
+  if (recipient?.email) invitation.email = recipient.email;
+  if (recipient?.name || recipient?.email) await invitation.save();
   const delivery = await deliverInvitation(
     {
       invitation,
       token,
       workspaceName: config?.workspaceName || workspace?.name,
       invitedBy: config?.invitationIdentity?.senderName || inviter?.name,
+      senderEmail: config?.invitationIdentity?.senderEmail || "",
       replyToEmail: config?.invitationIdentity?.replyToEmail || "",
     },
     models,
@@ -843,4 +910,5 @@ module.exports = {
   onboardCoach,
   removeMember,
   sendInvitation,
+  workspaceLaunchReadiness,
 };

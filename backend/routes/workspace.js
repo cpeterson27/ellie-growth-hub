@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const WorkspaceConfig = require("../models/WorkspaceConfig");
 const Workspace = require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
+const User = require("../models/User");
 const CoachProfile = require("../models/CoachProfile");
 const AmbassadorProfile = require("../models/AmbassadorProfile");
 const WorkspaceInvitation = require("../models/WorkspaceInvitation");
@@ -152,16 +153,16 @@ function memberResponse(
   isSelf = false,
 ) {
   const roles = normalizeRoles(membership);
-  const invitedName = invitation?.name || membership.userId?.name || "";
-  const invitedEmail = invitation?.email || membership.userId?.email || "";
+  const invitedName = membership.userId?.name || invitation?.name || "";
+  const invitedEmail = membership.userId?.email || invitation?.email || "";
   return {
     id: membership._id,
     userId: membership.userId?._id || membership.userId,
     firstName:
-      invitation?.name?.split(/\s+/)[0] || membership.userId?.firstName || "",
+      membership.userId?.firstName || invitation?.name?.split(/\s+/)[0] || "",
     lastName:
-      invitation?.name?.split(/\s+/).slice(1).join(" ") ||
       membership.userId?.lastName ||
+      invitation?.name?.split(/\s+/).slice(1).join(" ") ||
       "",
     phone: membership.userId?.phone || "",
     name: invitedName,
@@ -398,7 +399,14 @@ router.post(
         }),
       });
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res
+        .status(error.code === "WORKSPACE_LAUNCH_READY_REQUIRED" ? 409 : 400)
+        .json({
+          error: error.message,
+          code: error.code,
+          details: error.details || [],
+          detail: error.detail || "",
+        });
     }
   },
 );
@@ -413,10 +421,16 @@ router.get(
       }).lean();
       if (!invitation)
         return res.status(404).json({ error: "Invitation not found" });
+      const user = await User.findById(invitation.userId)
+        .select("name email")
+        .lean();
+      const currentInvitation = user
+        ? { ...invitation, name: user.name, email: user.email }
+        : invitation;
       return res.json({
         invitation: invitationResponse(
-          invitation,
-          await previewVariablesFor(invitation, req.auth.workspaceId),
+          currentInvitation,
+          await previewVariablesFor(currentInvitation, req.auth.workspaceId),
         ),
       });
     } catch (error) {
@@ -853,8 +867,18 @@ router.patch(
         ambassadorProfile.deactivatedAt = new Date();
         await ambassadorProfile.save();
       }
+      const invitation = await WorkspaceInvitation.findOne({
+        workspaceId: req.auth.workspaceId,
+        userId: membership.userId._id,
+        status: { $in: ["draft", "ready", "pending", "expired"] },
+      }).sort({ createdAt: -1 });
       return res.json({
-        member: memberResponse(membership, profile, ambassadorProfile),
+        member: memberResponse(
+          membership,
+          profile,
+          ambassadorProfile,
+          invitation,
+        ),
       });
     } catch (error) {
       return res.status(400).json({

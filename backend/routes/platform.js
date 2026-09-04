@@ -100,6 +100,14 @@ router.get("/businesses", requirePlatformOwner, async (_req, res) => {
     const social = connections.filter(
       (item) => String(item.workspaceId) === String(workspace._id),
     );
+    const domainReady = workspace.publicHosts?.length
+      ? "configured"
+      : "missing";
+    const senderEmailReady = config?.invitationIdentity?.senderEmail
+      ? "configured"
+      : "missing";
+    const websiteReady =
+      config?.publicSite?.published === true ? "published" : "draft";
     return {
       id: workspace._id,
       name: workspace.name,
@@ -107,11 +115,13 @@ router.get("/businesses", requirePlatformOwner, async (_req, res) => {
       status: workspace.status,
       publicHosts: workspace.publicHosts || [],
       readiness: {
-        domain: workspace.publicHosts?.length ? "configured" : "missing",
-        senderEmail: config?.invitationIdentity?.senderEmail
-          ? "configured"
-          : "missing",
-        website: config?.publicSite?.published === true ? "published" : "draft",
+        domain: domainReady,
+        senderEmail: senderEmailReady,
+        website: websiteReady,
+        launchReady:
+          domainReady === "configured" &&
+          senderEmailReady === "configured" &&
+          websiteReady === "published",
       },
       owner: owner?.userId
         ? { name: owner.userId.name, email: owner.userId.email }

@@ -1,4 +1,4 @@
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import PersonIdentityFields from "./PersonIdentityFields.jsx";
 import { personName } from "../utils/personIdentity.js";
@@ -59,6 +59,7 @@ function ActualInvitationPreview({ value, variables, subject = false }) {
 }
 
 export default function TeamAccess({ canManage, actorRoles = [] }) {
+  const navigate = useNavigate();
   const [members, setMembers] = useState([]),
     [catalog, setCatalog] = useState({ capabilities: [], roleDefaults: {} }),
     [programs, setPrograms] = useState([]);
@@ -271,12 +272,18 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
       });
       await load();
     } catch (err) {
+      const details = err.response?.data?.details || [];
       const message =
         [err.response?.data?.error, err.response?.data?.detail]
           .filter(Boolean)
           .join(" ") || "Unable to send invitation.";
       setError(message);
-      setSendFeedback({ status: "error", message });
+      setSendFeedback({
+        status: "error",
+        message,
+        details,
+        code: err.response?.data?.code || "",
+      });
     } finally {
       setSaving(false);
     }
@@ -383,9 +390,31 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
         roles: member.roles,
         status: member.status,
       });
+      const invitation = member.invitation?.id
+        ? await fetchWorkspaceInvitationPreview(member.invitation.id)
+        : null;
       setMembers((rows) =>
-        rows.map((row) => (row.id === member.id ? result.member : row)),
+        rows.map((row) =>
+          row.id === member.id
+            ? {
+                ...result.member,
+                invitation: invitation
+                  ? { ...result.member.invitation, ...invitation }
+                  : result.member.invitation || row.invitation,
+              }
+            : row,
+        ),
       );
+      if (invitation && preview?.id === member.invitation?.id)
+        setPreview({
+          ...invitation,
+          recipient: result.member.email,
+          displayName:
+            invitation.previewVariables?.displayName || result.member.name,
+          role:
+            invitation.previewVariables?.role ||
+            result.member.roles.map((role) => roleLabels[role]).join(", "),
+        });
       setIdentityEdit(null);
       setNotice("Member identity saved successfully.");
     } catch (err) {
@@ -1142,12 +1171,30 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
                   Send invitation
                 </Button>
                 {sendFeedback ? (
-                  <p
+                  <div
                     className={`team-access__notice is-${sendFeedback.status}`}
                     role="status"
                   >
-                    {sendFeedback.message}
-                  </p>
+                    <p>{sendFeedback.message}</p>
+                    {sendFeedback.details?.length ? (
+                      <div className="team-access__launch-blocker">
+                        <strong>Fix these settings first</strong>
+                        <ul>
+                          {sendFeedback.details.map((item) => (
+                            <li key={item.key}>
+                              <button
+                                type="button"
+                                onClick={() => navigate(item.path)}
+                              >
+                                {item.label}
+                              </button>
+                              <small>{item.detail}</small>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
                 <Button variant="outline" onClick={() => setPreview(null)}>
                   Keep as draft
