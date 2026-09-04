@@ -136,8 +136,13 @@ export default function PublicSiteAdmin({ section = "website" }) {
     try {
       setSaving(true);
       setError("");
-      setConfig(await updatePublicManagementConfig(config));
-      setMessage("Public website settings saved.");
+      const saved = await updatePublicManagementConfig(config);
+      setConfig(saved);
+      setMessage(
+        `Saved. Public website surface: ${
+          saved.branding?.surfaceMode || "light"
+        }.`,
+      );
     } catch (err) {
       setError(
         err.response?.data?.error || "Unable to save public-site settings.",
@@ -165,16 +170,25 @@ export default function PublicSiteAdmin({ section = "website" }) {
     });
   const uploadSiteImage = async (file, key, label = "image") => {
     if (!file) return;
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024)
+    if (
+      !/^image\/(png|jpeg|webp)$/.test(file.type) ||
+      file.size > 5 * 1024 * 1024
+    )
       return setError("Choose a PNG, JPG, or WEBP image up to 5 MB.");
     try {
       setUploading(key);
       setError("");
-      const asset = await uploadEventImage({ file: await fileData(file), filename: file.name });
+      const asset = await uploadEventImage({
+        file: await fileData(file),
+        filename: file.name,
+      });
       patchPublic(key, asset.url);
       setMessage(`${label} uploaded. Save to publish the change.`);
     } catch (err) {
-      setError(err.response?.data?.error || `Unable to upload the ${label.toLowerCase()}.`);
+      setError(
+        err.response?.data?.error ||
+          `Unable to upload the ${label.toLowerCase()}.`,
+      );
     } finally {
       setUploading("");
     }
@@ -186,26 +200,41 @@ export default function PublicSiteAdmin({ section = "website" }) {
     try {
       setUploading("introVideoUrl");
       setError("");
-      const asset = await uploadProgramVideo({ file: await fileData(file), filename: file.name });
+      const asset = await uploadProgramVideo({
+        file: await fileData(file),
+        filename: file.name,
+      });
       patchPublic("introVideoUrl", asset.url);
       setMessage("Homepage video uploaded. Save to publish the change.");
     } catch (err) {
-      setError(err.response?.data?.error || "Unable to upload the homepage video.");
+      setError(
+        err.response?.data?.error || "Unable to upload the homepage video.",
+      );
     } finally {
       setUploading("");
     }
   };
   const uploadProfilePhoto = async (id, file) => {
     if (!file) return;
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024)
+    if (
+      !/^image\/(png|jpeg|webp)$/.test(file.type) ||
+      file.size > 5 * 1024 * 1024
+    )
       return setError("Choose a PNG, JPG, or WEBP profile photo up to 5 MB.");
     try {
       setUploading(`profile-${id}`);
-      const asset = await uploadEventImage({ file: await fileData(file), filename: file.name });
+      const asset = await uploadEventImage({
+        file: await fileData(file),
+        filename: file.name,
+      });
       patchProfile(id, "avatarUrl", asset.url);
-      setMessage("Profile photo uploaded. Save the public profile to publish it.");
+      setMessage(
+        "Profile photo uploaded. Save the public profile to publish it.",
+      );
     } catch (err) {
-      setError(err.response?.data?.error || "Unable to upload the profile photo.");
+      setError(
+        err.response?.data?.error || "Unable to upload the profile photo.",
+      );
     } finally {
       setUploading("");
     }
@@ -413,8 +442,42 @@ export default function PublicSiteAdmin({ section = "website" }) {
             </div>
             <div className="homepage-media-uploads homepage-media-uploads--inline">
               <article>
-                <div className="homepage-media-preview">{config.publicSite.heroMediaUrl ? <img src={config.publicSite.heroMediaUrl} alt="Current homepage hero" /> : <span>Hero image</span>}</div>
-                <div><h4>Homepage hero image</h4><p>The large building or brand image beside the opening headline.</p><label className="website-upload-button">{uploading === "heroMediaUrl" ? "Uploading…" : config.publicSite.heroMediaUrl ? "Replace image" : "Upload image"}<input disabled={Boolean(uploading)} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadSiteImage(event.target.files?.[0], "heroMediaUrl", "Homepage hero image")} /></label></div>
+                <div className="homepage-media-preview">
+                  {config.publicSite.heroMediaUrl ? (
+                    <img
+                      src={config.publicSite.heroMediaUrl}
+                      alt="Current homepage hero"
+                    />
+                  ) : (
+                    <span>Hero image</span>
+                  )}
+                </div>
+                <div>
+                  <h4>Homepage hero image</h4>
+                  <p>
+                    The large building or brand image beside the opening
+                    headline.
+                  </p>
+                  <label className="website-upload-button">
+                    {uploading === "heroMediaUrl"
+                      ? "Uploading…"
+                      : config.publicSite.heroMediaUrl
+                        ? "Replace image"
+                        : "Upload image"}
+                    <input
+                      disabled={Boolean(uploading)}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) =>
+                        uploadSiteImage(
+                          event.target.files?.[0],
+                          "heroMediaUrl",
+                          "Homepage hero image",
+                        )
+                      }
+                    />
+                  </label>
+                </div>
               </article>
             </div>
           </div>
@@ -465,8 +528,42 @@ export default function PublicSiteAdmin({ section = "website" }) {
             </div>
             <div className="homepage-media-uploads homepage-media-uploads--inline">
               <article>
-                <div className="homepage-media-preview homepage-media-preview--portrait">{config.publicSite.aboutImageUrl ? <img src={config.publicSite.aboutImageUrl} alt="Current About Ellie portrait" /> : <span>Portrait</span>}</div>
-                <div><h4>About Ellie photo</h4><p>A vertical portrait works best in the homepage founder section.</p><label className="website-upload-button">{uploading === "aboutImageUrl" ? "Uploading…" : config.publicSite.aboutImageUrl ? "Replace photo" : "Upload photo"}<input disabled={Boolean(uploading)} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadSiteImage(event.target.files?.[0], "aboutImageUrl", "About Ellie photo")} /></label></div>
+                <div className="homepage-media-preview homepage-media-preview--portrait">
+                  {config.publicSite.aboutImageUrl ? (
+                    <img
+                      src={config.publicSite.aboutImageUrl}
+                      alt="Current About Ellie portrait"
+                    />
+                  ) : (
+                    <span>Portrait</span>
+                  )}
+                </div>
+                <div>
+                  <h4>About Ellie photo</h4>
+                  <p>
+                    A vertical portrait works best in the homepage founder
+                    section.
+                  </p>
+                  <label className="website-upload-button">
+                    {uploading === "aboutImageUrl"
+                      ? "Uploading…"
+                      : config.publicSite.aboutImageUrl
+                        ? "Replace photo"
+                        : "Upload photo"}
+                    <input
+                      disabled={Boolean(uploading)}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) =>
+                        uploadSiteImage(
+                          event.target.files?.[0],
+                          "aboutImageUrl",
+                          "About Ellie photo",
+                        )
+                      }
+                    />
+                  </label>
+                </div>
               </article>
             </div>
           </div>
@@ -475,14 +572,18 @@ export default function PublicSiteAdmin({ section = "website" }) {
               <span>03</span>
               <div>
                 <h4>Appearance &amp; typography</h4>
-                <p>Choose the public theme, visitor controls, fonts, and scale.</p>
+                <p>
+                  Choose the public theme, visitor controls, fonts, and scale.
+                </p>
               </div>
             </header>
             <div className="public-admin__grid">
               <label>
                 Website theme
                 <select
-                  value={config.branding?.surfaceMode === "light" ? "light" : "dark"}
+                  value={
+                    config.branding?.surfaceMode === "light" ? "light" : "dark"
+                  }
                   onChange={(e) =>
                     setConfig((current) => ({
                       ...current,
@@ -507,7 +608,9 @@ export default function PublicSiteAdmin({ section = "website" }) {
                 />
                 <span>
                   <strong>Let visitors switch themes</strong>
-                  <small>Show a light/dark control in the public navigation.</small>
+                  <small>
+                    Show a light/dark control in the public navigation.
+                  </small>
                 </span>
               </label>
               <label>
@@ -612,22 +715,98 @@ export default function PublicSiteAdmin({ section = "website" }) {
         <section className="homepage-media-editor">
           <p className="public-admin__help">
             Upload your video and poster image here. YouTube, Vimeo, and direct
-            HTTPS links remain available as an advanced option. Audio never autoplays.
+            HTTPS links remain available as an advanced option. Audio never
+            autoplays.
           </p>
           <div className="homepage-media-uploads">
             <article>
               <div className="homepage-media-preview is-video">
-                {config.publicSite.introVideoPosterUrl ? <img src={config.publicSite.introVideoPosterUrl} alt="Homepage video poster" /> : <span>Video</span>}
+                {config.publicSite.introVideoPosterUrl ? (
+                  <img
+                    src={config.publicSite.introVideoPosterUrl}
+                    alt="Homepage video poster"
+                  />
+                ) : (
+                  <span>Video</span>
+                )}
               </div>
-              <div><h4>Homepage video</h4><p>MP4, WEBM, or MOV up to 75 MB.</p><label className="website-upload-button">{uploading === "introVideoUrl" ? "Uploading…" : config.publicSite.introVideoUrl ? "Replace video" : "Upload video"}<input disabled={Boolean(uploading)} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => uploadHomepageVideo(event.target.files?.[0])} /></label></div>
+              <div>
+                <h4>Homepage video</h4>
+                <p>MP4, WEBM, or MOV up to 75 MB.</p>
+                <label className="website-upload-button">
+                  {uploading === "introVideoUrl"
+                    ? "Uploading…"
+                    : config.publicSite.introVideoUrl
+                      ? "Replace video"
+                      : "Upload video"}
+                  <input
+                    disabled={Boolean(uploading)}
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime"
+                    onChange={(event) =>
+                      uploadHomepageVideo(event.target.files?.[0])
+                    }
+                  />
+                </label>
+              </div>
             </article>
             <article>
-              <div className="homepage-media-preview">{config.publicSite.introVideoPosterUrl ? <img src={config.publicSite.introVideoPosterUrl} alt="" /> : <span>Poster</span>}</div>
-              <div><h4>Poster image</h4><p>Shown before the visitor plays the video.</p><label className="website-upload-button">{uploading === "introVideoPosterUrl" ? "Uploading…" : config.publicSite.introVideoPosterUrl ? "Replace image" : "Upload image"}<input disabled={Boolean(uploading)} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadSiteImage(event.target.files?.[0], "introVideoPosterUrl", "Poster image")} /></label></div>
+              <div className="homepage-media-preview">
+                {config.publicSite.introVideoPosterUrl ? (
+                  <img src={config.publicSite.introVideoPosterUrl} alt="" />
+                ) : (
+                  <span>Poster</span>
+                )}
+              </div>
+              <div>
+                <h4>Poster image</h4>
+                <p>Shown before the visitor plays the video.</p>
+                <label className="website-upload-button">
+                  {uploading === "introVideoPosterUrl"
+                    ? "Uploading…"
+                    : config.publicSite.introVideoPosterUrl
+                      ? "Replace image"
+                      : "Upload image"}
+                  <input
+                    disabled={Boolean(uploading)}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) =>
+                      uploadSiteImage(
+                        event.target.files?.[0],
+                        "introVideoPosterUrl",
+                        "Poster image",
+                      )
+                    }
+                  />
+                </label>
+              </div>
             </article>
           </div>
           <div className="public-admin__grid">
-            <details className="wide homepage-media-advanced"><summary>Advanced video and image URLs</summary><div className="public-admin__grid"><label>Intro video URL<input value={config.publicSite.introVideoUrl || ""} onChange={(e) => patchPublic("introVideoUrl", e.target.value)} /></label><label>Poster/background image URL<input value={config.publicSite.introVideoPosterUrl || ""} onChange={(e) => patchPublic("introVideoPosterUrl", e.target.value)} /></label></div></details>
+            <details className="wide homepage-media-advanced">
+              <summary>Advanced video and image URLs</summary>
+              <div className="public-admin__grid">
+                <label>
+                  Intro video URL
+                  <input
+                    value={config.publicSite.introVideoUrl || ""}
+                    onChange={(e) =>
+                      patchPublic("introVideoUrl", e.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Poster/background image URL
+                  <input
+                    value={config.publicSite.introVideoPosterUrl || ""}
+                    onChange={(e) =>
+                      patchPublic("introVideoPosterUrl", e.target.value)
+                    }
+                  />
+                </label>
+              </div>
+            </details>
             <label>
               Video eyebrow
               <input
@@ -964,13 +1143,24 @@ export default function PublicSiteAdmin({ section = "website" }) {
                   <select
                     value={program.publicPresentation?.section || "intensive"}
                     onChange={(e) =>
-                      setPrograms((rows) => rows.map((row) => row._id === program._id ? {
-                        ...row,
-                        publicPresentation: { ...row.publicPresentation, section: e.target.value },
-                      } : row))
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  section: e.target.value,
+                                },
+                              }
+                            : row,
+                        ),
+                      )
                     }
                   >
-                    <option value="accelerator">High Performance Accelerators</option>
+                    <option value="accelerator">
+                      High Performance Accelerators
+                    </option>
                     <option value="intensive">Intensive Programs</option>
                   </select>
                 </label>
@@ -981,10 +1171,19 @@ export default function PublicSiteAdmin({ section = "website" }) {
                     min="0"
                     value={program.publicPresentation?.sortOrder || 0}
                     onChange={(e) =>
-                      setPrograms((rows) => rows.map((row) => row._id === program._id ? {
-                        ...row,
-                        publicPresentation: { ...row.publicPresentation, sortOrder: Number(e.target.value) },
-                      } : row))
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  sortOrder: Number(e.target.value),
+                                },
+                              }
+                            : row,
+                        ),
+                      )
                     }
                   />
                 </label>
@@ -993,10 +1192,19 @@ export default function PublicSiteAdmin({ section = "website" }) {
                     type="checkbox"
                     checked={Boolean(program.publicPresentation?.featured)}
                     onChange={(e) =>
-                      setPrograms((rows) => rows.map((row) => row._id === program._id ? {
-                        ...row,
-                        publicPresentation: { ...row.publicPresentation, featured: e.target.checked },
-                      } : row))
+                      setPrograms((rows) =>
+                        rows.map((row) =>
+                          row._id === program._id
+                            ? {
+                                ...row,
+                                publicPresentation: {
+                                  ...row.publicPresentation,
+                                  featured: e.target.checked,
+                                },
+                              }
+                            : row,
+                        ),
+                      )
                     }
                   />
                   Mark as Most Popular
@@ -1325,7 +1533,8 @@ export default function PublicSiteAdmin({ section = "website" }) {
                 <Button
                   disabled={
                     !profile.slug ||
-                    (profile.ownerType === "coach" && !profile.coachProfileId) ||
+                    (profile.ownerType === "coach" &&
+                      !profile.coachProfileId) ||
                     (profile.ownerType === "team" && !profile.userId) ||
                     (profile.ownerType === "student" && !profile.contactId)
                   }
@@ -1430,8 +1639,42 @@ export default function PublicSiteAdmin({ section = "website" }) {
                       <div className="public-profile-photo-field">
                         <strong>Profile photo</strong>
                         <span className="public-profile-photo-control">
-                          {row.avatarUrl ? <img src={row.avatarUrl} alt="" /> : <i>{row.displayName?.slice(0, 1) || "?"}</i>}
-                          <span><label className="website-upload-button">{uploading === `profile-${row._id}` ? "Uploading…" : row.avatarUrl ? "Replace photo" : "Upload photo"}<input disabled={Boolean(uploading)} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadProfilePhoto(row._id, event.target.files?.[0])} /></label>{row.avatarUrl ? <button type="button" className="brand-remove" onClick={() => patchProfile(row._id, "avatarUrl", "")}>Remove</button> : null}</span>
+                          {row.avatarUrl ? (
+                            <img src={row.avatarUrl} alt="" />
+                          ) : (
+                            <i>{row.displayName?.slice(0, 1) || "?"}</i>
+                          )}
+                          <span>
+                            <label className="website-upload-button">
+                              {uploading === `profile-${row._id}`
+                                ? "Uploading…"
+                                : row.avatarUrl
+                                  ? "Replace photo"
+                                  : "Upload photo"}
+                              <input
+                                disabled={Boolean(uploading)}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                onChange={(event) =>
+                                  uploadProfilePhoto(
+                                    row._id,
+                                    event.target.files?.[0],
+                                  )
+                                }
+                              />
+                            </label>
+                            {row.avatarUrl ? (
+                              <button
+                                type="button"
+                                className="brand-remove"
+                                onClick={() =>
+                                  patchProfile(row._id, "avatarUrl", "")
+                                }
+                              >
+                                Remove
+                              </button>
+                            ) : null}
+                          </span>
                         </span>
                       </div>
                       <label>

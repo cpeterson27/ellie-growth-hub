@@ -8,6 +8,11 @@ const ASSETS = [
     "Website header logo",
     "Shown in the public website header and footer.",
   ],
+  [
+    "publicSiteLogoDarkUrl",
+    "Website header logo (White/Light variant)",
+    "Shown in the public website header and footer on dark surfaces.",
+  ],
   ["faviconUrl", "Website favicon", "Shown in the visitor's browser tab."],
 ];
 const APP_ASSETS = [
@@ -125,7 +130,9 @@ export default function WorkspaceBrandingEditor({
     }));
   const patchSocial = (label, url) => {
     const current = config.publicSite?.socialLinks || [];
-    const others = current.filter((item) => item.label.toLowerCase() !== label.toLowerCase());
+    const others = current.filter(
+      (item) => item.label.toLowerCase() !== label.toLowerCase(),
+    );
     patchSite("socialLinks", url.trim() ? [...others, { label, url }] : others);
   };
   const upload = async (scope, key, file) => {
@@ -182,6 +189,59 @@ export default function WorkspaceBrandingEditor({
             }
           />
         </label>
+        <label>
+          Intro label
+          <input
+            value={config.publicSite?.introLabel || ""}
+            onChange={(event) => patchSite("introLabel", event.target.value)}
+          />
+          <small>The short label shown above the homepage intro section.</small>
+        </label>
+        <label>
+          Headline accent
+          <input
+            value={config.publicSite?.headlineAccent || ""}
+            onChange={(event) =>
+              patchSite("headlineAccent", event.target.value)
+            }
+          />
+          <small>
+            The exact text must appear inside the homepage headline to be
+            highlighted.
+          </small>
+        </label>
+        <label>
+          Intro title accent
+          <input
+            value={config.publicSite?.introTitleAccent || ""}
+            onChange={(event) =>
+              patchSite("introTitleAccent", event.target.value)
+            }
+          />
+          <small>
+            The exact text must appear inside the homepage intro title to be
+            highlighted.
+          </small>
+        </label>
+        <label>
+          Hero quote attribution
+          <input
+            value={config.publicSite?.heroQuoteAttribution || ""}
+            onChange={(event) =>
+              patchSite("heroQuoteAttribution", event.target.value)
+            }
+          />
+          <small>The name or source shown below the hero quote.</small>
+        </label>
+        <label>
+          About quote
+          <textarea
+            value={config.publicSite?.aboutQuote || ""}
+            onChange={(event) => patchSite("aboutQuote", event.target.value)}
+            rows="4"
+          />
+          <small>The pull-quote shown beside the homepage about story.</small>
+        </label>
         <div className="brand-assets-list">
           {ASSETS.map(([key, label, help]) => (
             <AssetField
@@ -194,6 +254,7 @@ export default function WorkspaceBrandingEditor({
               onUpload={(file) => upload("branding", key, file)}
             />
           ))}
+
           <AssetField
             label="Brand feature / hero image"
             help="Optional visitor-facing image used in the homepage hero."
@@ -203,8 +264,8 @@ export default function WorkspaceBrandingEditor({
             onUpload={(file) => upload("publicSite", "heroMediaUrl", file)}
           />
           <AssetField
-            label="About Ellie photo"
-            help="Shown beside the About Ellie story on the homepage. A vertical or square portrait works best."
+            label="About page photo"
+            help="Shown beside the About story on the homepage. A vertical or square portrait works best."
             value={config.publicSite?.aboutImageUrl || ""}
             busy={uploading === "publicSite.aboutImageUrl"}
             onChange={(value) => patchSite("aboutImageUrl", value)}
@@ -258,10 +319,30 @@ export default function WorkspaceBrandingEditor({
           <button type="button">Primary action</button>
         </div>
         <div className="social-profile-editor">
-          <header><h4>Social profiles</h4><p>Add the profiles visitors can open from your public website.</p></header>
+          <header>
+            <h4>Social profiles</h4>
+            <p>Add the profiles visitors can open from your public website.</p>
+          </header>
           {SOCIALS.map(([label, placeholder]) => {
-            const item = (config.publicSite?.socialLinks || []).find((row) => row.label.toLowerCase() === label.toLowerCase());
-            return <label key={label}><strong>{label}</strong><input type="url" value={item?.url || ""} placeholder={placeholder} onChange={(event) => patchSocial(label, event.target.value)} /><span className={`social-profile-state ${item?.url ? "is-on" : ""}`}>{item?.url ? "Displayed" : "Hidden"}</span></label>;
+            const item = (config.publicSite?.socialLinks || []).find(
+              (row) => row.label.toLowerCase() === label.toLowerCase(),
+            );
+            return (
+              <label key={label}>
+                <strong>{label}</strong>
+                <input
+                  type="url"
+                  value={item?.url || ""}
+                  placeholder={placeholder}
+                  onChange={(event) => patchSocial(label, event.target.value)}
+                />
+                <span
+                  className={`social-profile-state ${item?.url ? "is-on" : ""}`}
+                >
+                  {item?.url ? "Displayed" : "Hidden"}
+                </span>
+              </label>
+            );
           })}
         </div>
       </section>
@@ -314,7 +395,7 @@ export default function WorkspaceBrandingEditor({
           }
         >
           {contrast >= 4.5
-            ? "Sidebar contrast passes AA."
+            ? "App sidebar contrast passes AA; public website theme is separate."
             : "Sidebar text contrast is too low. Choose more distinct colors."}
         </p>
         <div
@@ -342,6 +423,9 @@ export default function WorkspaceBrandingEditor({
         <Button loading={saving} disabled={contrast < 4.5} onClick={onSave}>
           Save branding
         </Button>
+        <output className="branding-save-status" aria-live="polite">
+          {saving ? "Saving public website branding…" : ""}
+        </output>
       </footer>
     </div>
   );
