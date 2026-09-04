@@ -300,7 +300,7 @@ async function inviteMember(input, models = dependencies) {
     { ...identity, email },
     models,
   );
-  name = user.name || name;
+  name = String(name || "").trim();
   const existing = await models.WorkspaceMembership.findOne({
     workspaceId: input.workspaceId,
     userId: user._id,
@@ -648,6 +648,7 @@ async function sendInvitation(
   if (body !== undefined) invitation.body = String(body).slice(0, 10000);
   if (!invitation.subject || !invitation.body)
     throw new Error("Invitation subject and message are required");
+  const token = crypto.randomBytes(32).toString("base64url");
   const [workspace, config, inviter] = await Promise.all([
     models.Workspace.findById(workspaceId).select("name").lean(),
     models.WorkspaceConfig?.findOne
@@ -660,6 +661,7 @@ async function sendInvitation(
   const delivery = await deliverInvitation(
     {
       invitation,
+      token,
       workspaceName: config?.workspaceName || workspace?.name,
       invitedBy: config?.invitationIdentity?.senderName || inviter?.name,
       replyToEmail: config?.invitationIdentity?.replyToEmail || "",

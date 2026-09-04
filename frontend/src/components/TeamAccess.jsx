@@ -179,8 +179,13 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
         setPreview({
           ...result.invitation,
           recipient: invite.email,
-          displayName: result.invitation.previewVariables?.displayName || result.member.name || personName(invite),
-          role: result.invitation.previewVariables?.role || invite.roles.map((role) => roleLabels[role]).join(", "),
+          displayName:
+            result.invitation.previewVariables?.displayName ||
+            result.member.name ||
+            personName(invite),
+          role:
+            result.invitation.previewVariables?.role ||
+            invite.roles.map((role) => roleLabels[role]).join(", "),
         });
         setShowInvite(false);
       } else
@@ -247,6 +252,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
       });
       setPreview(null);
       setError("");
+      setNotice(`Invitation sent successfully to ${preview.recipient}.`);
       await load();
     } catch (err) {
       setError(err.response?.data?.error || "Unable to send invitation.");
@@ -455,9 +461,9 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
               </span>
             </div>
             <p>
-              They will lose Lead Porch access and any pending invitation
-              link will stop working. Their CRM Contacts and business records
-              will stay intact.
+              They will lose Lead Porch access and any pending invitation link
+              will stop working. Their CRM Contacts and business records will
+              stay intact.
             </p>
           </div>
         ) : null}
@@ -857,8 +863,8 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
                     <div className="team-access__generated-referral">
                       <strong>Referral link</strong>
                       <span>
-                        Lead Porch generates a unique referral code from
-                        the ambassador’s name when this profile is created.
+                        Lead Porch generates a unique referral code from the
+                        ambassador’s name when this profile is created.
                       </span>
                     </div>
                     <label>
@@ -1008,9 +1014,18 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
               </label>
               <article>
                 <strong>
-                  <ActualInvitationPreview value={preview.subject} variables={preview.previewVariables} subject />
+                  <ActualInvitationPreview
+                    value={preview.subject}
+                    variables={preview.previewVariables}
+                    subject
+                  />
                 </strong>
-                <p className="team-access__recipient-preview-message"><ActualInvitationPreview value={preview.body} variables={preview.previewVariables} /></p>
+                <p className="team-access__recipient-preview-message">
+                  <ActualInvitationPreview
+                    value={preview.body}
+                    variables={preview.previewVariables}
+                  />
+                </p>
               </article>
               <div>
                 <Button loading={saving} onClick={send}>
