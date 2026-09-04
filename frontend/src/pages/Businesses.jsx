@@ -33,6 +33,10 @@ export default function Businesses() {
     [savingHosts, setSavingHosts] = useState(false),
     [message, setMessage] = useState("");
   const { refreshWorkspaces } = useAuth();
+  const invitationReady = (business) =>
+    business.readiness?.inviteReady ??
+    (business.readiness?.domain === "configured" &&
+      business.readiness?.senderEmail === "configured");
   useEffect(() => {
     fetchPlatformBusinesses()
       .then(setBusinesses)
@@ -251,12 +255,12 @@ export default function Businesses() {
               <small>Website: {business.readiness?.website || "unknown"}</small>
               <strong
                 className={
-                  business.readiness?.inviteReady
+                  invitationReady(business)
                     ? "business-readiness--ready"
                     : "business-readiness--blocked"
                 }
               >
-                {business.readiness?.inviteReady
+                {invitationReady(business)
                   ? "Ready to send invitations"
                   : "Invitations blocked"}
               </strong>
