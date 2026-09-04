@@ -14,6 +14,8 @@
     "tenant:migrate": "node scripts/migrate-workspace-ownership.js --apply",
     "tenant:indexes:audit": "node scripts/migrate-tenant-indexes.js",
     "tenant:indexes:migrate": "node scripts/migrate-tenant-indexes.js --apply",
+    "public-hosts:dry-run": "node scripts/migrate-public-hosts.js",
+    "public-hosts:migrate": "node scripts/migrate-public-hosts.js --apply",
     "memberships:roles:audit": "node scripts/migrate-membership-roles.js",
     "memberships:roles:migrate": "node scripts/migrate-membership-roles.js --apply",
     "test:tenant-isolation": "node test-workspace-isolation.js",

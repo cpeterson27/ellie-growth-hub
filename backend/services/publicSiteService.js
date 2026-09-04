@@ -157,7 +157,7 @@ function defaults(workspace) {
           primaryColor: "#173f36",
           accentColor: "#a8d65e",
           surfaceMode: "light",
-          publicSiteName: workspace?.name || "Growth Operator",
+          publicSiteName: workspace?.name || "Lead Porch",
           poweredByGrowthOperator: true,
         },
         publicSite: {
@@ -246,6 +246,9 @@ function sanitizedConfig(workspace, config) {
         b.publicSiteLogoUrl || b.logoUrl || base.branding.publicSiteLogoUrl,
         { relative: true },
       ),
+      publicSiteLogoDarkUrl: safeUrl(b.publicSiteLogoDarkUrl, {
+        relative: true,
+      }),
       poweredByGrowthOperator:
         b.poweredByGrowthOperator ?? base.branding.poweredByGrowthOperator,
     },
@@ -279,11 +282,16 @@ function sanitizedConfig(workspace, config) {
         0,
         300,
       ),
+      headlineAccent: String(p.headlineAccent || "").slice(0, 160),
+      introTitleAccent: String(p.introTitleAccent || "").slice(0, 160),
+      introLabel: String(p.introLabel || "").slice(0, 160),
       introBody: String(p.introBody || base.publicSite.introBody).slice(
         0,
         5000,
       ),
       aboutBody: String(p.aboutBody || "").slice(0, 12000),
+      aboutQuote: String(p.aboutQuote || "").slice(0, 1200),
+      heroQuoteAttribution: String(p.heroQuoteAttribution || "").slice(0, 160),
       aboutImageUrl: safeUrl(p.aboutImageUrl),
       heroMediaUrl: safeUrl(p.heroMediaUrl),
       introVideoUrl: safeUrl(p.introVideoUrl),
@@ -410,11 +418,55 @@ function sanitizedConfig(workspace, config) {
     },
   };
 }
-async function workspace(models = deps) {
-  const slug =
+function workspaceSlugForHost(request) {
+  const host = String(request?.headers?.host || "")
+    .split(":")[0]
+    .trim()
+    .toLowerCase();
+  const leadPorchHosts = String(
+      process.env.LEADPORCH_HOSTS || "leadporch.co,www.leadporch.co",
+    )
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+    ellieHosts = String(
+      process.env.ELLIE_PUBLIC_HOSTS ||
+        "elliescoaching.com,www.elliescoaching.com",
+    )
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+  if (leadPorchHosts.includes(host))
+    return process.env.LEADPORCH_WORKSPACE_SLUG || "leadporch";
+  if (ellieHosts.includes(host))
+    return process.env.ELLIE_WORKSPACE_SLUG || "ellie";
+  return (
     process.env.PUBLIC_WORKSPACE_SLUG ||
     process.env.ELLIE_WORKSPACE_SLUG ||
-    "ellie";
+    "ellie"
+  );
+}
+function requestHost(request) {
+  return String(request?.headers?.host || "")
+    .split(",")[0]
+    .split(":")[0]
+    .trim()
+    .toLowerCase();
+}
+async function workspace(models = deps, request) {
+  if (models?.headers && !request) {
+    request = models;
+    models = deps;
+  }
+  const host = requestHost(request);
+  if (host) {
+    const mapped = await models.Workspace.findOne({
+      publicHosts: host,
+      status: "active",
+    }).lean();
+    if (mapped) return mapped;
+  }
+  const slug = workspaceSlugForHost(request);
   const item = await models.Workspace.findOne({
     slug,
     status: "active",
@@ -492,8 +544,12 @@ function profileProjection(item) {
     sortOrder: Number(item.sortOrder) || 0,
   };
 }
-async function site(models = deps) {
-  const ws = await workspace(models);
+async function site(models = deps, request) {
+  if (models?.headers && !request) {
+    request = models;
+    models = deps;
+  }
+  const ws = await workspace(models, request);
   return runWithWorkspace(ws._id, async () => {
     const [
       config,
@@ -670,5 +726,7 @@ module.exports = {
   site,
   testimonialProjection,
   tokenProfile,
+  requestHost,
+  workspaceSlugForHost,
   workspace,
 };

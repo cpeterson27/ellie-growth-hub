@@ -14,7 +14,8 @@ export default function Login() {
   const [workspaceOptions, setWorkspaceOptions] = useState([]);
   const [workspaceId, setWorkspaceId] = useState("");
 
-  if (session) return <Navigate to={location.state?.from || "/dashboard"} replace />;
+  if (session)
+    return <Navigate to={location.state?.from || "/dashboard"} replace />;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -24,7 +25,9 @@ export default function Login() {
       await login(email, password, workspaceId);
       navigate(location.state?.from || "/dashboard", { replace: true });
     } catch (requestError) {
-      if (requestError.response?.data?.code === "WORKSPACE_SELECTION_REQUIRED") {
+      if (
+        requestError.response?.data?.code === "WORKSPACE_SELECTION_REQUIRED"
+      ) {
         const options = requestError.response.data.workspaces || [];
         setWorkspaceOptions(options);
         setWorkspaceId(options[0]?.id || "");
@@ -40,29 +43,62 @@ export default function Login() {
   return (
     <main className="login-page">
       <section className="login-panel">
-        <a className="login-brand" href="/" aria-label="Growth Operator home">G</a>
-        <p className="login-eyebrow">Growth Operator</p>
+        <a className="login-brand" href="/" aria-label="Lead Porch home">
+          L
+        </a>
+        <p className="login-eyebrow">Lead Porch</p>
         <h1>Welcome back</h1>
         <p className="login-intro">Sign in to your private growth workspace.</p>
         <form onSubmit={submit}>
           <label>
             Email address
-            <input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
           </label>
           <label>
             Password
-            <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
           </label>
-          {workspaceOptions.length > 1 ? <label>
-            Workspace
-            <select value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} required>
-              {workspaceOptions.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
-            </select>
-          </label> : null}
-          {error ? <p className="login-error" role="alert">{error}</p> : null}
-          <button type="submit" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
+          {workspaceOptions.length > 1 ? (
+            <label>
+              Workspace
+              <select
+                value={workspaceId}
+                onChange={(event) => setWorkspaceId(event.target.value)}
+                required
+              >
+                {workspaceOptions.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>
+                    {workspace.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {error ? (
+            <p className="login-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <button type="submit" disabled={submitting}>
+            {submitting ? "Signing in…" : "Sign in"}
+          </button>
         </form>
-        <small>New customers start from the Growth Operator website. Team members join an existing workspace by invitation.</small>
+        <small>
+          New customers start from the Lead Porch website. Team members join an
+          existing workspace by invitation.
+        </small>
       </section>
     </main>
   );
