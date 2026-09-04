@@ -1,55 +1,704 @@
-.team-access{display:grid;gap:18px}.team-access__members{display:grid;gap:14px}.team-access__members>article{border:1px solid #d9e2de;border-radius:14px;padding:16px}.team-access small{display:block;color:#687a74}.team-access em{background:#e8f2ee;border-radius:999px;font-style:normal;margin-left:6px;padding:5px 9px;text-transform:capitalize}.team-access__members p{color:#53665f;font-size:.78rem;line-height:1.6}.team-access__lifecycle{border-left:3px solid #2f8f67;padding-left:10px}.team-access__editor{background:#f7faf9;display:grid;gap:16px;margin-top:14px;padding:16px}.team-access fieldset{border:1px solid #d5e0dc;display:grid;gap:8px;padding:12px}.team-access fieldset legend{font-weight:800;padding:0 6px}.team-access__editor fieldset>label,.team-access__editor fieldset>div{align-items:start;display:grid;gap:8px;grid-template-columns:auto 150px 1fr}.team-access__editor fieldset>div{grid-template-columns:1fr 90px 90px}.team-access__editor label,.team-access__invite label,.team-access__preview label{display:grid;font-size:.78rem;font-weight:700;gap:5px}.team-access select,.team-access input:not([type=checkbox]),.team-access textarea{border:1px solid #bbc9c4;border-radius:7px;font:inherit;padding:9px;width:100%}.team-access__editor>div,.team-access__preview>div{display:flex;gap:8px;flex-wrap:wrap}.team-access__invite>div{display:grid;gap:10px;grid-template-columns:repeat(2,1fr)}.team-access__invite fieldset{grid-template-columns:repeat(5,1fr)}.team-access__invite fieldset label{display:flex;gap:6px}.team-access__role-guide p{margin:8px 0}.team-access__preview{display:grid;gap:12px}.team-access__preview article{background:#f7faf9;border:1px solid #d5e0dc;border-radius:10px;padding:16px}@media(max-width:800px){.team-access__invite>div{grid-template-columns:1fr}.team-access__editor fieldset>label,.team-access__editor fieldset>div{grid-template-columns:auto 1fr}.team-access__invite fieldset{grid-template-columns:1fr 1fr}}
+.team-access {
+  display: grid;
+  gap: 18px;
+}
+.team-access__members {
+  display: grid;
+  gap: 14px;
+}
+.team-access__members > article {
+  border: 1px solid #d9e2de;
+  border-radius: 14px;
+  padding: 16px;
+}
+.team-access small {
+  display: block;
+  color: #687a74;
+}
+.team-access em {
+  background: #e8f2ee;
+  border-radius: 999px;
+  font-style: normal;
+  margin-left: 6px;
+  padding: 5px 9px;
+  text-transform: capitalize;
+}
+.team-access__members p {
+  color: #53665f;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+.team-access__lifecycle {
+  border-left: 3px solid #2f8f67;
+  padding-left: 10px;
+}
+.team-access__editor {
+  background: #f7faf9;
+  display: grid;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 16px;
+}
+.team-access fieldset {
+  border: 1px solid #d5e0dc;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+.team-access fieldset legend {
+  font-weight: 800;
+  padding: 0 6px;
+}
+.team-access__editor fieldset > label,
+.team-access__editor fieldset > div {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto 150px 1fr;
+}
+.team-access__editor fieldset > div {
+  grid-template-columns: 1fr 90px 90px;
+}
+.team-access__editor label,
+.team-access__invite label,
+.team-access__preview label {
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 700;
+  gap: 5px;
+}
+.team-access select,
+.team-access input:not([type="checkbox"]),
+.team-access textarea {
+  border: 1px solid #bbc9c4;
+  border-radius: 7px;
+  font: inherit;
+  padding: 9px;
+  width: 100%;
+}
+.team-access__editor > div,
+.team-access__preview > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.team-access__invite > div {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+}
+.team-access__invite fieldset {
+  grid-template-columns: repeat(5, 1fr);
+}
+.team-access__invite fieldset label {
+  display: flex;
+  gap: 6px;
+}
+.team-access__role-guide p {
+  margin: 8px 0;
+}
+.team-access__preview {
+  display: grid;
+  gap: 12px;
+}
+.team-access__preview article {
+  background: #f7faf9;
+  border: 1px solid #d5e0dc;
+  border-radius: 10px;
+  padding: 16px;
+}
+@media (max-width: 800px) {
+  .team-access__invite > div {
+    grid-template-columns: 1fr;
+  }
+  .team-access__editor fieldset > label,
+  .team-access__editor fieldset > div {
+    grid-template-columns: auto 1fr;
+  }
+  .team-access__invite fieldset {
+    grid-template-columns: 1fr 1fr;
+  }
+}
 
+.team-access__status {
+  font-size: 0.78rem;
+  color: #315c4d;
+  background: #edf5f0;
+  padding: 5px 9px;
+  border-radius: 999px;
+}
+.team-access__permissions {
+  display: grid;
+  gap: 10px;
+}
+.team-access__permissions details {
+  background: white;
+  border: 1px solid #d5e0dc;
+  border-radius: 10px;
+  padding: 12px;
+}
+.team-access__permissions summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.team-access__permissions .team-access__permission {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 200px);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 0;
+}
+.team-access__editor fieldset > label {
+  grid-template-columns: 20px 1fr;
+}
+.team-access__editor fieldset > label small {
+  grid-column: 2;
+}
+.team-access__invite fieldset {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+@media (max-width: 800px) {
+  .team-access__permissions .team-access__permission {
+    grid-template-columns: 1fr;
+  }
+}
 
-
-.team-access__status{font-size:.78rem;color:#315c4d;background:#edf5f0;padding:5px 9px;border-radius:999px}
-.team-access__permissions{display:grid;gap:10px}.team-access__permissions details{background:white;border:1px solid #d5e0dc;border-radius:10px;padding:12px}
-.team-access__permissions summary{cursor:pointer;font-weight:650}
-.team-access__permissions .team-access__permission{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,200px);gap:16px;align-items:center;padding:10px 0}
-.team-access__editor fieldset>label{grid-template-columns:20px 1fr}.team-access__editor fieldset>label small{grid-column:2}
-.team-access__invite fieldset{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
-@media(max-width:800px){.team-access__permissions .team-access__permission{grid-template-columns:1fr}}
-
-.team-access__member-header>.team-access__status{white-space:nowrap;overflow-wrap:normal;justify-self:start}.team-access__member-header em{white-space:nowrap}.team-access__editor,.team-access label,.team-access fieldset{min-width:0}.team-access input,.team-access select,.team-access textarea{box-sizing:border-box;min-width:0}.team-access .settings-tabs{flex-wrap:wrap}.team-access__preview button:disabled{opacity:1;color:#fff;background:#315c4d;padding:10px 16px;border:0;border-radius:8px}
-@media(max-width:800px){.team-access__members>article{padding:12px}}
+.team-access__member-header > .team-access__status {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  justify-self: start;
+}
+.team-access__member-header em {
+  white-space: nowrap;
+}
+.team-access__editor,
+.team-access label,
+.team-access fieldset {
+  min-width: 0;
+}
+.team-access input,
+.team-access select,
+.team-access textarea {
+  box-sizing: border-box;
+  min-width: 0;
+}
+.team-access .settings-tabs {
+  flex-wrap: wrap;
+}
+.team-access__preview button:disabled {
+  opacity: 1;
+  color: #fff;
+  background: #315c4d;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+}
+@media (max-width: 800px) {
+  .team-access__members > article {
+    padding: 12px;
+  }
+}
 
 /* Respond to the member list's available width, including the settings sidebar. */
-.team-access__members{container-type:inline-size;gap:10px;min-width:0}
-.team-access__members>article{padding:14px 16px;min-width:0}
-.team-access__members>article>.team-access__member-header{display:grid;grid-template-columns:minmax(0,1fr) max-content max-content;align-items:center;gap:16px}
-.team-access__identity{display:flex;align-items:flex-start;gap:12px;min-width:0}
-.team-access__identity>:first-child{flex-shrink:0}
-.team-access__identity-copy{display:grid;gap:4px;min-width:0}
-.team-access__name{font-size:.9rem;line-height:1.4;overflow-wrap:anywhere}
-.team-access .team-access__email{font-size:.8rem;line-height:1.45;overflow-wrap:anywhere;word-break:normal}
-.team-access__roles{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;min-width:0}
-.team-access__member-header .team-access__roles em{margin:0;padding:3px 8px;font-size:.72rem;line-height:1.4;white-space:normal;overflow-wrap:normal}
-.team-access__member-header>.team-access__status{white-space:nowrap;overflow-wrap:normal;justify-self:start;align-self:center;line-height:1.4;font-size:.75rem;padding:4px 9px}
-.team-access__member-actions{display:flex;flex-direction:column;gap:4px;align-items:stretch}
-.team-access__member-actions>.btn{min-height:32px;padding:6px 10px;font-size:.78rem;line-height:1.35;white-space:nowrap;box-shadow:none}
-.team-access__member-actions>.team-access__resend{border-color:transparent;background:transparent;color:var(--color-text-muted,#53665f);font-size:.74rem}
-.team-access__member-actions>.team-access__resend:hover{color:var(--color-brand,#315c4d);background:var(--color-brand-soft,#edf5f0)}
-.team-access__resend-feedback{display:grid;gap:2px;max-width:220px;padding:7px 9px;border-radius:7px;background:#edf5f0;color:#315c4d;font-size:.72rem;line-height:1.35}.team-access__resend-feedback span{overflow-wrap:anywhere}.team-access__resend-feedback.is-failed{background:#fff0ee;color:#8b3028}
-.team-access__member-actions>.team-access__remove{background:var(--color-danger-soft);border-color:color-mix(in srgb,var(--color-danger) 28%,transparent);color:var(--color-danger)}
-.team-access__responsibilities{gap:0!important;padding:8px 14px 12px!important}.team-access__editor fieldset>.team-access__responsibility{align-items:center;border-bottom:1px solid #dce5e1;display:grid;gap:16px;grid-template-columns:minmax(0,1fr) auto;padding:14px 0}.team-access__editor fieldset>.team-access__responsibility:last-child{border-bottom:0}.team-access__responsibility>strong{font-size:.88rem;line-height:1.4}.team-access__responsibility-options{display:flex;flex-wrap:wrap;gap:10px 18px}.team-access__editor .team-access__responsibility-options>label{align-items:center;display:flex;gap:7px;grid-template-columns:none;white-space:nowrap}.team-access__responsibility-options input[type=checkbox]{appearance:auto;flex:0 0 auto;height:16px;margin:0;padding:0;width:16px}.team-access__remove-confirmation{display:grid;gap:16px}.team-access__remove-confirmation>p{margin:0}.team-access__remove-confirmation>div{align-items:center;background:var(--color-surface-subtle,#f4f7f5);border:1px solid var(--border,#d9e2de);border-radius:12px;display:flex;gap:12px;padding:14px}.team-access__remove-confirmation>div>span{display:grid;gap:3px;min-width:0}.team-access__remove-confirmation small{overflow-wrap:anywhere}.team-access__remove-modal{width:min(100%,520px)}.team-access__remove-modal .modal-footer{gap:8px}
-@container(max-width:680px){
-  .team-access__members>article>.team-access__member-header{grid-template-columns:minmax(0,1fr) max-content;gap:10px 14px}
-  .team-access__identity{grid-column:1;grid-row:1}
-  .team-access__member-header>.team-access__status{grid-column:1;grid-row:2;margin-left:48px}
-  .team-access__member-actions{grid-column:2;grid-row:1 / 3}
+.team-access__members {
+  container-type: inline-size;
+  gap: 10px;
+  min-width: 0;
 }
-@container(max-width:440px){
-  .team-access__members>article{padding:12px}
-  .team-access__members>article>.team-access__member-header{grid-template-columns:minmax(0,1fr);gap:12px}
-  .team-access__member-header>.team-access__status{grid-column:1;grid-row:auto;margin-left:48px}
-  .team-access__member-actions{grid-column:1;grid-row:auto;width:100%;gap:6px}
-  .team-access__member-actions>.btn{width:100%;min-height:38px}
+.team-access__members > article {
+  padding: 14px 16px;
+  min-width: 0;
 }
-@media(max-width:620px){.team-access__editor fieldset>.team-access__responsibility{align-items:start;grid-template-columns:1fr}.team-access__responsibility-options{display:grid;gap:10px}.team-access__remove-modal .modal-footer{display:grid;grid-template-columns:1fr 1fr}.team-access__remove-modal .modal-footer .btn{width:100%}}
-.invitation-identity-summary{align-items:center;display:flex;gap:18px;justify-content:space-between}.invitation-identity-summary>div{display:grid;gap:4px}.invitation-identity-summary span{color:#5f716a;font-size:.8rem}.invitation-identity-summary a{color:#1f6654;font-weight:750;white-space:nowrap}.invitation-template-preview{overflow:hidden}.invitation-preview-samples{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}.invitation-preview-message{display:block!important;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.invitation-preview-message button{display:inline-block;margin:4px 2px;vertical-align:middle}.invitation-template-editor>small{line-height:1.55}@media(max-width:720px){.invitation-identity-summary{align-items:flex-start;flex-direction:column}.invitation-preview-samples{grid-template-columns:1fr!important}.invitation-template-editor{padding:12px}.invitation-template-editor>div>.btn{width:100%}}
+.team-access__members > article > .team-access__member-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  align-items: center;
+  gap: 16px;
+}
+.team-access__identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.team-access__identity > :first-child {
+  flex-shrink: 0;
+}
+.team-access__identity-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.team-access__name {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.team-access .team-access__email {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.team-access__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+  min-width: 0;
+}
+.team-access__member-header .team-access__roles em {
+  margin: 0;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: normal;
+}
+.team-access__member-header > .team-access__status {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  justify-self: start;
+  align-self: center;
+  line-height: 1.4;
+  font-size: 0.75rem;
+  padding: 4px 9px;
+}
+.team-access__member-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+.team-access__member-actions > .btn {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.team-access__member-actions > .team-access__resend {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-muted, #53665f);
+  font-size: 0.74rem;
+}
+.team-access__member-actions > .team-access__resend:hover {
+  color: var(--color-brand, #315c4d);
+  background: var(--color-brand-soft, #edf5f0);
+}
+.team-access__resend-feedback {
+  display: grid;
+  gap: 2px;
+  max-width: 220px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #edf5f0;
+  color: #315c4d;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.team-access__resend-feedback span {
+  overflow-wrap: anywhere;
+}
+.team-access__resend-feedback.is-failed {
+  background: #fff0ee;
+  color: #8b3028;
+}
+.team-access__notice {
+  background: #e8f5ee;
+  border: 1px solid #9bd4b0;
+  border-radius: 8px;
+  color: #216547;
+  font-weight: 700;
+  margin: 0;
+  padding: 10px 14px;
+}
+.team-access__member-actions > .team-access__remove {
+  background: var(--color-danger-soft);
+  border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
+  color: var(--color-danger);
+}
+.team-access__responsibilities {
+  gap: 0 !important;
+  padding: 8px 14px 12px !important;
+}
+.team-access__editor fieldset > .team-access__responsibility {
+  align-items: center;
+  border-bottom: 1px solid #dce5e1;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 14px 0;
+}
+.team-access__editor fieldset > .team-access__responsibility:last-child {
+  border-bottom: 0;
+}
+.team-access__responsibility > strong {
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+.team-access__responsibility-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.team-access__editor .team-access__responsibility-options > label {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  grid-template-columns: none;
+  white-space: nowrap;
+}
+.team-access__responsibility-options input[type="checkbox"] {
+  appearance: auto;
+  flex: 0 0 auto;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  width: 16px;
+}
+.team-access__remove-confirmation {
+  display: grid;
+  gap: 16px;
+}
+.team-access__remove-confirmation > p {
+  margin: 0;
+}
+.team-access__remove-confirmation > div {
+  align-items: center;
+  background: var(--color-surface-subtle, #f4f7f5);
+  border: 1px solid var(--border, #d9e2de);
+  border-radius: 12px;
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+}
+.team-access__remove-confirmation > div > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.team-access__remove-confirmation small {
+  overflow-wrap: anywhere;
+}
+.team-access__remove-modal {
+  width: min(100%, 520px);
+}
+.team-access__remove-modal .modal-footer {
+  gap: 8px;
+}
+@container (max-width:680px) {
+  .team-access__members > article > .team-access__member-header {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 10px 14px;
+  }
+  .team-access__identity {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .team-access__member-header > .team-access__status {
+    grid-column: 1;
+    grid-row: 2;
+    margin-left: 48px;
+  }
+  .team-access__member-actions {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+}
+@container (max-width:440px) {
+  .team-access__members > article {
+    padding: 12px;
+  }
+  .team-access__members > article > .team-access__member-header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .team-access__member-header > .team-access__status {
+    grid-column: 1;
+    grid-row: auto;
+    margin-left: 48px;
+  }
+  .team-access__member-actions {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+    gap: 6px;
+  }
+  .team-access__member-actions > .btn {
+    width: 100%;
+    min-height: 38px;
+  }
+}
+@media (max-width: 620px) {
+  .team-access__editor fieldset > .team-access__responsibility {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+  .team-access__responsibility-options {
+    display: grid;
+    gap: 10px;
+  }
+  .team-access__remove-modal .modal-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .team-access__remove-modal .modal-footer .btn {
+    width: 100%;
+  }
+}
+.invitation-identity-summary {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+.invitation-identity-summary > div {
+  display: grid;
+  gap: 4px;
+}
+.invitation-identity-summary span {
+  color: #5f716a;
+  font-size: 0.8rem;
+}
+.invitation-identity-summary a {
+  color: #1f6654;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.invitation-template-preview {
+  overflow: hidden;
+}
+.invitation-preview-samples {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+}
+.invitation-preview-message {
+  display: block !important;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.invitation-preview-message button {
+  display: inline-block;
+  margin: 4px 2px;
+  vertical-align: middle;
+}
+.invitation-template-editor > small {
+  line-height: 1.55;
+}
+@media (max-width: 720px) {
+  .invitation-identity-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .invitation-preview-samples {
+    grid-template-columns: 1fr !important;
+  }
+  .invitation-template-editor {
+    padding: 12px;
+  }
+  .invitation-template-editor > div > .btn {
+    width: 100%;
+  }
+}
 
-.team-access__page-header{align-items:center;display:flex;gap:18px;justify-content:space-between}.team-access__page-header p{margin-bottom:0}.team-access__tabs{border-bottom:1px solid var(--border,#d9e2de);display:flex;gap:4px}.team-access__tabs button{background:transparent;border:0;border-bottom:3px solid transparent;color:var(--color-text-muted,#53665f);cursor:pointer;font:inherit;font-weight:700;padding:10px 14px}.team-access__tabs button.is-active{border-color:var(--color-brand,#226653);color:var(--color-text,#18221f)}
-.team-access__invite-modal{width:min(720px,calc(100vw - 32px))}.team-access__invite{display:grid;gap:16px}.team-access__invite-actions{display:flex;gap:8px;justify-content:flex-end}.team-access__role-settings{align-items:start;display:grid;gap:18px;grid-template-columns:190px minmax(0,1fr)}.team-access__role-settings>aside{background:var(--color-surface-subtle,#f6f9f7);border:1px solid var(--border,#d9e2de);border-radius:12px;display:grid;overflow:hidden;padding:6px}.team-access__role-settings>aside button{background:transparent;border:0;border-radius:8px;color:inherit;cursor:pointer;font:inherit;font-weight:650;padding:10px;text-align:left}.team-access__role-settings>aside button.is-active{background:white;box-shadow:0 1px 4px rgba(20,45,36,.1);color:var(--color-brand,#226653)}.team-access__role-editor{border:1px solid var(--border,#d9e2de);border-radius:14px;display:grid;gap:14px;padding:18px}.team-access__role-editor>header{align-items:start;display:flex;gap:12px;justify-content:space-between}.team-access__role-editor h3,.team-access__role-editor p{margin:0}.team-access__role-editor fieldset{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin:0}.team-access__role-editor fieldset label{align-items:center;display:flex;font-size:.82rem;gap:8px}.team-access__protected{background:#edf5f0;border-radius:999px;color:#315c4d;font-size:.75rem;font-weight:750;padding:5px 9px;white-space:nowrap}.team-access__role-actions{display:flex;flex-wrap:wrap;gap:8px}.team-access__protected-note{background:#f4f7f5;border-radius:9px;padding:12px}
-@media(max-width:700px){.team-access__page-header{align-items:stretch;flex-direction:column}.team-access__page-header .btn{width:100%}.team-access__tabs{overflow-x:auto}.team-access__tabs button{white-space:nowrap}.team-access__role-settings{grid-template-columns:1fr}.team-access__role-settings>aside{display:flex;overflow-x:auto}.team-access__role-settings>aside button{flex:0 0 auto}.team-access__invite-actions{display:grid;grid-template-columns:1fr}.team-access__invite-actions .btn{width:100%}}
-.team-access__invite .team-access__ambassador-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.team-access__invite .team-access__ambassador-fields>label{display:grid;grid-template-columns:1fr;gap:6px}.team-access__generated-referral{background:#edf5f1;border:1px solid #cfe1d8;border-radius:10px;display:grid!important;grid-column:1/-1;grid-template-columns:1fr!important;gap:4px!important;padding:12px}.team-access__generated-referral span{color:#53665f;font-size:.78rem;line-height:1.5}.team-access__ambassador-fields .form-error{font-size:.75rem;margin:0}@media(max-width:620px){.team-access__invite .team-access__ambassador-fields{grid-template-columns:1fr}.team-access__generated-referral{grid-column:auto}}
-.team-access__recipient-preview-message{display:block;line-height:1.7;overflow-wrap:anywhere;white-space:pre-wrap}.team-access__recipient-preview-message button{display:inline-block;margin:4px 2px;vertical-align:middle}
+.team-access__page-header {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+.team-access__page-header p {
+  margin-bottom: 0;
+}
+.team-access__tabs {
+  border-bottom: 1px solid var(--border, #d9e2de);
+  display: flex;
+  gap: 4px;
+}
+.team-access__tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: var(--color-text-muted, #53665f);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+.team-access__tabs button.is-active {
+  border-color: var(--color-brand, #226653);
+  color: var(--color-text, #18221f);
+}
+.team-access__invite-modal {
+  width: min(720px, calc(100vw - 32px));
+}
+.team-access__invite {
+  display: grid;
+  gap: 16px;
+}
+.team-access__invite-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.team-access__role-settings {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 190px minmax(0, 1fr);
+}
+.team-access__role-settings > aside {
+  background: var(--color-surface-subtle, #f6f9f7);
+  border: 1px solid var(--border, #d9e2de);
+  border-radius: 12px;
+  display: grid;
+  overflow: hidden;
+  padding: 6px;
+}
+.team-access__role-settings > aside button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  padding: 10px;
+  text-align: left;
+}
+.team-access__role-settings > aside button.is-active {
+  background: white;
+  box-shadow: 0 1px 4px rgba(20, 45, 36, 0.1);
+  color: var(--color-brand, #226653);
+}
+.team-access__role-editor {
+  border: 1px solid var(--border, #d9e2de);
+  border-radius: 14px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+.team-access__role-editor > header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+.team-access__role-editor h3,
+.team-access__role-editor p {
+  margin: 0;
+}
+.team-access__role-editor fieldset {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  margin: 0;
+}
+.team-access__role-editor fieldset label {
+  align-items: center;
+  display: flex;
+  font-size: 0.82rem;
+  gap: 8px;
+}
+.team-access__protected {
+  background: #edf5f0;
+  border-radius: 999px;
+  color: #315c4d;
+  font-size: 0.75rem;
+  font-weight: 750;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+.team-access__role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.team-access__protected-note {
+  background: #f4f7f5;
+  border-radius: 9px;
+  padding: 12px;
+}
+@media (max-width: 700px) {
+  .team-access__page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .team-access__page-header .btn {
+    width: 100%;
+  }
+  .team-access__tabs {
+    overflow-x: auto;
+  }
+  .team-access__tabs button {
+    white-space: nowrap;
+  }
+  .team-access__role-settings {
+    grid-template-columns: 1fr;
+  }
+  .team-access__role-settings > aside {
+    display: flex;
+    overflow-x: auto;
+  }
+  .team-access__role-settings > aside button {
+    flex: 0 0 auto;
+  }
+  .team-access__invite-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .team-access__invite-actions .btn {
+    width: 100%;
+  }
+}
+.team-access__invite .team-access__ambassador-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.team-access__invite .team-access__ambassador-fields > label {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+.team-access__generated-referral {
+  background: #edf5f1;
+  border: 1px solid #cfe1d8;
+  border-radius: 10px;
+  display: grid !important;
+  grid-column: 1/-1;
+  grid-template-columns: 1fr !important;
+  gap: 4px !important;
+  padding: 12px;
+}
+.team-access__generated-referral span {
+  color: #53665f;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.team-access__ambassador-fields .form-error {
+  font-size: 0.75rem;
+  margin: 0;
+}
+@media (max-width: 620px) {
+  .team-access__invite .team-access__ambassador-fields {
+    grid-template-columns: 1fr;
+  }
+  .team-access__generated-referral {
+    grid-column: auto;
+  }
+}
+.team-access__recipient-preview-message {
+  display: block;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.team-access__recipient-preview-message button {
+  display: inline-block;
+  margin: 4px 2px;
+  vertical-align: middle;
+}

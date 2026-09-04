@@ -392,7 +392,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
       </nav>
       {error ? <p className="form-error">{error}</p> : null}
       {notice ? (
-        <p className="discovery-notice" role="status">
+        <p className="team-access__notice" role="status">
           {notice}
         </p>
       ) : null}
