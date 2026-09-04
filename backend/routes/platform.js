@@ -118,6 +118,8 @@ router.get("/businesses", requirePlatformOwner, async (_req, res) => {
         domain: domainReady,
         senderEmail: senderEmailReady,
         website: websiteReady,
+        inviteReady:
+          domainReady === "configured" && senderEmailReady === "configured",
         launchReady:
           domainReady === "configured" &&
           senderEmailReady === "configured" &&

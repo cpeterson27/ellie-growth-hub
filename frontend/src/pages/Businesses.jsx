@@ -249,11 +249,22 @@ export default function Businesses() {
                 Sender email: {business.readiness?.senderEmail || "unknown"}
               </small>
               <small>Website: {business.readiness?.website || "unknown"}</small>
-              <strong>
-                {business.readiness?.launchReady
-                  ? "Ready for launch"
-                  : "Not ready for launch"}
+              <strong
+                className={
+                  business.readiness?.inviteReady
+                    ? "business-readiness--ready"
+                    : "business-readiness--blocked"
+                }
+              >
+                {business.readiness?.inviteReady
+                  ? "Ready to send invitations"
+                  : "Invitations blocked"}
               </strong>
+              <small>
+                {business.readiness?.launchReady
+                  ? "Ready for full launch"
+                  : "Website launch still needs setup"}
+              </small>
             </div>
             <div className="business-card__connections">
               {business.social.map((social) => (
