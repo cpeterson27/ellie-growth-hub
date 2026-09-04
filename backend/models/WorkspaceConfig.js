@@ -13,6 +13,7 @@ const workspaceConfigSchema = new mongoose.Schema(
     moduleAccess: {
       coaching: { type: Boolean, default: false },
       ambassadors: { type: Boolean, default: false },
+      publicProof: { type: Boolean, default: false },
     },
     legalBusinessName: {
       type: String,

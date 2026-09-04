@@ -55,8 +55,12 @@ router.get("/", async (req, res) => {
   res.json({
     workspaceName: config.workspaceName,
     moduleAccess: isEllieWorkspace
-      ? { coaching: true, ambassadors: true }
-      : config.moduleAccess || { coaching: false, ambassadors: false },
+      ? { coaching: true, ambassadors: true, publicProof: true }
+      : config.moduleAccess || {
+          coaching: false,
+          ambassadors: false,
+          publicProof: false,
+        },
     legalBusinessName: config.legalBusinessName,
     postalAddress: config.postalAddress,
     addressLine1: config.addressLine1,
@@ -117,6 +121,7 @@ router.patch("/", async (req, res) => {
               moduleAccess: {
                 coaching: req.body.moduleAccess.coaching === true,
                 ambassadors: req.body.moduleAccess.ambassadors === true,
+                publicProof: req.body.moduleAccess.publicProof === true,
               },
             }
           : {}),

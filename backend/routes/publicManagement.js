@@ -40,6 +40,7 @@ router.patch("/config", admin, async (req, res) => {
       branding: req.body.branding,
       appBranding: req.body.appBranding,
       publicSite: req.body.publicSite,
+      moduleAccess: req.body.moduleAccess,
       organizationLogoUrl: req.body.organizationLogoUrl,
     });
     const config = await WorkspaceConfig.findOneAndUpdate(
@@ -49,6 +50,7 @@ router.patch("/config", admin, async (req, res) => {
           branding: clean.branding,
           appBranding: clean.appBranding,
           publicSite: clean.publicSite,
+          moduleAccess: clean.moduleAccess,
         },
       },
       { upsert: true, new: true },
@@ -275,26 +277,23 @@ router.patch("/programs/:id", admin, async (req, res) => {
     });
     if (!program) return res.status(404).json({ error: "Program not found" });
     const input = req.body || {},
-      slug = String(input.slug || program.publicPresentation?.slug || program.name)
+      slug = String(
+        input.slug || program.publicPresentation?.slug || program.name,
+      )
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, ""),
       description = String(input.description || "").trim();
     if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))
-      return res
-        .status(400)
-        .json({
-          error:
-            "Use a lowercase program slug with letters, numbers, and hyphens",
-        });
+      return res.status(400).json({
+        error:
+          "Use a lowercase program slug with letters, numbers, and hyphens",
+      });
     if (input.status === "published" && (!slug || !description))
-      return res
-        .status(400)
-        .json({
-          error:
-            "Add a program name and description before publishing.",
-        });
+      return res.status(400).json({
+        error: "Add a program name and description before publishing.",
+      });
     program.publicPresentation = {
       slug,
       title: String(input.title || program.name).slice(0, 180),
@@ -325,14 +324,12 @@ router.patch("/programs/:id", admin, async (req, res) => {
     await program.save();
     res.json({ success: true, data: program });
   } catch (error) {
-    res
-      .status(400)
-      .json({
-        error:
-          error.code === 11000
-            ? "That public program slug is already used"
-            : error.message,
-      });
+    res.status(400).json({
+      error:
+        error.code === 11000
+          ? "That public program slug is already used"
+          : error.message,
+    });
   }
 });
 router.get("/profiles", admin, async (req, res) =>
@@ -402,14 +399,12 @@ router.post("/profiles", admin, async (req, res) => {
     });
     res.status(201).json({ success: true, data: profile });
   } catch (error) {
-    res
-      .status(400)
-      .json({
-        error:
-          error.code === 11000
-            ? "A public profile already exists for this person or URL"
-            : error.message,
-      });
+    res.status(400).json({
+      error:
+        error.code === 11000
+          ? "A public profile already exists for this person or URL"
+          : error.message,
+    });
   }
 });
 router.patch("/profiles/:id", admin, async (req, res) => {
@@ -443,12 +438,10 @@ router.post("/profiles/:id/edit-token", admin, async (req, res) => {
     req.auth.workspaceId,
     req.auth.user._id,
   );
-  res
-    .status(201)
-    .json({
-      success: true,
-      data: { editPath: `/profile/edit/${token}`, expiresInDays: 30 },
-    });
+  res.status(201).json({
+    success: true,
+    data: { editPath: `/profile/edit/${token}`, expiresInDays: 30 },
+  });
 });
 router.get(
   "/profile/me",
@@ -501,14 +494,12 @@ router.put(
       await profile.save();
       res.json({ success: true, data: profile });
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          error:
-            error.code === 11000
-              ? "That profile URL is already used"
-              : error.message,
-        });
+      res.status(400).json({
+        error:
+          error.code === 11000
+            ? "That profile URL is already used"
+            : error.message,
+      });
     }
   },
 );

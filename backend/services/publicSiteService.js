@@ -237,14 +237,38 @@ function sanitizedConfig(workspace, config) {
       ...(p.sectionVisibility || {}),
     },
     ellie = workspace?.slug === (process.env.ELLIE_WORKSPACE_SLUG || "ellie"),
+    moduleAccess = ellie
+      ? { coaching: true, ambassadors: true, publicProof: true }
+      : {
+          coaching: config?.moduleAccess?.coaching === true,
+          ambassadors: config?.moduleAccess?.ambassadors === true,
+          publicProof: config?.moduleAccess?.publicProof === true,
+        },
     contactEmail =
       ellie &&
       (!p.contactEmail ||
         String(p.contactEmail).toLowerCase() === "support@elliescoaching.com")
         ? "team@elliescoaching.com"
         : p.contactEmail || "";
+  const effectiveVisibility = {
+    ...visibility,
+    ...(moduleAccess.coaching
+      ? {}
+      : {
+          video: false,
+          programs: false,
+          journey: false,
+          team: false,
+          event: false,
+          community: false,
+        }),
+    ...(moduleAccess.publicProof
+      ? {}
+      : { proof: false, testimonials: false, results: false }),
+  };
   return {
     workspace: { name: workspace.name, slug: workspace.slug },
+    moduleAccess,
     branding: {
       logoUrl: safeUrl(b.logoUrl || base.branding.logoUrl, { relative: true }),
       faviconUrl: safeUrl(b.faviconUrl, { relative: true }),
@@ -414,7 +438,7 @@ function sanitizedConfig(workspace, config) {
       baseFontSize: Math.min(20, Math.max(14, Number(p.baseFontSize) || 16)),
       headingScale: Math.min(1.2, Math.max(0.8, Number(p.headingScale) || 1)),
       sectionVisibility: Object.fromEntries(
-        Object.entries(visibility).map(([key, value]) => [
+        Object.entries(effectiveVisibility).map(([key, value]) => [
           key,
           value !== false,
         ]),

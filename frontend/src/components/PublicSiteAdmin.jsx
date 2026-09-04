@@ -166,6 +166,11 @@ export default function PublicSiteAdmin({ section = "website" }) {
       ...config.publicSite.sectionVisibility,
       [key]: value,
     });
+  const patchModuleAccess = (key, value) =>
+    setConfig((current) => ({
+      ...current,
+      moduleAccess: { ...current.moduleAccess, [key]: value },
+    }));
   const siteName =
     config?.branding?.publicSiteName ||
     config?.workspaceName ||
@@ -850,6 +855,40 @@ export default function PublicSiteAdmin({ section = "website" }) {
       ) : null}
       {tab === "sections" ? (
         <section className="website-content-editor">
+          <div className="website-editor-group">
+            <header>
+              <span>00</span>
+              <div>
+                <h4>Optional site capabilities</h4>
+                <p>Turn on only the content this workspace actually offers.</p>
+              </div>
+            </header>
+            <div className="public-admin__checks">
+              <label className="website-toggle">
+                <input
+                  type="checkbox"
+                  checked={config.moduleAccess?.coaching === true}
+                  onChange={(e) =>
+                    patchModuleAccess("coaching", e.target.checked)
+                  }
+                />
+                <span>Programs, coaches, and client journey</span>
+              </label>
+              <label className="website-toggle">
+                <input
+                  type="checkbox"
+                  checked={config.moduleAccess?.publicProof === true}
+                  onChange={(e) =>
+                    patchModuleAccess("publicProof", e.target.checked)
+                  }
+                />
+                <span>Testimonials, results, and proof</span>
+              </label>
+            </div>
+            <Button loading={saving} onClick={saveConfig}>
+              Save site capabilities
+            </Button>
+          </div>
           <div className="public-admin__checks">
             {Object.entries(visibilityLabels).map(([key, label]) => (
               <label className="website-toggle" key={key}>
