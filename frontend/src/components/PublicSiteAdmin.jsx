@@ -249,6 +249,7 @@ export default function PublicSiteAdmin({ section = "website" }) {
       const saved = await createManagedTestimonial(testimonial);
       setTestimonials((rows) => [saved, ...rows]);
       setTestimonial(blankTestimonial);
+      setMessage("Testimonial saved successfully.");
     } catch (err) {
       setError(err.response?.data?.error || "Unable to create testimonial.");
     }
@@ -258,6 +259,7 @@ export default function PublicSiteAdmin({ section = "website" }) {
     setTestimonials((rows) =>
       rows.map((item) => (item._id === saved._id ? saved : item)),
     );
+    setMessage(`Testimonial ${status} successfully.`);
   };
   const saveProgram = async (program) => {
     try {
@@ -278,6 +280,7 @@ export default function PublicSiteAdmin({ section = "website" }) {
       const saved = await createManagedProfile(profile);
       setProfiles((rows) => [...rows, saved]);
       setProfile(blankProfile);
+      setMessage(`${saved.displayName} public profile saved successfully.`);
     } catch (err) {
       setError(err.response?.data?.error || "Unable to create profile.");
     }
