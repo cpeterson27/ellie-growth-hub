@@ -152,14 +152,20 @@ function memberResponse(
   isSelf = false,
 ) {
   const roles = normalizeRoles(membership);
+  const invitedName = invitation?.name || membership.userId?.name || "";
+  const invitedEmail = invitation?.email || membership.userId?.email || "";
   return {
     id: membership._id,
     userId: membership.userId?._id || membership.userId,
-    firstName: membership.userId?.firstName || "",
-    lastName: membership.userId?.lastName || "",
+    firstName:
+      invitation?.name?.split(/\s+/)[0] || membership.userId?.firstName || "",
+    lastName:
+      invitation?.name?.split(/\s+/).slice(1).join(" ") ||
+      membership.userId?.lastName ||
+      "",
     phone: membership.userId?.phone || "",
-    name: membership.userId?.name || "",
-    email: membership.userId?.email || "",
+    name: invitedName,
+    email: invitedEmail,
     avatarUrl: membership.userId?.avatarUrl || "",
     role: membership.role,
     roles,
@@ -202,6 +208,8 @@ function memberResponse(
           sentAt: invitation.sentAt,
           expiresAt: invitation.expiresAt,
           acceptedAt: invitation.acceptedAt,
+          name: invitation.name,
+          email: invitation.email,
         }
       : null,
     lifecycle:

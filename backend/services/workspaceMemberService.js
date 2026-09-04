@@ -184,14 +184,21 @@ async function deliverInvitation(
         .select("publicHosts")
         .lean()
     : null;
-  if (!senderEmail && workspace?.publicHosts?.length) {
+  const configuredFallback = String(process.env.EMAIL_FROM || "").trim();
+  const fallbackDomain = configuredFallback
+    .match(/@([^>\s]+)/)?.[1]
+    ?.toLowerCase();
+  const mappedHost = (workspace?.publicHosts || []).find(
+    (host) => host && !String(host).toLowerCase().startsWith("www."),
+  );
+  if (!senderEmail && mappedHost && fallbackDomain !== mappedHost) {
     throw new Error(
       "Set the workspace invitation sender email in Organization Profile before sending.",
     );
   }
   const from = senderEmail
     ? `${invitedBy || workspaceName} <${senderEmail}>`
-    : process.env.EMAIL_FROM || "Lead Porch <onboarding@resend.dev>";
+    : configuredFallback || "Lead Porch <onboarding@resend.dev>";
   const vars = {
     firstName: invitation.name.split(/\s+/)[0],
     displayName: invitation.name,
