@@ -447,7 +447,9 @@ function workspaceSlugForHost(request) {
   );
 }
 function requestHost(request) {
-  return String(request?.headers?.host || "")
+  return String(
+    request?.headers?.["x-public-host"] || request?.headers?.host || "",
+  )
     .split(",")[0]
     .split(":")[0]
     .trim()
