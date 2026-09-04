@@ -32,6 +32,23 @@ const dependencies = {
 };
 const INVITATION_DAYS = 7;
 
+async function workspaceConfigFor(workspaceId, models) {
+  if (!models.WorkspaceConfig?.findOne) return null;
+  const query = models.WorkspaceConfig.findOne({
+    workspaceId,
+    key: "primary",
+  });
+  const config = await query.select("workspaceName invitationIdentity").lean();
+  if (config?.invitationIdentity?.senderEmail) return config;
+  if (!models.WorkspaceConfig.collection?.findOne) return config;
+  return (
+    (await models.WorkspaceConfig.collection.findOne({
+      workspaceId,
+      key: "primary",
+    })) || config
+  );
+}
+
 async function requireOwnerActor(input, models) {
   if (!input.workspaceId || !input.actorUserId)
     throw Object.assign(
@@ -652,11 +669,7 @@ async function sendInvitation(
   const token = crypto.randomBytes(32).toString("base64url");
   const [workspace, config, inviter] = await Promise.all([
     models.Workspace.findById(workspaceId).select("name").lean(),
-    models.WorkspaceConfig?.findOne
-      ? models.WorkspaceConfig.findOne({ workspaceId, key: "primary" })
-          .select("workspaceName invitationIdentity")
-          .lean()
-      : null,
+    workspaceConfigFor(workspaceId, models),
     models.User.findById(invitation.invitedBy).select("name").lean(),
   ]);
   const delivery = await deliverInvitation(
