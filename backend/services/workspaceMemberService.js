@@ -162,8 +162,18 @@ async function deliverInvitation(
     invitation.workspaceId,
     models,
   )}/accept-invitation/${encodeURIComponent(token)}`;
-  const from = senderEmail
-    ? `${invitedBy || workspaceName} <${senderEmail}>`
+  const workspace = invitation.workspaceId
+    ? await models.Workspace.findById(invitation.workspaceId)
+        .select("publicHosts")
+        .lean()
+    : null;
+  const mappedHost = (workspace?.publicHosts || []).find(
+    (host) => host && !String(host).toLowerCase().startsWith("www."),
+  );
+  const effectiveSenderEmail =
+    senderEmail || (mappedHost ? `team@${mappedHost}` : "");
+  const from = effectiveSenderEmail
+    ? `${invitedBy || workspaceName} <${effectiveSenderEmail}>`
     : process.env.EMAIL_FROM || "Lead Porch <onboarding@resend.dev>";
   const vars = {
     firstName: invitation.name.split(/\s+/)[0],

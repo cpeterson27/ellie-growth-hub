@@ -14,7 +14,9 @@ async function renderEmailContent(
   { contact = null, preview = false } = {},
 ) {
   const workspace = outreachItem.workspaceId
-    ? await Workspace.findById(outreachItem.workspaceId).select("name").lean()
+    ? await Workspace.findById(outreachItem.workspaceId)
+        .select("name publicHosts")
+        .lean()
     : null;
   const workspaceConfig = await WorkspaceConfig.findOne({
     ...(outreachItem.workspaceId
@@ -165,7 +167,9 @@ async function sendEmail(outreachItem) {
       key: "primary",
     }).lean();
     const workspace = outreachItem.workspaceId
-      ? await Workspace.findById(outreachItem.workspaceId).select("name").lean()
+      ? await Workspace.findById(outreachItem.workspaceId)
+          .select("name publicHosts")
+          .lean()
       : null;
     const gmailConnection = await IntegrationConnection.findOne({
       ...(outreachItem.workspaceId
@@ -178,9 +182,15 @@ async function sendEmail(outreachItem) {
       String(workspaceConfig?.invitationIdentity?.replyToEmail || "").trim() ||
       String(process.env.EMAIL_REPLY_TO || "").trim() ||
       String(gmailConnection?.settings?.email || "").trim();
-    const senderEmail = String(
-      workspaceConfig?.invitationIdentity?.senderEmail || "",
-    ).trim();
+    const senderEmail =
+      String(workspaceConfig?.invitationIdentity?.senderEmail || "").trim() ||
+      String(
+        (workspace?.publicHosts || []).find(
+          (host) => host && !String(host).toLowerCase().startsWith("www."),
+        ) || "",
+      )
+        .trim()
+        .toLowerCase();
     const senderName = String(
       workspaceConfig?.invitationIdentity?.senderName ||
         workspace?.name ||
@@ -190,7 +200,9 @@ async function sendEmail(outreachItem) {
 
     const response = await integrationHub.execute("resend", "sendEmail", {
       from:
-        (senderEmail ? `${senderName} <${senderEmail}>` : "") ||
+        (senderEmail
+          ? `${senderName} <${senderEmail.includes("@") ? senderEmail : `team@${senderEmail}`}>`
+          : "") ||
         process.env.EMAIL_FROM ||
         `${senderName} <onboarding@resend.dev>`,
       to: recipient,
