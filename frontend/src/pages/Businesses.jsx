@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   createPlatformWorkspace,
   fetchPlatformBusinesses,
+  updatePlatformWorkspaceHosts,
 } from "../services/api.js";
 import useAuth from "../context/useAuth.js";
 import "./Businesses.css";
@@ -26,6 +27,9 @@ export default function Businesses() {
   const [creating, setCreating] = useState(false),
     [showCreate, setShowCreate] = useState(false),
     [draft, setDraft] = useState({ name: "", slug: "", publicHosts: "" });
+  const [editingHosts, setEditingHosts] = useState(null),
+    [savingHosts, setSavingHosts] = useState(false),
+    [message, setMessage] = useState("");
   const { refreshWorkspaces } = useAuth();
   useEffect(() => {
     fetchPlatformBusinesses()
@@ -67,6 +71,25 @@ export default function Businesses() {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, ""),
     }));
+  const saveHosts = async (business) => {
+    setSavingHosts(true);
+    setError("");
+    setMessage("");
+    try {
+      const publicHosts = String(editingHosts || "")
+        .split(",")
+        .map((host) => host.trim())
+        .filter(Boolean);
+      await updatePlatformWorkspaceHosts(business.id, publicHosts);
+      setBusinesses(await fetchPlatformBusinesses());
+      setEditingHosts(null);
+      setMessage(`${business.name} public domains saved successfully.`);
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to save public domains.");
+    } finally {
+      setSavingHosts(false);
+    }
+  };
   return (
     <main className="businesses-page">
       <header className="businesses-page__header">
@@ -143,6 +166,7 @@ export default function Businesses() {
         </form>
       ) : null}
       {error ? <p className="form-error">{error}</p> : null}
+      {message ? <p className="businesses-message">{message}</p> : null}
       <section className="businesses-list">
         {businesses.map((business) => (
           <article key={business.id} className="business-card">
@@ -179,6 +203,39 @@ export default function Businesses() {
                   ? business.publicHosts.join(", ")
                   : "Not configured"}
               </small>
+              {editingHosts === null ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelected(business.id);
+                    setEditingHosts((business.publicHosts || []).join(", "));
+                  }}
+                >
+                  Edit domains
+                </button>
+              ) : selected === business.id ? (
+                <div>
+                  <input
+                    value={editingHosts}
+                    onChange={(event) => setEditingHosts(event.target.value)}
+                    placeholder="client.com, www.client.com"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingHosts}
+                    onClick={() => saveHosts(business)}
+                  >
+                    {savingHosts ? "Saving…" : "Save domains"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingHosts}
+                    onClick={() => setEditingHosts(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
             </div>
             <div className="business-card__connections">
               {business.social.map((social) => (

@@ -211,6 +211,10 @@ export const fetchPlatformBusinesses = () =>
   api.get("/platform/businesses").then((res) => res.data.businesses);
 export const createPlatformWorkspace = (values) =>
   api.post("/platform/workspaces", values).then((res) => res.data.workspace);
+export const updatePlatformWorkspaceHosts = (id, publicHosts) =>
+  api
+    .patch(`/platform/workspaces/${id}/public-hosts`, { publicHosts })
+    .then((res) => res.data.workspace);
 export const fetchLaunchReadiness = () =>
   api.get("/workspace/readiness").then((res) => res.data.data);
 export const fetchPublicSite = () =>

@@ -132,5 +132,34 @@ router.post("/workspaces", requirePlatformOwner, async (req, res) => {
   }
 });
 
+router.patch(
+  "/workspaces/:id/public-hosts",
+  requirePlatformOwner,
+  async (req, res) => {
+    try {
+      const publicHosts = workspaceProvisioningService.normalizePublicHosts(
+        req.body?.publicHosts,
+      );
+      const workspace = await Workspace.findByIdAndUpdate(
+        req.params.id,
+        { $set: { publicHosts } },
+        { new: true, runValidators: true },
+      )
+        .select("name slug status publicHosts")
+        .lean();
+      if (!workspace)
+        return res.status(404).json({ error: "Workspace not found" });
+      return res.json({ workspace });
+    } catch (error) {
+      return res.status(error.code === 11000 ? 409 : 400).json({
+        error:
+          error.code === 11000
+            ? "One of those public domains is already assigned to another workspace"
+            : error.message || "Unable to update public domains",
+      });
+    }
+  },
+);
+
 module.exports = router;
 module.exports.connectionSummary = connectionSummary;
