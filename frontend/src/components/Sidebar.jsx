@@ -261,6 +261,8 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   }, [session?.workspace?.name, socialConnectionOnly]);
   const coachOnly = isCoachOnly(session);
   const ambassadorOnly = isAmbassadorOnly(session);
+  const coachingEnabled = organization?.moduleAccess?.coaching === true;
+  const ambassadorsEnabled = organization?.moduleAccess?.ambassadors === true;
   const displayedOrganization = socialConnectionOnly
     ? {
         workspaceName: session?.workspace?.name || "Lead Porch",
@@ -281,7 +283,19 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
       : coachOnly
         ? coachGroups
         : canManageCoaching(session)
-          ? [navGroups[0], coachingGroup, ...navGroups.slice(1)]
+          ? [
+              navGroups[0],
+              ...(coachingEnabled ? [coachingGroup] : []),
+              ...navGroups
+                .map((group) => ({
+                  ...group,
+                  items: group.items.filter(
+                    (item) =>
+                      item.path !== "/ambassadors/manage" || ambassadorsEnabled,
+                  ),
+                }))
+                .slice(1),
+            ]
           : navGroups;
   if (!coachOnly && canUseCoachPortal(session))
     groups = [...groups, ...coachGroups];

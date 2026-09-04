@@ -10,6 +10,10 @@ const workspaceConfigSchema = new mongoose.Schema(
       trim: true,
       maxlength: 120,
     },
+    moduleAccess: {
+      coaching: { type: Boolean, default: false },
+      ambassadors: { type: Boolean, default: false },
+    },
     legalBusinessName: {
       type: String,
       default: "Ellie's Coaching",

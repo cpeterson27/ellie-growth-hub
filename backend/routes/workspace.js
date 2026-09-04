@@ -34,6 +34,11 @@ router.get(
 );
 
 router.get("/", async (req, res) => {
+  const workspace = await Workspace.findById(req.auth.workspaceId)
+    .select("slug")
+    .lean();
+  const isEllieWorkspace =
+    workspace?.slug === (process.env.ELLIE_WORKSPACE_SLUG || "ellie");
   const config = await WorkspaceConfig.findOneAndUpdate(
     { workspaceId: req.auth.workspaceId, key: "primary" },
     { $setOnInsert: { workspaceName: "Lead Porch" } },
@@ -49,6 +54,9 @@ router.get("/", async (req, res) => {
   }
   res.json({
     workspaceName: config.workspaceName,
+    moduleAccess: isEllieWorkspace
+      ? { coaching: true, ambassadors: true }
+      : config.moduleAccess || { coaching: false, ambassadors: false },
     legalBusinessName: config.legalBusinessName,
     postalAddress: config.postalAddress,
     addressLine1: config.addressLine1,
@@ -104,6 +112,14 @@ router.patch("/", async (req, res) => {
     {
       $set: {
         workspaceName,
+        ...(req.body?.moduleAccess
+          ? {
+              moduleAccess: {
+                coaching: req.body.moduleAccess.coaching === true,
+                ambassadors: req.body.moduleAccess.ambassadors === true,
+              },
+            }
+          : {}),
         legalBusinessName: String(req.body?.legalBusinessName || "").trim(),
         postalAddress: String(req.body?.postalAddress || "").trim(),
         addressLine1: String(req.body?.addressLine1 || "").trim(),
