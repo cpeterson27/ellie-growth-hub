@@ -63,7 +63,7 @@ function connectionSummary(provider, connections) {
 router.get("/businesses", requirePlatformOwner, async (_req, res) => {
   const [workspaces, memberships, connections] = await Promise.all([
     Workspace.find({})
-      .select("name slug status createdAt updatedAt")
+      .select("name slug status publicHosts createdAt updatedAt")
       .sort({ name: 1 })
       .lean(),
     WorkspaceMembership.find({})
