@@ -182,15 +182,9 @@ async function sendEmail(outreachItem) {
       String(workspaceConfig?.invitationIdentity?.replyToEmail || "").trim() ||
       String(process.env.EMAIL_REPLY_TO || "").trim() ||
       String(gmailConnection?.settings?.email || "").trim();
-    const senderEmail =
-      String(workspaceConfig?.invitationIdentity?.senderEmail || "").trim() ||
-      String(
-        (workspace?.publicHosts || []).find(
-          (host) => host && !String(host).toLowerCase().startsWith("www."),
-        ) || "",
-      )
-        .trim()
-        .toLowerCase();
+    const senderEmail = String(
+      workspaceConfig?.invitationIdentity?.senderEmail || "",
+    ).trim();
     const senderName = String(
       workspaceConfig?.invitationIdentity?.senderName ||
         workspace?.name ||
@@ -198,11 +192,16 @@ async function sendEmail(outreachItem) {
         "Lead Porch",
     ).trim();
 
+    if (!senderEmail && workspace?.publicHosts?.length) {
+      return {
+        success: false,
+        message:
+          "Set the workspace invitation sender email in Organization Profile before sending.",
+      };
+    }
     const response = await integrationHub.execute("resend", "sendEmail", {
       from:
-        (senderEmail
-          ? `${senderName} <${senderEmail.includes("@") ? senderEmail : `team@${senderEmail}`}>`
-          : "") ||
+        (senderEmail ? `${senderName} <${senderEmail}>` : "") ||
         process.env.EMAIL_FROM ||
         `${senderName} <onboarding@resend.dev>`,
       to: recipient,

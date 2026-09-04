@@ -587,8 +587,8 @@ export default function Settings() {
                     placeholder="team@yourdomain.com"
                   />
                   <small>
-                    Use an address on a verified sending domain. Leave blank to
-                    use the platform fallback.
+                    Required before sending from this workspace. Use an address
+                    on a verified sending domain.
                   </small>
                 </label>
                 <label className="form-field">
