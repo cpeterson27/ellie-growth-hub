@@ -241,6 +241,10 @@ export const fetchPublicManagementConfig = () =>
   api.get("/public-management/config").then((res) => res.data.data);
 export const updatePublicManagementConfig = (values) =>
   api.patch("/public-management/config", values).then((res) => res.data.data);
+export const loadLeadPorchStarterSite = () =>
+  api
+    .post("/public-management/config/lead-porch-starter")
+    .then((res) => res.data.data);
 export const fetchApplicationConfig = () =>
   api.get("/public-management/application-config").then((res) => res.data.data);
 export const updateApplicationConfig = (values) =>

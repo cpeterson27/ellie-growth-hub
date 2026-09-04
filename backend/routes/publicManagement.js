@@ -63,6 +63,42 @@ router.patch("/config", admin, async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
+router.post("/config/lead-porch-starter", admin, async (req, res) => {
+  try {
+    if (
+      req.auth.workspace?.slug === (process.env.ELLIE_WORKSPACE_SLUG || "ellie")
+    )
+      return res
+        .status(403)
+        .json({ error: "Ellie’s website cannot use the Lead Porch starter." });
+    const starter = service.defaults(req.auth.workspace);
+    const config = await WorkspaceConfig.findOneAndUpdate(
+      { workspaceId: req.auth.workspaceId, key: "primary" },
+      {
+        $set: {
+          branding: starter.branding,
+          publicSite: starter.publicSite,
+          moduleAccess: {
+            coaching: false,
+            ambassadors: false,
+            publicProof: false,
+          },
+        },
+      },
+      { upsert: true, new: true },
+    );
+    res.json({
+      success: true,
+      data: service.sanitizedConfig(req.auth.workspace, config),
+    });
+  } catch (error) {
+    res
+      .status(400)
+      .json({
+        error: error.message || "Unable to load Lead Porch starter site.",
+      });
+  }
+});
 router.get("/application-config", admin, async (req, res) => {
   const config = await WorkspaceConfig.findOne({
     workspaceId: req.auth.workspaceId,

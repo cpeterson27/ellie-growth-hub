@@ -13,6 +13,7 @@ import {
   fetchManagedTestimonials,
   fetchPublicManagementConfig,
   fetchWorkspaceMembers,
+  loadLeadPorchStarterSite,
   updateManagedProfile,
   updateManagedTestimonial,
   updateProgramPublicPresentation,
@@ -151,6 +152,29 @@ export default function PublicSiteAdmin({ section = "website" }) {
     } catch (err) {
       setError(
         err.response?.data?.error || "Unable to save public-site settings.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  const loadLeadPorchStarter = async () => {
+    if (
+      !window.confirm(
+        "Replace this workspace website with the Lead Porch starter site?",
+      )
+    )
+      return;
+    try {
+      setSaving(true);
+      setError("");
+      setConfig(await loadLeadPorchStarterSite());
+      setMessage(
+        "Lead Porch starter site loaded. Review and save your contact details.",
+      );
+    } catch (err) {
+      setError(
+        err.response?.data?.error ||
+          "Unable to load the Lead Porch starter site.",
       );
     } finally {
       setSaving(false);
@@ -338,6 +362,11 @@ export default function PublicSiteAdmin({ section = "website" }) {
               visible sections.
             </p>
           </div>
+          {config.workspace?.slug !== "ellie" ? (
+            <Button variant="outline" onClick={loadLeadPorchStarter}>
+              Load Lead Porch starter
+            </Button>
+          ) : null}
         </header>
       ) : (
         <header className="website-section-heading">

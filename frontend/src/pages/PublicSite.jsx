@@ -715,6 +715,7 @@ export function PublicHome() {
   const { site } = useWorkspaceTheme();
   const p = site?.publicSite || {},
     visibility = p.sectionVisibility || {},
+    showPrograms = visibility.programs !== false,
     heroImage = p.heroMediaUrl || "",
     workspaceName =
       site?.branding?.publicSiteName || site?.workspace?.name || "",
@@ -757,9 +758,14 @@ export function PublicHome() {
             </h1>
             <div className="public-hero-subhead">{p.subheadline}</div>
             <div className="public-hero-actions">
-              <a className="public-hero-btn-primary" href="#programs">
-                Explore programs
-              </a>
+              <SmartLink
+                className="public-hero-btn-primary"
+                to={showPrograms ? "#programs" : p.primaryCtaUrl || "#contact"}
+              >
+                {showPrograms
+                  ? "Explore programs"
+                  : p.primaryCtaLabel || "Contact us"}
+              </SmartLink>
               <SmartLink
                 className="public-hero-btn-secondary"
                 to={p.secondaryCtaUrl || "/#about"}
