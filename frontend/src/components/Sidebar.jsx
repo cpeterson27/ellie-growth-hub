@@ -333,7 +333,12 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
           )}
         </div>
         <div>
-          <p>Lead Porch</p>
+          <p>
+            {displayedOrganization?.workspaceName ||
+              session?.workspace?.name ||
+              site?.workspace?.name ||
+              "Lead Porch"}
+          </p>
           <small>Powered by Lead Porch</small>
         </div>
       </div>

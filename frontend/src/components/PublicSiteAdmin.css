@@ -388,6 +388,9 @@
   padding: 10px 14px;
   text-align: center;
 }
+.branding-save-status:empty {
+  display: none;
+}
 .brand-contrast {
   border-radius: 8px;
   font-weight: 700;
