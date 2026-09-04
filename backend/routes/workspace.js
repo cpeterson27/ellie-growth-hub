@@ -32,9 +32,9 @@ router.get(
     }),
 );
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
   const config = await WorkspaceConfig.findOneAndUpdate(
-    { key: "primary" },
+    { workspaceId: req.auth.workspaceId, key: "primary" },
     { $setOnInsert: { workspaceName: "Lead Porch" } },
     { upsert: true, new: true },
   );
@@ -99,7 +99,7 @@ router.patch("/", async (req, res) => {
       .status(400)
       .json({ error: "Enter a valid invitation reply-to email." });
   const config = await WorkspaceConfig.findOneAndUpdate(
-    { key: "primary" },
+    { workspaceId: req.auth.workspaceId, key: "primary" },
     {
       $set: {
         workspaceName,
@@ -821,9 +821,9 @@ router.patch(
   },
 );
 
-router.get("/discovery-templates", async (_req, res) => {
+router.get("/discovery-templates", async (req, res) => {
   const config = await WorkspaceConfig.findOneAndUpdate(
-    { key: "primary" },
+    { workspaceId: req.auth.workspaceId, key: "primary" },
     { $setOnInsert: { workspaceName: "Growth Operator" } },
     { upsert: true, new: true },
   );
@@ -886,7 +886,7 @@ router.put("/discovery-templates", async (req, res) => {
     }))
     .filter((template) => template.name);
   const config = await WorkspaceConfig.findOneAndUpdate(
-    { key: "primary" },
+    { workspaceId: req.auth.workspaceId, key: "primary" },
     { $set: { discoveryTemplates: templates } },
     { upsert: true, new: true },
   );
