@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "./Button.jsx";
 import { uploadEventImage } from "../services/api.js";
 
@@ -101,6 +101,11 @@ export default function WorkspaceBrandingEditor({
 }) {
   const [uploading, setUploading] = useState(""),
     [saveMessage, setSaveMessage] = useState("");
+  useEffect(() => {
+    if (!saveMessage) return undefined;
+    const timer = window.setTimeout(() => setSaveMessage(""), 4000);
+    return () => window.clearTimeout(timer);
+  }, [saveMessage]);
   const patchPublic = (key, value) =>
     setConfig((current) => ({
       ...current,

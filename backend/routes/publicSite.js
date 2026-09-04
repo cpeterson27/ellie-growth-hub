@@ -25,6 +25,7 @@ function limited(req, res, next) {
 }
 router.get("/site", async (req, res, next) => {
   try {
+    res.set("Cache-Control", "no-store");
     res.json({ success: true, data: await service.site(req) });
   } catch (error) {
     next(error);
