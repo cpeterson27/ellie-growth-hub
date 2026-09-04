@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Button from "./Button.jsx";
 import { uploadEventImage } from "../services/api.js";
 
@@ -44,19 +44,6 @@ const SOCIALS = [
   ["X", "https://x.com/"],
   ["YouTube", "https://youtube.com/"],
 ];
-
-function contrastRatio(a, b) {
-  const rgb = (hex) =>
-    [1, 3, 5]
-      .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
-  const lum = (hex) => {
-    const [r, g, bl] = rgb(hex);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
-  };
-  const [one, two] = [lum(a), lum(b)].sort((x, y) => y - x);
-  return (one + 0.05) / (two + 0.05);
-}
 
 function AssetField({ label, help, value, onChange, onUpload, busy }) {
   const [advanced, setAdvanced] = useState(false);
@@ -165,14 +152,6 @@ export default function WorkspaceBrandingEditor({
   };
   const app = config.appBranding || {},
     brand = config.branding || {};
-  const contrast = useMemo(
-    () =>
-      contrastRatio(
-        app.sidebarBackgroundColor || "#102a24",
-        app.sidebarTextColor || "#f7faf8",
-      ),
-    [app.sidebarBackgroundColor, app.sidebarTextColor],
-  );
   return (
     <div className="workspace-branding-editor">
       <section>
@@ -388,17 +367,6 @@ export default function WorkspaceBrandingEditor({
             </label>
           ))}
         </div>
-        <p
-          className={
-            contrast >= 4.5
-              ? "brand-contrast is-good"
-              : "brand-contrast is-warning"
-          }
-        >
-          {contrast >= 4.5
-            ? "App sidebar contrast passes AA; public website theme is separate."
-            : "Sidebar text contrast is too low. Choose more distinct colors."}
-        </p>
         <div
           className="brand-live-preview brand-app-preview"
           style={{
@@ -423,7 +391,6 @@ export default function WorkspaceBrandingEditor({
       <footer>
         <Button
           loading={saving}
-          disabled={contrast < 4.5}
           onClick={async () => {
             setSaveMessage("");
             try {
