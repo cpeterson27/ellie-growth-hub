@@ -27,7 +27,10 @@ router.get("/site", async (req, res, next) => {
   try {
     res.set("Cache-Control", "no-store");
     const data = await service.site(req);
-    if (!data.publicSite?.published)
+    const legalPath = String(req.query.publicPath || "").match(
+      /^\/(?:privacy(?:-policy)?|terms|data-deletion)\/?$/,
+    );
+    if (!data.publicSite?.published && !legalPath)
       return res.status(404).json({ error: "This website is not published." });
     res.json({ success: true, data });
   } catch (error) {

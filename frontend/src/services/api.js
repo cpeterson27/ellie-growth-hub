@@ -219,7 +219,12 @@ export const fetchLaunchReadiness = () =>
   api.get("/workspace/readiness").then((res) => res.data.data);
 export const fetchPublicSite = () =>
   api
-    .get("/public/site", { params: { publicHost: window.location.hostname } })
+    .get("/public/site", {
+      params: {
+        publicHost: window.location.hostname,
+        publicPath: window.location.pathname,
+      },
+    })
     .then((res) => res.data.data);
 export const fetchPublicProgram = (slug) =>
   api.get(`/public/programs/${slug}`).then((res) => res.data.data);
