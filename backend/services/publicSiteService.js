@@ -67,6 +67,16 @@ function defaults(workspace) {
       testimonials: true,
       event: true,
       community: true,
+    },
+    genericVisibility = {
+      video: false,
+      proof: false,
+      programs: false,
+      journey: false,
+      team: false,
+      testimonials: false,
+      event: false,
+      community: false,
     };
   return ellie
     ? {
@@ -198,7 +208,7 @@ function defaults(workspace) {
           bodyFont: "modern",
           baseFontSize: 16,
           headingScale: 1,
-          sectionVisibility: visibility,
+          sectionVisibility: genericVisibility,
           trustMetrics: [],
           footerText: "",
         },

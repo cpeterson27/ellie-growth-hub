@@ -152,7 +152,12 @@ export function PublicLayout({ children }) {
       <div className="public-loading">{`Opening ${workspaceName || "your"} site…`}</div>
     );
   const socials = site?.publicSite?.socialLinks || [],
-    showResults = site?.publicSite?.sectionVisibility?.results === true,
+    visibility = site?.publicSite?.sectionVisibility || {},
+    showPrograms = visibility.programs !== false,
+    showJourney = visibility.journey !== false,
+    showTeam = visibility.team !== false,
+    showTestimonials = visibility.testimonials !== false,
+    showResults = visibility.results === true,
     close = () => setOpen(false);
   return (
     <div
@@ -186,13 +191,19 @@ export function PublicLayout({ children }) {
           <a onClick={close} href="/#about">
             Why us
           </a>
-          <a onClick={close} href="/#programs">
-            Programs
-          </a>
-          <a onClick={close} href="/#journey">
-            The path
-          </a>
-          <Link to="/testimonials">Testimonials</Link>
+          {showPrograms ? (
+            <a onClick={close} href="/#programs">
+              Programs
+            </a>
+          ) : null}
+          {showJourney ? (
+            <a onClick={close} href="/#journey">
+              The path
+            </a>
+          ) : null}
+          {showTestimonials ? (
+            <Link to="/testimonials">Testimonials</Link>
+          ) : null}
           <Link className="public-login" to="/login">
             Login
           </Link>
@@ -225,15 +236,15 @@ export function PublicLayout({ children }) {
           </div>
           <div className="public-footer-col">
             <div className="public-footer-label">EXPLORE</div>
-            <a href="/#programs">Programs</a>
+            {showPrograms ? <a href="/#programs">Programs</a> : null}
             <a href="/#about">About</a>
-            <a href="/#team">Team</a>
+            {showTeam ? <a href="/#team">Team</a> : null}
             {showResults ? <Link to="/testimonials">Results</Link> : null}
           </div>
           <div className="public-footer-col">
             <div className="public-footer-label">CONNECT</div>
             <a href="/#contact">Contact</a>
-            <a href="/#programs">Application</a>
+            {showPrograms ? <a href="/#programs">Application</a> : null}
             {socials.map((link) => (
               <a
                 key={link.url}
