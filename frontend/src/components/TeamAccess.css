@@ -315,6 +315,11 @@
   margin: 0;
   padding: 10px 14px;
 }
+.team-access__notice.is-error {
+  background: #fff0ee;
+  border-color: #d08a82;
+  color: #8b3028;
+}
 .team-access__member-actions > .team-access__remove {
   background: var(--color-danger-soft);
   border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
