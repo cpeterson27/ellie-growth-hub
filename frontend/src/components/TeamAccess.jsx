@@ -79,6 +79,16 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
     [identitySaving, setIdentitySaving] = useState(false);
   const resendInFlight = useRef(new Set()),
     removalInFlight = useRef(new Set());
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(""), 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+  useEffect(() => {
+    if (!sendFeedback || sendFeedback.status !== "success") return undefined;
+    const timer = window.setTimeout(() => setSendFeedback(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [sendFeedback]);
   const blankInvite = {
     firstName: "",
     lastName: "",
