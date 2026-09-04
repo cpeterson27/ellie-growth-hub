@@ -1,6 +1,7 @@
 const express = require("express");
 const Workspace = require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
+const WorkspaceConfig = require("../models/WorkspaceConfig");
 const SocialConnection = require("../models/SocialConnection");
 const { requirePlatformOwner } = require("../middleware/auth");
 const workspaceProvisioningService = require("../services/workspaceProvisioningService");
@@ -76,7 +77,18 @@ router.get("/businesses", requirePlatformOwner, async (_req, res) => {
       )
       .lean(),
   ]);
+  const configs = await Promise.all(
+    workspaces.map((workspace) =>
+      WorkspaceConfig.collection.findOne({
+        workspaceId: workspace._id,
+        key: "primary",
+      }),
+    ),
+  );
   const data = workspaces.map((workspace) => {
+    const config = configs.find(
+      (item) => String(item?.workspaceId) === String(workspace._id),
+    );
     const team = memberships.filter(
       (item) => String(item.workspaceId) === String(workspace._id),
     );
@@ -94,6 +106,13 @@ router.get("/businesses", requirePlatformOwner, async (_req, res) => {
       slug: workspace.slug,
       status: workspace.status,
       publicHosts: workspace.publicHosts || [],
+      readiness: {
+        domain: workspace.publicHosts?.length ? "configured" : "missing",
+        senderEmail: config?.invitationIdentity?.senderEmail
+          ? "configured"
+          : "missing",
+        website: config?.publicSite?.published === true ? "published" : "draft",
+      },
       owner: owner?.userId
         ? { name: owner.userId.name, email: owner.userId.email }
         : null,

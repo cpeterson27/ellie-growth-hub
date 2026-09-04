@@ -243,6 +243,14 @@ export default function Businesses() {
               ) : null}
             </div>
             <div className="business-card__connections">
+              <strong>Onboarding readiness</strong>
+              <small>Domain: {business.readiness?.domain || "unknown"}</small>
+              <small>
+                Sender email: {business.readiness?.senderEmail || "unknown"}
+              </small>
+              <small>Website: {business.readiness?.website || "unknown"}</small>
+            </div>
+            <div className="business-card__connections">
               {business.social.map((social) => (
                 <div key={social.provider}>
                   <strong>{providerNames[social.provider]}</strong>
