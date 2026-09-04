@@ -275,6 +275,7 @@ async function deliverInvitation(
   await invitation.save();
   if (models.CrmActivity)
     await models.CrmActivity.create({
+      type: "system",
       source: "crm",
       title:
         invitation.deliveryStatus === "sent"
