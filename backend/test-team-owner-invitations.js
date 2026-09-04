@@ -166,7 +166,7 @@ async function run() {
     (error) =>
       error.code === "WORKSPACE_LAUNCH_READY_REQUIRED" &&
       Array.isArray(error.details) &&
-      error.details.length === 3,
+      error.details.length === 2,
   );
   actorRole = "admin";
   await assert.rejects(

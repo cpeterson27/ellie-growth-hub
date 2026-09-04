@@ -110,7 +110,7 @@ async function workspaceLaunchReadiness(workspaceId, models) {
   const [workspace, config] = await Promise.all([
     models.Workspace.findById(workspaceId).select("publicHosts").lean(),
     models.WorkspaceConfig.findOne({ workspaceId, key: "primary" })
-      .select("invitationIdentity publicSite")
+      .select("invitationIdentity")
       .lean(),
   ]);
   const publicHost = (workspace?.publicHosts || [])
@@ -138,16 +138,6 @@ async function workspaceLaunchReadiness(workspaceId, models) {
         ? `Configured as ${config.invitationIdentity.senderEmail}`
         : "Set an invitation sender email in Organization Profile.",
       path: "/settings/communications/invitations",
-    },
-    {
-      key: "website",
-      label: "Website",
-      ready: config?.publicSite?.published === true,
-      detail:
-        config?.publicSite?.published === true
-          ? "Public site is published"
-          : "Publish the public website before sending invitations.",
-      path: "/settings/website",
     },
   ];
   const missing = items
@@ -731,7 +721,9 @@ async function sendInvitation(
   const readiness = await workspaceLaunchReadiness(workspaceId, models);
   if (!readiness.ready) {
     const error = new Error(
-      "Finish workspace setup before sending invitations.",
+      `Finish workspace setup before sending invitations: ${readiness.missing
+        .map((item) => item.label)
+        .join(", ")}.`,
     );
     error.code = "WORKSPACE_LAUNCH_READY_REQUIRED";
     error.details = readiness.missing;
