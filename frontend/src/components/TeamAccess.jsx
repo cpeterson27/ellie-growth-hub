@@ -229,7 +229,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
         ...current,
         roleDefaults: result.roleDefaults,
       }));
-      setNotice(`${roleLabels[roleDraft]} reset to Growth Operator defaults.`);
+      setNotice(`${roleLabels[roleDraft]} reset to Lead Porch defaults.`);
     } catch (err) {
       setError(
         err.response?.data?.error || "Unable to reset role permissions.",
@@ -455,7 +455,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
               </span>
             </div>
             <p>
-              They will lose Growth Operator access and any pending invitation
+              They will lose Lead Porch access and any pending invitation
               link will stop working. Their CRM Contacts and business records
               will stay intact.
             </p>
@@ -857,7 +857,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
                     <div className="team-access__generated-referral">
                       <strong>Referral link</strong>
                       <span>
-                        Growth Operator generates a unique referral code from
+                        Lead Porch generates a unique referral code from
                         the ambassador’s name when this profile is created.
                       </span>
                     </div>

@@ -25,7 +25,7 @@ export default function AmbassadorPortal() {
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     <section className="ambassador-referral-card" aria-labelledby="my-referral-link-title">
       <div className="ambassador-referral-card__heading"><FiLink aria-hidden="true"/><div><p>Referral tools</p><h2 id="my-referral-link-title">My referral link</h2></div></div>
-      <p>Share this complete link with people who have asked to learn more. Growth Operator will preserve your referral when they submit the public program application.</p>
+      <p>Share this complete link with people who have asked to learn more. Lead Porch will preserve your referral when they submit the public program application.</p>
       <dl><div><dt>Referral code</dt><dd>{profile?.referralCode || "Not configured"}</dd></div></dl>
       <div className="ambassador-copy-row"><input aria-label="My complete referral URL" readOnly value={profile?.referralUrl || "Your link will appear after your account is activated."}/><Button onClick={copyLink} disabled={!profile?.referralUrl}>Copy referral link</Button></div>
       {copyStatus ? <p className="ambassador-copy-status" role="status"><FiCheck aria-hidden="true"/>{copyStatus}</p> : null}

@@ -518,7 +518,7 @@ function contactWorkflowState(contact = {}) {
     return {
       key: "audience",
       label: "Add audience info",
-      detail: "Tell Growth Operator what this person is interested in.",
+      detail: "Tell Lead Porch what this person is interested in.",
     };
   }
   if (contact.campaignIds?.length) {
@@ -919,7 +919,7 @@ export default function Contacts() {
       setCardStatus(
         err.name === "NotAllowedError"
           ? "Camera access was blocked. Allow camera access."
-          : "Growth Operator could not start the camera. Try again.",
+          : "Lead Porch could not start the camera. Try again.",
       );
     }
   }
@@ -1406,7 +1406,7 @@ export default function Contacts() {
         } catch (previewError) {
           setImportError(
             previewError.response?.data?.message ||
-              "Growth Operator could not check this CSV for duplicates. Import is paused.",
+              "Lead Porch could not check this CSV for duplicates. Import is paused.",
           );
         }
       },
@@ -1425,7 +1425,7 @@ export default function Contacts() {
     } catch (previewError) {
       setImportError(
         previewError.response?.data?.message ||
-          "Growth Operator could not recheck this working list for duplicates.",
+          "Lead Porch could not recheck this working list for duplicates.",
       );
     }
   }
@@ -1796,7 +1796,7 @@ export default function Contacts() {
       }
     }
     throw new Error(
-      "Email verification is taking longer than expected. Keep this window open and click Verify again shortly; Growth Operator will reuse the existing check.",
+      "Email verification is taking longer than expected. Keep this window open and click Verify again shortly; Lead Porch will reuse the existing check.",
     );
   }
 
@@ -1908,7 +1908,7 @@ export default function Contacts() {
       <section className="crm-mode-banner" aria-label="CRM connection options">
         <div>
           <span className="crm-mode-banner__eyebrow">Your contact system</span>
-          <strong>Growth Operator CRM is active.</strong>
+          <strong>Lead Porch CRM is active.</strong>
           <p>
             Use this CRM on its own, or connect another CRM and keep the same
             review, audience, and campaign workflow.
@@ -2590,7 +2590,7 @@ export default function Contacts() {
                         {!hasAudienceSignals(contact) ? (
                           <span
                             className="contact-status-badge contact-status-badge--unknown"
-                            title="Growth Operator has only identity information and will not guess this person’s interests."
+                            title="Lead Porch has only identity information and will not guess this person’s interests."
                           >
                             Audience unknown
                           </span>
@@ -2920,7 +2920,7 @@ export default function Contacts() {
           </fieldset>
           <p className="business-card-consent">
             <strong>Email safety:</strong> Receiving a business card does not
-            automatically grant bulk-marketing consent. Growth Operator stores the contact
+            automatically grant bulk-marketing consent. Lead Porch stores the contact
             for relationship follow-up; campaign permission remains off until it
             is recorded separately.
           </p>
@@ -2947,7 +2947,7 @@ export default function Contacts() {
         }
       >
         <p className="contact-modal-intro">
-          Only a usable name is required. Growth Operator saves this contact directly
+          Only a usable name is required. Lead Porch saves this contact directly
           to MongoDB.
         </p>
         {contactEditorSections.map(([section, fields]) => (
@@ -3035,7 +3035,7 @@ export default function Contacts() {
                 <strong>I personally confirmed this email address</strong>
                 <small>
                   Use this only when the person gave you the address directly or
-                  you already confirmed it. Growth Operator records this as
+                  you already confirmed it. Lead Porch records this as
                   owner-confirmed, not Emailable-verified.
                 </small>
               </span>
@@ -3057,7 +3057,7 @@ export default function Contacts() {
               <strong>Can receive campaign email</strong>
               <small>
                 {manualContact.email
-                  ? "Turn this on when this person gave permission. Growth Operator will include unsubscribe options automatically."
+                  ? "Turn this on when this person gave permission. Lead Porch will include unsubscribe options automatically."
                   : "Enter an email address above to enable this setting."}
               </small>
             </span>
@@ -3175,7 +3175,7 @@ export default function Contacts() {
                   <span>List preparation workspace</span>
                   <strong>Turn a contact table into a clean CSV</strong>
                   <small>
-                    Paste rows with column headings. Growth Operator separates the people
+                    Paste rows with column headings. Lead Porch separates the people
                     into editable fields, flags incomplete records, and
                     prepares a CSV for your email-finder website. Nothing is
                     added to the CRM until you choose to import it.
@@ -3199,14 +3199,14 @@ export default function Contacts() {
                   if (!pasted.trim()) return;
                   event.preventDefault();
                   setImportPasteText(pasted);
-                  setImportFileName("People pasted into Growth Operator");
+                  setImportFileName("People pasted into Lead Porch");
                   prepareImport(pasted, "csv");
                 }}
               >
                 <span className="lead-clipboard-target__icon">⌘V</span>
                 <strong>Click here, then paste tabular contacts</strong>
                 <p>
-                  Growth Operator immediately converts the clipboard into spreadsheet
+                  Lead Porch immediately converts the clipboard into spreadsheet
                   columns. The unstructured source text is not kept on screen.
                 </p>
                 <small>Mac: Command + V · Windows: Ctrl + V</small>
@@ -3217,7 +3217,7 @@ export default function Contacts() {
             </div>
             <p>
               Upload a CSV exported from a spreadsheet or another CRM.
-              Growth Operator recognizes common people columns automatically.
+              Lead Porch recognizes common people columns automatically.
             </p>
             <label className="crm-file-drop crm-file-drop--primary">
               <input
@@ -3283,7 +3283,7 @@ export default function Contacts() {
                 <p>
                   Download this clean file for your email-finder website. When
                   it returns the emails, upload that completed CSV back here so
-                  Growth Operator keeps every field in the correct column.
+                  Lead Porch keeps every field in the correct column.
                 </p>
               </div>
               <Button variant="outline" onClick={downloadPreparedContactCsv}>
@@ -3297,7 +3297,7 @@ export default function Contacts() {
                     <span>Duplicate protection complete</span>
                     <h3>
                       {duplicatePreview.newContacts} new ·{" "}
-                      {duplicatePreview.existingContacts} already in Growth Operator ·{" "}
+                      {duplicatePreview.existingContacts} already in Lead Porch ·{" "}
                       {duplicatePreview.duplicatesInFile} repeated in this
                       import
                     </h3>
@@ -3309,7 +3309,7 @@ export default function Contacts() {
                   </strong>
                 </header>
                 <p>
-                  Growth Operator will never create another contact for a matched row.
+                  Lead Porch will never create another contact for a matched row.
                   Existing contacts are updated with useful new information.
                   Repeated rows in this file resolve to the same contact.
                 </p>
@@ -3334,7 +3334,7 @@ export default function Contacts() {
                               {row.company ? ` · ${row.company}` : ""}
                             </small>
                           </div>
-                          <p>No matching contact was found in Growth Operator.</p>
+                          <p>No matching contact was found in Lead Porch.</p>
                         </article>
                       ))}
                   </section>
@@ -3356,7 +3356,7 @@ export default function Contacts() {
                               className={`duplicate-preflight__status is-${row.status}`}
                             >
                               {row.status === "existing"
-                                ? "Already in Growth Operator"
+                                ? "Already in Lead Porch"
                                 : "Repeated in import"}
                             </span>
                             <div>
@@ -3384,7 +3384,7 @@ export default function Contacts() {
               </section>
             ) : (
               <section className="duplicate-preflight is-checking">
-                <strong>Checking every row against Growth Operator…</strong>
+                <strong>Checking every row against Lead Porch…</strong>
                 <span>
                   Import stays disabled until duplicate protection finishes.
                 </span>
@@ -3422,7 +3422,7 @@ export default function Contacts() {
                 <strong>Approve these people for campaign email</strong>
                 <small>
                   Turn this on only when everyone in this import is eligible to
-                  receive this campaign. Growth Operator applies it to the whole group and
+                  receive this campaign. Lead Porch applies it to the whole group and
                   adds unsubscribe options automatically.
                 </small>
               </span>
@@ -3628,9 +3628,9 @@ export default function Contacts() {
                   <tr>
                     {importHeaders.map((header) => (
                       <th key={header}>
-                        <span>Map to Growth Operator field</span>
+                        <span>Map to Lead Porch field</span>
                         <select
-                          aria-label={`Map ${header} column to Growth Operator field`}
+                          aria-label={`Map ${header} column to Lead Porch field`}
                           value={header}
                           onChange={(event) =>
                             remapImportHeader(header, event.target.value)
@@ -3824,7 +3824,7 @@ export default function Contacts() {
                 <header>
                   <span>Deal to Close follow-up</span>
                   <h3>This is a saved public signal—not a complete person yet</h3>
-                  <p>Growth Operator kept the original post as evidence, but it will not treat a Reddit username as a real name or invent an email. Complete these steps in order.</p>
+                  <p>Lead Porch kept the original post as evidence, but it will not treat a Reddit username as a real name or invent an email. Complete these steps in order.</p>
                 </header>
                 <ol>
                   <li className="is-done"><b>1</b><div><strong>Buyer intent reviewed</strong><span>You already said this signal may be worth following up.</span></div></li>
@@ -3857,7 +3857,7 @@ export default function Contacts() {
                   {unsubscribeSourceLabel(
                     detailContact.emailPreferences?.unsubscribeSource,
                   )}{" "}
-                  on {unsubscribeDate(detailContact)}. Growth Operator will keep campaign
+                  on {unsubscribeDate(detailContact)}. Lead Porch will keep campaign
                   sending blocked unless the contact explicitly opts in again.
                 </p>
               </section>
@@ -3868,7 +3868,7 @@ export default function Contacts() {
                   <div>
                     <span>LinkedIn outreach</span>
                     <h3>Review the message, then hand it off</h3>
-                    <p>Growth Operator prepares and tracks the draft. You remain responsible for pasting and sending it on LinkedIn.</p>
+                    <p>Lead Porch prepares and tracks the draft. You remain responsible for pasting and sending it on LinkedIn.</p>
                   </div>
                   <em className={`is-${detailContact.linkedinOutreach?.status || "not_started"}`}>
                     {(detailContact.linkedinOutreach?.status || "not_started").replaceAll("_", " ")}
@@ -3929,7 +3929,7 @@ export default function Contacts() {
                 <div><dt>Source records</dt><dd>{detailContact.sources?.length ? detailContact.sources.join(", ") : detailContact.sourceProvider || "Manual"}</dd></div>
               </dl>
               {detailContact.notes ? <div className="contact-research-notes"><strong>Research and relationship notes</strong><p>{detailContact.notes}</p></div> : null}
-              <Button variant="outline" onClick={() => navigate(`/operators/jarvis?prompt=${encodeURIComponent(`Research ${contactDisplayName(detailContact)} using public evidence. Do not guess missing identity or contact information.`)}`)}>Research with Growth Operator</Button>
+              <Button variant="outline" onClick={() => navigate(`/operators/jarvis?prompt=${encodeURIComponent(`Research ${contactDisplayName(detailContact)} using public evidence. Do not guess missing identity or contact information.`)}`)}>Research with Lead Porch</Button>
             </section> : null}
             {detailTab === "details" ? contactDetailGroups.map(([group, fields]) => {
               const rows = fields.map(([field, label]) => [
@@ -3994,7 +3994,7 @@ export default function Contacts() {
         onClose={() => setEditingContact(null)}
         title={
           contactEditMode === "audience"
-            ? "Tell Growth Operator who this contact is"
+            ? "Tell Lead Porch who this contact is"
             : "Edit contact & campaign"
         }
         footer={
@@ -4052,7 +4052,7 @@ export default function Contacts() {
                   a future campaign?
                 </h3>
                 <p>
-                  Add only information you know. Growth Operator uses these categories to
+                  Add only information you know. Lead Porch uses these categories to
                   suggest the right campaigns—it will never guess from a name or
                   email.
                 </p>

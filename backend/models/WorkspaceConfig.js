@@ -6,7 +6,7 @@ const workspaceConfigSchema = new mongoose.Schema(
     key: { type: String, default: "primary", index: true },
     workspaceName: {
       type: String,
-      default: "Growth Operator",
+      default: "Lead Porch",
       trim: true,
       maxlength: 120,
     },
@@ -52,6 +52,11 @@ const workspaceConfigSchema = new mongoose.Schema(
       },
       publicSiteName: { type: String, default: "", maxlength: 160 },
       publicSiteLogoUrl: { type: String, default: "", maxlength: 1000 },
+      publicSiteLogoDarkUrl: {
+        type: String,
+        default: "/elliescoachinglogo-white.png",
+        maxlength: 1000,
+      },
       poweredByGrowthOperator: { type: Boolean, default: false },
     },
     appBranding: {
@@ -75,10 +80,32 @@ const workspaceConfigSchema = new mongoose.Schema(
     publicSite: {
       published: { type: Boolean, default: false },
       headline: { type: String, default: "", maxlength: 300 },
+      headlineAccent: { type: String, default: "Discipline", maxlength: 160 },
       subheadline: { type: String, default: "", maxlength: 1200 },
       introTitle: { type: String, default: "", maxlength: 300 },
+      introTitleAccent: {
+        type: String,
+        default: "real operators",
+        maxlength: 160,
+      },
+      introLabel: {
+        type: String,
+        default: "WHY ELLIE COACHING",
+        maxlength: 160,
+      },
       introBody: { type: String, default: "", maxlength: 5000 },
       aboutBody: { type: String, default: "", maxlength: 12000 },
+      aboutQuote: {
+        type: String,
+        default:
+          "Successful investing is not about chasing shortcuts. It's about playing the infinite game, surrounding yourself with like-minded people, and consistently doing the work.",
+        maxlength: 2000,
+      },
+      heroQuoteAttribution: {
+        type: String,
+        default: "ELLIE BAXTER",
+        maxlength: 160,
+      },
       aboutImageUrl: { type: String, default: "", maxlength: 1000 },
       eyebrow: { type: String, default: "", maxlength: 160 },
       heroMediaUrl: { type: String, default: "", maxlength: 1000 },

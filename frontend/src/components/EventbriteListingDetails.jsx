@@ -165,7 +165,7 @@ export default function EventbriteListingDetails({ event }) {
             ))
           ) : (
             <EmptyField>
-              The public API did not expose Eventbrite’s Lineup section. Growth Operator
+              The public API did not expose Eventbrite’s Lineup section. Lead Porch
               will not invent speaker names.
             </EmptyField>
           )}
@@ -299,7 +299,7 @@ export default function EventbriteListingDetails({ event }) {
             through its public API.
           </strong>
           <p>
-            Growth Operator shows everything Eventbrite returns and sends unsupported
+            Lead Porch shows everything Eventbrite returns and sends unsupported
             edits to the authoritative Eventbrite editor.
           </p>
         </div>

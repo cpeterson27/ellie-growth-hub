@@ -55,7 +55,7 @@ export default function InvitationTemplates() {
     setDraft({ ...draft, [field]: next.value });
     requestAnimationFrame(() => { input?.focus(); input?.setSelectionRange(next.cursor, next.cursor); });
   };
-  return <div className="account-settings-panel account-settings-panel--refined team-access"><header><p className="page-eyebrow">Settings · Communications</p><h2>Invitation Templates</h2><p>These workspace-specific messages are used when you invite people into Growth Operator. You can still personalize the copy for one recipient before sending.</p></header>
+  return <div className="account-settings-panel account-settings-panel--refined team-access"><header><p className="page-eyebrow">Settings · Communications</p><h2>Invitation Templates</h2><p>These workspace-specific messages are used when you invite people into Lead Porch. You can still personalize the copy for one recipient before sending.</p></header>
     {notice ? <p className="settings-save-note" role="status">{notice}</p> : null}
     <section className="settings-section invitation-identity-summary"><div><strong>Invitation identity</strong><span>Business: {identity.workspaceName || "Not configured"}</span><span>Invited by: {identity.invitedBy || "Authenticated inviter"}</span></div><Link to="/settings">Edit organization identity</Link></section>
     <section className="settings-section team-access__role-guide"><div className="settings-tabs">{Object.keys(labels).map((key) => <button type="button" className={selected === key ? "is-active" : ""} key={key} onClick={() => choose(key)}>{labels[key]}</button>)}</div>

@@ -19,7 +19,7 @@ const APP_ASSETS = [
   [
     "logoUrl",
     "Dashboard and sidebar logo",
-    "Used throughout the authenticated Growth Operator app.",
+    "Used throughout the authenticated Lead Porch app.",
   ],
   [
     "logoLightUrl",
@@ -333,7 +333,7 @@ export default function WorkspaceBrandingEditor({
       </section>
       <section>
         <header>
-          <p className="page-eyebrow">Growth Operator app branding</p>
+          <p className="page-eyebrow">Lead Porch app branding</p>
           <h4>Authenticated workspace identity</h4>
           <p>
             Used by Owner, Admin, Coach, Closer, Ambassador, Member, and Viewer

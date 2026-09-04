@@ -702,7 +702,7 @@ export default function ProgramWebsiteSettings({ websiteUrl = "/", onChange }) {
                     ? "High Performance Accelerators"
                     : "Intensive 6-Week Programs"}
                 </span>
-                <small>Growth Operator places programs automatically from their saved price.</small>
+                <small>Lead Porch places programs automatically from their saved price.</small>
               </div>
               <label className="website-toggle">
                 <input

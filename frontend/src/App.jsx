@@ -74,7 +74,7 @@ const SocialWorkspace = lazy(() => import("./pages/SocialWorkspace.jsx"));
 const MyProfile = lazy(() => import("./pages/MyProfile.jsx"));
 const Businesses = lazy(() => import("./pages/Businesses.jsx"));
 
-const PageLoading = () => <div className="auth-loading">Opening Growth Operator…</div>;
+const PageLoading = () => <div className="auth-loading">Opening Lead Porch…</div>;
 
 function ProtectedApp() {
   const { loading, session } = useAuth();

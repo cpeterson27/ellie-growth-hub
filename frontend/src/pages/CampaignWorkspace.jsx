@@ -556,11 +556,11 @@ export default function CampaignWorkspace() {
                   </div>
                   <div
                     className="campaign-routing-explainer"
-                    aria-label="You do not assign contacts here. Growth Operator routes each contact automatically."
+                    aria-label="You do not assign contacts here. Lead Porch routes each contact automatically."
                   >
                     <strong>Automatic recipient routing</strong>
                     <span>
-                      Growth Operator chooses the approved template for each
+                      Lead Porch chooses the approved template for each
                       contact.
                     </span>
                   </div>
@@ -1076,14 +1076,14 @@ export default function CampaignWorkspace() {
                     <span>2</span>
                     <p>
                       <strong>Use real contact sources</strong>Contacts come
-                      from Growth Operator research, CRM records, CSV uploads,
+                      from Lead Porch research, CRM records, CSV uploads,
                       manual entry, and future approved integrations.
                     </p>
                   </div>
                   <div>
                     <span>3</span>
                     <p>
-                      <strong>Match safely</strong>Growth Operator compares the
+                      <strong>Match safely</strong>Lead Porch compares the
                       brief with titles, industries, tags, keywords, companies,
                       lists, and notes. Nothing is emailed automatically.
                     </p>

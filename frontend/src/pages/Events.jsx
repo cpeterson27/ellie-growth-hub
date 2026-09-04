@@ -161,13 +161,13 @@ function changedFields(original, draft) {
       "Campaign audience",
       (original.audience || []).join(", "),
       draft.audience,
-      "Growth Operator only",
+      "Lead Porch only",
     ],
     [
       "Audience approval",
       original.audienceConfirmedAt ? "Confirmed" : "Not confirmed",
       draft.audienceConfirmed ? "Confirmed" : "Not confirmed",
-      "Growth Operator only",
+      "Lead Porch only",
     ],
   ];
   return fields
@@ -482,7 +482,7 @@ export default function Events() {
           setError("");
           await updateManagedEventbriteEvent(editingEvent._id, payload);
           setEventModalOpen(false);
-          setSuccess("Growth Operator draft updated. Nothing was sent to Eventbrite.");
+          setSuccess("Lead Porch draft updated. Nothing was sent to Eventbrite.");
           await loadWorkspace();
         } catch (err) {
           setError(err.response?.data?.error || "Unable to save this draft.");
@@ -530,7 +530,7 @@ export default function Events() {
       } else {
         await createEvent({ ...payload, status: "draft" });
         setSuccess(
-          "Draft saved in Growth Operator. No Eventbrite listing was created.",
+          "Draft saved in Lead Porch. No Eventbrite listing was created.",
         );
       }
       setEventModalOpen(false);
@@ -558,7 +558,7 @@ export default function Events() {
       setSuccess(
         recommendations.length
           ? `Generated ${recommendations.length} grounded audience recommendations.`
-          : "Add more detail about the attendee and event outcome so Growth Operator can recommend an audience.",
+          : "Add more detail about the attendee and event outcome so Lead Porch can recommend an audience.",
       );
     } catch (err) {
       setError(err.response?.data?.error || "Unable to recommend an audience.");
@@ -589,7 +589,7 @@ export default function Events() {
       setError("");
       await importEventbriteEvent(selectedEventId);
       setSelectedEventId("");
-      setSuccess("Existing Eventbrite event added to Growth Operator.");
+      setSuccess("Existing Eventbrite event added to Lead Porch.");
       await loadWorkspace();
     } catch (err) {
       setError(
@@ -708,7 +708,7 @@ export default function Events() {
         <section className="event-import-strip">
           <div>
             <strong>Add an existing Eventbrite event</strong>
-            <p>Only listings that are not already in Growth Operator appear here.</p>
+            <p>Only listings that are not already in Lead Porch appear here.</p>
           </div>
           <select
             className="select-input"
@@ -727,7 +727,7 @@ export default function Events() {
             disabled={!selectedEventId}
             onClick={importEvent}
           >
-            Add to Growth Operator
+            Add to Lead Porch
           </Button>
         </section>
       ) : null}
@@ -747,7 +747,7 @@ export default function Events() {
                   ? "Live on Eventbrite"
                   : isEventbrite
                     ? "Eventbrite draft"
-                    : "Growth Operator draft";
+                    : "Lead Porch draft";
               return (
                 <article className="event-portfolio-card" key={event._id}>
                   <div className="event-portfolio-card__header">
@@ -920,7 +920,7 @@ export default function Events() {
               </>
             ) : (
               <Button loading={loading} onClick={() => saveEvent(false)}>
-                {editingEvent ? "Review changes" : "Save Growth Operator draft"}
+                {editingEvent ? "Review changes" : "Save Lead Porch draft"}
               </Button>
             )}
           </>
@@ -952,7 +952,7 @@ export default function Events() {
                 className={manageTab === "strategy" ? "active" : ""}
                 onClick={() => setManageTab("strategy")}
               >
-                Growth Operator campaign strategy
+                Lead Porch campaign strategy
               </button>
             </div>
 
@@ -1118,10 +1118,10 @@ export default function Events() {
               <div className="event-strategy">
                 <div className="event-strategy__header">
                   <div>
-                    <p className="events-eyebrow">Growth Operator only</p>
+                    <p className="events-eyebrow">Lead Porch only</p>
                     <h3>Campaign audience</h3>
                     <p>
-                      This is Growth Operator’s internal targeting brief. It guides
+                      This is Lead Porch’s internal targeting brief. It guides
                       contact matching, lead research, and campaign messaging.
                       It does not change the public Eventbrite listing and it
                       does not remove contacts you already assigned.
@@ -1137,7 +1137,7 @@ export default function Events() {
                   <div className="audience-suggestions">
                     <strong>Step 1 · Suggested audience segments</strong>
                     <p>
-                      Growth Operator found these in the Eventbrite listing. Use them as a
+                      Lead Porch found these in the Eventbrite listing. Use them as a
                       shortcut, or keep the campaign audience you already chose.
                     </p>
                     <div>
@@ -1194,7 +1194,7 @@ export default function Events() {
                     placeholder="Choose suggestions above or type audience groups separated with commas"
                   />
                   <small>
-                    Growth Operator compares these labels against CRM contacts, native
+                    Lead Porch compares these labels against CRM contacts, native
                     imports, titles, industries, companies, tags, keywords,
                     lists, and notes. Contacts can already be assigned; this
                     confirms the targeting rule for future matching.
@@ -1214,7 +1214,7 @@ export default function Events() {
                   <span>
                     <strong>Step 3 · Approve this audience for matching</strong>
                     <small>
-                      After this is checked and saved, Growth Operator can use these
+                      After this is checked and saved, Lead Porch can use these
                       groups as the official campaign filter. No emails are
                       generated or sent from this step.
                     </small>
@@ -1241,7 +1241,7 @@ export default function Events() {
             {wizardStep === 0 ? (
               <div className="campaign-form-grid event-form">
                 <p className="event-section-intro span-2">
-                  Start with the promise of the event. This stays in Growth Operator until
+                  Start with the promise of the event. This stays in Lead Porch until
                   you explicitly create an Eventbrite draft.
                 </p>
                 <label className="form-field span-2">
@@ -1373,7 +1373,7 @@ export default function Events() {
                 <section className="event-image-uploader span-2">
                   <div>
                     <h3>Event image</h3>
-                    <p>Upload an image from this device. Growth Operator stores it securely and creates the hosted URL automatically.</p>
+                    <p>Upload an image from this device. Lead Porch stores it securely and creates the hosted URL automatically.</p>
                   </div>
                   <div className="event-image-uploader__body">
                     {draft.planning.imageUrl ? (
@@ -1430,7 +1430,7 @@ export default function Events() {
               <div className="event-strategy">
                 <div className="event-strategy__header">
                   <div><h3>Audience recommendations</h3>
-                    <p>Growth Operator analyzes the event draft and your ideal-attendee notes to suggest targeting segments. Contacts come from Growth Operator research, the CRM, CSV imports, or future approved integrations.</p>
+                    <p>Lead Porch analyzes the event draft and your ideal-attendee notes to suggest targeting segments. Contacts come from Lead Porch research, the CRM, CSV imports, or future approved integrations.</p>
                   </div>
                   <Button loading={loading} onClick={generateAudience}>Generate recommendations</Button>
                 </div>
@@ -1440,7 +1440,7 @@ export default function Events() {
                 </label>
                 <p className="event-form-note">
                   These are targeting segments, not people. After you select
-                  and approve segments, Growth Operator can match them against existing
+                  and approve segments, Lead Porch can match them against existing
                   CRM contacts and future research or CRM imports with known
                   professional or interest signals.
                   Name-and-email-only contacts stay “Audience unknown” until a
@@ -1451,7 +1451,7 @@ export default function Events() {
                     <strong>Recommendation method:</strong>{" "}
                     {draft.audienceRecommendationSource === "openai"
                       ? "OpenAI analyzed the event information entered in this draft."
-                      : "Growth Operator’s built-in matching rules analyzed the event information entered in this draft."}
+                      : "Lead Porch’s built-in matching rules analyzed the event information entered in this draft."}
                   </p>
                 ) : null}
                 <div className="audience-recommendation-list">
@@ -1476,7 +1476,7 @@ export default function Events() {
               return <div className="event-readiness">
                 <div><p className="events-eyebrow">Draft readiness</p>
                   <h3>{readiness.complete} of {readiness.total} sections ready</h3>
-                  <p>Saving here creates only an Growth Operator draft. Nothing is sent to Eventbrite.</p>
+                  <p>Saving here creates only an Lead Porch draft. Nothing is sent to Eventbrite.</p>
                 </div>
                 <div className="event-readiness__checks">
                   {readiness.checks.map(([label, ready]) => (

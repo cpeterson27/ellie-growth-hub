@@ -334,8 +334,8 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
         </div>
         <div>
           <p>
-            {displayedOrganization?.workspaceName ||
-              session?.workspace?.name ||
+            {session?.workspace?.name ||
+              displayedOrganization?.workspaceName ||
               site?.workspace?.name ||
               "Lead Porch"}
           </p>

@@ -20,7 +20,7 @@ export default function Navbar({ onMenuClick }) {
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const isCoach = isCoachOnly(session);
   const socialConnectionOnly = isSocialConnectionOnly(session);
-  const displayedWorkspaceName = socialConnectionOnly ? session?.workspace?.name || "Growth Operator" : workspaceName;
+  const displayedWorkspaceName = socialConnectionOnly ? session?.workspace?.name || "Lead Porch" : workspaceName;
   const pageKey = location.pathname.split("/")[1] || "command-center";
   const pageMeta = {
     "command-center": ["Command Center", "Today’s priorities and next best actions."],
@@ -42,10 +42,10 @@ export default function Navbar({ onMenuClick }) {
     jarvis: ["AI Operators", "Prepare, review, and monitor AI-supported growth work."],
     "development-requests": ["Development requests", "Approve and hand software changes to Codex safely."],
     analytics: ["Analytics", "See what is working and where to focus next."],
-    integrations: ["Integrations", "Connect the systems behind Growth Operator’s growth engine."],
+    integrations: ["Integrations", "Connect the systems behind Lead Porch’s growth engine."],
     settings: ["Settings", "Personalize the workspace and operating rules."],
     coach: ["Coach Portal", "Your students, assignments, and upcoming coaching work."],
-  }[pageKey] || ["Growth workspace", "Operate Growth Operator’s growth engine from one place."];
+  }[pageKey] || ["Growth workspace", "Operate Lead Porch’s growth engine from one place."];
   const changeInitiative = (value) => {
     setSelectedId(value);
     if (value !== "all") navigate(`/campaigns/${value}`);
@@ -110,7 +110,7 @@ export default function Navbar({ onMenuClick }) {
           <p className="navbar__eyebrow"><span>{displayedWorkspaceName}</span><i />{pageMeta[0]}</p>
           <h1 className="navbar__title">{pageMeta[1]}</h1>
         </div>
-        <div className="navbar__mobile-brand"><strong>{session?.workspace?.name || "Growth Operator"}</strong><span>{pageMeta[1]}</span></div>
+        <div className="navbar__mobile-brand"><strong>{session?.workspace?.name || "Lead Porch"}</strong><span>{pageMeta[1]}</span></div>
         {!isCoach ? <label className="initiative-switcher">
           <span>Current campaign</span>
           <select value={selectedId} onChange={(event) => changeInitiative(event.target.value)}>
@@ -145,7 +145,7 @@ export default function Navbar({ onMenuClick }) {
           </div> : null}
         </div>
         <button className="navbar__jarvis" type="button" onClick={() => navigate("/operators/jarvis")}>
-          <FiCpu /><span>Ask Growth Operator</span><i />
+          <FiCpu /><span>Ask Lead Porch</span><i />
         </button>
         <button className="navbar__profile" type="button" onClick={() => navigate("/profile")} aria-label="Open my profile"><UserAvatar user={session?.user} size="sm"/></button>
       </div> : <div className="navbar__actions"><span className="navbar__coach-context">Restricted coach workspace</span><button className="navbar__profile" type="button" onClick={() => navigate("/profile")} aria-label="Open my profile"><UserAvatar user={session?.user} size="sm"/></button></div>}

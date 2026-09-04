@@ -18,11 +18,11 @@ export default function PublicPaymentRequest() {
   return <main className="public-payment"><section>
     <p className="public-payment__eyebrow">{request.businessName}</p><h1>{request.programName}</h1>
     <div className="public-payment__summary"><div><span>Payment</span><strong>{labels[request.paymentType] || "Program payment"}</strong></div><div><span>Amount due now</span><strong>{money(request.amountMinor, request.currency)}</strong></div></div>
-    {query.get("returned") ? <p className="public-payment__notice">Square is confirming your payment. This page changes to Paid only after Growth Operator receives Square’s verified confirmation.</p> : null}
+    {query.get("returned") ? <p className="public-payment__notice">Square is confirming your payment. This page changes to Paid only after Lead Porch receives Square’s verified confirmation.</p> : null}
     <p className={`public-payment__status public-payment__status--${request.status}`}>Status: {request.status.replaceAll("_", " ")}</p>
     {error ? <p className="public-payment__error" role="alert">{error}</p> : null}
     {request.canContinue ? <button type="button" onClick={continueToSquare} disabled={busy}>{busy ? "Opening Square…" : "Continue to secure Square checkout"}</button> : null}
     {terminal ? <p>No further payment action is available for this request. Contact {request.businessName} if you need help.</p> : null}
-    <small>Card details are entered only on Square’s hosted checkout. Growth Operator does not receive your card number.</small>
+    <small>Card details are entered only on Square’s hosted checkout. Lead Porch does not receive your card number.</small>
   </section></main>;
 }

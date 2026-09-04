@@ -53,7 +53,7 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
   const oauthStatus = connectionsOnly ? params.get("status") : "";
   const oauthProvider = params.get("social") || "social account";
   const providerName = oauthProvider === "meta" ? "Facebook + Instagram" : oauthProvider === "linkedin" ? "LinkedIn" : oauthProvider === "instagram" ? "Instagram" : oauthProvider === "x" ? "X" : "Social account";
-  const oauthNotice = oauthStatus === "connected" ? `${providerName} connected. Choose the account Growth Operator should use.` : "";
+  const oauthNotice = oauthStatus === "connected" ? `${providerName} connected. Choose the account Lead Porch should use.` : "";
   const oauthError = oauthStatus === "denied" ? `${providerName} authorization was cancelled. You can connect it when you are ready.` : oauthStatus === "failed" ? params.get("message") || `${providerName} connection failed. Try again or ask the app administrator to verify provider configuration.` : "";
   useEffect(() => {
     let active = true;
@@ -124,10 +124,10 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
   return (
     <main className="social-workspace">
       <header>
-        <p className="page-eyebrow">Growth Operator</p>
+        <p className="page-eyebrow">Lead Porch</p>
         <h1>Social</h1>
         <p>
-          Connect and manage the social accounts Growth Operator can use for
+          Connect and manage the social accounts Lead Porch can use for
           content, conversations, and automations.
         </p>
       </header>
@@ -433,7 +433,7 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
                         {message.direction === "inbound"
                           ? message.sender?.name || "Contact"
                           : message.metadata?.senderType === "automation"
-                            ? "Growth Operator automation"
+                            ? "Lead Porch automation"
                             : message.createdBy?.name || "Team"}
                       </strong>
                       <p>{message.body}</p>

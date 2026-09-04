@@ -718,7 +718,7 @@ export default function JarvisChat() {
           </div>
         )}
 
-        <p className="jarvis-input-note">Press ⌘J while Growth Operator is open to start a voice turn. Talk records one request and sends it to Jarvis. Jarvis never sends outreach or changes records without a confirmed action.</p>
+        <p className="jarvis-input-note">Press ⌘J while Lead Porch is open to start a voice turn. Talk records one request and sends it to Jarvis. Jarvis never sends outreach or changes records without a confirmed action.</p>
         {speechError ? <div className={speechError.startsWith("Using this device") ? "jarvis-voice-notice" : "jarvis-error"}>{speechError}</div> : null}
         {error && <div className="jarvis-error">{intentResearchTask ? `${friendlyJarvisError} No identity was added unless supported evidence appears above.` : friendlyJarvisError}</div>}
       </form>

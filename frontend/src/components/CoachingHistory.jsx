@@ -12,7 +12,7 @@ const idOf = (value) => value?._id || value || "";
 const contactName = (contact) => contact?.name || [contact?.firstName, contact?.lastName].filter(Boolean).join(" ") || contact?.email || "Student";
 
 function authorName(note) {
-  return note.authorCoachProfileId?.displayName || note.authorUserId?.name || note.authorUserId?.email || "Growth Operator user";
+  return note.authorCoachProfileId?.displayName || note.authorUserId?.name || note.authorUserId?.email || "Lead Porch user";
 }
 
 export default function CoachingHistory({ student, coachMode = false }) {

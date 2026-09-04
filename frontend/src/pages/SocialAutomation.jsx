@@ -228,7 +228,7 @@ export default function SocialAutomation() {
     <main className="social-automation">
       <header>
         <div>
-          <p className="eyebrow">Growth Operator</p>
+          <p className="eyebrow">Lead Porch</p>
           <h1>Social Automation</h1>
           <p>
             Social Automations are rules for what happens after an interaction.
@@ -360,10 +360,10 @@ export default function SocialAutomation() {
               setForm({ ...form, contentBriefId: kind === "brief" ? id : "", contentId: kind === "post" ? id : "" });
             }}>
               <option value="">All posts</option>
-              {postOptions.key === `${form.provider}:${form.assetId}` && postOptions.briefs.length ? <optgroup label="Growth Operator posts">{postOptions.briefs.map((post) => <option key={post.id} value={`brief:${post.id}`}>{`${post.title} · ${post.status.replaceAll("_", " ")}${post.updatedAt ? ` · ${new Date(post.updatedAt).toLocaleDateString()}` : ""}`}</option>)}</optgroup> : null}
+              {postOptions.key === `${form.provider}:${form.assetId}` && postOptions.briefs.length ? <optgroup label="Lead Porch posts">{postOptions.briefs.map((post) => <option key={post.id} value={`brief:${post.id}`}>{`${post.title} · ${post.status.replaceAll("_", " ")}${post.updatedAt ? ` · ${new Date(post.updatedAt).toLocaleDateString()}` : ""}`}</option>)}</optgroup> : null}
               {postOptions.key === `${form.provider}:${form.assetId}` && postOptions.recent.length ? <optgroup label="Already published posts">{postOptions.recent.map((post) => <option key={post.id} value={`post:${post.id}`}>{`${post.text.slice(0, 80)}${post.text.length > 80 ? "…" : ""}${post.publishedAt ? ` · ${new Date(post.publishedAt).toLocaleDateString()}` : ""}`}</option>)}</optgroup> : null}
             </select>
-            {!form.assetId ? <small>Choose a connected account first.</small> : postOptions.key !== `${form.provider}:${form.assetId}` ? <small>Loading posts…</small> : postOptions.error ? <small role="alert">{postOptions.error} Select All posts or reconnect the account.</small> : <small>Choose a Growth Operator draft/scheduled post, an already-published post, or All posts.</small>}
+            {!form.assetId ? <small>Choose a connected account first.</small> : postOptions.key !== `${form.provider}:${form.assetId}` ? <small>Loading posts…</small> : postOptions.error ? <small role="alert">{postOptions.error} Select All posts or reconnect the account.</small> : <small>Choose a Lead Porch draft/scheduled post, an already-published post, or All posts.</small>}
           </label>
           <label>
             Keywords <small>(comma separated)</small>

@@ -14,7 +14,7 @@ const LABELS = {
   "imports:write": "Import owner-provided lead files after confirmation",
   "settings:write": "Add confirmed custom CRM fields",
   offline_access: "Stay connected until you disconnect the app",
-  openid: "Confirm your Growth Operator account identity",
+  openid: "Confirm your Lead Porch account identity",
 };
 
 export default function OAuthConsent() {
@@ -31,7 +31,7 @@ export default function OAuthConsent() {
       .catch((requestError) => setError(requestError.response?.data?.error || "This connection request is invalid or expired."));
   }, [location.search, session]);
 
-  if (authLoading) return <div className="auth-loading">Checking your Growth Operator account…</div>;
+  if (authLoading) return <div className="auth-loading">Checking your Lead Porch account…</div>;
   if (!session) return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
 
   const decide = async (approved) => {
@@ -41,19 +41,19 @@ export default function OAuthConsent() {
       const response = await approveOAuthConnection({ ...params, approved });
       window.location.assign(response.redirectUrl);
     } catch (requestError) {
-      setError(requestError.response?.data?.error || "Growth Operator could not complete this connection.");
+      setError(requestError.response?.data?.error || "Lead Porch could not complete this connection.");
       setSubmitting(false);
     }
   };
 
   return <main className="login-page">
     <section className="login-panel oauth-consent-panel">
-      <a className="login-brand" href="/" aria-label="Growth Operator home">G</a>
+      <a className="login-brand" href="/" aria-label="Lead Porch home">G</a>
       <p className="login-eyebrow">Secure AI connection</p>
       <h1>Connect {details?.clientName || "this AI assistant"}?</h1>
-      <p className="login-intro">This app is requesting access to <strong>{details?.workspaceName || session.workspace?.name}</strong>. It will never receive your Growth Operator password.</p>
+      <p className="login-intro">This app is requesting access to <strong>{details?.workspaceName || session.workspace?.name}</strong>. It will never receive your Lead Porch password.</p>
       {details?.scopes?.length ? <div className="oauth-scope-list">{details.scopes.map((scope) => <p key={scope}><span>✓</span>{LABELS[scope] || scope}</p>)}</div> : null}
-      <p className="oauth-consent-warning">Campaign sending and permanent deletion are not included. Growth Operator records connected tool activity, and you can disconnect the app from Settings.</p>
+      <p className="oauth-consent-warning">Campaign sending and permanent deletion are not included. Lead Porch records connected tool activity, and you can disconnect the app from Settings.</p>
       {error ? <p className="login-error" role="alert">{error}</p> : null}
       <div className="oauth-consent-actions"><button type="button" className="oauth-deny" disabled={submitting} onClick={() => decide(false)}>Cancel</button><button type="button" disabled={submitting || !details} onClick={() => decide(true)}>{submitting ? "Connecting…" : "Allow connection"}</button></div>
     </section>

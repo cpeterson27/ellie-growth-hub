@@ -55,8 +55,8 @@ const deliveryLabel = (item) => {
 };
 const viewGuidance = {
   processing: { title: "Accepted by Resend", body: "Resend accepted these messages and is waiting for the recipient’s mail server to confirm delivery. Do not send them again." },
-  delayed: { title: "Delivery is taking longer", body: "Resend is still retrying these messages. Growth Operator will move each one to Delivered or Bounced when the recipient’s server responds." },
-  unconfirmed: { title: "Provider status unavailable", body: "Growth Operator has a sent record but no matching provider result. These are shown separately so they are never mistaken for active delivery." },
+  delayed: { title: "Delivery is taking longer", body: "Resend is still retrying these messages. Lead Porch will move each one to Delivered or Bounced when the recipient’s server responds." },
+  unconfirmed: { title: "Provider status unavailable", body: "Lead Porch has a sent record but no matching provider result. These are shown separately so they are never mistaken for active delivery." },
   delivered: { title: "Delivered successfully", body: "The recipient’s mail server accepted the email. Wait for a reply; delivery does not guarantee the person opened it." },
   bounced: { title: "Replace the email address", body: "Keep the contact, but do not reuse this address. Open the contact, research a different verified email, and update the record before future outreach." },
 };
@@ -323,7 +323,7 @@ export default function Outreach() {
         throw new Error(result.failures?.[0]?.message || "The replacement email could not be sent.");
       }
       setPreview(null);
-      setNotice(`Replacement sent to ${approved.contactEmail}. Growth Operator will update its delivery status automatically.`);
+      setNotice(`Replacement sent to ${approved.contactEmail}. Lead Porch will update its delivery status automatically.`);
       await loadItems(selected);
       setFilter("processing");
     } catch (err) {
@@ -422,7 +422,7 @@ export default function Outreach() {
         if (failures.length) setError(failures.slice(0, 8).join(" · "));
       },
       error: () => {
-        setError("Growth Operator could not read that correction CSV.");
+        setError("Lead Porch could not read that correction CSV.");
         setBulkCorrecting(false);
       },
     });
@@ -666,7 +666,7 @@ export default function Outreach() {
               </label>
             )}
             {emailCorrectionError ? <p className="form-error">{emailCorrectionError}</p> : null}
-            <p className="outreach-email-correction__note"><strong>What happens next:</strong> Growth Operator updates the contact and creates a new draft for your review. Confirm this address is correct before approving it. The bounced record stays unchanged for an accurate audit trail, and nothing is sent automatically.</p>
+            <p className="outreach-email-correction__note"><strong>What happens next:</strong> Lead Porch updates the contact and creates a new draft for your review. Confirm this address is correct before approving it. The bounced record stays unchanged for an accurate audit trail, and nothing is sent automatically.</p>
           </form>
         ) : null}
       </Modal>

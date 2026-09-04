@@ -892,7 +892,7 @@
 
 /* Screenshot-matched public homepage composition. These selectors intentionally
    target the existing public components so content, uploads and application
-   behavior remain driven by Growth Operator. */
+   behavior remain driven by Lead Porch. */
 .public-site {
   font-family: var(--public-body-font, "DM Sans", ui-sans-serif, system-ui, sans-serif);
   background: var(--public-bg);

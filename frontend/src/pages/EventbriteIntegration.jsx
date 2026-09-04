@@ -56,7 +56,7 @@ export default function EventbriteIntegration() {
   const formatDateTime = (value) =>
     value ? new Date(value).toLocaleString() : "Not recorded yet";
   const webhookMessage = webhook?.lastMessage?.toLowerCase().includes("path you requested")
-    ? "Test received. Eventbrite can reach Growth Operator automatically."
+    ? "Test received. Eventbrite can reach Lead Porch automatically."
     : webhook?.lastMessage;
 
   const connectEventbrite = async () => {
@@ -81,7 +81,7 @@ export default function EventbriteIntegration() {
       await loadStatus();
     } catch (err) {
       const message = err.response?.data?.message || err.response?.data?.error ||
-        "Growth Operator could not configure the webhook automatically.";
+        "Lead Porch could not configure the webhook automatically.";
       setSetupNotice(message);
     } finally {
       setConfiguringWebhook(false);
@@ -119,15 +119,15 @@ export default function EventbriteIntegration() {
           <div className="eventbrite-health-list">
             <div>
               <span className={`eventbrite-step-number ${connection?.connected ? "is-ready" : ""}`}>{connection?.connected ? "✓" : "1"}</span>
-              <p><strong>Connect Eventbrite account</strong><small>{connection?.connected ? `${connection.accountEmail || "Authorized account"} is connected.` : connection?.configured ? "Client action: connect Eventbrite with OAuth." : "Developer action first: configure Growth Operator’s Eventbrite app credentials."}</small></p>
+              <p><strong>Connect Eventbrite account</strong><small>{connection?.connected ? `${connection.accountEmail || "Authorized account"} is connected.` : connection?.configured ? "Client action: connect Eventbrite with OAuth." : "Developer action first: configure Lead Porch’s Eventbrite app credentials."}</small></p>
             </div>
             <div>
               <span className={`eventbrite-step-number ${webhookVerified ? "is-ready" : ""}`}>{webhookVerified ? "✓" : "2"}</span>
-              <p><strong>Verify automatic updates</strong><small>{webhookVerified ? `Eventbrite last checked in ${formatDateTime(webhook.lastReceivedAt)}.` : webhook?.configured ? "Click Test in Eventbrite or wait for the first real event update." : "Developer action: configure Growth Operator’s webhook receiver token."}</small></p>
+              <p><strong>Verify automatic updates</strong><small>{webhookVerified ? `Eventbrite last checked in ${formatDateTime(webhook.lastReceivedAt)}.` : webhook?.configured ? "Click Test in Eventbrite or wait for the first real event update." : "Developer action: configure Lead Porch’s webhook receiver token."}</small></p>
             </div>
             <div>
               <span className={`eventbrite-step-number ${latestSync ? "is-ready" : ""}`}>{latestSync ? "✓" : "3"}</span>
-              <p><strong>Confirm reporting sync</strong><small>{latestSync ? `Growth Operator last refreshed event data ${formatDateTime(latestSync)}.` : "Open or import a connected Eventbrite event so Growth Operator can pull registrations, revenue, and check-ins."}</small></p>
+              <p><strong>Confirm reporting sync</strong><small>{latestSync ? `Lead Porch last refreshed event data ${formatDateTime(latestSync)}.` : "Open or import a connected Eventbrite event so Lead Porch can pull registrations, revenue, and check-ins."}</small></p>
             </div>
           </div>
           {webhookMessage ? <p className="eventbrite-health-note">{webhookMessage}</p> : null}
@@ -152,7 +152,7 @@ export default function EventbriteIntegration() {
                 >
                   {webhookVerified ? "Check automatic updates" : "Set up automatic updates"}
                 </Button>
-                <small>Growth Operator will try to create or verify the Eventbrite webhook for this account.</small>
+                <small>Lead Porch will try to create or verify the Eventbrite webhook for this account.</small>
               </div>
             ) : null}
             <Button variant="outline" onClick={() => navigate("/events")}>Open Events</Button>
@@ -161,9 +161,9 @@ export default function EventbriteIntegration() {
 
         <DashboardCard title="What this integration does">
           <div className="integration-role-list">
-            <article><strong>Imports events</strong><p>Add existing Eventbrite listings to Growth Operator so campaigns can be planned around them.</p></article>
-            <article><strong>Publishes drafts</strong><p>Create an Eventbrite draft from an Growth Operator event only after the user confirms it.</p></article>
-            <article><strong>Refreshes reporting</strong><p>Orders, attendees, check-ins, ticket changes, and event edits update Growth Operator automatically after setup is verified.</p></article>
+            <article><strong>Imports events</strong><p>Add existing Eventbrite listings to Lead Porch so campaigns can be planned around them.</p></article>
+            <article><strong>Publishes drafts</strong><p>Create an Eventbrite draft from an Lead Porch event only after the user confirms it.</p></article>
+            <article><strong>Refreshes reporting</strong><p>Orders, attendees, check-ins, ticket changes, and event edits update Lead Porch automatically after setup is verified.</p></article>
           </div>
         </DashboardCard>
       </section>
@@ -172,15 +172,15 @@ export default function EventbriteIntegration() {
         <DashboardCard title="Client actions">
           <div className="integration-role-list">
             <article><strong>1. Click Connect Eventbrite</strong><p>The client signs into Eventbrite themselves. They do not send you their password.</p></article>
-            <article><strong>2. Approve Growth Operator</strong><p>Eventbrite grants Growth Operator an access token for the approved account.</p></article>
-            <article><strong>3. Choose events</strong><p>The client imports or creates events from the Events page. Growth Operator then keeps reporting current after automatic updates are verified.</p></article>
+            <article><strong>2. Approve Lead Porch</strong><p>Eventbrite grants Lead Porch an access token for the approved account.</p></article>
+            <article><strong>3. Choose events</strong><p>The client imports or creates events from the Events page. Lead Porch then keeps reporting current after automatic updates are verified.</p></article>
           </div>
         </DashboardCard>
 
         <DashboardCard title="Developer/admin actions">
           <div className="integration-role-list">
-            <article><strong>Configure Growth Operator app credentials once</strong><p>Set Eventbrite client ID, client secret, redirect URI, and encryption key in the backend environment.</p></article>
-            <article><strong>Set webhook receiver token once</strong><p>This lives in Growth Operator’s backend environment. Clients should never paste or manage this value.</p></article>
+            <article><strong>Configure Lead Porch app credentials once</strong><p>Set Eventbrite client ID, client secret, redirect URI, and encryption key in the backend environment.</p></article>
+            <article><strong>Set webhook receiver token once</strong><p>This lives in Lead Porch’s backend environment. Clients should never paste or manage this value.</p></article>
             <article><strong>Use automatic setup first</strong><p>Click Set up automatic updates. If Eventbrite blocks API webhook creation, guide the client by screen-share while they are logged in.</p></article>
           </div>
         </DashboardCard>
@@ -188,8 +188,8 @@ export default function EventbriteIntegration() {
 
       <DashboardCard title="Developer setup values">
         <div className="eventbrite-config-list">
-          <div><span className={connection?.configured ? "is-ready" : ""}>{connection?.configured ? "✓" : "!"}</span><p><strong>OAuth app credentials</strong><small>{connection?.configured ? "Configured in Growth Operator’s backend environment." : "Set EVENTBRITE_CLIENT_ID, EVENTBRITE_CLIENT_SECRET, EVENTBRITE_REDIRECT_URI, and INTEGRATION_CREDENTIAL_ENCRYPTION_KEY."}</small></p></div>
-          <div><span className={webhook?.configured ? "is-ready" : ""}>{webhook?.configured ? "✓" : "!"}</span><p><strong>Webhook receiver token</strong><small>{webhook?.configured ? "Configured in Growth Operator’s backend environment." : "Set EVENTBRITE_WEBHOOK_TOKEN in the backend environment."}</small></p></div>
+          <div><span className={connection?.configured ? "is-ready" : ""}>{connection?.configured ? "✓" : "!"}</span><p><strong>OAuth app credentials</strong><small>{connection?.configured ? "Configured in Lead Porch’s backend environment." : "Set EVENTBRITE_CLIENT_ID, EVENTBRITE_CLIENT_SECRET, EVENTBRITE_REDIRECT_URI, and INTEGRATION_CREDENTIAL_ENCRYPTION_KEY."}</small></p></div>
+          <div><span className={webhook?.configured ? "is-ready" : ""}>{webhook?.configured ? "✓" : "!"}</span><p><strong>Webhook receiver token</strong><small>{webhook?.configured ? "Configured in Lead Porch’s backend environment." : "Set EVENTBRITE_WEBHOOK_TOKEN in the backend environment."}</small></p></div>
           <div><span className="is-ready">i</span><p><strong>Webhook URL format</strong><small>{webhookUrl}</small></p></div>
         </div>
       </DashboardCard>

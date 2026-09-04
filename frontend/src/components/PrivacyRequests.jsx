@@ -26,7 +26,7 @@ export default function PrivacyRequests() {
   const approve = async () => { try { setBusy(true); const result = await approvePrivacyRequest(detail.request._id, { contactIds: selectedContacts, categories, confirmation }); setConfirmationDraft(result.confirmation); await load(); await open(detail.request._id); setConfirmationDraft(result.confirmation); } catch (err) { setError(err.response?.data?.error || "Unable to complete this request."); } finally { setBusy(false); } };
   const toggle = (setter, current, value) => setter(current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
   return <div className="account-settings-panel account-settings-panel--refined privacy-requests">
-    <header><p className="page-eyebrow">Privacy operations</p><h2>Data deletion requests</h2><p>Review, verify, and explicitly approve requests. Growth Operator never deletes data merely because an email was received.</p></header>
+    <header><p className="page-eyebrow">Privacy operations</p><h2>Data deletion requests</h2><p>Review, verify, and explicitly approve requests. Lead Porch never deletes data merely because an email was received.</p></header>
     {error ? <p className="form-error">{error}</p> : null}
     <div className="privacy-request-layout">
       <div className="privacy-request-list">{rows.length ? rows.map((row) => <button key={row._id} className={detail?.request?._id === row._id ? "is-active" : ""} onClick={() => open(row._id)}><strong>{row.requester?.email || "Requester identity removed"}</strong><span>{LABELS[row.status]} · {new Date(row.createdAt).toLocaleDateString()}</span></button>) : <p>No privacy requests have been detected.</p>}</div>

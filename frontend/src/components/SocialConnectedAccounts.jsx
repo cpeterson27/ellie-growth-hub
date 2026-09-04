@@ -20,7 +20,7 @@ function ChannelRow({ channel, connection, connections, busy, onConnect, onDisco
   const elsewhere = new Set(connections.filter(row => row.provider !== connection.provider).flatMap(row => row.selectedAssetIds || []));
   const choose = (asset, checked) => onSelectAssets(connection.provider, checked ? [...selectedIds, asset.id] : selectedIds.filter(id => id !== asset.id && !assets.some(row => row.id === id && row.parentId === asset.id)));
   const accountPicker = connection.connected && assets.length > 0 && <fieldset className="social-page-picker" disabled={busy}>
-    <legend>{channel.provider === "meta" ? "Choose the Facebook Page Growth Operator should manage" : channel.provider === "linkedin" ? "Choose the LinkedIn Page Growth Operator should manage" : "Choose your professional account"}</legend>
+    <legend>{channel.provider === "meta" ? "Choose the Facebook Page Lead Porch should manage" : channel.provider === "linkedin" ? "Choose the LinkedIn Page Lead Porch should manage" : "Choose your professional account"}</legend>
     <p>Only selected accounts are used. Discovering an account does not activate it.</p>
     {assets.map(asset => {
       const ownedElsewhere = elsewhere.has(asset.id);
