@@ -26,7 +26,10 @@ function limited(req, res, next) {
 router.get("/site", async (req, res, next) => {
   try {
     res.set("Cache-Control", "no-store");
-    res.json({ success: true, data: await service.site(req) });
+    const data = await service.site(req);
+    if (!data.publicSite?.published)
+      return res.status(404).json({ error: "This website is not published." });
+    res.json({ success: true, data });
   } catch (error) {
     next(error);
   }

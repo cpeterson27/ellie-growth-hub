@@ -166,6 +166,10 @@ export default function PublicSiteAdmin({ section = "website" }) {
       ...config.publicSite.sectionVisibility,
       [key]: value,
     });
+  const siteName =
+    config?.branding?.publicSiteName ||
+    config?.workspaceName ||
+    "your workspace";
   const fileData = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -527,7 +531,7 @@ export default function PublicSiteAdmin({ section = "website" }) {
                 />
               </label>
               <label className="wide">
-                About Ellie
+                About {siteName}
                 <textarea
                   value={config.publicSite.aboutBody || ""}
                   onChange={(e) => patchPublic("aboutBody", e.target.value)}
@@ -540,14 +544,14 @@ export default function PublicSiteAdmin({ section = "website" }) {
                   {config.publicSite.aboutImageUrl ? (
                     <img
                       src={config.publicSite.aboutImageUrl}
-                      alt="Current About Ellie portrait"
+                      alt={`Current About ${siteName} portrait`}
                     />
                   ) : (
                     <span>Portrait</span>
                   )}
                 </div>
                 <div>
-                  <h4>About Ellie photo</h4>
+                  <h4>About {siteName} photo</h4>
                   <p>
                     A vertical portrait works best in the homepage founder
                     section.
@@ -862,7 +866,7 @@ export default function PublicSiteAdmin({ section = "website" }) {
             <header>
               <span>01</span>
               <div>
-                <h4>Why choose Ellie’s Coaching</h4>
+                <h4>Why choose {siteName}</h4>
                 <p>Edit the three value cards shown on the homepage.</p>
               </div>
             </header>
