@@ -38,17 +38,17 @@ export function PrivacyPage() {
     <LegalShell
       eyebrow="Privacy & trust"
       title="Privacy Policy"
-      intro="This policy explains how Ellie’s Coaching uses information through this website, program applications, communications, and authorized service connections."
+      intro="This policy explains how Lead Porch uses information through this website, contact forms, communications, and authorized service connections."
     >
       <section>
         <h2>1. Scope</h2>
         <p>
-          This Privacy Policy applies to the Ellie’s Coaching public website at
-          elliescoaching.com, its program-application experience, and related
-          communications and integrations operated through Lead Porch. Private
-          services you use directly—including social networks, event platforms,
-          payment providers, calendar services, video-meeting services, and
-          community platforms—also apply their own privacy policies.
+          This Privacy Policy applies to the Lead Porch public website at
+          leadporch.co, its contact experience, and related communications and
+          integrations operated through Lead Porch. Private services you use
+          directly—including social networks, event platforms, payment
+          providers, calendar services, video-meeting services, and community
+          platforms—also apply their own privacy policies.
         </p>
       </section>
       <section>
@@ -66,7 +66,7 @@ export function PrivacyPage() {
           </li>
           <li>
             Information included in messages, replies, forms, meetings, event
-            registrations, or other interactions with Ellie’s Coaching.
+            registrations, or other interactions with Lead Porch.
           </li>
           <li>
             Consent records for email or text communications and requests to opt
@@ -75,9 +75,9 @@ export function PrivacyPage() {
         </ul>
         <p>
           Submitting a program application creates or updates a workspace-scoped
-          CRM contact and related business record so the Ellie’s Coaching team
-          can review the application, preserve attribution, communicate about
-          next steps, and avoid unnecessary duplicate records.
+          CRM contact and related business record so the Lead Porch team can
+          review the application, preserve attribution, communicate about next
+          steps, and avoid unnecessary duplicate records.
         </p>
       </section>
       <section>
@@ -97,9 +97,9 @@ export function PrivacyPage() {
       <section>
         <h2>4. Facebook, Instagram, and Meta data</h2>
         <p>
-          When an authorized Ellie’s Coaching administrator connects selected
-          Facebook Pages or professional Instagram accounts through Meta’s
-          official authorization flow, Lead Porch may process:
+          When an authorized Lead Porch administrator connects selected Facebook
+          Pages or professional Instagram accounts through Meta’s official
+          authorization flow, Lead Porch may process:
         </p>
         <ul>
           <li>
@@ -185,12 +185,11 @@ export function PrivacyPage() {
       <section>
         <h2>7. Selling and disclosure</h2>
         <p>
-          Ellie’s Coaching does not sell personal information. Information may
-          be disclosed to service providers that help operate requested
-          features; to authorized Ellie’s Coaching team members who need it for
-          their work; when directed by the person or account owner; or when
-          reasonably necessary for security, legal process, or protection of
-          rights.
+          Lead Porch does not sell personal information. Information may be
+          disclosed to service providers that help operate requested features;
+          to authorized Lead Porch team members who need it for their work; when
+          directed by the person or account owner; or when reasonably necessary
+          for security, legal process, or protection of rights.
         </p>
       </section>
       <section>
@@ -255,7 +254,7 @@ export function TermsPage() {
     <LegalShell
       eyebrow="Website terms"
       title="Terms of Service"
-      intro="These terms govern use of the Ellie’s Coaching public website and program-application experience."
+      intro="These terms govern use of the Lead Porch public website and contact experience."
     >
       <section>
         <h2>1. Accepting these terms</h2>
@@ -269,10 +268,10 @@ export function TermsPage() {
       <section>
         <h2>2. Website purpose</h2>
         <p>
-          The website provides information about Ellie’s Coaching, published
-          programs, events, team profiles, testimonials, and ways to apply or
-          make contact. Website content is general information and may be
-          updated, corrected, or removed.
+          The website provides information about Lead Porch, published programs,
+          events, team profiles, testimonials, and ways to apply or make
+          contact. Website content is general information and may be updated,
+          corrected, or removed.
         </p>
       </section>
       <section>
@@ -319,7 +318,7 @@ export function TermsPage() {
         <h2>7. Intellectual property</h2>
         <p>
           The website’s branding, text, graphics, program descriptions, and
-          other materials are owned by or used with permission by Ellie’s
+          other materials are owned by or used with permission by Lead Porch
           Coaching and may be protected by intellectual-property laws. You may
           use the public site for personal informational purposes, but may not
           reproduce or commercially exploit its content without permission
@@ -331,7 +330,7 @@ export function TermsPage() {
         <p>
           The site may link to or interact with services such as Meta, Google,
           Zoom, Eventbrite, Stripe, Skool, and other providers. Their services
-          are governed by their own terms and privacy practices. Ellie’s
+          are governed by their own terms and privacy practices. Lead Porch
           Coaching is not responsible for a third party’s independent service,
           availability, or content.
         </p>
@@ -340,7 +339,7 @@ export function TermsPage() {
         <h2>9. Service availability and disclaimers</h2>
         <p>
           The public site is provided on an “as available” basis. To the extent
-          permitted by law, Ellie’s Coaching disclaims warranties that are not
+          permitted by law, Lead Porch disclaims warranties that are not
           expressly stated in a separate written agreement, including that the
           site will always be available or error-free. Nothing in these terms
           excludes rights or responsibilities that cannot legally be excluded.
@@ -349,7 +348,7 @@ export function TermsPage() {
       <section>
         <h2>10. Responsibility for loss</h2>
         <p>
-          To the extent permitted by applicable law, Ellie’s Coaching is not
+          To the extent permitted by applicable law, Lead Porch is not
           responsible for indirect or consequential loss arising solely from use
           of, or inability to use, the public website. This section does not
           limit responsibility that cannot legally be limited and does not
@@ -381,7 +380,7 @@ export function DataDeletionPage() {
     <LegalShell
       eyebrow="Meta user-data request"
       title="Facebook & Instagram Data Deletion Instructions"
-      intro="Use these instructions to request deletion of information associated with a Facebook or Instagram interaction or authorization processed by Ellie’s Coaching through Lead Porch."
+      intro="Use these instructions to request deletion of information associated with a Facebook or Instagram interaction or authorization processed by Lead Porch."
     >
       <section
         className="legal-callout"
@@ -408,8 +407,8 @@ export function DataDeletionPage() {
           <li>
             Do not send your Facebook or Instagram password, an access token, an
             authorization code, a webhook secret, or any other account
-            credential. Ellie’s Coaching will never ask for those items to
-            process a deletion request.
+            credential. Lead Porch will never ask for those items to process a
+            deletion request.
           </li>
         </ol>
       </section>
@@ -420,15 +419,15 @@ export function DataDeletionPage() {
           additional information needed to verify that the requester is the
           person concerned or is authorized to act for the connected business
           asset. There is no claim that this process is fully automated. Once
-          verified, Ellie’s Coaching will identify and delete or de-identify
+          verified, Lead Porch will identify and delete or de-identify
           applicable workspace records, which may include the associated social
           identity link, supported Meta event records, conversation records, CRM
           contact information, tracked links, and program application
           information.
         </p>
         <p>
-          If the request concerns an Ellie’s Coaching business connection, any
-          separate action involving stored Meta authorization must be explicitly
+          If the request concerns a Lead Porch business connection, any separate
+          action involving stored Meta authorization must be explicitly
           confirmed by an authorized account administrator. Disconnecting it may
           affect the selected Facebook Page or professional Instagram account.
         </p>
@@ -439,9 +438,8 @@ export function DataDeletionPage() {
           You may also remove the app or revoke its permissions from your
           Facebook or Instagram settings. Revocation stops future authorized
           access after Meta processes it, but it may not by itself delete
-          information already provided to Ellie’s Coaching. Send the request
-          above if you also want existing Ellie’s Coaching records reviewed for
-          deletion.
+          information already provided to Lead Porch. Send the request above if
+          you also want existing Lead Porch records reviewed for deletion.
         </p>
       </section>
       <section>
@@ -450,7 +448,7 @@ export function DataDeletionPage() {
           Some information may be retained where reasonably necessary for
           security, fraud prevention, legal obligations, dispute resolution,
           consent or suppression records, or system backups. Where a request is
-          completed, Ellie’s Coaching will respond using the contact information
+          completed, Lead Porch will respond using the contact information
           supplied by the requester. Requests involving another person’s data
           cannot be fulfilled without appropriate authority.
         </p>
