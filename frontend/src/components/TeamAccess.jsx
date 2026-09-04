@@ -73,7 +73,8 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
     [saving, setSaving] = useState(false),
     [resendingId, setResendingId] = useState(""),
     [removingId, setRemovingId] = useState(""),
-    [resendFeedback, setResendFeedback] = useState({});
+    [resendFeedback, setResendFeedback] = useState({}),
+    [sendFeedback, setSendFeedback] = useState("");
   const resendInFlight = useRef(new Set()),
     removalInFlight = useRef(new Set());
   const blankInvite = {
@@ -246,13 +247,13 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
   const send = async () => {
     try {
       setSaving(true);
+      setError("");
+      setSendFeedback("");
       await sendWorkspaceInvitation(preview.id, {
         subject: preview.subject,
         body: preview.body,
       });
-      setPreview(null);
-      setError("");
-      setNotice(`Invitation sent successfully to ${preview.recipient}.`);
+      setSendFeedback(`Invitation sent successfully to ${preview.recipient}.`);
       await load();
     } catch (err) {
       setError(err.response?.data?.error || "Unable to send invitation.");
@@ -337,6 +338,7 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
     try {
       await removeWorkspaceMember(memberId);
       setMembers((rows) => rows.filter((row) => row.id !== memberId));
+      setError("");
       setEditing(null);
       setDraft(null);
       setRemoving(null);
@@ -1031,6 +1033,11 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
                 <Button loading={saving} onClick={send}>
                   Send invitation
                 </Button>
+                {sendFeedback ? (
+                  <p className="team-access__notice" role="status">
+                    {sendFeedback}
+                  </p>
+                ) : null}
                 <Button variant="outline" onClick={() => setPreview(null)}>
                   Keep as draft
                 </Button>

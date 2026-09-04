@@ -229,8 +229,10 @@ async function deliverInvitation(
     invitation.sentAt = new Date();
     invitation.deliveryError = "";
   } catch (error) {
-    invitation.tokenHash = previousAuthorization.tokenHash;
-    invitation.expiresAt = previousAuthorization.expiresAt;
+    invitation.tokenHash =
+      previousAuthorization.tokenHash || invitation.tokenHash;
+    invitation.expiresAt =
+      previousAuthorization.expiresAt || invitation.expiresAt;
     invitation.status = previousAuthorization.status;
     invitation.deliveryStatus = "failed";
     invitation.deliveryError = String(
