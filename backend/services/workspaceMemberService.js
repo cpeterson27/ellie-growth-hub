@@ -393,6 +393,17 @@ async function inviteMember(input, models = dependencies) {
     );
   if (existing && normalizeRoles(existing).includes("owner"))
     await requireOwnerActor(input, models);
+  if (
+    !userCreated &&
+    !establishedElsewhere &&
+    (!existing || existing.status !== "active")
+  ) {
+    user.name = identity.name;
+    user.firstName = identity.firstName;
+    user.lastName = identity.lastName;
+    if (identity.phone) user.phone = identity.phone;
+    await user.save();
+  }
   // Reuse established global identity. Only fill missing fields for an existing
   // membership in this workspace; never edit a foreign workspace's user.
   if (existing) {
@@ -730,15 +741,11 @@ async function sendInvitation(
     throw error;
   }
   const token = crypto.randomBytes(32).toString("base64url");
-  const [workspace, config, inviter, recipient] = await Promise.all([
+  const [workspace, config, inviter] = await Promise.all([
     models.Workspace.findById(workspaceId).select("name").lean(),
     workspaceConfigFor(workspaceId, models),
     models.User.findById(invitation.invitedBy).select("name").lean(),
-    models.User.findById(invitation.userId).select("name email").lean(),
   ]);
-  if (recipient?.name) invitation.name = recipient.name;
-  if (recipient?.email) invitation.email = recipient.email;
-  if (recipient?.name || recipient?.email) await invitation.save();
   const delivery = await deliverInvitation(
     {
       invitation,

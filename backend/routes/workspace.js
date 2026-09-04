@@ -153,16 +153,16 @@ function memberResponse(
   isSelf = false,
 ) {
   const roles = normalizeRoles(membership);
-  const invitedName = membership.userId?.name || invitation?.name || "";
-  const invitedEmail = membership.userId?.email || invitation?.email || "";
+  const invitedName = invitation?.name || membership.userId?.name || "";
+  const invitedEmail = invitation?.email || membership.userId?.email || "";
   return {
     id: membership._id,
     userId: membership.userId?._id || membership.userId,
     firstName:
-      membership.userId?.firstName || invitation?.name?.split(/\s+/)[0] || "",
+      invitation?.name?.split(/\s+/)[0] || membership.userId?.firstName || "",
     lastName:
-      membership.userId?.lastName ||
       invitation?.name?.split(/\s+/).slice(1).join(" ") ||
+      membership.userId?.lastName ||
       "",
     phone: membership.userId?.phone || "",
     name: invitedName,
@@ -421,16 +421,10 @@ router.get(
       }).lean();
       if (!invitation)
         return res.status(404).json({ error: "Invitation not found" });
-      const user = await User.findById(invitation.userId)
-        .select("name email")
-        .lean();
-      const currentInvitation = user
-        ? { ...invitation, name: user.name, email: user.email }
-        : invitation;
       return res.json({
         invitation: invitationResponse(
-          currentInvitation,
-          await previewVariablesFor(currentInvitation, req.auth.workspaceId),
+          invitation,
+          await previewVariablesFor(invitation, req.auth.workspaceId),
         ),
       });
     } catch (error) {
