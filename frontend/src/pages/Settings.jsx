@@ -84,6 +84,7 @@ export default function Settings() {
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState("");
   const [invitationIdentity, setInvitationIdentity] = useState({
     senderName: "",
+    senderEmail: "",
     replyToEmail: "",
   });
   const [campaigns, setCampaigns] = useState([]);
@@ -141,6 +142,7 @@ export default function Settings() {
         setOrganizationLogoUrl(config.organizationLogoUrl || "");
         setInvitationIdentity({
           senderName: config.invitationIdentity?.senderName || "",
+          senderEmail: config.invitationIdentity?.senderEmail || "",
           replyToEmail: config.invitationIdentity?.replyToEmail || "",
         });
       })
@@ -470,10 +472,10 @@ export default function Settings() {
                 <div>
                   <h3>Brand assets</h3>
                   <p>
-                    The primary organization logo used in the authenticated
-                    Lead Porch sidebar and campaign email branding. Public
-                    website light/dark logos are managed separately under
-                    Website &amp; Brand.
+                    The primary organization logo used in the authenticated Lead
+                    Porch sidebar and campaign email branding. Public website
+                    light/dark logos are managed separately under Website &amp;
+                    Brand.
                   </p>
                 </div>
               </div>
@@ -540,8 +542,7 @@ export default function Settings() {
                     }}
                   />
                   <small>
-                    Used in Lead Porch and as [Business name] in
-                    invitations.
+                    Used in Lead Porch and as [Business name] in invitations.
                   </small>
                 </label>
                 <label className="form-field">
@@ -570,6 +571,25 @@ export default function Settings() {
                   <small>
                     Optional. If blank, [Invited by] uses the person who created
                     the invitation.
+                  </small>
+                </label>
+                <label className="form-field">
+                  <span>Invitation sender email</span>
+                  <input
+                    type="email"
+                    value={invitationIdentity.senderEmail}
+                    onChange={(event) => {
+                      setInvitationIdentity({
+                        ...invitationIdentity,
+                        senderEmail: event.target.value,
+                      });
+                      setSaved(false);
+                    }}
+                    placeholder="team@yourdomain.com"
+                  />
+                  <small>
+                    Use an address on a verified sending domain. Leave blank to
+                    use the platform fallback.
                   </small>
                 </label>
                 <label className="form-field">
@@ -892,13 +912,12 @@ export default function Settings() {
             <header>
               <p className="page-eyebrow">Lead Porch connections</p>
               <h2>
-                Connect Lead Porch to ChatGPT, Claude, Codex, or an MCP
-                client
+                Connect Lead Porch to ChatGPT, Claude, Codex, or an MCP client
               </h2>
               <p>
-                Lead Porch receives controlled access to Lead Porch
-                research and ranked lead lists. Email sending is not available
-                through this connection.
+                Lead Porch receives controlled access to Lead Porch research and
+                ranked lead lists. Email sending is not available through this
+                connection.
               </p>
             </header>
             <section className="settings-section">
@@ -907,9 +926,9 @@ export default function Settings() {
                 <div>
                   <h3>Connect Codex</h3>
                   <p>
-                    Sign in with your Lead Porch account once. Codex stores
-                    and refreshes its own authorization—there is no secret token
-                    to copy or remember.
+                    Sign in with your Lead Porch account once. Codex stores and
+                    refreshes its own authorization—there is no secret token to
+                    copy or remember.
                   </p>
                 </div>
               </div>

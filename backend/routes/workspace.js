@@ -61,6 +61,7 @@ router.get("/", async (_req, res) => {
     appBranding: config.appBranding || {},
     invitationIdentity: config.invitationIdentity || {
       senderName: "",
+      senderEmail: "",
       replyToEmail: "",
     },
   });
@@ -73,6 +74,18 @@ router.patch("/", async (req, res) => {
   const invitationSenderName = String(
     req.body?.invitationIdentity?.senderName || "",
   ).trim();
+  const invitationSenderEmail = String(
+    req.body?.invitationIdentity?.senderEmail || "",
+  )
+    .trim()
+    .toLowerCase();
+  if (
+    invitationSenderEmail &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invitationSenderEmail)
+  )
+    return res
+      .status(400)
+      .json({ error: "Enter a valid invitation sender email." });
   const invitationReplyToEmail = String(
     req.body?.invitationIdentity?.replyToEmail || "",
   )
@@ -102,6 +115,7 @@ router.patch("/", async (req, res) => {
         organizationLogoUrl: String(req.body?.organizationLogoUrl || "").trim(),
         invitationIdentity: {
           senderName: invitationSenderName,
+          senderEmail: invitationSenderEmail,
           replyToEmail: invitationReplyToEmail,
         },
         ...(req.body?.appBranding ? { appBranding: req.body.appBranding } : {}),
@@ -124,6 +138,7 @@ router.patch("/", async (req, res) => {
     appBranding: config.appBranding || {},
     invitationIdentity: config.invitationIdentity || {
       senderName: "",
+      senderEmail: "",
       replyToEmail: "",
     },
   });
@@ -270,22 +285,18 @@ router.put(
   async (req, res) => {
     try {
       if (!req.auth.roles.includes("owner") && !req.auth.isPlatformOwner)
-        return res
-          .status(403)
-          .json({
-            error: "Only a workspace owner can change role templates",
-            code: "OWNER_REQUIRED",
-          });
+        return res.status(403).json({
+          error: "Only a workspace owner can change role templates",
+          code: "OWNER_REQUIRED",
+        });
       const role = String(req.params.role || "").toLowerCase();
       if (!ROLE_DEFAULTS[role])
         return res.status(404).json({ error: "Role template not found" });
       if (role === "owner")
-        return res
-          .status(409)
-          .json({
-            error: "Owner permissions are protected and cannot be customized",
-            code: "OWNER_TEMPLATE_PROTECTED",
-          });
+        return res.status(409).json({
+          error: "Owner permissions are protected and cannot be customized",
+          code: "OWNER_TEMPLATE_PROTECTED",
+        });
       const workspace = await Workspace.findOne({
         _id: req.auth.workspaceId,
         status: "active",
@@ -316,12 +327,10 @@ router.delete(
   requireCapability("team.manage"),
   async (req, res) => {
     if (!req.auth.roles.includes("owner") && !req.auth.isPlatformOwner)
-      return res
-        .status(403)
-        .json({
-          error: "Only a workspace owner can reset role templates",
-          code: "OWNER_REQUIRED",
-        });
+      return res.status(403).json({
+        error: "Only a workspace owner can reset role templates",
+        code: "OWNER_REQUIRED",
+      });
     const role = String(req.params.role || "").toLowerCase();
     if (!ROLE_DEFAULTS[role] || role === "owner")
       return res
@@ -511,12 +520,10 @@ router.delete(
       if (!invitation)
         return res.status(404).json({ error: "Invitation not found" });
       if (invitation.status === "accepted")
-        return res
-          .status(409)
-          .json({
-            error:
-              "Accepted invitations cannot be cancelled; remove workspace access instead",
-          });
+        return res.status(409).json({
+          error:
+            "Accepted invitations cannot be cancelled; remove workspace access instead",
+        });
       invitation.status = "revoked";
       invitation.expiresAt = new Date();
       await invitation.save();
@@ -598,18 +605,16 @@ router.post("/members", requireCapability("team.manage"), async (req, res) => {
       const previewVariables = data.invitation
         ? await previewVariablesFor(data.invitation, req.auth.workspaceId)
         : null;
-      return res
-        .status(data.alreadyActive ? 200 : 201)
-        .json({
-          member: memberResponse(
-            { ...data.membership.toObject(), userId: data.user },
-            null,
-            data.ambassadorProfile,
-            data.invitation,
-          ),
-          invitation: invitationResponse(data.invitation, previewVariables),
-          alreadyActive: data.alreadyActive,
-        });
+      return res.status(data.alreadyActive ? 200 : 201).json({
+        member: memberResponse(
+          { ...data.membership.toObject(), userId: data.user },
+          null,
+          data.ambassadorProfile,
+          data.invitation,
+        ),
+        invitation: invitationResponse(data.invitation, previewVariables),
+        alreadyActive: data.alreadyActive,
+      });
     }
     if (
       roles.includes("coach") &&
@@ -626,18 +631,16 @@ router.post("/members", requireCapability("team.manage"), async (req, res) => {
       const previewVariables = data.invitation
         ? await previewVariablesFor(data.invitation, req.auth.workspaceId)
         : null;
-      return res
-        .status(data.alreadyActive ? 200 : 201)
-        .json({
-          member: memberResponse(
-            { ...data.membership.toObject(), userId: data.user },
-            data.coachProfile,
-            null,
-            data.invitation,
-          ),
-          invitation: invitationResponse(data.invitation, previewVariables),
-          alreadyActive: data.alreadyActive,
-        });
+      return res.status(data.alreadyActive ? 200 : 201).json({
+        member: memberResponse(
+          { ...data.membership.toObject(), userId: data.user },
+          data.coachProfile,
+          null,
+          data.invitation,
+        ),
+        invitation: invitationResponse(data.invitation, previewVariables),
+        alreadyActive: data.alreadyActive,
+      });
     }
     const result = await workspaceMemberService.inviteMember({
       workspaceId: req.auth.workspaceId,
@@ -658,27 +661,23 @@ router.post("/members", requireCapability("team.manage"), async (req, res) => {
     const previewVariables = result.invitation
       ? await previewVariablesFor(result.invitation, req.auth.workspaceId)
       : null;
-    res
-      .status(result.alreadyActive ? 200 : 201)
-      .json({
-        member: memberResponse(
-          { ...result.membership.toObject(), userId: result.user },
-          profile,
-          null,
-          result.invitation,
-        ),
-        invitation: invitationResponse(result.invitation, previewVariables),
-        alreadyActive: result.alreadyActive,
-      });
+    res.status(result.alreadyActive ? 200 : 201).json({
+      member: memberResponse(
+        { ...result.membership.toObject(), userId: result.user },
+        profile,
+        null,
+        result.invitation,
+      ),
+      invitation: invitationResponse(result.invitation, previewVariables),
+      alreadyActive: result.alreadyActive,
+    });
   } catch (error) {
-    res
-      .status(400)
-      .json({
-        error:
-          error.code === 11000
-            ? "That email already belongs to an account"
-            : error.message,
-      });
+    res.status(400).json({
+      error:
+        error.code === 11000
+          ? "That email already belongs to an account"
+          : error.message,
+    });
   }
 });
 
@@ -811,12 +810,10 @@ router.patch(
         member: memberResponse(membership, profile, ambassadorProfile),
       });
     } catch (error) {
-      return res
-        .status(400)
-        .json({
-          error: error.message || "Unable to update team access",
-          code: error.code,
-        });
+      return res.status(400).json({
+        error: error.message || "Unable to update team access",
+        code: error.code,
+      });
     }
   },
 );

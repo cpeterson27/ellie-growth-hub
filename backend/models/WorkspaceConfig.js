@@ -32,6 +32,13 @@ const workspaceConfigSchema = new mongoose.Schema(
     },
     invitationIdentity: {
       senderName: { type: String, default: "", trim: true, maxlength: 120 },
+      senderEmail: {
+        type: String,
+        default: "",
+        trim: true,
+        lowercase: true,
+        maxlength: 320,
+      },
       replyToEmail: {
         type: String,
         default: "",

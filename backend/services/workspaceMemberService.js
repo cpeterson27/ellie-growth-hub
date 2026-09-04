@@ -145,6 +145,7 @@ async function deliverInvitation(
     token = crypto.randomBytes(32).toString("base64url"),
     workspaceName,
     invitedBy = "",
+    senderEmail = "",
     replyToEmail = "",
   },
   models,
@@ -161,6 +162,9 @@ async function deliverInvitation(
     invitation.workspaceId,
     models,
   )}/accept-invitation/${encodeURIComponent(token)}`;
+  const from = senderEmail
+    ? `${invitedBy || workspaceName} <${senderEmail}>`
+    : process.env.EMAIL_FROM || "Lead Porch <onboarding@resend.dev>";
   const vars = {
     firstName: invitation.name.split(/\s+/)[0],
     displayName: invitation.name,
@@ -203,7 +207,7 @@ async function deliverInvitation(
   invitation.renderedBody = rendered.body;
   try {
     await models.integrationHub.execute("resend", "sendEmail", {
-      from: process.env.EMAIL_FROM || "Growth Operator <onboarding@resend.dev>",
+      from,
       to: invitation.email,
       subject: rendered.subject,
       text: rendered.body,
@@ -398,6 +402,7 @@ async function inviteMember(input, models = dependencies) {
         token,
         workspaceName: config?.workspaceName || workspace?.name,
         invitedBy: config?.invitationIdentity?.senderName || inviter?.name,
+        senderEmail: config?.invitationIdentity?.senderEmail || "",
         replyToEmail: config?.invitationIdentity?.replyToEmail || "",
       },
       models,
