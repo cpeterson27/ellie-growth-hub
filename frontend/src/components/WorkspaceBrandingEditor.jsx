@@ -112,7 +112,8 @@ export default function WorkspaceBrandingEditor({
   saving,
   setError,
 }) {
-  const [uploading, setUploading] = useState("");
+  const [uploading, setUploading] = useState(""),
+    [saveMessage, setSaveMessage] = useState("");
   const patchPublic = (key, value) =>
     setConfig((current) => ({
       ...current,
@@ -420,11 +421,23 @@ export default function WorkspaceBrandingEditor({
         </div>
       </section>
       <footer>
-        <Button loading={saving} disabled={contrast < 4.5} onClick={onSave}>
+        <Button
+          loading={saving}
+          disabled={contrast < 4.5}
+          onClick={async () => {
+            setSaveMessage("");
+            try {
+              await onSave();
+              setSaveMessage("Saved successfully.");
+            } catch {
+              setSaveMessage("Save failed. Review the message above.");
+            }
+          }}
+        >
           Save branding
         </Button>
         <output className="branding-save-status" aria-live="polite">
-          {saving ? "Saving public website branding…" : ""}
+          {saving ? "Saving all branding changes…" : saveMessage}
         </output>
       </footer>
     </div>

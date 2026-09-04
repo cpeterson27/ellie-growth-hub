@@ -137,12 +137,17 @@ export default function PublicSiteAdmin({ section = "website" }) {
       setSaving(true);
       setError("");
       const saved = await updatePublicManagementConfig(config);
-      setConfig(saved);
-      setMessage(
-        `Saved. Public website surface: ${
-          saved.branding?.surfaceMode || "light"
-        }.`,
-      );
+      const verified = await fetchPublicManagementConfig();
+      setConfig(verified);
+      const requestedSurface = config.branding?.surfaceMode || "light";
+      const savedSurface = verified.branding?.surfaceMode || "light";
+      if (requestedSurface !== savedSurface) {
+        throw new Error(
+          `The server saved ${savedSurface} instead of ${requestedSurface}.`,
+        );
+      }
+      setMessage("All branding changes saved successfully.");
+      return saved;
     } catch (err) {
       setError(
         err.response?.data?.error || "Unable to save public-site settings.",
