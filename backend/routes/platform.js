@@ -93,6 +93,7 @@ router.get("/businesses", requirePlatformOwner, async (_req, res) => {
       name: workspace.name,
       slug: workspace.slug,
       status: workspace.status,
+      publicHosts: workspace.publicHosts || [],
       owner: owner?.userId
         ? { name: owner.userId.name, email: owner.userId.email }
         : null,
@@ -113,24 +114,21 @@ router.post("/workspaces", requirePlatformOwner, async (req, res) => {
       ownerUserId: req.auth.userId,
       publicHosts: req.body?.publicHosts,
     });
-    return res
-      .status(201)
-      .json({
-        workspace: {
-          id: workspace._id,
-          name: workspace.name,
-          slug: workspace.slug,
-          status: workspace.status,
-          billingStatus: workspace.billingStatus,
-        },
-      });
+    return res.status(201).json({
+      workspace: {
+        id: workspace._id,
+        name: workspace.name,
+        slug: workspace.slug,
+        status: workspace.status,
+        publicHosts: workspace.publicHosts || [],
+        billingStatus: workspace.billingStatus,
+      },
+    });
   } catch (error) {
-    return res
-      .status(error.code === "WORKSPACE_SLUG_EXISTS" ? 409 : 400)
-      .json({
-        error: error.message || "Unable to create workspace",
-        code: error.code,
-      });
+    return res.status(error.code === "WORKSPACE_SLUG_EXISTS" ? 409 : 400).json({
+      error: error.message || "Unable to create workspace",
+      code: error.code,
+    });
   }
 });
 
