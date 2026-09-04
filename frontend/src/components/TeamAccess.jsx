@@ -256,7 +256,12 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
       setSendFeedback(`Invitation sent successfully to ${preview.recipient}.`);
       await load();
     } catch (err) {
-      setError(err.response?.data?.error || "Unable to send invitation.");
+      const message =
+        [err.response?.data?.error, err.response?.data?.detail]
+          .filter(Boolean)
+          .join(" ") || "Unable to send invitation.";
+      setError(message);
+      setSendFeedback(message);
     } finally {
       setSaving(false);
     }

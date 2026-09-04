@@ -251,8 +251,6 @@ async function deliverInvitation(
   await invitation.save();
   if (models.CrmActivity)
     await models.CrmActivity.create({
-      workspaceId: invitation.workspaceId,
-      type: "system",
       source: "crm",
       title:
         invitation.deliveryStatus === "sent"
@@ -271,6 +269,7 @@ async function deliverInvitation(
     });
   return {
     deliveryStatus: invitation.deliveryStatus,
+    deliveryError: invitation.deliveryError || "",
     ...(process.env.NODE_ENV === "production" ? {} : { acceptUrl }),
   };
 }
@@ -675,6 +674,7 @@ async function sendInvitation(
       "Invitation email could not be sent. Check the email connection and try again.",
     );
     error.code = "INVITATION_DELIVERY_FAILED";
+    error.deliveryError = delivery.deliveryError || "";
     throw error;
   }
   return delivery;
