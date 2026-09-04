@@ -98,6 +98,11 @@ export default function Settings() {
     confirmPassword: "",
   });
   const [mcpTokens, setMcpTokens] = useState([]);
+  useEffect(() => {
+    if (!saved) return undefined;
+    const timer = window.setTimeout(() => setSaved(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [saved]);
   const [newMcpToken, setNewMcpToken] = useState(null);
   const [mcpName, setMcpName] = useState("Lead Porch");
   const [oauthConnections, setOauthConnections] = useState([]);
@@ -348,12 +353,6 @@ export default function Settings() {
           </p>
         </div>
       </div>
-      {saved ? (
-        <p className="discovery-notice">
-          Organization profile saved. Campaign email footers now use these
-          details.
-        </p>
-      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
       <section className="account-layout">
         <nav className="account-settings-nav" aria-label="Settings sections">
@@ -774,6 +773,11 @@ export default function Settings() {
               >
                 Save organization profile
               </Button>
+              {saved ? (
+                <p className="settings-save-confirmation" role="status">
+                  Organization profile saved successfully.
+                </p>
+              ) : null}
             </footer>
           </div>
         ) : activeSection === "login" ? (
