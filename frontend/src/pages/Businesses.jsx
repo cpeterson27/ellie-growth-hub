@@ -19,6 +19,8 @@ const statusNames = {
   needs_attention: "Needs attention",
   not_connected: "Not connected",
 };
+const canonicalHosts = (hosts = []) =>
+  hosts.filter((host) => !String(host).toLowerCase().startsWith("www."));
 
 export default function Businesses() {
   const [businesses, setBusinesses] = useState([]),
@@ -141,7 +143,8 @@ export default function Businesses() {
           <label>
             Public website domains
             <small>
-              Comma-separated hostnames, such as client.com, www.client.com
+              Enter the canonical domain. The www alias is added automatically
+              for root domains.
             </small>
             <input
               value={draft.publicHosts}
@@ -199,8 +202,8 @@ export default function Businesses() {
             <div className="business-card__connections">
               <strong>Public domains</strong>
               <small>
-                {business.publicHosts?.length
-                  ? business.publicHosts.join(", ")
+                {canonicalHosts(business.publicHosts).length
+                  ? canonicalHosts(business.publicHosts).join(", ")
                   : "Not configured"}
               </small>
               {editingHosts === null ? (
@@ -208,7 +211,9 @@ export default function Businesses() {
                   type="button"
                   onClick={() => {
                     setSelected(business.id);
-                    setEditingHosts((business.publicHosts || []).join(", "));
+                    setEditingHosts(
+                      canonicalHosts(business.publicHosts).join(", "),
+                    );
                   }}
                 >
                   Edit domains

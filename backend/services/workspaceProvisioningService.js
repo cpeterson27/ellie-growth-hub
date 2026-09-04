@@ -50,7 +50,16 @@ function normalizePublicHosts(values) {
     )
   )
     throw new Error("Public hosts must be valid hostnames");
-  return hosts;
+  return [
+    ...new Set(
+      hosts.flatMap((host) => {
+        const labels = host.split(".");
+        if (labels.length !== 2) return [host];
+        const apex = host.startsWith("www.") ? host.slice(4) : host;
+        return [apex, `www.${apex}`];
+      }),
+    ),
+  ];
 }
 
 async function createWorkspace(
