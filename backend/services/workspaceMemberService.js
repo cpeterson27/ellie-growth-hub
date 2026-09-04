@@ -67,7 +67,18 @@ function invitationHash(token) {
     .update(String(token || ""))
     .digest("hex");
 }
-function publicFrontendUrl() {
+async function publicFrontendUrl(workspaceId, models) {
+  const workspace = workspaceId
+    ? await models.Workspace.findById(workspaceId).select("publicHosts").lean()
+    : null;
+  const publicHost = (workspace?.publicHosts || [])
+    .map((host) =>
+      String(host || "")
+        .trim()
+        .toLowerCase(),
+    )
+    .find((host) => host && !host.startsWith("www."));
+  if (publicHost) return `https://${publicHost}`;
   return String(
     process.env.PUBLIC_FRONTEND_URL ||
       process.env.FRONTEND_URL ||
@@ -146,7 +157,10 @@ async function deliverInvitation(
       ),
       { code: "INVITATION_BUSINESS_NAME_REQUIRED" },
     );
-  const acceptUrl = `${publicFrontendUrl()}/accept-invitation/${encodeURIComponent(token)}`;
+  const acceptUrl = `${await publicFrontendUrl(
+    invitation.workspaceId,
+    models,
+  )}/accept-invitation/${encodeURIComponent(token)}`;
   const vars = {
     firstName: invitation.name.split(/\s+/)[0],
     displayName: invitation.name,
