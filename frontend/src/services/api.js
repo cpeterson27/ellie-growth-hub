@@ -214,7 +214,9 @@ export const createPlatformWorkspace = (values) =>
 export const fetchLaunchReadiness = () =>
   api.get("/workspace/readiness").then((res) => res.data.data);
 export const fetchPublicSite = () =>
-  api.get("/public/site").then((res) => res.data.data);
+  api
+    .get("/public/site", { params: { publicHost: window.location.hostname } })
+    .then((res) => res.data.data);
 export const fetchPublicProgram = (slug) =>
   api.get(`/public/programs/${slug}`).then((res) => res.data.data);
 export const fetchPublicTestimonials = () =>
