@@ -74,7 +74,9 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
     [resendingId, setResendingId] = useState(""),
     [removingId, setRemovingId] = useState(""),
     [resendFeedback, setResendFeedback] = useState({}),
-    [sendFeedback, setSendFeedback] = useState(null);
+    [sendFeedback, setSendFeedback] = useState(null),
+    [identityEdit, setIdentityEdit] = useState(null),
+    [identitySaving, setIdentitySaving] = useState(false);
   const resendInFlight = useRef(new Set()),
     removalInFlight = useRef(new Set());
   const blankInvite = {
@@ -360,6 +362,28 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
       setRemovingId("");
     }
   };
+  const saveIdentity = async (member) => {
+    try {
+      setIdentitySaving(true);
+      setError("");
+      const result = await updateWorkspaceMember(member.id, {
+        firstName: identityEdit.firstName,
+        lastName: identityEdit.lastName,
+        email: identityEdit.email,
+        roles: member.roles,
+        status: member.status,
+      });
+      setMembers((rows) =>
+        rows.map((row) => (row.id === member.id ? result.member : row)),
+      );
+      setIdentityEdit(null);
+      setNotice("Member identity saved successfully.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Unable to save member identity.");
+    } finally {
+      setIdentitySaving(false);
+    }
+  };
   const cancelInvite = async () => {
     try {
       setSaving(true);
@@ -516,6 +540,23 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
                       >
                         Manage access
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const parts = String(member.name || "")
+                            .trim()
+                            .split(/\s+/);
+                          setIdentityEdit({
+                            memberId: member.id,
+                            firstName: member.firstName || parts.shift() || "",
+                            lastName: member.lastName || parts.join(" "),
+                            email: member.email || "",
+                          });
+                        }}
+                      >
+                        Edit identity
+                      </Button>
                       {!member.isSelf ? (
                         <Button
                           className="team-access__remove"
@@ -581,6 +622,55 @@ export default function TeamAccess({ canManage, actorRoles = [] }) {
                     </div>
                   ) : null}
                 </header>
+                {identityEdit?.memberId === member.id ? (
+                  <div className="team-access__identity-editor">
+                    <input
+                      aria-label="First name"
+                      value={identityEdit.firstName}
+                      onChange={(event) =>
+                        setIdentityEdit({
+                          ...identityEdit,
+                          firstName: event.target.value,
+                        })
+                      }
+                    />
+                    <input
+                      aria-label="Last name"
+                      value={identityEdit.lastName}
+                      onChange={(event) =>
+                        setIdentityEdit({
+                          ...identityEdit,
+                          lastName: event.target.value,
+                        })
+                      }
+                    />
+                    <input
+                      aria-label="Email"
+                      type="email"
+                      value={identityEdit.email}
+                      onChange={(event) =>
+                        setIdentityEdit({
+                          ...identityEdit,
+                          email: event.target.value,
+                        })
+                      }
+                    />
+                    <Button
+                      size="sm"
+                      loading={identitySaving}
+                      onClick={() => saveIdentity(member)}
+                    >
+                      Save identity
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setIdentityEdit(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : null}
                 {editing === member.id && draft ? (
                   <div className="team-access__editor">
                     <fieldset>

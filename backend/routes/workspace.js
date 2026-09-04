@@ -727,6 +727,42 @@ router.patch(
       });
       if (!requestedRoles.length)
         return res.status(400).json({ error: "At least one role is required" });
+      if (
+        req.body.firstName !== undefined ||
+        req.body.lastName !== undefined ||
+        req.body.email !== undefined
+      ) {
+        const firstName = String(
+          req.body.firstName ?? membership.userId.firstName ?? "",
+        ).trim();
+        const lastName = String(
+          req.body.lastName ?? membership.userId.lastName ?? "",
+        ).trim();
+        const email = String(req.body.email ?? membership.userId.email ?? "")
+          .trim()
+          .toLowerCase();
+        if (
+          !firstName ||
+          !lastName ||
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+        )
+          return res
+            .status(400)
+            .json({ error: "Enter a valid first name, last name, and email." });
+        membership.userId.firstName = firstName;
+        membership.userId.lastName = lastName;
+        membership.userId.name = `${firstName} ${lastName}`;
+        membership.userId.email = email;
+        await membership.userId.save();
+        await WorkspaceInvitation.updateMany(
+          {
+            workspaceId: req.auth.workspaceId,
+            userId: membership.userId._id,
+            status: { $in: ["draft", "ready", "pending", "expired"] },
+          },
+          { $set: { name: membership.userId.name, email } },
+        );
+      }
       const allow = validCapabilities(
         req.body.permissionOverrides?.allow ??
           membership.permissionOverrides?.allow,
