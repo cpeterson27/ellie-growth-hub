@@ -79,7 +79,7 @@ async function perform(
   const assetId = clean(thread.metadata?.assetId, 255),
     commentId = clean(thread.metadata?.commentId, 500);
   if (!assetId || !commentId)
-    throw new Error("Facebook comment context is unavailable");
+    throw new Error("Meta comment context is unavailable");
   if (action === "reply" && (!clean(body) || clean(body).length > 2000))
     throw new Error("Reply must contain 1–2000 characters");
 
@@ -89,7 +89,10 @@ async function perform(
     workspaceId,
   );
   const asset = connection?.assets?.find(
-    (row) => row.type === "facebook_page" && String(row.id) === assetId,
+    (row) =>
+      row.type ===
+        (provider === "instagram" ? "instagram_business" : "facebook_page") &&
+      String(row.id) === assetId,
   );
   if (
     !connection ||
@@ -133,7 +136,7 @@ async function perform(
     metadata: {
       socialEventKey,
       eventType: `social.facebook.comment.${action}`,
-      provider: "facebook",
+      provider,
       assetId,
       commentId,
       threadId,

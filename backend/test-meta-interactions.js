@@ -783,8 +783,8 @@ async function refresh() {
         assert.equal(options.params.grant_type, "ig_refresh_token");
         return { data: { access_token: "new", expires_in: 5184000 } };
       }
-      if (url.includes("/v26.0/ig"))
-        return { data: { id: "ig", username: "leadporch" } };
+      if (url.endsWith("/me"))
+        return { data: { user_id: "ig", username: "leadporch" } };
       if (url.endsWith("/permissions"))
         return {
           data: {
