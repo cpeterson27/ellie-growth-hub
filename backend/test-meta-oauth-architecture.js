@@ -275,9 +275,15 @@ async function run() {
     };
     axios.post = async (address, body) => {
       calls.push(address);
-      if (address === "https://api.instagram.com/oauth/access_token") {
+           if (address === "https://api.instagram.com/oauth/access_token") {
         assert.equal(new URLSearchParams(body).get("client_id"), "ig-app");
-        return { data: { access_token: "ig-short", user_id: "ig-user" } };
+        return {
+          data: {
+            access_token: "ig-short",
+            user_id: "ig-user",
+            permissions: "instagram_business_basic",
+          },
+        };
       }
       assert(
         address.includes("/v26.0/") && address.endsWith("/subscribed_apps"),

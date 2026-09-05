@@ -178,6 +178,7 @@ function stateNonceHash(nonce) {
     .digest("hex");
 }
 
+
 async function createAuthorizationRequest(provider, auth, dependencies = {}) {
   const authorization = authorizationUrl(provider, auth);
   const parsed = new URL(authorization);
@@ -192,6 +193,7 @@ async function createAuthorizationRequest(provider, auth, dependencies = {}) {
   });
   return authorization;
 }
+
 
 async function consumeState(rawState, provider, dependencies = {}) {
   const state = verifyState(rawState, provider);
@@ -1026,18 +1028,6 @@ async function refreshInstagram(workspaceId, http = axios) {
 
   if (String(profile.data?.user_id || "") !== accountId)
     throw new Error("Instagram authorization identity mismatch");
-  const permissions = await instagramOAuthOperation(
-    "instagram_permission_verification",
-    () =>
-      http.get(
-        `https://graph.instagram.com/${settings.apiVersion}/me/permissions`,
-        {
-          params: { access_token: token },
-          timeout: 15000,
-        },
-      ),
-  );
-  const rows = permissions.data?.data || [];
   const updated = await SocialConnection.findOneAndUpdate(
     {
       _id: connection._id,
@@ -1056,12 +1046,6 @@ async function refreshInstagram(workspaceId, http = axios) {
         expiresAt: new Date(
           Date.now() + Number(refreshed.data.expires_in) * 1000,
         ),
-        scopes: rows
-          .filter((row) => row.status === "granted")
-          .map((row) => row.permission),
-        declinedScopes: rows
-          .filter((row) => row.status !== "granted")
-          .map((row) => row.permission),
         lastVerifiedAt: new Date(),
         "authorization.valid": true,
         "authorization.verifiedAt": new Date(),
@@ -1177,26 +1161,15 @@ async function exchangeInstagram(code, http = axios) {
         timeout: 15000,
       }),
   );
-  const permissionResponse = await instagramOAuthOperation(
-    "instagram_permission_verification",
-    () =>
-      http.get(
-        `https://graph.instagram.com/${settings.apiVersion}/me/permissions`,
-        { params: { access_token: accessToken }, timeout: 15000 },
-      ),
-  );
   if (String(profile.data?.user_id || "") !== accountId)
     throw new Error("Instagram authorization identity mismatch");
-  const permissionRows = permissionResponse.data?.data || [];
-  const grantedScopes = permissionRows
-    .filter((row) => row.status === "granted")
-    .map((row) => row.permission);
+    const grantedScopes = splitScopes(initial.permissions || "");
   return {
     credentials: { accessToken },
     scopes: grantedScopes,
-    declinedScopes: permissionRows
-      .filter((row) => row.status !== "granted")
-      .map((row) => row.permission),
+    declinedScopes: settings.scopes.filter(
+      (scope) => !grantedScopes.includes(scope),
+    ),
     account: {
       id: accountId,
       name: profile.data.username || "Instagram professional account",

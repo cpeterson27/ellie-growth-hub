@@ -125,26 +125,20 @@ async function authorization() {
     oauth.verifyState(x.searchParams.get("state"), "instagram"),
     null,
   );
+   process.env.INSTAGRAM_OAUTH_SCOPES =
+    "instagram_business_basic,instagram_business_content_publish";
   const token = await oauth.exchangeInstagram("fixture-code", {
     post: async () => ({
-      data: { access_token: "short-fixture", user_id: "123" },
+      data: {
+        access_token: "short-fixture",
+        user_id: "123",
+        permissions: "instagram_business_basic",
+      },
     }),
     get: async (url) =>
       url.endsWith("/access_token")
         ? { data: { access_token: "long-fixture", expires_in: 1000 } }
-        : url.endsWith("/permissions")
-          ? {
-              data: {
-                data: [
-                  { permission: "instagram_business_basic", status: "granted" },
-                  {
-                    permission: "instagram_business_content_publish",
-                    status: "declined",
-                  },
-                ],
-              },
-            }
-          : { data: { user_id: "123", username: "fixture" } },
+        : { data: { user_id: "123", username: "fixture" } },
   });
   assert.deepEqual(token.scopes, ["instagram_business_basic"]);
   assert.deepEqual(token.declinedScopes, [
