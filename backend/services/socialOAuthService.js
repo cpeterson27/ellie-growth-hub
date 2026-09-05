@@ -1018,13 +1018,10 @@ async function refreshInstagram(workspaceId, http = axios) {
   const profile = await instagramOAuthOperation(
     "instagram_profile_verification",
     () =>
-      http.get(
-        `https://graph.instagram.com/${settings.apiVersion}/${encodeURIComponent(accountId)}`,
-        {
-          params: { fields: "id,username", access_token: token },
-          timeout: 15000,
-        },
-      ),
+      http.get(`https://graph.instagram.com/${settings.apiVersion}/me`, {
+        params: { fields: "user_id,username", access_token: token },
+        timeout: 15000,
+      }),
   );
   const permissions = await instagramOAuthOperation(
     "instagram_permission_verification",
@@ -1034,7 +1031,7 @@ async function refreshInstagram(workspaceId, http = axios) {
         { params: { access_token: token }, timeout: 15000 },
       ),
   );
-  if (String(profile.data?.id || "") !== accountId)
+  if (String(profile.data?.user_id || "") !== accountId)
     throw new Error("Instagram authorization identity mismatch");
   const rows = permissions.data?.data || [];
   const updated = await SocialConnection.findOneAndUpdate(
@@ -1171,13 +1168,10 @@ async function exchangeInstagram(code, http = axios) {
   const profile = await instagramOAuthOperation(
     "instagram_profile_verification",
     () =>
-      http.get(
-        `https://graph.instagram.com/${settings.apiVersion}/${encodeURIComponent(accountId)}`,
-        {
-          params: { fields: "id,username", access_token: accessToken },
-          timeout: 15000,
-        },
-      ),
+      http.get(`https://graph.instagram.com/${settings.apiVersion}/me`, {
+        params: { fields: "user_id,username", access_token: accessToken },
+        timeout: 15000,
+      }),
   );
   const permissionResponse = await instagramOAuthOperation(
     "instagram_permission_verification",
@@ -1187,7 +1181,7 @@ async function exchangeInstagram(code, http = axios) {
         { params: { access_token: accessToken }, timeout: 15000 },
       ),
   );
-  if (String(profile.data?.id || "") !== accountId)
+  if (String(profile.data?.user_id || "") !== accountId)
     throw new Error("Instagram authorization identity mismatch");
   const rows = permissionResponse.data?.data || [];
   return {
