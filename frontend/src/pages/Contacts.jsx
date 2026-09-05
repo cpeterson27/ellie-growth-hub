@@ -3789,7 +3789,6 @@ export default function Contacts() {
                 </p>
               </div>
               <div className="contact-detail__actions">
-                {!routeContactId ? <Button variant="outline" size="sm" onClick={() => navigate(`/crm/contacts/${detailContact._id}`)}>Open full record</Button> : null}
                 <Button
                   size="sm"
                   onClick={() => {

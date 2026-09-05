@@ -34,7 +34,7 @@ function readHidden(prompt) {
 async function main() {
   const [emailArg, ...nameParts] = process.argv.slice(2);
   const email = String(emailArg || "").trim().toLowerCase();
-  const name = nameParts.join(" ").trim() || "Growth Operator Owner";
+  const name = nameParts.join(" ").trim() || "Lead Porch Owner";
   if (!email) {
     throw new Error("Usage: npm run create-owner -- owner@example.com 'Owner Name'");
   }
@@ -51,7 +51,7 @@ async function main() {
 
   const workspace = await Workspace.findOneAndUpdate(
     { slug: "ellie" },
-    { $setOnInsert: { name: "Growth Operator", slug: "ellie", status: "active", billingStatus: "setup" } },
+    { $setOnInsert: { name: "Lead Porch", slug: "ellie", status: "active", billingStatus: "setup" } },
     { upsert: true, returnDocument: "after" },
   );
   const user = await User.create({ email, name, passwordHash: await hashPassword(password) });

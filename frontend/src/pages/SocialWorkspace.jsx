@@ -125,57 +125,76 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
     <main className="social-workspace">
       <header>
         <p className="page-eyebrow">Lead Porch</p>
-        <h1>Social</h1>
-        <p>
+        <h1 className="page-title">Social</h1>
+        <p className="page-subtitle">
           Connect and manage the social accounts Lead Porch can use for
           content, conversations, and automations.
         </p>
       </header>
+
       {!connectionsOnly ? (
         <nav aria-label="Social workspace">
           {sections.map(([key, label]) => (
-            <NavLink key={key} to={`/social/${key}`} end>
+            <NavLink
+              key={key}
+              to={`/social/${key}`}
+              end
+              className={({ isActive }) => (isActive ? "active" : undefined)}
+            >
               {label}
             </NavLink>
           ))}
         </nav>
       ) : null}
+
       {(error || oauthError) && (
         <p role="alert" className="form-error">
           {error || oauthError}
         </p>
       )}
       {oauthNotice ? <p role="status" className="discovery-notice">{oauthNotice}</p> : null}
-      {section === "leads" && <SocialLeads />}
+
+      {section === "leads" && (
+        <div className="social-panel">
+          <SocialLeads />
+        </div>
+      )}
+
       {section === "create" ? (
-        <SocialStudio />
+        <div className="social-panel">
+          <SocialStudio />
+        </div>
       ) : section === "content" ? (
-        <Content />
+        <div className="social-panel">
+          <Content />
+        </div>
       ) : null}
+
       {section === "automations" ? (
-        <>
+        <div className="social-panel">
           <SocialAutomation />
           <Link to="/automations">
             Open workflow builder and execution history
           </Link>
-        </>
+        </div>
       ) : null}
+
       {["overview", "analytics"].includes(section) && data?.counts ? (
         <>
-          <section className="social-stat-grid">
+          <div className="social-stat-grid">
             {Object.entries(data.counts).map(([key, value]) => (
               <article key={key}>
                 <strong>{value}</strong>
                 <span>{human(key.replace(/([A-Z])/g, " $1"))}</span>
               </article>
             ))}
-          </section>
+          </div>
           <p>
             Counts reflect stored activity. Content counts cover the latest{" "}
             {data.boundedContentCount} items. Reach, impressions, likes, and
             inferred conversions are not fabricated.
           </p>
-          <section className="social-panel">
+          <div className="social-panel">
             <h2>
               {section === "analytics"
                 ? "Known social activity"
@@ -196,12 +215,13 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
             ) : (
               <p>No recorded social activity yet.</p>
             )}
-          </section>
+          </div>
         </>
       ) : null}
+
       {section === "analytics" && data?.rows ? (
         <>
-          <section className="social-panel">
+          <div className="social-panel">
             <h2>Known social attribution</h2>
             <p>{data.attributionNote}</p>
             <div style={{ overflowX: "auto" }}>
@@ -230,8 +250,8 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
                 </tbody>
               </table>
             </div>
-          </section>
-          <section className="social-panel">
+          </div>
+          <div className="social-panel">
             <h2>Connected account insights</h2>
             <p>{data.metricsNote}</p>
             {data.providerInsights?.assets?.length ? (
@@ -273,11 +293,12 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
                 yet.
               </p>
             )}
-          </section>
+          </div>
         </>
       ) : null}
+
       {section === "calendar" && Array.isArray(data) ? (
-        <section className="social-panel">
+        <div className="social-panel">
           <h2>Content calendar</h2>
           <label>
             Network
@@ -368,10 +389,11 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
           {!data.some((row) => row.social?.requestedPublishAt) ? (
             <p>No scheduled content. Create and approve a draft first.</p>
           ) : null}
-        </section>
+        </div>
       ) : null}
+
       {section === "inbox" ? (
-        <>
+        <div className="social-panel">
           <div className="social-filters">
             <label>
               Show
@@ -457,36 +479,46 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
               )}
             </section>
           </div>
-        </>
+        </div>
       ) : null}
+
       {["accounts", "settings"].includes(section) && data?.connections ? (
-        <SocialConnectedAccounts
-          data={data}
-          busy={busy}
-          onRefresh={() => action(() => refreshInstagramAuthorization())}
-          onConnect={(provider) =>
-            action(async () => {
-              const result = await beginSocialConnection(provider);
-              window.location.assign(result.authorizationUrl);
-            })
-          }
-          onDisconnect={(provider) =>
-            action(() => disconnectSocialConnection(provider))
-          }
-          onSelectAssets={(provider, ids) =>
-            action(() => selectSocialAssets(provider, ids))
-          }
-        />
+        <div className="social-panel">
+          <SocialConnectedAccounts
+            data={data}
+            busy={busy}
+            onRefresh={() => action(() => refreshInstagramAuthorization())}
+            onConnect={(provider) =>
+              action(async () => {
+                const result = await beginSocialConnection(provider);
+                window.location.assign(result.authorizationUrl);
+              })
+            }
+            onDisconnect={(provider) =>
+              action(() => disconnectSocialConnection(provider))
+            }
+            onSelectAssets={(provider, ids) =>
+              action(() => selectSocialAssets(provider, ids))
+            }
+          />
+        </div>
       ) : null}
+
       {section === "settings" ? (
-        <>
+        <div className="social-panel">
           <SocialAutomationControls />
           <SocialOnboardingSettings />
-        </>
+        </div>
       ) : null}
-      {section === "distribution" ? <SocialDistributionForm /> : null}
+
+      {section === "distribution" ? (
+        <div className="social-panel">
+          <SocialDistributionForm />
+        </div>
+      ) : null}
+
       {section === "distribution" && Array.isArray(data) ? (
-        <section className="social-panel">
+        <div className="social-panel">
           <h2>Ambassador content tasks</h2>
           <p>
             Assign reviewed content from the Content Library. Ambassadors
@@ -507,7 +539,7 @@ export default function SocialWorkspace({ connectionsOnly = false, section: sect
             </article>
           ))}
           {!data.length && <p>No content tasks assigned yet.</p>}
-        </section>
+        </div>
       ) : null}
     </main>
   );

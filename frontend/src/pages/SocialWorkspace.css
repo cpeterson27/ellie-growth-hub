@@ -1,1 +1,324 @@
-.social-workspace{display:grid;gap:24px;min-width:0}.social-workspace>nav{display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid #dbe3df;padding-bottom:14px}.social-workspace>nav a{padding:9px 13px;border-radius:8px;color:#244137;text-decoration:none}.social-workspace>nav a.active{background:#173c2e;color:white}.social-stat-grid,.social-account-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}.social-stat-grid article,.social-panel{background:#fff;border:1px solid #dbe3df;border-radius:14px;padding:20px;min-width:0}.social-stat-grid article{display:grid;gap:8px}.social-stat-grid strong{font-size:2rem}.social-panel article{padding:14px 0;border-bottom:1px solid #e8ecea;display:grid;gap:7px}.social-workspace label{display:grid;gap:7px}.social-workspace input,.social-workspace select,.social-workspace button{padding:9px;border:1px solid #b8c8bf;border-radius:7px;max-width:100%}.social-workspace button{cursor:pointer;background:#f3f7f4}.social-workspace button:disabled{opacity:.5;cursor:not-allowed}.social-filters{display:flex;gap:15px;flex-wrap:wrap}.social-inbox{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:20px}.social-inbox>section:first-child{display:grid;align-content:start;gap:8px}.social-inbox button{display:grid;gap:7px;text-align:left}.social-inbox button.selected{border-color:#397457;background:#e8f4ed}.social-panel p,.social-inbox span{overflow-wrap:anywhere;white-space:pre-wrap}.social-panel small{color:#61736a}@media(max-width:700px){.social-inbox{grid-template-columns:1fr}.social-workspace>nav{gap:4px}.social-workspace>nav a{padding:7px}}
+/* ─── Social Workspace ─────────────────────────────────────────────────────
+   Apple-style: rounded cards, soft surfaces, clean tab nav, proper tokens.
+──────────────────────────────────────────────────────────────────────────── */
+
+.social-workspace {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+.social-workspace .page-header {
+  margin-bottom: 0;
+}
+
+/* ── Section tab nav ─────────────────────────────────────────────────────── */
+.social-workspace > nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.social-workspace > nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.social-workspace > nav a:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+}
+
+.social-workspace > nav a.active {
+  background: var(--color-brand);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── Stat grid ───────────────────────────────────────────────────────────── */
+.social-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.social-stat-grid article {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 20px 22px;
+  display: grid;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.social-stat-grid article:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.social-stat-grid small {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.social-stat-grid strong {
+  font-size: 2rem;
+  font-weight: 760;
+  color: var(--color-text);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.social-stat-grid span {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+/* ── Generic panel ───────────────────────────────────────────────────────── */
+.social-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 22px 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.social-panel h3 {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  font-weight: 720;
+  color: var(--color-text);
+}
+
+.social-panel h4 {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.social-panel article {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+  display: grid;
+  gap: 6px;
+}
+
+.social-panel article:last-child {
+  border-bottom: none;
+}
+
+.social-panel p {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.social-panel small {
+  color: var(--color-text-subtle);
+  font-size: 0.78rem;
+}
+
+/* ── Account grid ────────────────────────────────────────────────────────── */
+.social-account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+/* ── Form controls inside social workspace ──────────────────────────────── */
+.social-workspace label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.social-workspace input,
+.social-workspace select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.social-workspace input:focus-visible,
+.social-workspace select:focus-visible {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-soft);
+  outline: none;
+}
+
+.social-workspace button {
+  padding: 9px 16px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 650;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.social-workspace button:hover:not(:disabled) {
+  background: var(--color-brand-soft);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.social-workspace button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Filters row ─────────────────────────────────────────────────────────── */
+.social-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ── Inbox split view ────────────────────────────────────────────────────── */
+.social-inbox {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.social-inbox > section:first-child {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.social-inbox button {
+  display: grid;
+  gap: 5px;
+  text-align: left;
+  padding: 12px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  width: 100%;
+}
+
+.social-inbox button:hover {
+  background: var(--color-surface-subtle);
+}
+
+.social-inbox button.selected {
+  background: var(--color-brand-soft);
+  border-color: var(--color-brand);
+}
+
+.social-inbox span {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* ── Notice/error banners ────────────────────────────────────────────────── */
+.social-workspace .form-error,
+.social-workspace [class*="notice"],
+.social-workspace [class*="error"] {
+  padding: 10px 16px;
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.social-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 3rem 2rem;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  color: var(--color-text-muted);
+}
+
+.social-empty svg {
+  font-size: 2rem;
+  color: var(--color-brand);
+  opacity: 0.5;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .social-inbox {
+    grid-template-columns: 1fr;
+  }
+
+  .social-inbox > section:first-child {
+    max-height: 280px;
+  }
+
+  .social-workspace > nav {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .social-workspace > nav a {
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .social-stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .social-workspace > nav a {
+    padding: 6px 9px;
+    font-size: 0.75rem;
+  }
+}

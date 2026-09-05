@@ -9,7 +9,11 @@ import {
   updateSocialAutomation,
   fetchCampaigns,
 } from "../services/api.js";
-import { CampaignSelect, ContactLabelsControl } from "../components/SocialAutomationFields.jsx";
+import { Link } from "react-router-dom";
+import {
+  CampaignSelect,
+  ContactLabelsControl,
+} from "../components/SocialAutomationFields.jsx";
 import "./SocialAutomation.css";
 
 const EMPTY = {
@@ -78,22 +82,23 @@ export default function SocialAutomation() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [campaigns, setCampaigns] = useState([]);
-  const [postOptions, setPostOptions] = useState({ key: "", recent: [], briefs: [], error: "" });
+  const [postOptions, setPostOptions] = useState({
+    key: "",
+    recent: [],
+    briefs: [],
+    error: "",
+  });
   const load = async () => {
     setLoading(true);
 
     try {
-      const [
-        nextOverview,
-        nextAutomations,
-        nextLeads,
-        nextCampaigns,
-      ] = await Promise.all([
-        fetchSocialAutomationOverview(),
-        fetchSocialAutomations(),
-        fetchSocialLeads(),
-        fetchCampaigns(),
-      ]);
+      const [nextOverview, nextAutomations, nextLeads, nextCampaigns] =
+        await Promise.all([
+          fetchSocialAutomationOverview(),
+          fetchSocialAutomations(),
+          fetchSocialLeads(),
+          fetchCampaigns(),
+        ]);
 
       setOverview(nextOverview);
       setAutomations(nextAutomations);
@@ -118,23 +123,16 @@ export default function SocialAutomation() {
       fetchSocialLeads(),
       fetchCampaigns(),
     ])
-      .then(
-        ([
-          nextOverview,
-          nextAutomations,
-          nextLeads,
-          nextCampaigns,
-        ]) => {
-          if (active) {
-            setOverview(nextOverview);
-            setAutomations(nextAutomations);
-            setLeads(nextLeads);
-            setCampaigns(
-              Array.isArray(nextCampaigns) ? nextCampaigns.filter(Boolean) : [],
-            );
-          }
-        },
-      )
+      .then(([nextOverview, nextAutomations, nextLeads, nextCampaigns]) => {
+        if (active) {
+          setOverview(nextOverview);
+          setAutomations(nextAutomations);
+          setLeads(nextLeads);
+          setCampaigns(
+            Array.isArray(nextCampaigns) ? nextCampaigns.filter(Boolean) : [],
+          );
+        }
+      })
       .catch((error) => {
         if (active)
           setMessage(
@@ -154,10 +152,37 @@ export default function SocialAutomation() {
     if (!form.assetId) return;
     const key = `${form.provider}:${form.assetId}`;
     let active = true;
-    Promise.all([fetchSocialAutomationContentBriefs(form.provider, form.assetId), fetchSocialAutomationPosts(form.provider, form.assetId).catch((error) => ({ providerError: error.response?.data?.error || "Recent Meta posts could not be loaded." }))])
-      .then(([briefs, recent]) => { if (active) setPostOptions({ key, briefs: Array.isArray(briefs) ? briefs : [], recent: Array.isArray(recent) ? recent : [], error: recent?.providerError || "" }); })
-      .catch((error) => { if (active) setPostOptions({ key, briefs: [], recent: [], error: error.response?.data?.error || "Posts could not be loaded." }); });
-    return () => { active = false; };
+    Promise.all([
+      fetchSocialAutomationContentBriefs(form.provider, form.assetId),
+      fetchSocialAutomationPosts(form.provider, form.assetId).catch(
+        (error) => ({
+          providerError:
+            error.response?.data?.error ||
+            "Recent Meta posts could not be loaded.",
+        }),
+      ),
+    ])
+      .then(([briefs, recent]) => {
+        if (active)
+          setPostOptions({
+            key,
+            briefs: Array.isArray(briefs) ? briefs : [],
+            recent: Array.isArray(recent) ? recent : [],
+            error: recent?.providerError || "",
+          });
+      })
+      .catch((error) => {
+        if (active)
+          setPostOptions({
+            key,
+            briefs: [],
+            recent: [],
+            error: error.response?.data?.error || "Posts could not be loaded.",
+          });
+      });
+    return () => {
+      active = false;
+    };
   }, [form.provider, form.assetId]);
 
   const assets = useMemo(
@@ -231,9 +256,9 @@ export default function SocialAutomation() {
           <p className="eyebrow">Lead Porch</p>
           <h1>Social Automation</h1>
           <p>
-            Social Automations are rules for what happens after an interaction.
-            Social Leads shows the people captured; Social Content is where you
-            create posts.
+            Social Automations capture intent from Meta comments and messages.
+            Use this page for the immediate reply, qualification, CTA, and lead
+            attribution; use workspace Automations for the CRM follow-up.
           </p>
         </div>
         <span className="native-badge">
@@ -284,6 +309,7 @@ export default function SocialAutomation() {
           them. Use workspace Automations for follow-up tasks and employee
           notifications, and Social Inbox to assign conversations.
         </p>
+        <Link to="/automations">Open CRM Automations</Link>
       </section>
       <section className="social-grid">
         <form className="social-panel" onSubmit={save}>
@@ -322,7 +348,14 @@ export default function SocialAutomation() {
               disabled={Boolean(editingId)}
               required
               value={form.assetId}
-              onChange={(e) => setForm({ ...form, assetId: e.target.value, contentId: "", contentBriefId: "" })}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  assetId: e.target.value,
+                  contentId: "",
+                  contentBriefId: "",
+                })
+              }
             >
               <option value="">Select an account/page</option>
               {assets.map((asset) => (
@@ -354,16 +387,63 @@ export default function SocialAutomation() {
           </label>
           <label>
             Apply this automation to
-            <select value={form.contentBriefId ? `brief:${form.contentBriefId?._id || form.contentBriefId}` : form.contentId ? `post:${form.contentId}` : ""} disabled={!form.assetId} onChange={(event) => {
-              const [kind, ...idParts] = event.target.value.split(":");
-              const id = idParts.join(":");
-              setForm({ ...form, contentBriefId: kind === "brief" ? id : "", contentId: kind === "post" ? id : "" });
-            }}>
+            <select
+              value={
+                form.contentBriefId
+                  ? `brief:${form.contentBriefId?._id || form.contentBriefId}`
+                  : form.contentId
+                    ? `post:${form.contentId}`
+                    : ""
+              }
+              disabled={!form.assetId}
+              onChange={(event) => {
+                const [kind, ...idParts] = event.target.value.split(":");
+                const id = idParts.join(":");
+                setForm({
+                  ...form,
+                  contentBriefId: kind === "brief" ? id : "",
+                  contentId: kind === "post" ? id : "",
+                });
+              }}
+            >
               <option value="">All posts</option>
-              {postOptions.key === `${form.provider}:${form.assetId}` && postOptions.briefs.length ? <optgroup label="Lead Porch posts">{postOptions.briefs.map((post) => <option key={post.id} value={`brief:${post.id}`}>{`${post.title} · ${post.status.replaceAll("_", " ")}${post.updatedAt ? ` · ${new Date(post.updatedAt).toLocaleDateString()}` : ""}`}</option>)}</optgroup> : null}
-              {postOptions.key === `${form.provider}:${form.assetId}` && postOptions.recent.length ? <optgroup label="Already published posts">{postOptions.recent.map((post) => <option key={post.id} value={`post:${post.id}`}>{`${post.text.slice(0, 80)}${post.text.length > 80 ? "…" : ""}${post.publishedAt ? ` · ${new Date(post.publishedAt).toLocaleDateString()}` : ""}`}</option>)}</optgroup> : null}
+              {postOptions.key === `${form.provider}:${form.assetId}` &&
+              postOptions.briefs.length ? (
+                <optgroup label="Lead Porch posts">
+                  {postOptions.briefs.map((post) => (
+                    <option
+                      key={post.id}
+                      value={`brief:${post.id}`}
+                    >{`${post.title} · ${post.status.replaceAll("_", " ")}${post.updatedAt ? ` · ${new Date(post.updatedAt).toLocaleDateString()}` : ""}`}</option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {postOptions.key === `${form.provider}:${form.assetId}` &&
+              postOptions.recent.length ? (
+                <optgroup label="Already published posts">
+                  {postOptions.recent.map((post) => (
+                    <option
+                      key={post.id}
+                      value={`post:${post.id}`}
+                    >{`${post.text.slice(0, 80)}${post.text.length > 80 ? "…" : ""}${post.publishedAt ? ` · ${new Date(post.publishedAt).toLocaleDateString()}` : ""}`}</option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
-            {!form.assetId ? <small>Choose a connected account first.</small> : postOptions.key !== `${form.provider}:${form.assetId}` ? <small>Loading posts…</small> : postOptions.error ? <small role="alert">{postOptions.error} Select All posts or reconnect the account.</small> : <small>Choose a Lead Porch draft/scheduled post, an already-published post, or All posts.</small>}
+            {!form.assetId ? (
+              <small>Choose a connected account first.</small>
+            ) : postOptions.key !== `${form.provider}:${form.assetId}` ? (
+              <small>Loading posts…</small>
+            ) : postOptions.error ? (
+              <small role="alert">
+                {postOptions.error} Select All posts or reconnect the account.
+              </small>
+            ) : (
+              <small>
+                Choose a Lead Porch draft/scheduled post, an already-published
+                post, or All posts.
+              </small>
+            )}
           </label>
           <label>
             Keywords <small>(comma separated)</small>
@@ -419,8 +499,16 @@ export default function SocialAutomation() {
               placeholder="https://elliescoaching.com/apply"
             />
           </label>
-          <CampaignSelect campaigns={campaigns} value={form.campaignId} onChange={(campaignId) => setForm({ ...form, campaignId })} />
-          <ContactLabelsControl value={form.tags} onChange={(tags) => setForm({ ...form, tags })} onError={setMessage} />
+          <CampaignSelect
+            campaigns={campaigns}
+            value={form.campaignId}
+            onChange={(campaignId) => setForm({ ...form, campaignId })}
+          />
+          <ContactLabelsControl
+            value={form.tags}
+            onChange={(tags) => setForm({ ...form, tags })}
+            onError={setMessage}
+          />
 
           <label className="checkbox">
             <input
@@ -456,7 +544,8 @@ export default function SocialAutomation() {
                       ...item,
                       keywords: item.keywords.join(","),
                       tags: item.tags || [],
-                      contentBriefId: item.contentBriefId?._id || item.contentBriefId || "",
+                      contentBriefId:
+                        item.contentBriefId?._id || item.contentBriefId || "",
                       qualification: item.qualification.join(","),
                       ctaLabel: item.cta?.label || "",
                       ctaDestination: item.cta?.destination || "",

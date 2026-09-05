@@ -43,14 +43,25 @@ export function WorkspaceThemeProvider({ children }) {
       "--workspace-border",
       b.surfaceMode === "light" ? "#dce2de" : "#2a302c",
     );
+    // Apply app (dashboard) branding variables.
+    // Guard every setProperty call so we only write a value when it is a
+    // non-empty string.  Without the guard, fields that haven't been
+    // configured yet are `undefined`, and calling setProperty with
+    // `undefined` writes the literal string "undefined" to the CSS
+    // variable — which overrides the fallback values baked into the CSS.
     const app = site?.appBranding;
+    const setProp = (name, value) => {
+      if (value && typeof value === "string" && value.trim() !== "") {
+        root.style.setProperty(name, value.trim());
+      }
+    };
     if (app) {
-      root.style.setProperty("--app-sidebar-background", app.sidebarBackgroundColor);
-      root.style.setProperty("--app-sidebar-text", app.sidebarTextColor);
-      root.style.setProperty("--app-header", app.headerColor);
-      root.style.setProperty("--app-primary-action", app.primaryActionColor);
-      root.style.setProperty("--app-accent", app.accentColor);
-      root.style.setProperty("--app-background", app.backgroundColor);
+      setProp("--app-sidebar-background", app.sidebarBackgroundColor);
+      setProp("--app-sidebar-text", app.sidebarTextColor);
+      setProp("--app-header", app.headerColor);
+      setProp("--app-primary-action", app.primaryActionColor);
+      setProp("--app-accent", app.accentColor);
+      setProp("--app-background", app.backgroundColor);
     }
     const publicRoute = /^\/(?:$|about(?:\/|$)|coaching-programs(?:\/|$)|testimonials(?:\/|$)|contact(?:\/|$)|people(?:\/|$)|privacy(?:-policy)?(?:\/|$)|terms(?:\/|$)|data-deletion(?:\/|$)|apply(?:\/|$)|ref(?:\/|$)|profile\/edit(?:\/|$))/.test(pathname);
     const favicon = publicRoute ? b.faviconUrl : app?.faviconUrl || b.faviconUrl;

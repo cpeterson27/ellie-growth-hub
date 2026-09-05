@@ -52,6 +52,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
   const { session } = useAuth();
+
   const [activeSection, setActiveSection] = useState(() =>
     location.pathname.endsWith("/payments")
       ? "payments"
@@ -67,6 +68,7 @@ export default function Settings() {
                 ? "team"
                 : "profile",
   );
+
   const [workspaceName, setWorkspaceName] = useState(
     () => getWorkspaceSettings().workspaceName,
   );
@@ -98,11 +100,13 @@ export default function Settings() {
     confirmPassword: "",
   });
   const [mcpTokens, setMcpTokens] = useState([]);
+
   useEffect(() => {
     if (!saved) return undefined;
     const timer = window.setTimeout(() => setSaved(false), 4000);
     return () => window.clearTimeout(timer);
   }, [saved]);
+
   const [newMcpToken, setNewMcpToken] = useState(null);
   const [mcpName, setMcpName] = useState("Lead Porch");
   const [oauthConnections, setOauthConnections] = useState([]);
@@ -210,11 +214,7 @@ export default function Settings() {
     try {
       setSaving(true);
       await changePassword(passwords);
-      setPasswords({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
+      setPasswords({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setSaved(true);
       setError("");
     } catch (err) {
@@ -227,9 +227,7 @@ export default function Settings() {
   const save = async () => {
     try {
       setSaving(true);
-      const cityLine = [address.city, address.region]
-        .filter(Boolean)
-        .join(", ");
+      const cityLine = [address.city, address.region].filter(Boolean).join(", ");
       const postalAddress = [
         address.line1,
         address.line2,
@@ -253,10 +251,7 @@ export default function Settings() {
         organizationLogoUrl,
         invitationIdentity,
       });
-      const local = {
-        ...getWorkspaceSettings(),
-        workspaceName: config.workspaceName,
-      };
+      const local = { ...getWorkspaceSettings(), workspaceName: config.workspaceName };
       saveWorkspaceSettings(local);
       setWorkspaceName(config.workspaceName);
       window.dispatchEvent(
@@ -270,9 +265,7 @@ export default function Settings() {
       setSaved(true);
       setError("");
     } catch (err) {
-      setError(
-        err.response?.data?.error || "Unable to save the workspace name.",
-      );
+      setError(err.response?.data?.error || "Unable to save the workspace name.");
     } finally {
       setSaving(false);
     }
@@ -292,14 +285,9 @@ export default function Settings() {
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-      const uploaded = await uploadEventImage({
-        file: dataUrl,
-        filename: file.name,
-      });
+      const uploaded = await uploadEventImage({ file: dataUrl, filename: file.name });
       setOrganizationLogoUrl(uploaded.url);
-      const cityLine = [address.city, address.region]
-        .filter(Boolean)
-        .join(", ");
+      const cityLine = [address.city, address.region].filter(Boolean).join(", ");
       const postalAddress = [
         address.line1,
         address.line2,
@@ -333,320 +321,241 @@ export default function Settings() {
       );
       setSaved(true);
     } catch (err) {
-      setError(
-        err.response?.data?.error || "Unable to upload the organization logo.",
-      );
+      setError(err.response?.data?.error || "Unable to upload the organization logo.");
     } finally {
       setLogoUploading(false);
     }
   };
 
+  /* ─── Nav helper ─────────────────────────────────────────────────────── */
+  const navBtn = (id, label, Icon, path) => (
+    <button
+      key={id}
+      className={`settings-nav-btn${activeSection === id ? " is-active" : ""}`}
+      onClick={() => {
+        setActiveSection(id);
+        if (path) navigate(path);
+      }}
+    >
+      <Icon aria-hidden="true" />
+      {label}
+    </button>
+  );
+
+  /* ─── Render ─────────────────────────────────────────────────────────── */
   return (
-    <div className="page-dashboard account-page">
+    <div className="settings-page page-dashboard">
       <div className="page-header">
         <div>
-          <p className="page-eyebrow">Account</p>
+          <p className="page-eyebrow">Workspace</p>
           <h1 className="page-title">Settings</h1>
           <p className="page-subtitle">
-            Manage the account and organization behind this Lead Porch
-            workspace.
+            Manage your account, organization, and workspace configuration.
           </p>
         </div>
       </div>
-      {error ? <p className="form-error">{error}</p> : null}
-      <section className="account-layout">
-        <nav className="account-settings-nav" aria-label="Settings sections">
-          <button
-            className={activeSection === "profile" ? "is-active" : ""}
-            onClick={() => setActiveSection("profile")}
-          >
-            <FiUser /> Organization profile
-          </button>
-          <button
-            className={activeSection === "login" ? "is-active" : ""}
-            onClick={() => setActiveSection("login")}
-          >
-            <FiLock /> Login & password
-          </button>
-          <button
-            className={activeSection === "security" ? "is-active" : ""}
-            onClick={() => setActiveSection("security")}
-          >
-            <FiShield /> Security
-          </button>
-          <button
-            className={activeSection === "ai" ? "is-active" : ""}
-            onClick={() => setActiveSection("ai")}
-          >
-            <FiCpu /> AI connections
-          </button>
-          <button
-            className={activeSection === "team" ? "is-active" : ""}
-            onClick={() => {
-              setActiveSection("team");
-              navigate("/settings/team");
-            }}
-          >
-            <FiUsers /> Team & Access
-          </button>
-          {hasPermission(session, "payments.view") ||
-          hasPermission(session, "payments.manage") ? (
-            <button
-              className={activeSection === "payments" ? "is-active" : ""}
-              onClick={() => {
-                setActiveSection("payments");
-                navigate("/settings/payments");
-              }}
-            >
-              <FiCreditCard /> Payments
-            </button>
-          ) : null}
-          {hasPermission(session, "team.manage") ? (
-            <button
-              className={activeSection === "invitations" ? "is-active" : ""}
-              onClick={() => {
-                setActiveSection("invitations");
-                navigate("/settings/communications/invitations");
-              }}
-            >
-              <FiMail /> Communications · Invitation templates
-            </button>
-          ) : null}
+
+      {error ? <p className="settings-error">{error}</p> : null}
+
+      <div className="settings-shell">
+        {/* ── Sidebar nav ──────────────────────────────────────────────── */}
+        <nav className="settings-sidebar" aria-label="Settings sections">
+          {/* Account group */}
+          <div className="settings-nav-group">
+            <p className="settings-nav-group__label">Account</p>
+            {navBtn("profile", "Organization profile", FiUser)}
+            {navBtn("login", "Login & password", FiLock)}
+            {navBtn("security", "Security", FiShield)}
+            {navBtn("ai", "AI connections", FiCpu)}
+          </div>
+
+          {/* Workspace group */}
+          <div className="settings-nav-group">
+            <p className="settings-nav-group__label">Workspace</p>
+            {navBtn("team", "Team & Access", FiUsers, "/settings/team")}
+            {hasPermission(session, "payments.view") ||
+            hasPermission(session, "payments.manage")
+              ? navBtn("payments", "Payments", FiCreditCard, "/settings/payments")
+              : null}
+            {hasPermission(session, "team.manage")
+              ? navBtn(
+                  "invitations",
+                  "Invitation templates",
+                  FiMail,
+                  "/settings/communications/invitations",
+                )
+              : null}
+          </div>
+
+          {/* Publishing group */}
           {hasPermission(session, "workspace.manage") ? (
-            <button
-              className={activeSection === "public" ? "is-active" : ""}
-              onClick={() => {
-                setActiveSection("public");
-                navigate("/settings/website");
-              }}
-            >
-              <FiImage /> Website & Brand
-            </button>
-          ) : null}
-          {hasPermission(session, "workspace.manage") ? (
-            <button
-              className={activeSection === "applications" ? "is-active" : ""}
-              onClick={() => {
-                setActiveSection("applications");
-                navigate("/settings/applications");
-              }}
-            >
-              <FiBriefcase /> Student Application
-            </button>
-          ) : null}
-          {hasPermission(session, "workspace.manage") ? (
-            <button
-              className={activeSection === "readiness" ? "is-active" : ""}
-              onClick={() => setActiveSection("readiness")}
-            >
-              <FiCheck /> Launch readiness
-            </button>
-          ) : null}
-          {hasPermission(session, "workspace.manage") ? (
-            <button
-              className={activeSection === "privacy" ? "is-active" : ""}
-              onClick={() => {
-                setActiveSection("privacy");
-                navigate("/settings/privacy");
-              }}
-            >
-              <FiShield /> Privacy requests
-            </button>
+            <div className="settings-nav-group">
+              <p className="settings-nav-group__label">Publishing</p>
+              {navBtn("public", "Website & Brand", FiImage, "/settings/website")}
+              {navBtn(
+                "applications",
+                "Student Application",
+                FiBriefcase,
+                "/settings/applications",
+              )}
+              {navBtn("readiness", "Launch readiness", FiCheck)}
+              {navBtn("privacy", "Privacy requests", FiShield, "/settings/privacy")}
+            </div>
           ) : null}
         </nav>
+
+        {/* ── Content panel ────────────────────────────────────────────── */}
+
+        {/* Organization profile */}
         {activeSection === "profile" ? (
-          <div className="account-settings-panel account-settings-panel--refined">
-            <header>
+          <div className="settings-panel">
+            <header className="settings-panel__header">
               <p className="page-eyebrow">Organization profile</p>
-              <h2>Identity and email brand</h2>
+              <h2>Identity &amp; email brand</h2>
               <p>
                 Set the client-level identity once. Individual events and
                 programs can use their own logo and campaign branding.
               </p>
             </header>
 
+            {/* Brand assets */}
             <section className="settings-section">
-              <div className="settings-section__heading">
-                <FiImage />
-                <div>
+              <div className="settings-section__head">
+                <div className="settings-section__icon"><FiImage /></div>
+                <div className="settings-section__head-text">
                   <h3>Brand assets</h3>
                   <p>
-                    The primary organization logo used in the authenticated Lead
-                    Porch sidebar and campaign email branding. Public website
-                    light/dark logos are managed separately under Website &amp;
-                    Brand.
+                    The primary organization logo used in the Lead Porch sidebar
+                    and campaign email branding. Public website logos are managed
+                    under Website &amp; Brand.
                   </p>
                 </div>
               </div>
-              <div className="brand-asset-row">
-                <div className="brand-logo-preview">
+              <div className="settings-logo-row">
+                <div className="settings-logo-preview">
                   {organizationLogoUrl ? (
                     <img src={organizationLogoUrl} alt="Organization logo" />
                   ) : (
-                    <span>
+                    <span className="settings-logo-preview__empty">
                       <FiImage />
-                      No logo uploaded
+                      No logo
                     </span>
                   )}
                 </div>
-                <div>
-                  <label className="brand-upload-button">
+                <div className="settings-logo-actions">
+                  <label className="settings-upload-btn">
                     Choose logo
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(event) => uploadLogo(event.target.files?.[0])}
+                      onChange={(e) => uploadLogo(e.target.files?.[0])}
                     />
                   </label>
-                  <small>
-                    {logoUploading
-                      ? "Uploading…"
-                      : "PNG, JPG, or WEBP · maximum 8 MB"}
-                  </small>
+                  <span className="settings-upload-hint">
+                    {logoUploading ? "Uploading…" : "PNG, JPG, or WEBP · max 8 MB"}
+                  </span>
                   {organizationLogoUrl ? (
                     <button
-                      className="brand-remove"
                       type="button"
-                      onClick={() => {
-                        setOrganizationLogoUrl("");
-                        setSaved(false);
-                      }}
+                      className="settings-remove-btn"
+                      onClick={() => { setOrganizationLogoUrl(""); setSaved(false); }}
                     >
-                      Remove
+                      Remove logo
                     </button>
                   ) : null}
                 </div>
               </div>
             </section>
 
+            {/* Business details */}
             <section className="settings-section">
-              <div className="settings-section__heading">
-                <FiBriefcase />
-                <div>
+              <div className="settings-section__head">
+                <div className="settings-section__icon"><FiBriefcase /></div>
+                <div className="settings-section__head-text">
                   <h3>Business details</h3>
-                  <p>
-                    Used in navigation and the compliance footer on campaign
-                    email.
-                  </p>
+                  <p>Used in navigation and the compliance footer on campaign email.</p>
                 </div>
               </div>
-              <div className="account-profile-form account-profile-form--compact">
+              <div className="settings-form">
                 <label className="form-field">
                   <span>Business / display name</span>
                   <input
                     value={workspaceName}
-                    onChange={(event) => {
-                      setWorkspaceName(event.target.value);
-                      setSaved(false);
-                    }}
+                    onChange={(e) => { setWorkspaceName(e.target.value); setSaved(false); }}
                   />
-                  <small>
-                    Used in Lead Porch and as [Business name] in invitations.
-                  </small>
+                  <small>Used in Lead Porch and as [Business name] in invitations.</small>
                 </label>
                 <label className="form-field">
                   <span>Legal business name</span>
                   <input
                     value={legalBusinessName}
-                    onChange={(event) => {
-                      setLegalBusinessName(event.target.value);
-                      setSaved(false);
-                    }}
+                    onChange={(e) => { setLegalBusinessName(e.target.value); setSaved(false); }}
                   />
                 </label>
                 <label className="form-field">
                   <span>Default invitation sender name</span>
                   <input
                     value={invitationIdentity.senderName}
-                    onChange={(event) => {
-                      setInvitationIdentity({
-                        ...invitationIdentity,
-                        senderName: event.target.value,
-                      });
+                    onChange={(e) => {
+                      setInvitationIdentity({ ...invitationIdentity, senderName: e.target.value });
                       setSaved(false);
                     }}
                     placeholder={session?.user?.name || "Authenticated inviter"}
                   />
-                  <small>
-                    Optional. If blank, [Invited by] uses the person who created
-                    the invitation.
-                  </small>
+                  <small>Optional. If blank, [Invited by] uses the person who sent the invitation.</small>
                 </label>
                 <label className="form-field">
                   <span>Invitation sender email</span>
                   <input
                     type="email"
                     value={invitationIdentity.senderEmail}
-                    onChange={(event) => {
-                      setInvitationIdentity({
-                        ...invitationIdentity,
-                        senderEmail: event.target.value,
-                      });
+                    onChange={(e) => {
+                      setInvitationIdentity({ ...invitationIdentity, senderEmail: e.target.value });
                       setSaved(false);
                     }}
                     placeholder="team@yourdomain.com"
                   />
-                  <small>
-                    Required before sending from this workspace. Use an address
-                    on a verified sending domain.
-                  </small>
+                  <small>Required before sending. Use an address on a verified sending domain.</small>
                 </label>
                 <label className="form-field">
                   <span>Invitation reply-to email</span>
                   <input
                     type="email"
                     value={invitationIdentity.replyToEmail}
-                    onChange={(event) => {
-                      setInvitationIdentity({
-                        ...invitationIdentity,
-                        replyToEmail: event.target.value,
-                      });
+                    onChange={(e) => {
+                      setInvitationIdentity({ ...invitationIdentity, replyToEmail: e.target.value });
                       setSaved(false);
                     }}
                     placeholder={session?.user?.email || "name@example.com"}
                   />
-                  <small>
-                    Optional. Replies to invitation emails are directed here
-                    when configured.
-                  </small>
+                  <small>Optional. Replies to invitation emails are directed here.</small>
                 </label>
                 <label className="form-field">
                   <span>Business website</span>
                   <input
                     type="url"
                     value={websiteUrl}
-                    onChange={(event) => {
-                      setWebsiteUrl(event.target.value);
-                      setSaved(false);
-                    }}
+                    onChange={(e) => { setWebsiteUrl(e.target.value); setSaved(false); }}
                     placeholder="https://elliescoaching.com"
                   />
                 </label>
-                <fieldset className="settings-address-fields">
+
+                <fieldset className="settings-address">
                   <legend>Business mailing address</legend>
-                  <p>
-                    Saved automatically in the compliance footer of campaign
-                    emails.
-                  </p>
-                  <label className="form-field settings-address-fields__wide">
+                  <p>Saved in the compliance footer of campaign emails.</p>
+                  <label className="form-field settings-address__wide">
                     <span>Street address</span>
                     <input
                       value={address.line1}
-                      onChange={(event) => {
-                        setAddress({ ...address, line1: event.target.value });
-                        setSaved(false);
-                      }}
+                      onChange={(e) => { setAddress({ ...address, line1: e.target.value }); setSaved(false); }}
                       placeholder="123 Main Street"
                     />
                   </label>
-                  <label className="form-field settings-address-fields__wide">
+                  <label className="form-field settings-address__wide">
                     <span>Unit, suite, or mailbox</span>
                     <input
                       value={address.line2}
-                      onChange={(event) => {
-                        setAddress({ ...address, line2: event.target.value });
-                        setSaved(false);
-                      }}
+                      onChange={(e) => { setAddress({ ...address, line2: e.target.value }); setSaved(false); }}
                       placeholder="Suite 200 (optional)"
                     />
                   </label>
@@ -654,118 +563,99 @@ export default function Settings() {
                     <span>City</span>
                     <input
                       value={address.city}
-                      onChange={(event) => {
-                        setAddress({ ...address, city: event.target.value });
-                        setSaved(false);
-                      }}
+                      onChange={(e) => { setAddress({ ...address, city: e.target.value }); setSaved(false); }}
                     />
                   </label>
                   <label className="form-field">
                     <span>State / region</span>
                     <input
                       value={address.region}
-                      onChange={(event) => {
-                        setAddress({ ...address, region: event.target.value });
-                        setSaved(false);
-                      }}
+                      onChange={(e) => { setAddress({ ...address, region: e.target.value }); setSaved(false); }}
                     />
                   </label>
                   <label className="form-field">
                     <span>Postal code</span>
                     <input
                       value={address.postalCode}
-                      onChange={(event) => {
-                        setAddress({
-                          ...address,
-                          postalCode: event.target.value,
-                        });
-                        setSaved(false);
-                      }}
+                      onChange={(e) => { setAddress({ ...address, postalCode: e.target.value }); setSaved(false); }}
                     />
                   </label>
                   <label className="form-field">
                     <span>Country</span>
                     <input
                       value={address.country}
-                      onChange={(event) => {
-                        setAddress({ ...address, country: event.target.value });
-                        setSaved(false);
-                      }}
+                      onChange={(e) => { setAddress({ ...address, country: e.target.value }); setSaved(false); }}
                     />
                   </label>
                 </fieldset>
               </div>
             </section>
 
+            {/* Email connection */}
             <section className="settings-section">
-              <div className="settings-section__heading">
-                <FiMail />
-                <div>
+              <div className="settings-section__head">
+                <div className="settings-section__icon"><FiMail /></div>
+                <div className="settings-section__head-text">
                   <h3>Email connection</h3>
                   <p>Mailbox access is managed from Integrations.</p>
                 </div>
               </div>
               <div className="settings-email-row">
                 <span>{accountEmail || "No Gmail account connected"}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate("/integrations/gmail")}
-                >
+                <Button variant="outline" size="sm" onClick={() => navigate("/integrations/gmail")}>
                   Manage connection
                 </Button>
               </div>
             </section>
 
+            {/* Campaign brands */}
             <section className="settings-section">
-              <div className="settings-section__heading">
-                <FiImage />
-                <div>
+              <div className="settings-section__head">
+                <div className="settings-section__icon"><FiImage /></div>
+                <div className="settings-section__head-text">
                   <h3>Campaign brands</h3>
-                  <p>
-                    Give each event or program its own replaceable logo,
-                    website, and email color.
-                  </p>
+                  <p>Give each event or program its own logo, website, and email color.</p>
                 </div>
               </div>
-              <div className="program-brand-links">
+              <div className="settings-brand-list">
                 {campaigns.length ? (
                   campaigns.map((campaign) => (
                     <button
                       key={campaign._id}
+                      className="settings-brand-item"
                       onClick={() => navigate(`/campaigns/${campaign._id}`)}
                     >
-                      <span>
-                        {campaign.brand?.logoUrl ? (
-                          <img src={campaign.brand.logoUrl} alt="" />
-                        ) : (
-                          <FiImage />
-                        )}
-                        <span className="campaign-brand-name">
-                          <small>
-                            {campaign.campaignKind === "program"
-                              ? "Program"
-                              : "Event"}
-                          </small>
-                          <strong>
+                      <div className="settings-brand-item__left">
+                        <div className="settings-brand-item__logo">
+                          {campaign.brand?.logoUrl ? (
+                            <img src={campaign.brand.logoUrl} alt="" />
+                          ) : (
+                            <FiImage />
+                          )}
+                        </div>
+                        <div className="settings-brand-item__label">
+                          <span className="settings-brand-item__kind">
+                            {campaign.campaignKind === "program" ? "Program" : "Event"}
+                          </span>
+                          <span className="settings-brand-item__name">
                             {campaign.programName || campaign.name}
-                          </strong>
-                        </span>
-                      </span>
-                      <em>
+                          </span>
+                        </div>
+                      </div>
+                      <span className="settings-brand-item__action">
                         Manage brand <FiArrowUpRight />
-                      </em>
+                      </span>
                     </button>
                   ))
                 ) : (
-                  <p>
+                  <p style={{ color: "var(--color-text-muted)", fontSize: "0.875rem", margin: 0 }}>
                     No campaigns yet. Create an event or program campaign first.
                   </p>
                 )}
               </div>
             </section>
 
-            <footer>
+            <footer className="settings-panel__footer">
               <Button
                 loading={saving}
                 disabled={workspaceName.trim().length < 2}
@@ -774,52 +664,44 @@ export default function Settings() {
                 Save organization profile
               </Button>
               {saved ? (
-                <p className="settings-save-confirmation" role="status">
-                  Organization profile saved successfully.
-                </p>
+                <span className="settings-save-ok" role="status">
+                  <FiCheck /> Saved successfully
+                </span>
               ) : null}
             </footer>
           </div>
+
         ) : activeSection === "login" ? (
+          /* ── Login & password ──────────────────────────────────────────── */
           <form
-            className="account-settings-panel account-settings-panel--refined"
-            onSubmit={(event) => {
-              event.preventDefault();
-              savePassword();
-            }}
+            className="settings-panel"
+            onSubmit={(e) => { e.preventDefault(); savePassword(); }}
           >
-            <header>
-              <p className="page-eyebrow">Login & password</p>
+            <header className="settings-panel__header">
+              <p className="page-eyebrow">Login &amp; password</p>
               <h2>Sign-in details</h2>
               <p>
                 Change the password for {session?.user?.email}. Your other
                 signed-in devices will be logged out.
               </p>
             </header>
+
             <section className="settings-section">
-              <div className="settings-section__heading">
-                <FiLock />
-                <div>
+              <div className="settings-section__head">
+                <div className="settings-section__icon"><FiLock /></div>
+                <div className="settings-section__head-text">
                   <h3>Change password</h3>
-                  <p>
-                    Use at least 12 characters and a password unique to Growth
-                    Operator.
-                  </p>
+                  <p>Use at least 12 characters and a password unique to Lead Porch.</p>
                 </div>
               </div>
-              <div className="account-profile-form account-profile-form--compact">
+              <div className="settings-form">
                 <label className="form-field">
                   <span>Current password</span>
                   <input
                     type="password"
                     autoComplete="current-password"
                     value={passwords.currentPassword}
-                    onChange={(event) =>
-                      setPasswords({
-                        ...passwords,
-                        currentPassword: event.target.value,
-                      })
-                    }
+                    onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
                   />
                 </label>
                 <span />
@@ -829,12 +711,7 @@ export default function Settings() {
                     type="password"
                     autoComplete="new-password"
                     value={passwords.newPassword}
-                    onChange={(event) =>
-                      setPasswords({
-                        ...passwords,
-                        newPassword: event.target.value,
-                      })
-                    }
+                    onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
                   />
                 </label>
                 <label className="form-field">
@@ -843,17 +720,13 @@ export default function Settings() {
                     type="password"
                     autoComplete="new-password"
                     value={passwords.confirmPassword}
-                    onChange={(event) =>
-                      setPasswords({
-                        ...passwords,
-                        confirmPassword: event.target.value,
-                      })
-                    }
+                    onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
                   />
                 </label>
               </div>
             </section>
-            <footer>
+
+            <footer className="settings-panel__footer">
               <Button
                 type="submit"
                 loading={saving}
@@ -865,120 +738,119 @@ export default function Settings() {
               >
                 Update password
               </Button>
+              {saved ? (
+                <span className="settings-save-ok" role="status">
+                  <FiCheck /> Password updated
+                </span>
+              ) : null}
             </footer>
           </form>
+
         ) : activeSection === "security" ? (
-          <div className="account-settings-panel account-settings-panel--refined">
-            <header>
+          /* ── Security ──────────────────────────────────────────────────── */
+          <div className="settings-panel">
+            <header className="settings-panel__header">
               <p className="page-eyebrow">Security</p>
               <h2>Account protection</h2>
-              <p>
-                Review the security controls currently protecting this
-                workspace.
-              </p>
+              <p>Review the security controls protecting this workspace.</p>
             </header>
-            <section className="settings-section security-check-list">
-              <p>
-                <FiShield />
-                <span>
-                  <strong>Secure server-side sessions</strong>
-                  <small>Sessions expire automatically after 14 days.</small>
-                </span>
-                <em>Active</em>
-              </p>
-              <p>
-                <FiLock />
-                <span>
-                  <strong>Protected account changes</strong>
-                  <small>
-                    Passwords are hashed and current-password verification is
-                    required.
-                  </small>
-                </span>
-                <em>Active</em>
-              </p>
-              <p>
-                <FiUsers />
-                <span>
-                  <strong>Capability-based workspace access</strong>
-                  <small>
-                    Your roles are{" "}
-                    {(session?.roles || [session?.role || "member"]).join(", ")}
-                    .
-                  </small>
-                </span>
-                <em>Active</em>
-              </p>
+
+            <section className="settings-section">
+              <div className="settings-security-list">
+                <div className="settings-security-item">
+                  <div className="settings-security-item__icon"><FiShield /></div>
+                  <div className="settings-security-item__text">
+                    <strong>Secure server-side sessions</strong>
+                    <small>Sessions expire automatically after 14 days.</small>
+                  </div>
+                  <span className="settings-security-badge">Active</span>
+                </div>
+                <div className="settings-security-item">
+                  <div className="settings-security-item__icon"><FiLock /></div>
+                  <div className="settings-security-item__text">
+                    <strong>Protected account changes</strong>
+                    <small>Passwords are hashed and current-password verification is required.</small>
+                  </div>
+                  <span className="settings-security-badge">Active</span>
+                </div>
+                <div className="settings-security-item">
+                  <div className="settings-security-item__icon"><FiUsers /></div>
+                  <div className="settings-security-item__text">
+                    <strong>Capability-based workspace access</strong>
+                    <small>
+                      Your roles are{" "}
+                      {(session?.roles || [session?.role || "member"]).join(", ")}.
+                    </small>
+                  </div>
+                  <span className="settings-security-badge">Active</span>
+                </div>
+              </div>
             </section>
           </div>
+
         ) : activeSection === "ai" ? (
-          <div className="account-settings-panel account-settings-panel--refined">
-            <header>
+          /* ── AI connections ────────────────────────────────────────────── */
+          <div className="settings-panel">
+            <header className="settings-panel__header">
               <p className="page-eyebrow">Lead Porch connections</p>
-              <h2>
-                Connect Lead Porch to ChatGPT, Claude, Codex, or an MCP client
-              </h2>
+              <h2>Connect to ChatGPT, Claude, Codex, or an MCP client</h2>
               <p>
-                Lead Porch receives controlled access to Lead Porch research and
-                ranked lead lists. Email sending is not available through this
-                connection.
+                Give AI tools controlled access to Lead Porch research and ranked
+                lead lists. Email sending is not available through this connection.
               </p>
             </header>
+
+            {/* Codex OAuth */}
             <section className="settings-section">
-              <div className="settings-section__heading">
-                <FiCpu />
-                <div>
+              <div className="settings-section__head">
+                <div className="settings-section__icon"><FiCpu /></div>
+                <div className="settings-section__head-text">
                   <h3>Connect Codex</h3>
                   <p>
-                    Sign in with your Lead Porch account once. Codex stores and
-                    refreshes its own authorization—there is no secret token to
-                    copy or remember.
+                    Sign in once. Codex stores and refreshes its own
+                    authorization — no secret token to copy or remember.
                   </p>
                 </div>
               </div>
-              <div className="settings-connection-details">
-                <label>
-                  <span>MCP server URL</span>
+              <div style={{ display: "grid", gap: "14px" }}>
+                <div className="settings-copy-block">
+                  <span className="settings-copy-block__label">MCP server URL</span>
                   <div className="settings-copy-row">
                     <code>{mcpEndpoint}</code>
                     <button
                       type="button"
+                      className="settings-copy-btn"
                       onClick={() => copyValue("endpoint", mcpEndpoint)}
                     >
                       {copiedValue === "endpoint" ? <FiCheck /> : <FiCopy />}
                       {copiedValue === "endpoint" ? "Copied" : "Copy URL"}
                     </button>
                   </div>
-                </label>
-                <label>
-                  <span>Codex setup commands</span>
+                </div>
+                <div className="settings-copy-block">
+                  <span className="settings-copy-block__label">Codex setup commands</span>
                   <div className="settings-copy-row">
-                    <code className="settings-command-lines">
+                    <code style={{ lineHeight: 1.8 }}>
                       {codexCommand}
                       <br />
                       {codexLoginCommand}
                     </code>
                     <button
                       type="button"
+                      className="settings-copy-btn"
                       onClick={() => copyValue("codex", codexSetupCommands)}
                     >
                       {copiedValue === "codex" ? <FiCheck /> : <FiCopy />}
                       {copiedValue === "codex" ? "Copied" : "Copy commands"}
                     </button>
                   </div>
-                </label>
-                <ol>
+                </div>
+                <ol className="settings-steps">
                   <li>Run both commands in Terminal.</li>
-                  <li>
-                    Your browser opens Lead Porch. Sign in and approve the
-                    requested access.
-                  </li>
-                  <li>
-                    Restart Codex once. Lead Porch will then be available
-                    whenever you need it.
-                  </li>
+                  <li>Your browser opens Lead Porch. Sign in and approve the requested access.</li>
+                  <li>Restart Codex once. Lead Porch will then be available whenever you need it.</li>
                 </ol>
-                <p className="settings-oauth-note">
+                <div className="settings-oauth-note">
                   <FiShield />
                   <span>
                     <strong>Professional OAuth connection</strong>
@@ -987,13 +859,15 @@ export default function Settings() {
                       permissions, and one-click revocation from this page.
                     </small>
                   </span>
-                </p>
+                </div>
               </div>
             </section>
-            <section className="settings-section settings-section--secondary">
-              <div className="settings-section__heading">
-                <FiLock />
-                <div>
+
+            {/* Manual token */}
+            <section className="settings-section settings-section--muted">
+              <div className="settings-section__head">
+                <div className="settings-section__icon"><FiLock /></div>
+                <div className="settings-section__head-text">
                   <h3>Manual token for Custom GPTs</h3>
                   <p>
                     Use this only when a client cannot sign in with OAuth.
@@ -1004,7 +878,7 @@ export default function Settings() {
               <div className="settings-ai-create">
                 <input
                   value={mcpName}
-                  onChange={(event) => setMcpName(event.target.value)}
+                  onChange={(e) => setMcpName(e.target.value)}
                   placeholder="Connection name"
                 />
                 <Button
@@ -1017,56 +891,48 @@ export default function Settings() {
               </div>
               {newMcpToken ? (
                 <div className="settings-token-reveal">
-                  <strong>
-                    Copy this token now—it will not be shown again.
-                  </strong>
+                  <strong>Copy this token now — it will not be shown again.</strong>
                   <div className="settings-copy-row">
                     <code>{newMcpToken.token}</code>
                     <button
                       type="button"
+                      className="settings-copy-btn"
                       onClick={() => copyValue("token", newMcpToken.token)}
                     >
                       {copiedValue === "token" ? <FiCheck /> : <FiCopy />}
                       {copiedValue === "token" ? "Copied" : "Copy token"}
                     </button>
                   </div>
+                  <small>ChatGPT Actions schema: {getGptActionsSchemaEndpoint()}</small>
                   <small>
-                    ChatGPT Actions schema: {getGptActionsSchemaEndpoint()}
-                  </small>
-                  <small>
-                    Keep this connection private. Anyone with its token can use
-                    your Lead Porch permissions.
+                    Keep this connection private. Anyone with its token can use your Lead Porch permissions.
                   </small>
                 </div>
               ) : null}
               {mcpTokens.length && !newMcpToken ? (
-                <p className="settings-token-warning">
-                  <strong>Lost an existing manual token?</strong> For security,
-                  it cannot be recovered. Revoke it below and create a
-                  replacement.
-                </p>
+                <div className="settings-token-warning">
+                  <strong>Lost an existing manual token?</strong> For security, it
+                  cannot be recovered. Revoke it below and create a replacement.
+                </div>
               ) : null}
             </section>
+
+            {/* Active connections */}
             <section className="settings-section">
-              <div className="settings-section__heading">
-                <FiShield />
-                <div>
+              <div className="settings-section__head">
+                <div className="settings-section__icon"><FiShield /></div>
+                <div className="settings-section__head-text">
                   <h3>Active connections</h3>
-                  <p>
-                    Every tool call is workspace-scoped and recorded in Growth
-                    Operator's audit log.
-                  </p>
+                  <p>Every tool call is workspace-scoped and recorded in the audit log.</p>
                 </div>
               </div>
-              <div className="team-member-list">
+              <div className="settings-connections-list">
                 {oauthConnections.map((connection) => (
-                  <div key={connection.id}>
-                    <span>
+                  <div key={connection.id} className="settings-connection-item">
+                    <div className="settings-connection-item__info">
                       <strong>{connection.name}</strong>
-                      <small>
-                        OAuth connection · {connection.scopes.join(" · ")}
-                      </small>
-                    </span>
+                      <small>OAuth · {connection.scopes.join(" · ")}</small>
+                    </div>
                     <button
                       className="settings-revoke"
                       onClick={() => disconnectAiApp(connection.clientId)}
@@ -1077,15 +943,14 @@ export default function Settings() {
                   </div>
                 ))}
                 {mcpTokens.map((token) => (
-                  <div key={token._id || token.id}>
-                    <span>
+                  <div key={token._id || token.id} className="settings-connection-item">
+                    <div className="settings-connection-item__info">
                       <strong>{token.name}</strong>
                       <small>
                         {token.prefix}… · expires{" "}
-                        {new Date(token.expiresAt).toLocaleDateString()} ·
-                        secret hidden after creation
+                        {new Date(token.expiresAt).toLocaleDateString()} · secret hidden after creation
                       </small>
-                    </span>
+                    </div>
                     <button
                       className="settings-revoke"
                       onClick={() => revokeAi(token._id || token.id)}
@@ -1096,34 +961,43 @@ export default function Settings() {
                   </div>
                 ))}
                 {!oauthConnections.length && !mcpTokens.length ? (
-                  <p>No AI assistants connected yet.</p>
+                  <p style={{ color: "var(--color-text-muted)", fontSize: "0.875rem", margin: 0 }}>
+                    No AI assistants connected yet.
+                  </p>
                 ) : null}
               </div>
             </section>
           </div>
+
         ) : activeSection === "payments" ? (
           <PaymentSettings />
+
         ) : activeSection === "public" ? (
           <WebsiteBrandManager websiteUrl={websiteUrl} />
+
         ) : activeSection === "applications" ? (
-          <div className="account-settings-content">
+          <div className="settings-applications-stack">
             <ApplicationImageSettings />
             <ApplicationRouting />
             <ApplicationNotificationSettings />
           </div>
+
         ) : activeSection === "readiness" ? (
           <LaunchReadiness />
+
         ) : activeSection === "privacy" ? (
           <PrivacyRequests />
+
         ) : activeSection === "invitations" ? (
           <InvitationTemplates />
+
         ) : (
           <TeamAccess
             canManage={hasPermission(session, "team.manage")}
             actorRoles={session?.roles || [session?.role].filter(Boolean)}
           />
         )}
-      </section>
+      </div>
     </div>
   );
 }

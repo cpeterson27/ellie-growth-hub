@@ -1,13 +1,18 @@
 .stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  min-height: 150px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem 1.4rem 1.25rem;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  box-shadow: var(--shadow);
+  gap: 0;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .stat-card__header {
@@ -15,46 +20,61 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.stat-card__meta {
+  flex: 1;
+  min-width: 0;
 }
 
 .stat-card__title {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.95rem;
+  margin: 0 0 6px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+  letter-spacing: 0.01em;
 }
 
 .stat-card__value {
-  margin: 0.4rem 0 0;
+  margin: 0;
   font-size: 2rem;
-  color: var(--text);
-  font-weight: 700;
+  font-weight: 760;
+  color: var(--color-text);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
 }
 
 .stat-card__icon {
-  width: 44px;
-  height: 44px;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 14px;
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  border-radius: var(--radius-md);
+  font-size: 1.05rem;
 }
 
 .stat-card__subtitle {
-  margin: 0.85rem 0 0;
-  font-size: 0.95rem;
-  color: var(--text-muted);
+  margin: 10px 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .stat-card__trend {
-  margin-top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 700;
 }
 
 .stat-card__trend--positive {
-  color: #1f9d55;
+  color: var(--color-success);
 }
 
 .stat-card__trend--negative {
-  color: #d0384b;
+  color: var(--color-danger);
 }

@@ -11,7 +11,7 @@ export default function StatCard({
   return (
     <article className="stat-card">
       <div className="stat-card__header">
-        <div>
+        <div className="stat-card__meta">
           <p className="stat-card__title">{title}</p>
           <p className="stat-card__value">{value}</p>
         </div>
