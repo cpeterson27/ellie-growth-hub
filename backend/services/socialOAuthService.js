@@ -1027,7 +1027,9 @@ async function refreshInstagram(workspaceId, http = axios) {
   );
 
   if (String(profile.data?.user_id || "") !== accountId)
-    throw new Error("Instagram authorization identity mismatch");
+    throw new Error(
+      `Instagram authorization identity mismatch: initial=${accountId} profile=${profile.data?.user_id}`,
+    );
   const updated = await SocialConnection.findOneAndUpdate(
     {
       _id: connection._id,
