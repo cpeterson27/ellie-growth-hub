@@ -1154,7 +1154,6 @@ async function exchangeInstagram(code, http = axios) {
   if (!token.data?.access_token)
     throw new Error("Instagram long-lived authorization unavailable");
   const accessToken = token.data.access_token;
-  const accountId = String(initial.user_id);
   const profile = await instagramOAuthOperation(
     "instagram_profile_verification",
     () =>
@@ -1163,10 +1162,9 @@ async function exchangeInstagram(code, http = axios) {
         timeout: 15000,
       }),
   );
-  if (String(profile.data?.user_id || "") !== accountId)
-    throw new Error(
-      `Instagram authorization identity mismatch: initial=${accountId} (raw type ${typeof initial.user_id}) profile=${profile.data?.user_id} (raw type ${typeof profile.data?.user_id})`,
-    );
+  const accountId = String(profile.data?.user_id || "");
+  if (!accountId)
+    throw new Error("Instagram did not return a verifiable account id");
     const grantedScopes = splitScopes(initial.permissions || "");
   return {
     credentials: { accessToken },

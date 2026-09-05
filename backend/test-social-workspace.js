@@ -131,7 +131,9 @@ async function authorization() {
     post: async () => ({
       data: {
         access_token: "short-fixture",
-        user_id: "123",
+        // Real Meta responses use a different, legacy-style ID here than
+        // graph.instagram.com/me; this must not be treated as the account id.
+        user_id: 39250387624560410,
         permissions: "instagram_business_basic",
       },
     }),
@@ -144,6 +146,8 @@ async function authorization() {
   assert.deepEqual(token.declinedScopes, [
     "instagram_business_content_publish",
   ]);
+  assert.equal(token.account.id, "123");
+  assert.equal(token.assets[0].id, "123");
   assert.equal(
     publishing.capability(
       "instagram",
