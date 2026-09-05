@@ -1164,7 +1164,9 @@ async function exchangeInstagram(code, http = axios) {
       }),
   );
   if (String(profile.data?.user_id || "") !== accountId)
-    throw new Error("Instagram authorization identity mismatch");
+    throw new Error(
+      `Instagram authorization identity mismatch: initial=${accountId} (raw type ${typeof initial.user_id}) profile=${profile.data?.user_id} (raw type ${typeof profile.data?.user_id})`,
+    );
     const grantedScopes = splitScopes(initial.permissions || "");
   return {
     credentials: { accessToken },
