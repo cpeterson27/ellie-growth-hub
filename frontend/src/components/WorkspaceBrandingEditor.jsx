@@ -6,7 +6,7 @@ const ASSETS = [
   [
     "publicSiteLogoUrl",
     "Website header logo",
-    "Shown in the public website header and footer.",
+    "Shown in the public website header and footer. Also used as the program application page's image, unless a dedicated one is set under Settings → Student Application.",
   ],
   [
     "publicSiteLogoDarkUrl",
@@ -19,7 +19,7 @@ const APP_ASSETS = [
   [
     "logoUrl",
     "Dashboard and sidebar logo",
-    "Used throughout the authenticated Lead Porch app.",
+    "Used throughout the authenticated Lead Porch app. Takes priority over the Organization profile logo in Settings — set that one only for campaign emails.",
   ],
   [
     "logoLightUrl",
@@ -337,7 +337,9 @@ export default function WorkspaceBrandingEditor({
           <h4>Authenticated workspace identity</h4>
           <p>
             Used by Owner, Admin, Coach, Closer, Ambassador, Member, and Viewer
-            portals. It does not replace public website assets.
+            portals. It does not replace public website assets. The Dashboard
+            and sidebar logo below overrides the Organization profile logo in
+            Settings whenever both are set.
           </p>
         </header>
         <div className="brand-assets-list">

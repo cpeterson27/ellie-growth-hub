@@ -425,9 +425,19 @@ export default function Settings() {
                 <div className="settings-section__head-text">
                   <h3>Brand assets</h3>
                   <p>
-                    The primary organization logo used in the Lead Porch sidebar
-                    and campaign email branding. Public website logos are managed
-                    under Website &amp; Brand.
+                    Used in campaign email branding and the compliance footer.
+                    This is a <strong>fallback</strong> for the dashboard sidebar
+                    logo only — if a dedicated logo is set under{" "}
+                    <button
+                      type="button"
+                      className="settings-inline-link"
+                      onClick={() => setActiveSection("public")}
+                    >
+                      Website &amp; Brand
+                    </button>
+                    , that one is shown instead and this image won't appear
+                    there. Public website logos are also managed under
+                    Website &amp; Brand, not here.
                   </p>
                 </div>
               </div>
