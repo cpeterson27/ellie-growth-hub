@@ -1,6 +1,6 @@
 export const channelDefinitions = [
   { provider: "meta", name: "Facebook + Instagram", description: "Connect your Facebook Page and the professional Instagram account linked to it.", connectLabel: "Connect Facebook & Instagram", method: "Facebook Login for Business", assetType: "facebook_page", recommended: true },
-  { provider: "instagram", name: "Instagram only", description: "Connect an Instagram professional account without connecting Facebook.", connectLabel: "Connect Instagram only", method: "Direct Instagram Login", assetType: "instagram_business" },
+  { provider: "instagram", name: "Instagram only", description: "Connect an Instagram professional account without connecting Facebook.", connectLabel: "Connect Instagram only", method: "Direct Instagram Login", assetType: "instagram_business", preConnectNotice: "Instagram authorizes whichever professional account is active in your browser right now — not necessarily the one you intend. Before clicking connect, open Instagram and switch to the correct account first." },
   { provider: "linkedin", name: "LinkedIn", description: "Connect a LinkedIn Page your business is authorized to manage.", connectLabel: "Connect LinkedIn", method: "LinkedIn OAuth", assetType: "linkedin_organization", secondary: true },
   { provider: "x", name: "X / Twitter", description: "Text publishing after provider setup", method: "OAuth 2.0 with PKCE", secondary: true },
 ];

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { FaFacebookF, FaInstagram, FaLinkedinIn } from "react-icons/fa";
 import Button from "./Button.jsx";
@@ -25,6 +26,26 @@ const socialAssetIdentity = (asset) => ({
       ? asset.name
       : "",
 });
+function AssetAvatar({ asset }) {
+  const identity = socialAssetIdentity(asset);
+  return asset?.avatarUrl ? (
+    <img
+      className="social-asset-avatar"
+      src={asset.avatarUrl}
+      alt={`${identity.primary} profile`}
+      referrerPolicy="no-referrer"
+    />
+  ) : (
+    <span className="social-asset-avatar social-asset-initials" aria-hidden="true">
+      {(asset?.name || asset?.username || "Account").slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+function emptyAssetsGuidance(provider) {
+  if (provider === "linkedin")
+    return "No manageable LinkedIn Pages were returned. Confirm that you administer a LinkedIn Page and that organization access is approved, then click Reconnect to refresh this list.";
+  return "No Facebook Pages were found for this Facebook profile. In Meta Business Suite, confirm this profile has admin access to the Facebook Page linked to your Instagram business account, then click Reconnect below to refresh this list.";
+}
 function ChannelRow({
   channel,
   connection,
@@ -37,32 +58,33 @@ function ChannelRow({
 }) {
   const Icon = icons[channel.provider];
   const state = connectionState(connection);
+  const [manageOpen, setManageOpen] = useState(false);
   const selectedIds = connection.selectedAssetIds || [];
   const assets = connection.assets || [];
-  const selected = assets.filter(
-    (asset) =>
-      selectedIds.includes(asset.id) &&
-      (!channel.assetType || asset.type === channel.assetType),
-  );
-  const visibleAssets =
-    channel.provider === "meta"
+  const account = connection.account || {};
+  const isDirectInstagram = channel.provider === "instagram";
+  const manageableAssets = isDirectInstagram
+    ? []
+    : channel.provider === "meta"
       ? assets.filter((asset) =>
           ["facebook_page", "instagram_business"].includes(asset.type),
         )
       : assets.filter(
           (asset) => !channel.assetType || asset.type === channel.assetType,
         );
-  const account = connection.account || {};
-  const accountIdentity =
-    account.name ||
-    account.username ||
-    account.id ||
-    "Instagram professional account";
+  const selected = manageableAssets.filter((asset) =>
+    selectedIds.includes(asset.id),
+  );
+  const directAsset = isDirectInstagram ? assets[0] : null;
+  const directActive = directAsset ? selectedIds.includes(directAsset.id) : false;
   const elsewhere = new Set(
     connections
       .filter((row) => row.provider !== connection.provider)
       .flatMap((row) => row.selectedAssetIds || []),
   );
+  const needsDecision =
+    connection.connected && !isDirectInstagram && selected.length === 0;
+  const showManage = manageOpen || needsDecision;
   const choose = (asset, checked) =>
     onSelectAssets(
       connection.provider,
@@ -74,52 +96,44 @@ function ChannelRow({
               !assets.some((row) => row.id === id && row.parentId === asset.id),
           ),
     );
-  const accountPicker = connection.connected && assets.length > 0 && (
+  const toggleDirect = (checked) =>
+    onSelectAssets(connection.provider, checked ? [directAsset.id] : []);
+  const picker = manageableAssets.length > 0 && (
     <fieldset className="social-page-picker" disabled={busy}>
       <legend>
         {channel.provider === "meta"
           ? "Choose the Facebook Page Lead Porch should manage"
-          : channel.provider === "linkedin"
-            ? "Choose the LinkedIn Page Lead Porch should manage"
-            : "Choose your professional account"}
+          : "Choose the LinkedIn Page Lead Porch should manage"}
       </legend>
       <p>
-        Only selected accounts are used. Discovering an account does not
-        activate it.
+        Only selected accounts are used. Created a new Page or account since
+        you connected? Click Reconnect below to refresh this list.
       </p>
-      {assets.map((asset) => {
+      {manageableAssets.map((asset) => {
         const ownedElsewhere = elsewhere.has(asset.id);
         const needsParent =
           asset.type === "instagram_business" &&
           asset.parentId &&
           !selectedIds.includes(asset.parentId);
-        const linked = assets.find((row) => row.parentId === asset.id);
+        const linked = manageableAssets.find(
+          (row) => row.parentId === asset.id,
+        );
         const identity = socialAssetIdentity(asset);
+        const isChecked = selectedIds.includes(asset.id);
         return (
-          <label key={asset.id}>
+          <label
+            key={asset.id}
+            className={
+              asset.parentId ? "social-page-picker-row--child" : undefined
+            }
+          >
             <input
               type="checkbox"
-              checked={selectedIds.includes(asset.id)}
+              checked={isChecked}
               disabled={ownedElsewhere || needsParent}
               onChange={(event) => choose(asset, event.target.checked)}
             />
-            {asset.avatarUrl ? (
-              <img
-                className="social-asset-avatar"
-                src={asset.avatarUrl}
-                alt={`${identity.primary} profile`}
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span
-                className="social-asset-avatar social-asset-initials"
-                aria-hidden="true"
-              >
-                {(asset.name || asset.username || "Account")
-                  .slice(0, 1)
-                  .toUpperCase()}
-              </span>
-            )}
+            <AssetAvatar asset={asset} />
             <span>
               {identity.primary}
               <small>
@@ -129,8 +143,8 @@ function ChannelRow({
                     ? "Already connected through another method — deselect it there to switch"
                     : needsParent
                       ? "Select its Facebook Page first"
-                      : selectedIds.includes(asset.id)
-                        ? "Selected"
+                      : isChecked
+                        ? "Active for Lead Porch"
                         : "Available to select",
                   linked
                     ? `Linked Instagram: @${linked.username || linked.name}`
@@ -146,10 +160,27 @@ function ChannelRow({
       {channel.provider === "meta" && (
         <p>
           A linked Instagram account becomes active only after you select it
-          with its Facebook Page.
+          together with its Facebook Page.
         </p>
       )}
     </fieldset>
+  );
+  const identityBlock = connection.connected && (
+    <div className="social-identity" aria-label={`${channel.name} signed-in profile`}>
+      <AssetAvatar asset={account} />
+      <span>
+        <strong>Signed in as</strong>
+        <span className="social-identity-name">
+          {account.username
+            ? `@${String(account.username).replace(/^@/, "")}`
+            : account.name || "Account"}
+        </span>
+        {account.name && account.username && account.name !== account.username && (
+          <small>{account.name}</small>
+        )}
+        {account.id && <small>Account ID: {account.id}</small>}
+      </span>
+    </div>
   );
   if (!connection.connected && !channel.secondary)
     return (
@@ -169,6 +200,11 @@ function ChannelRow({
           <h3>{channel.name}</h3>
           <p>{channel.description}</p>
         </div>
+        {channel.preConnectNotice && (
+          <p className="social-precheck-notice" role="note">
+            {channel.preConnectNotice}
+          </p>
+        )}
         {connection.configured ? (
           <Button
             disabled={busy}
@@ -211,118 +247,85 @@ function ChannelRow({
         >
           {state.label}
         </span>
-        {connection.connected && (
+        {connection.connected && !isDirectInstagram && (
           <div className="social-channel-action">
             <button
               type="button"
               className="social-manage-link"
-              onClick={(event) =>
-                event.currentTarget
-                  .closest("article")
-                  ?.querySelector("details")
-                  ?.setAttribute("open", "")
-              }
+              aria-expanded={showManage}
+              onClick={() => setManageOpen((open) => !open)}
             >
-              Manage connection
+              {showManage ? "Hide account list" : "Manage connection"}
             </button>
           </div>
         )}
       </div>
-      {connection.connected && (
+      {identityBlock}
+      {connection.connected && isDirectInstagram && directAsset && (
+        <div
+          className={`social-direct-toggle ${directActive ? "social-direct-toggle--active" : ""}`}
+        >
+          <span
+            className={`social-connection-badge social-connection-badge--${directActive ? "connected" : "neutral"}`}
+          >
+            {directActive ? "Active for Lead Porch" : "Not active yet"}
+          </span>
+          <p>
+            {directActive
+              ? "Lead Porch automations and publishing use this Instagram account."
+              : "This Instagram account is authorized but not yet in use anywhere in Lead Porch. Activate it below."}
+          </p>
+          <Button
+            variant={directActive ? "outline" : undefined}
+            disabled={busy}
+            onClick={() => toggleDirect(!directActive)}
+          >
+            {directActive ? "Deactivate this account" : "Activate this account"}
+          </Button>
+        </div>
+      )}
+      {connection.connected && !isDirectInstagram && selected.length > 0 && (
         <div className="social-connected-assets">
-          {visibleAssets.length ? (
-            visibleAssets.map((asset) => {
-              const identity = socialAssetIdentity(asset);
-              const isSelected = selectedIds.includes(asset.id);
-              return (
-                <div className="social-connected-asset" key={asset.id}>
-                  {asset.avatarUrl ? (
-                    <img
-                      className="social-asset-avatar"
-                      src={asset.avatarUrl}
-                      alt={`${identity.primary} profile`}
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span
-                      className="social-asset-avatar social-asset-initials"
-                      aria-hidden="true"
-                    >
-                      {(asset.name || asset.username || "Account")
-                        .slice(0, 1)
-                        .toUpperCase()}
-                    </span>
-                  )}
-                  <span>
-                    <strong>
-                      {asset.type === "facebook_page"
-                        ? "Facebook"
-                        : asset.type === "linkedin_organization"
-                          ? "LinkedIn"
-                          : asset.type === "x_account"
-                            ? "X"
-                            : "Instagram"}
-                    </strong>
-                    <span>{identity.primary}</span>
-                    {identity.secondary && <small>{identity.secondary}</small>}
-                  </span>
-                  <span
-                    className={`social-asset-state ${isSelected ? "social-asset-state--selected" : ""}`}
-                  >
-                    {isSelected ? "Connected" : "Available"}
-                  </span>
-                </div>
-              );
-            })
+          {selected.map((asset) => {
+            const identity = socialAssetIdentity(asset);
+            return (
+              <div className="social-connected-asset" key={asset.id}>
+                <AssetAvatar asset={asset} />
+                <span>
+                  <strong>
+                    {asset.type === "facebook_page"
+                      ? "Facebook"
+                      : asset.type === "linkedin_organization"
+                        ? "LinkedIn"
+                        : "Instagram"}
+                  </strong>
+                  <span>{identity.primary}</span>
+                  {identity.secondary && <small>{identity.secondary}</small>}
+                </span>
+                <span className="social-asset-state social-asset-state--selected">
+                  Active
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {connection.connected && !isDirectInstagram && showManage && (
+        <div className="social-manage-panel">
+          {manageableAssets.length > 0 ? (
+            picker
           ) : (
             <p className="social-empty-assets">
-              {channel.provider === "linkedin"
-                ? "No manageable LinkedIn Pages were returned. Confirm that you administer a LinkedIn Page and that organization access is approved, then reconnect."
-                : "Account authorized — choose an account in Manage connection."}
+              {emptyAssetsGuidance(channel.provider)}
             </p>
           )}
         </div>
       )}
-      {connection.connected && (
-        <div
-          className="social-provider-account"
-          aria-label={`${channel.name} authorized profile`}
-        >
-          {account.avatarUrl ? (
-            <img
-              className="social-asset-avatar"
-              src={account.avatarUrl}
-              alt={`${accountIdentity} profile`}
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <span
-              className="social-asset-avatar social-asset-initials"
-              aria-hidden="true"
-            >
-              {accountIdentity.slice(0, 1).toUpperCase()}
-            </span>
-          )}
-          <span>
-            <strong>Authorized profile</strong>
-            <span>
-              {account.username
-                ? `@${String(account.username).replace(/^@/, "")}`
-                : accountIdentity}
-            </span>
-            {account.id && <small>Account ID: {account.id}</small>}
-          </span>
-        </div>
-      )}
-      {connection.connected && !selected.length && accountPicker}
       <details className="social-connection-details">
-        <summary>
-          {connection.connected ? "Connection details" : "Connection details"}
-        </summary>
+        <summary>Connection details</summary>
         {connection.authorizationNotice && (
           <p role="status">{connection.authorizationNotice}</p>
         )}
-        {selected.length > 0 && accountPicker}
         <dl>
           <div>
             <dt>Authorization method</dt>
