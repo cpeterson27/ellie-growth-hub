@@ -74,7 +74,21 @@ const workspaceCors = cors({
   credentials: true,
 });
 const publicChatCors = cors({ origin: true, credentials: false });
-app.use((req, res, next) => req.path.startsWith("/api/chat/widget/") ? publicChatCors(req, res, next) : workspaceCors(req, res, next));
+// Static assets and the HTML document shell (everything outside /api) are
+// public, non-credentialed resources — the same as any static host would
+// serve them, with no origin restriction. Only /api/* (aside from the
+// already-public chat widget) carries session/credential-bearing data and
+// needs the strict allowlist below. Without this split, a browser's
+// same-origin module-script fetch (crossorigin="anonymous", which sends an
+// Origin header) got rejected with a 500 by the origin allowlist whenever
+// the page's own origin wasn't already in it — breaking every page load.
+const publicAssetCors = cors({ origin: true, credentials: false });
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/chat/widget/"))
+    return publicChatCors(req, res, next);
+  if (!req.path.startsWith("/api/")) return publicAssetCors(req, res, next);
+  return workspaceCors(req, res, next);
+});
 app.use(express.json({
   limit: "12mb",
   verify(req, _res, buffer) {
