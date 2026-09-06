@@ -61,9 +61,20 @@ class MetaMessagingAdapter extends ConversationChannelAdapter {
     const token = credentials.pageTokens?.[String(pageId)] || (connection.provider === "instagram" ? credentials.accessToken : null);
     const version = require("../socialProviderConfig").graphVersion();
     if (!token || !version) throw new Error("Meta messaging credentials are unavailable");
-    const response = await axios.post(`https://${connection.provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com"}/${version}/${assetId}/messages`, { recipient: { id: recipientId }, message: { text: String(body || "").trim() } }, { params: { access_token: token }, timeout: 15000 });
+    const apiHost = connection.provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com";
+    console.log(`[Meta messaging] outbound message requested: workspaceId=${connection.workspaceId} channel=${channel} assetId=${assetId} senderType=${senderType} bodyLength=${String(body || "").trim().length}`);
+    let response;
+    try {
+      response = await axios.post(`https://${apiHost}/${version}/${assetId}/messages`, { recipient: { id: recipientId }, message: { text: String(body || "").trim() } }, { params: { access_token: token }, timeout: 15000 });
+    } catch (error) {
+      console.error(`[Meta messaging] Meta API request failed: workspaceId=${connection.workspaceId} assetId=${assetId} status=${error.response?.status || "n/a"} providerCode=${error.response?.data?.error?.code || "n/a"}`);
+      throw error;
+    }
+    console.log(`[Meta messaging] Meta API response: workspaceId=${connection.workspaceId} assetId=${assetId} status=${response.status} messageId=${response.data?.message_id || "missing"}`);
     if (!response.data?.message_id) throw new Error("Provider message outcome is unknown");
-    return ingestProviderMessage({ thread: { channel, provider: "meta", providerThreadId: thread.providerThreadId, participants: thread.participants, contactIds: thread.contactIds, organizationId: thread.organizationId, metadata: thread.metadata }, message: { providerMessageId: response.data?.message_id || `meta:${crypto.randomUUID()}`, direction: "outbound", body, createdBy: userId, sender: { address: String(assetId) }, recipients: [{ address: String(recipientId), role: "to" }], deliveryStatus: "sent", metadata: { assetId, senderType } } });
+    const saved = await ingestProviderMessage({ thread: { channel, provider: "meta", providerThreadId: thread.providerThreadId, participants: thread.participants, contactIds: thread.contactIds, organizationId: thread.organizationId, metadata: thread.metadata }, message: { providerMessageId: response.data?.message_id || `meta:${crypto.randomUUID()}`, direction: "outbound", body, createdBy: userId, sender: { address: String(assetId) }, recipients: [{ address: String(recipientId), role: "to" }], deliveryStatus: "sent", metadata: { assetId, senderType } } });
+    console.log(`[Meta messaging] outbound message saved: threadId=${saved.thread._id} messageId=${saved.message._id}`);
+    return saved;
   }
   async sendCommentPrivateReply({ assetId, commentId, body, occurredAt, threadId, workspaceId, connectionProvider = null, senderType = "automation" }) {
     if (!commentId || !String(body || "").trim() || String(body).length > 2000) throw new Error("A comment and 1–2000 character response are required");

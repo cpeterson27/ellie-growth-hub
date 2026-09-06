@@ -23,6 +23,7 @@
     "test:crm-core": "node test-crm-core.js",
     "test:communications-core": "node test-communications-core.js",
     "test:social-conversations": "node test-social-conversations.js",
+    "test:instagram-messaging-review": "node test-instagram-messaging-review.js",
     "test:social-lead-automation": "node test-social-lead-automation.js",
     "test:meta-preconnection": "node test-meta-preconnection.js",
     "test:meta-deauthorization": "node test-meta-deauthorization.js",

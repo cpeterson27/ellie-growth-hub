@@ -21,6 +21,17 @@ const { deliver: deliverMetaReply } = require("../services/metaAutomationReplySe
 const router = express.Router();
 const META_FIELDS_TO_UNSUBSCRIBE = new Set(["messaging_handover", "standby", "story_insights"]);
 
+// Development-visibility only: never logs tokens, credentials, or message bodies.
+// Contact/conversation-level detail is logged at the source in
+// socialLeadAutomationService; this only reports the terminal outcome.
+function logIngestResult(result, assetId) {
+  if (!result) return console.log(`[Meta webhook] ignored: no normalized event assetId=${assetId}`);
+  if (result.ignored) return console.log(`[Meta webhook] ignored: reason=${result.reason || "unknown"} assetId=${assetId}`);
+  if (result.duplicate) return console.log(`[Meta webhook] duplicate delivery skipped: providerEventId=${result.event?.providerEventId || "unknown"}`);
+  if (result.contextOnly) return console.log(`[Meta webhook] processed as context-only (no identifiable sender): providerEventId=${result.event?.providerEventId || "unknown"}`);
+  console.log(`[Meta webhook] event processed successfully: eventType=${result.event?.eventType} providerEventId=${result.event?.providerEventId}`);
+}
+
 router.get(["/meta", "/instagram"], (req, res) => {
   const verifyToken = String((req.path === "/instagram" ? process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN : process.env.META_WEBHOOK_VERIFY_TOKEN) || "").trim();
   if (verifyToken && req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === verifyToken) return res.status(200).send(String(req.query["hub.challenge"] || ""));
@@ -28,16 +39,27 @@ router.get(["/meta", "/instagram"], (req, res) => {
 });
 
 router.post(["/meta", "/instagram"], async (req, res) => {
-  if (!validateMetaSignature(req.rawBody, req.get("x-hub-signature-256"), req.path === "/instagram" ? "INSTAGRAM_APP_SECRET" : "META_APP_SECRET")) return res.status(403).json({ error: "Invalid Meta signature" });
+  const channel = req.path === "/instagram" ? "instagram" : "meta";
+  const entryCount = req.body?.entry?.length || 0;
+  console.log(`[Meta webhook] received: channel=${channel} entries=${entryCount}`);
+  if (!validateMetaSignature(req.rawBody, req.get("x-hub-signature-256"), req.path === "/instagram" ? "INSTAGRAM_APP_SECRET" : "META_APP_SECRET")) {
+    console.warn(`[Meta webhook] ignored: invalid signature channel=${channel}`);
+    return res.status(403).json({ error: "Invalid Meta signature" });
+  }
   try {
     for (const entry of req.body?.entry || []) {
-      const connection = await connectionForAsset(entry.id, req.path === "/instagram" ? "instagram" : "meta");
-      if (!connection?.workspaceId) continue;
+      const connection = await connectionForAsset(entry.id, channel === "instagram" ? "instagram" : "meta");
+      if (!connection?.workspaceId) {
+        console.log(`[Meta webhook] ignored: no connected workspace matches asset assetId=${entry.id}`);
+        continue;
+      }
+      console.log(`[Meta webhook] workspace matched: workspaceId=${connection.workspaceId} assetId=${entry.id} connectionProvider=${connection.provider}`);
       await runWithWorkspace(connection.workspaceId, async () => {
         if (Array.isArray(entry.standby) && entry.standby.length) console.warn("[Meta webhook] standby events are intentionally not processed; remove standby in Meta");
         if (Array.isArray(entry.messaging_handover) && entry.messaging_handover.length) console.warn("[Meta webhook] handover events are intentionally not processed; remove messaging_handover in Meta");
         for (const event of entry.messaging || []) {
           const result = await ingestMetaMessage({ connection, assetId: entry.id, event, entryTime: entry.time });
+          logIngestResult(result, entry.id);
           await deliverMetaReply(result?.event);
         }
         for (const change of entry.changes || []) {
@@ -47,6 +69,7 @@ router.post(["/meta", "/instagram"], async (req, res) => {
           }
           if (["comments", "live_comments", "feed", "mentions", "mention", "messages", "message_edit", "message_edits", "message_reactions", "message_reads", "message_deliveries", "messaging_seen", "messaging_optins", "messaging_postbacks", "messaging_referral", "messaging_referrals", "messaging_customer_information", "messaging_in_thread_lead_form_submit"].includes(change.field)) {
             const result = await ingestMetaComment({ connection, assetId: entry.id, change, entryTime: entry.time });
+            logIngestResult(result, entry.id);
             await deliverMetaReply(result?.event);
           }
         }

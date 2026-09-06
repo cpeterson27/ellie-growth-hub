@@ -485,6 +485,7 @@ async function ingestSocialEvent(event, options = {}) {
       }
     }
     const { contact, identity, created } = await resolveIdentity(event, deps);
+    console.log(`[Social lead automation] contact ${created ? "created" : "matched"}: provider=${event.provider} assetId=${event.assetId} contactId=${contact._id}`);
     const automation = recordOnly
       ? null
       : await matchingAutomation(event, deps);
@@ -572,6 +573,7 @@ async function ingestSocialEvent(event, options = {}) {
           },
         },
       });
+      console.log(`[Social lead automation] conversation ${conversation.created ? "created" : "matched"}, inbound message saved: threadId=${conversation.thread._id} channel=${event.provider} messageId=${conversation.message._id}`);
     }
     let responseTemplate = automation?.responseTemplate || "";
     const ctaDestination = clean(automation?.cta?.destination, 2000);
@@ -643,6 +645,7 @@ async function ingestSocialEvent(event, options = {}) {
     return {
       duplicate: false,
       contact,
+      contactCreated: created,
       identity,
       automation,
       conversation,
