@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
+import { FiCheck } from "react-icons/fi";
 import {
   fetchPublicApplication,
   submitPublicApplication,
 } from "../services/api.js";
 import { PublicLayout } from "./PublicSite.jsx";
 import useWorkspaceTheme from "../context/useWorkspaceTheme.js";
+import { cloudinaryImage } from "../utils/cloudinaryImage.js";
 import "./PublicApplication.css";
 
 const initial = {
@@ -132,7 +134,7 @@ export default function PublicApplication() {
           {heroLogo ? (
             <div className="application-hero__logo">
               <img
-                src={heroLogo}
+                src={cloudinaryImage(heroLogo, 800)}
                 alt={config?.heroImageUrl ? "" : site?.branding?.publicSiteName || "Ellie Coaching"}
               />
             </div>
@@ -140,6 +142,9 @@ export default function PublicApplication() {
         </section>
         {done ? (
           <section className="application-success">
+            <span className="application-success__badge" aria-hidden="true">
+              <FiCheck />
+            </span>
             <h2>Application received</h2>
             <p>{done}</p>
             {config?.nextStepCta?.url ? (
@@ -153,170 +158,198 @@ export default function PublicApplication() {
             Program applications are not currently open.
           </p>
         ) : (
-          <form onSubmit={submit}>
-            <div className="application-grid">
-              <label>
-                First name
-                <input
-                  required
-                  autoComplete="given-name"
-                  value={form.firstName}
-                  onChange={(event) => set("firstName", event.target.value)}
-                />
-              </label>
-              <label>
-                Last name
-                <input
-                  required
-                  autoComplete="family-name"
-                  value={form.lastName}
-                  onChange={(event) => set("lastName", event.target.value)}
-                />
-              </label>
-              <label>
-                Email
-                <input
-                  required
-                  type="email"
-                  autoComplete="email"
-                  value={form.email}
-                  onChange={(event) => set("email", event.target.value)}
-                />
-              </label>
-              <label>
-                Phone
-                <input
-                  type="tel"
-                  autoComplete="tel"
-                  value={form.phone}
-                  onChange={(event) => set("phone", event.target.value)}
-                />
-              </label>
-              <label className="wide">
-                Choose a program
-                <select
-                  required
-                  value={form.coachingProgramId}
-                  onChange={(event) =>
-                    set("coachingProgramId", event.target.value)
-                  }
-                >
-                  <option value="">Select a program</option>
-                  {config?.programs?.map((row) => (
-                    <option value={row.id} key={row.id}>
-                      {row.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="wide application-referral">
-                Referral code or referral link <span>(optional)</span>
-                <input
-                  autoComplete="off"
-                  placeholder="Enter the code or paste the link you received"
-                  value={form.referralCode}
-                  onChange={(event) => set("referralCode", event.target.value)}
-                />
-                <small>
-                  If an ambassador or coach shared Ellie’s Coaching with you,
-                  enter their code or link so we can give them credit.
-                </small>
-              </label>
-              <label className="wide">
-                {config?.questionLabels?.investingExperience ||
-                  "Investing experience"}
-                <textarea
-                  value={form.investingExperience}
-                  onChange={(event) =>
-                    set("investingExperience", event.target.value)
-                  }
-                />
-              </label>
-              <label className="wide">
-                {config?.questionLabels?.currentSituation ||
-                  "Current situation"}
-                <textarea
-                  value={form.currentSituation}
-                  onChange={(event) =>
-                    set("currentSituation", event.target.value)
-                  }
-                />
-              </label>
-              <label className="wide">
-                {config?.questionLabels?.goals || "Goals"}
-                <textarea
-                  value={form.goals}
-                  onChange={(event) => set("goals", event.target.value)}
-                />
-              </label>
-              <label>
-                {config?.questionLabels?.desiredStartTimeline ||
-                  "Desired start timeline"}
-                {config?.timelineOptions?.length ? (
+          <form onSubmit={submit} className="application-form">
+            <fieldset className="application-section">
+              <legend>
+                <span className="application-section__index">1</span>
+                Your details
+              </legend>
+              <div className="application-grid">
+                <label>
+                  First name
+                  <input
+                    required
+                    autoComplete="given-name"
+                    value={form.firstName}
+                    onChange={(event) => set("firstName", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Last name
+                  <input
+                    required
+                    autoComplete="family-name"
+                    value={form.lastName}
+                    onChange={(event) => set("lastName", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Email
+                  <input
+                    required
+                    type="email"
+                    autoComplete="email"
+                    value={form.email}
+                    onChange={(event) => set("email", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Phone
+                  <input
+                    type="tel"
+                    autoComplete="tel"
+                    value={form.phone}
+                    onChange={(event) => set("phone", event.target.value)}
+                  />
+                </label>
+              </div>
+            </fieldset>
+            <fieldset className="application-section">
+              <legend>
+                <span className="application-section__index">2</span>
+                Your program
+              </legend>
+              <div className="application-grid">
+                <label className="wide">
+                  Choose a program
                   <select
-                    value={form.desiredStartTimeline}
+                    required
+                    value={form.coachingProgramId}
                     onChange={(event) =>
-                      set("desiredStartTimeline", event.target.value)
+                      set("coachingProgramId", event.target.value)
                     }
                   >
-                    <option value="">Select</option>
-                    {config.timelineOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
+                    <option value="">Select a program</option>
+                    {config?.programs?.map((row) => (
+                      <option value={row.id} key={row.id}>
+                        {row.title}
                       </option>
                     ))}
                   </select>
-                ) : (
+                </label>
+                <label className="wide application-referral">
+                  Referral code or referral link <span>(optional)</span>
                   <input
-                    value={form.desiredStartTimeline}
+                    autoComplete="off"
+                    placeholder="Enter the code or paste the link you received"
+                    value={form.referralCode}
+                    onChange={(event) => set("referralCode", event.target.value)}
+                  />
+                  <small>
+                    If an ambassador or coach shared Ellie’s Coaching with you,
+                    enter their code or link so we can give them credit.
+                  </small>
+                </label>
+              </div>
+            </fieldset>
+            <fieldset className="application-section">
+              <legend>
+                <span className="application-section__index">3</span>
+                Tell us about you
+              </legend>
+              <div className="application-grid">
+                <label className="wide">
+                  {config?.questionLabels?.investingExperience ||
+                    "Investing experience"}
+                  <textarea
+                    value={form.investingExperience}
                     onChange={(event) =>
-                      set("desiredStartTimeline", event.target.value)
+                      set("investingExperience", event.target.value)
                     }
                   />
-                )}
-              </label>
-              <label className="wide">
-                {config?.questionLabels?.message ||
-                  "Anything else we should know?"}
-                <textarea
-                  value={form.message}
-                  onChange={(event) => set("message", event.target.value)}
-                />
-              </label>
-            </div>
-            <div className="application-consent">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.smsConsent}
-                  onChange={(event) => set("smsConsent", event.target.checked)}
-                />
-                I agree to receive program-application text messages. Message
-                and data rates may apply. Reply STOP to opt out.
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.marketingEmailConsent}
-                  onChange={(event) =>
-                    set("marketingEmailConsent", event.target.checked)
-                  }
-                />
-                I would like to receive Ellie Coaching news and program updates
-                by email.
-              </label>
-              <label>
-                <input
-                  required
-                  type="checkbox"
-                  checked={form.privacyTermsAccepted}
-                  onChange={(event) =>
-                    set("privacyTermsAccepted", event.target.checked)
-                  }
-                />
-                <span>I acknowledge the <a href={config?.privacyUrl || "/privacy"} target="_blank" rel="noreferrer">Privacy Policy</a> and <a href={config?.termsUrl || "/terms"} target="_blank" rel="noreferrer">Terms of Service</a>.</span>
-              </label>
-            </div>
+                </label>
+                <label className="wide">
+                  {config?.questionLabels?.currentSituation ||
+                    "Current situation"}
+                  <textarea
+                    value={form.currentSituation}
+                    onChange={(event) =>
+                      set("currentSituation", event.target.value)
+                    }
+                  />
+                </label>
+                <label className="wide">
+                  {config?.questionLabels?.goals || "Goals"}
+                  <textarea
+                    value={form.goals}
+                    onChange={(event) => set("goals", event.target.value)}
+                  />
+                </label>
+                <label>
+                  {config?.questionLabels?.desiredStartTimeline ||
+                    "Desired start timeline"}
+                  {config?.timelineOptions?.length ? (
+                    <select
+                      value={form.desiredStartTimeline}
+                      onChange={(event) =>
+                        set("desiredStartTimeline", event.target.value)
+                      }
+                    >
+                      <option value="">Select</option>
+                      {config.timelineOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={form.desiredStartTimeline}
+                      onChange={(event) =>
+                        set("desiredStartTimeline", event.target.value)
+                      }
+                    />
+                  )}
+                </label>
+                <label className="wide">
+                  {config?.questionLabels?.message ||
+                    "Anything else we should know?"}
+                  <textarea
+                    value={form.message}
+                    onChange={(event) => set("message", event.target.value)}
+                  />
+                </label>
+              </div>
+            </fieldset>
+            <fieldset className="application-section application-section--consent">
+              <legend>
+                <span className="application-section__index">4</span>
+                Stay in touch
+              </legend>
+              <div className="application-consent">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.smsConsent}
+                    onChange={(event) => set("smsConsent", event.target.checked)}
+                  />
+                  I agree to receive program-application text messages. Message
+                  and data rates may apply. Reply STOP to opt out.
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.marketingEmailConsent}
+                    onChange={(event) =>
+                      set("marketingEmailConsent", event.target.checked)
+                    }
+                  />
+                  I would like to receive Ellie Coaching news and program updates
+                  by email.
+                </label>
+                <label>
+                  <input
+                    required
+                    type="checkbox"
+                    checked={form.privacyTermsAccepted}
+                    onChange={(event) =>
+                      set("privacyTermsAccepted", event.target.checked)
+                    }
+                  />
+                  <span>I acknowledge the <a href={config?.privacyUrl || "/privacy"} target="_blank" rel="noreferrer">Privacy Policy</a> and <a href={config?.termsUrl || "/terms"} target="_blank" rel="noreferrer">Terms of Service</a>.</span>
+                </label>
+              </div>
+            </fieldset>
             {error ? <p className="application-error">{error}</p> : null}
             <button
               className="public-button"

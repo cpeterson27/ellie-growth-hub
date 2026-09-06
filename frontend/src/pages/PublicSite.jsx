@@ -18,6 +18,7 @@ import {
   fetchPublicProgram,
   fetchPublicTestimonials,
 } from "../services/api.js";
+import { cloudinaryImage } from "../utils/cloudinaryImage.js";
 import "./PublicSite.css";
 import "./PublicEnhancements.css";
 
@@ -58,7 +59,7 @@ function Brand({ site, theme }) {
     >
       {logo ? (
         <img
-          src={logo}
+          src={cloudinaryImage(logo, 340)}
           alt={
             site?.branding?.publicSiteName || workspaceName || "Workspace logo"
           }
@@ -334,7 +335,7 @@ function ProgramCards({ programs = [] }) {
                 {program.imageUrl ? (
                   <img
                     className="public-accelerator-img"
-                    src={program.imageUrl}
+                    src={cloudinaryImage(program.imageUrl, 760)}
                     alt={`${program.title} program`}
                     loading="lazy"
                   />
@@ -424,7 +425,7 @@ function ProgramCards({ programs = [] }) {
                   {program.imageUrl ? (
                     <img
                       className="public-program-img"
-                      src={program.imageUrl}
+                      src={cloudinaryImage(program.imageUrl, 760)}
                       alt={`${program.title} program`}
                       loading="lazy"
                     />
@@ -533,7 +534,7 @@ function Testimonials({ rows = [] }) {
           {row.avatarUrl ? (
             <img
               className="testimonial-avatar"
-              src={row.avatarUrl}
+              src={cloudinaryImage(row.avatarUrl, 128)}
               alt=""
               loading="lazy"
             />
@@ -597,7 +598,7 @@ function HeroVideoTile({ site }) {
         style={
           p.introVideoPosterUrl
             ? {
-                backgroundImage: `linear-gradient(#0002,#0002),url(${p.introVideoPosterUrl})`,
+                backgroundImage: `linear-gradient(#0002,#0002),url(${cloudinaryImage(p.introVideoPosterUrl, 480)})`,
               }
             : undefined
         }
@@ -643,7 +644,7 @@ function HeroVideoTile({ site }) {
             ) : (
               <video
                 src={p.introVideoUrl}
-                poster={p.introVideoPosterUrl}
+                poster={cloudinaryImage(p.introVideoPosterUrl, 1280)}
                 controls
                 autoPlay
               />
@@ -656,7 +657,11 @@ function HeroVideoTile({ site }) {
 }
 function Portrait({ person }) {
   return person.avatarUrl ? (
-    <img src={person.avatarUrl} alt={person.displayName} loading="lazy" />
+    <img
+      src={cloudinaryImage(person.avatarUrl, 600)}
+      alt={person.displayName}
+      loading="lazy"
+    />
   ) : (
     <div className="team-placeholder" aria-hidden="true">
       {person.displayName.slice(0, 2).toUpperCase()}
@@ -778,7 +783,11 @@ export function PublicHome() {
           <div className="public-hero-right">
             <div className="public-hero-img-box">
               {heroImage ? (
-                <img className="public-hero-img" src={heroImage} alt="" />
+                <img
+                  className="public-hero-img"
+                  src={cloudinaryImage(heroImage, 960)}
+                  alt=""
+                />
               ) : (
                 <div
                   className="public-hero-image-placeholder"
@@ -824,9 +833,10 @@ export function PublicHome() {
             <div className="public-meet-photo-area">
               {p.aboutImageUrl ? (
                 <img
-                  src={p.aboutImageUrl}
+                  src={cloudinaryImage(p.aboutImageUrl, 1200)}
                   className="public-meet-photo"
                   alt={aboutDisplayName}
+                  loading="lazy"
                 />
               ) : (
                 <div className="public-meet-placeholder" aria-hidden="true">
@@ -1215,7 +1225,7 @@ export function PublicProfilePage() {
           <>
             <header>
               {row.avatarUrl ? (
-                <img src={row.avatarUrl} alt={row.displayName} />
+                <img src={cloudinaryImage(row.avatarUrl, 192)} alt={row.displayName} />
               ) : (
                 <span>{row.displayName.slice(0, 2).toUpperCase()}</span>
               )}
