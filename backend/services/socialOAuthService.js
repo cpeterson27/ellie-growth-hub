@@ -452,6 +452,13 @@ async function verifyMetaToken(accessToken, providerConfig, http = axios) {
     throw new Error(
       "Meta returned an invalid authorization for this application",
     );
+  const grantedPageIds = [
+    ...new Set(
+      (data.granular_scopes || [])
+        .filter((row) => row.scope === "pages_show_list")
+        .flatMap((row) => (row.target_ids || []).map(String)),
+    ),
+  ];
   return {
     valid: true,
     userId: String(data.user_id || ""),
@@ -459,10 +466,37 @@ async function verifyMetaToken(accessToken, providerConfig, http = axios) {
       ? new Date(Number(data.data_access_expires_at) * 1000)
       : null,
     verifiedAt: new Date(),
+    grantedPageIds,
   };
 }
 
-async function discoverPages(accessToken, providerConfig, http = axios) {
+async function discoverPages(
+  accessToken,
+  providerConfig,
+  http = axios,
+  grantedPageIds = [],
+) {
+  // Meta's asset picker (Facebook Login for Business) issues granular
+  // scopes tied to specific Page ids; those Pages don't appear in
+  // /me/accounts, which only lists Pages under a broad, unscoped grant.
+  if (grantedPageIds.length) {
+    const pages = [];
+    for (const pageId of grantedPageIds) {
+      const response = await http.get(
+        `https://graph.facebook.com/${providerConfig.apiVersion}/${pageId}`,
+        {
+          params: {
+            fields:
+              "id,name,picture,instagram_business_account{id,username,name,profile_picture_url}",
+            access_token: accessToken,
+          },
+          timeout: 15000,
+        },
+      );
+      if (response.data?.id) pages.push(response.data);
+    }
+    return pages;
+  }
   const pages = new Map(),
     cursors = new Set();
   let after;
@@ -529,16 +563,20 @@ async function exchangeMeta(code, http = axios) {
   } catch {
     /* A short-lived token remains valid for initial setup. */
   }
-  const [authorization, permissions, profileResponse, pagesResponse] =
-    await Promise.all([
-      verifyMetaToken(accessToken, providerConfig, http),
-      metaPermissions(accessToken, providerConfig, http),
-      http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me`, {
-        params: { fields: "id,name", access_token: accessToken },
-        timeout: 15000,
-      }),
-      discoverPages(accessToken, providerConfig, http),
-    ]);
+  const authorization = await verifyMetaToken(accessToken, providerConfig, http);
+  const [permissions, profileResponse, pagesResponse] = await Promise.all([
+    metaPermissions(accessToken, providerConfig, http),
+    http.get(`https://graph.facebook.com/${providerConfig.apiVersion}/me`, {
+      params: { fields: "id,name", access_token: accessToken },
+      timeout: 15000,
+    }),
+    discoverPages(
+      accessToken,
+      providerConfig,
+      http,
+      authorization.grantedPageIds,
+    ),
+  ]);
   const pageTokens = {};
   const assets = [];
   if (
