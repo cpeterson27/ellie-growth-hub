@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "postinstall": "cd ../frontend && npm install --include=dev && npm run build",
     "automation:indexes:preflight": "node scripts/migrate-automation-action-indexes.js --preflight",
     "automation:indexes:migrate": "node scripts/migrate-automation-action-indexes.js --apply",
     "test:automation-indexes": "node test-automation-action-indexes.js",
