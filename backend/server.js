@@ -215,6 +215,8 @@ connectDatabase(mongoUri)
       });
     });
 
+    app.use(require("./middleware/publicHtmlShell").publicHtmlShell);
+
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       if (process.env.RESEARCH_WORKER_MODE !== "external") startResearchMonitorRunner();
