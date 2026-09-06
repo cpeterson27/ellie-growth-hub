@@ -312,8 +312,13 @@ export default function Sidebar({ isOpen, isCollapsed, onClose }) {
   const appBranding = socialConnectionOnly
     ? {}
     : displayedOrganization?.appBranding || site?.appBranding || {};
-  const appLogo =
-    appBranding.logoUrl || displayedOrganization?.organizationLogoUrl || "";
+  // The dashboard sidebar is always a dark surface, so it prefers the
+  // dark-backgrounds logo — the same single light/dark logo pair used
+  // everywhere else (public website, application page).
+  const brand = socialConnectionOnly
+    ? {}
+    : displayedOrganization?.branding || site?.branding || {};
+  const appLogo = brand.publicSiteLogoDarkUrl || brand.publicSiteLogoUrl || "";
   const compactLogo = appBranding.compactLogoUrl || appLogo;
   const sidebarStyle = {
     "--app-sidebar-background": appBranding.sidebarBackgroundColor,

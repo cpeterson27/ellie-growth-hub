@@ -60,7 +60,9 @@ async function renderEmailContent(
       )
       .join("")}</body></html>`;
   const organizationLogo = String(
-    workspaceConfig?.organizationLogoUrl || "",
+    workspaceConfig?.branding?.publicSiteLogoUrl ||
+      workspaceConfig?.organizationLogoUrl ||
+      "",
   ).trim();
   if (organizationLogo && !html.includes(organizationLogo)) {
     const logoHtml = `<div style="margin:0 0 28px"><img src="${organizationLogo.replace(/"/g, "&quot;")}" alt="${String(businessName).replace(/[<>&"]/g, "")}" style="display:block;max-height:84px;max-width:220px;object-fit:contain"></div>`;

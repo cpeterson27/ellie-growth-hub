@@ -324,6 +324,111 @@
   justify-self: start;
   padding-left: 0 !important;
 }
+.logo-field {
+  background: linear-gradient(180deg, #fbfcfb, #f5f7f6);
+  border: 1px solid #dce4e0;
+  border-radius: 20px;
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+.logo-field > header h4 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.logo-field > header p {
+  margin: 0;
+  color: #5c6b64;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  max-width: 56ch;
+}
+.logo-field__slots {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.logo-slot {
+  background: #fff;
+  border: 1px solid #dce4e0;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(22, 50, 42, 0.05);
+  display: grid;
+  gap: 14px;
+  overflow: hidden;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.logo-slot:hover {
+  box-shadow: 0 16px 34px rgba(22, 50, 42, 0.09);
+  transform: translateY(-1px);
+}
+.logo-slot__swatch {
+  align-items: center;
+  display: flex;
+  height: 110px;
+  justify-content: center;
+  padding: 16px;
+}
+.logo-slot__swatch--light {
+  background: repeating-conic-gradient(#f4f6f5 0% 25%, #ffffff 0% 50%) 0 0/16px
+    16px;
+}
+.logo-slot__swatch--dark {
+  background: #121815;
+}
+.logo-slot__swatch img {
+  display: block;
+  height: auto;
+  max-height: 78px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.logo-slot__placeholder {
+  color: #93a19b;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.logo-slot__swatch--dark .logo-slot__placeholder {
+  color: #5c6b64;
+}
+.logo-slot__body {
+  display: grid;
+  gap: 6px;
+  padding: 0 16px 16px;
+}
+.logo-slot__body strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.logo-slot__body small {
+  color: #68766f;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.logo-slot__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.logo-slot__actions button {
+  background: #fff;
+  border: 1px solid #c7d2cd;
+  border-radius: 8px;
+  color: #20332c;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+@media (max-width: 640px) {
+  .logo-field__slots {
+    grid-template-columns: 1fr;
+  }
+}
 .brand-color-grid {
   display: grid;
   gap: 12px;

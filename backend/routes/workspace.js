@@ -72,6 +72,10 @@ router.get("/", async (req, res) => {
     websiteUrl: config.websiteUrl,
     organizationLogoUrl: config.organizationLogoUrl,
     appBranding: config.appBranding || {},
+    branding: {
+      publicSiteLogoUrl: config.branding?.publicSiteLogoUrl || "",
+      publicSiteLogoDarkUrl: config.branding?.publicSiteLogoDarkUrl || "",
+    },
     invitationIdentity: config.invitationIdentity || {
       senderName: "",
       senderEmail: "",
@@ -158,6 +162,10 @@ router.patch("/", async (req, res) => {
     websiteUrl: config.websiteUrl,
     organizationLogoUrl: config.organizationLogoUrl,
     appBranding: config.appBranding || {},
+    branding: {
+      publicSiteLogoUrl: config.branding?.publicSiteLogoUrl || "",
+      publicSiteLogoDarkUrl: config.branding?.publicSiteLogoDarkUrl || "",
+    },
     invitationIdentity: config.invitationIdentity || {
       senderName: "",
       senderEmail: "",

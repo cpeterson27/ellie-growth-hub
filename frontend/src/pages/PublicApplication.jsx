@@ -118,9 +118,11 @@ export default function PublicApplication() {
     !config?.intro || config.intro === legacyIntro
       ? "Choose the program that fits your goals and tell us a little about where you are today."
       : config.intro;
+  // The hero panel is always a dark surface, so it prefers the
+  // dark-backgrounds logo — the same single light/dark logo pair used
+  // everywhere else (public website header, dashboard sidebar).
   const heroLogo =
-    config?.heroImageUrl || site?.branding?.publicSiteLogoUrl ||
-    (site?.workspace?.slug === "ellie" ? "/elliescoachinglogo.png" : "");
+    site?.branding?.publicSiteLogoDarkUrl || site?.branding?.publicSiteLogoUrl || "";
   const embedded = new URLSearchParams(location.search).get("embed") === "1";
 
   const content = (
@@ -135,7 +137,7 @@ export default function PublicApplication() {
             <div className="application-hero__logo">
               <img
                 src={cloudinaryImage(heroLogo, 800)}
-                alt={config?.heroImageUrl ? "" : site?.branding?.publicSiteName || "Ellie Coaching"}
+                alt={site?.branding?.publicSiteName || "Site logo"}
               />
             </div>
           ) : null}

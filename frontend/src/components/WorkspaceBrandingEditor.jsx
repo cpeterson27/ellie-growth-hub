@@ -3,34 +3,9 @@ import Button from "./Button.jsx";
 import { uploadEventImage } from "../services/api.js";
 
 const ASSETS = [
-  [
-    "publicSiteLogoUrl",
-    "Website header logo",
-    "Shown in the public website header and footer. Also used as the program application page's image, unless a dedicated one is set under Settings → Student Application.",
-  ],
-  [
-    "publicSiteLogoDarkUrl",
-    "Website header logo (White/Light variant)",
-    "Shown in the public website header and footer on dark surfaces.",
-  ],
   ["faviconUrl", "Website favicon", "Shown in the visitor's browser tab."],
 ];
 const APP_ASSETS = [
-  [
-    "logoUrl",
-    "Dashboard and sidebar logo",
-    "Used throughout the authenticated Lead Porch app. Takes priority over the Organization profile logo in Settings — set that one only for campaign emails.",
-  ],
-  [
-    "logoLightUrl",
-    "Logo for light surfaces",
-    "Optional variant for light headers and panels.",
-  ],
-  [
-    "logoDarkUrl",
-    "Logo for dark surfaces",
-    "Optional variant for dark headers and sidebars.",
-  ],
   [
     "faviconUrl",
     "App favicon",
@@ -89,6 +64,105 @@ function AssetField({ label, help, value, onChange, onUpload, busy }) {
         ) : null}
       </div>
     </article>
+  );
+}
+
+function LogoSlot({ surface, value, onChange, onUpload, busy }) {
+  const [advanced, setAdvanced] = useState(false);
+  const isDark = surface === "dark";
+  return (
+    <article className="logo-slot">
+      <div
+        className={`logo-slot__swatch logo-slot__swatch--${surface}`}
+        aria-hidden="true"
+      >
+        {value ? (
+          <img src={value} alt="" />
+        ) : (
+          <span className="logo-slot__placeholder">No logo yet</span>
+        )}
+      </div>
+      <div className="logo-slot__body">
+        <strong>{isDark ? "Dark backgrounds" : "Light backgrounds"}</strong>
+        <small>
+          {isDark
+            ? "Used on dark surfaces — the dashboard sidebar, the application page, and your website when its surface is set to dark or charcoal."
+            : "Used on light surfaces — your website header and footer when its surface is set to light."}
+        </small>
+        <div className="logo-slot__actions">
+          <label className="website-upload-button">
+            {busy ? "Uploading…" : value ? "Replace" : "Upload"}
+            <input
+              disabled={busy}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(event) => onUpload(event.target.files?.[0])}
+            />
+          </label>
+          {value ? (
+            <button type="button" onClick={() => onChange("")}>
+              Remove
+            </button>
+          ) : null}
+        </div>
+        <button
+          className="brand-advanced-toggle"
+          type="button"
+          aria-expanded={advanced}
+          onClick={() => setAdvanced((current) => !current)}
+        >
+          Advanced URL {advanced ? "−" : "+"}
+        </button>
+        {advanced ? (
+          <input
+            type="url"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="https://…"
+          />
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function LogoField({
+  lightValue,
+  darkValue,
+  onChangeLight,
+  onChangeDark,
+  onUploadLight,
+  onUploadDark,
+  busyLight,
+  busyDark,
+}) {
+  return (
+    <section className="logo-field">
+      <header>
+        <h4>Logo</h4>
+        <p>
+          One logo, in two variants. Used everywhere — your public website,
+          the dashboard sidebar, and the program application page — so you
+          only ever set it here.
+        </p>
+      </header>
+      <div className="logo-field__slots">
+        <LogoSlot
+          surface="light"
+          value={lightValue}
+          onChange={onChangeLight}
+          onUpload={onUploadLight}
+          busy={busyLight}
+        />
+        <LogoSlot
+          surface="dark"
+          value={darkValue}
+          onChange={onChangeDark}
+          onUpload={onUploadDark}
+          busy={busyDark}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -163,8 +237,21 @@ export default function WorkspaceBrandingEditor({
         <header>
           <p className="page-eyebrow">Public website branding</p>
           <h4>Visitor-facing identity</h4>
-          <p>These assets and colors belong only to the public website.</p>
+          <p>
+            Your logo below is shared app-wide. Everything else on this page
+            — name, colors, and copy — belongs only to the public website.
+          </p>
         </header>
+        <LogoField
+          lightValue={brand.publicSiteLogoUrl || ""}
+          darkValue={brand.publicSiteLogoDarkUrl || ""}
+          onChangeLight={(value) => patchPublic("publicSiteLogoUrl", value)}
+          onChangeDark={(value) => patchPublic("publicSiteLogoDarkUrl", value)}
+          onUploadLight={(file) => upload("branding", "publicSiteLogoUrl", file)}
+          onUploadDark={(file) => upload("branding", "publicSiteLogoDarkUrl", file)}
+          busyLight={uploading === "branding.publicSiteLogoUrl"}
+          busyDark={uploading === "branding.publicSiteLogoDarkUrl"}
+        />
         <label>
           Public site name
           <input
@@ -337,9 +424,8 @@ export default function WorkspaceBrandingEditor({
           <h4>Authenticated workspace identity</h4>
           <p>
             Used by Owner, Admin, Coach, Closer, Ambassador, Member, and Viewer
-            portals. It does not replace public website assets. The Dashboard
-            and sidebar logo below overrides the Organization profile logo in
-            Settings whenever both are set.
+            portals. The sidebar always shows the dark-backgrounds logo set
+            above — there's no separate logo to manage here.
           </p>
         </header>
         <div className="brand-assets-list">
@@ -382,8 +468,11 @@ export default function WorkspaceBrandingEditor({
           }}
         >
           <span>Live preview · app shell</span>
-          {app.logoDarkUrl || app.logoUrl ? (
-            <img src={app.logoDarkUrl || app.logoUrl} alt="" />
+          {brand.publicSiteLogoDarkUrl || brand.publicSiteLogoUrl ? (
+            <img
+              src={brand.publicSiteLogoDarkUrl || brand.publicSiteLogoUrl}
+              alt=""
+            />
           ) : (
             <strong>Workspace</strong>
           )}

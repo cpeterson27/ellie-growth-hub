@@ -20,7 +20,6 @@ import TeamAccess from "../components/TeamAccess.jsx";
 import ApplicationNotificationSettings from "../components/ApplicationNotificationSettings.jsx";
 import WebsiteBrandManager from "../components/WebsiteBrandManager.jsx";
 import ApplicationRouting from "../components/ApplicationRouting.jsx";
-import ApplicationImageSettings from "../components/ApplicationImageSettings.jsx";
 import LaunchReadiness from "../components/LaunchReadiness.jsx";
 import PrivacyRequests from "../components/PrivacyRequests.jsx";
 import InvitationTemplates from "../components/InvitationTemplates.jsx";
@@ -39,7 +38,6 @@ import {
   revokeMcpAccessToken,
   revokeOAuthConnection,
   updateWorkspaceConfig,
-  uploadEventImage,
 } from "../services/api.js";
 import { hasPermission } from "../utils/roleAccess.js";
 import {
@@ -83,6 +81,9 @@ export default function Settings() {
     country: "United States",
   });
   const [websiteUrl, setWebsiteUrl] = useState("");
+  // No UI edits this directly anymore (logos live only under Website &
+  // Brand) — kept only so saving the Organization profile form doesn't
+  // wipe out a value set before that consolidation.
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState("");
   const [invitationIdentity, setInvitationIdentity] = useState({
     senderName: "",
@@ -90,7 +91,6 @@ export default function Settings() {
     replyToEmail: "",
   });
   const [campaigns, setCampaigns] = useState([]);
-  const [logoUploading, setLogoUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -271,61 +271,6 @@ export default function Settings() {
     }
   };
 
-  const uploadLogo = async (file) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/") || file.size > 8 * 1024 * 1024) {
-      setError("Choose a PNG, JPG, or WEBP logo smaller than 8 MB.");
-      return;
-    }
-    try {
-      setLogoUploading(true);
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const uploaded = await uploadEventImage({ file: dataUrl, filename: file.name });
-      setOrganizationLogoUrl(uploaded.url);
-      const cityLine = [address.city, address.region].filter(Boolean).join(", ");
-      const postalAddress = [
-        address.line1,
-        address.line2,
-        [cityLine, address.postalCode].filter(Boolean).join(" "),
-        address.country,
-      ]
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .join(", ");
-      const config = await updateWorkspaceConfig({
-        workspaceName,
-        legalBusinessName,
-        postalAddress,
-        addressLine1: address.line1,
-        addressLine2: address.line2,
-        addressCity: address.city,
-        addressRegion: address.region,
-        addressPostalCode: address.postalCode,
-        addressCountry: address.country,
-        websiteUrl,
-        organizationLogoUrl: uploaded.url,
-        invitationIdentity,
-      });
-      window.dispatchEvent(
-        new CustomEvent("workspace-organization-updated", {
-          detail: {
-            workspaceName: config.workspaceName,
-            organizationLogoUrl: config.organizationLogoUrl || uploaded.url,
-          },
-        }),
-      );
-      setSaved(true);
-    } catch (err) {
-      setError(err.response?.data?.error || "Unable to upload the organization logo.");
-    } finally {
-      setLogoUploading(false);
-    }
-  };
 
   /* ─── Nav helper ─────────────────────────────────────────────────────── */
   const navBtn = (id, label, Icon, path) => (
@@ -418,16 +363,15 @@ export default function Settings() {
               </p>
             </header>
 
-            {/* Brand assets */}
+            {/* Business details */}
             <section className="settings-section">
               <div className="settings-section__head">
-                <div className="settings-section__icon"><FiImage /></div>
+                <div className="settings-section__icon"><FiBriefcase /></div>
                 <div className="settings-section__head-text">
-                  <h3>Brand assets</h3>
+                  <h3>Business details</h3>
                   <p>
-                    Used in campaign email branding and the compliance footer.
-                    This is a <strong>fallback</strong> for the dashboard sidebar
-                    logo only — if a dedicated logo is set under{" "}
+                    Used in navigation and the compliance footer on campaign
+                    email. Your logo lives in one place —{" "}
                     <button
                       type="button"
                       className="settings-inline-link"
@@ -435,55 +379,8 @@ export default function Settings() {
                     >
                       Website &amp; Brand
                     </button>
-                    , that one is shown instead and this image won't appear
-                    there. Public website logos are also managed under
-                    Website &amp; Brand, not here.
+                    .
                   </p>
-                </div>
-              </div>
-              <div className="settings-logo-row">
-                <div className="settings-logo-preview">
-                  {organizationLogoUrl ? (
-                    <img src={organizationLogoUrl} alt="Organization logo" />
-                  ) : (
-                    <span className="settings-logo-preview__empty">
-                      <FiImage />
-                      No logo
-                    </span>
-                  )}
-                </div>
-                <div className="settings-logo-actions">
-                  <label className="settings-upload-btn">
-                    Choose logo
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => uploadLogo(e.target.files?.[0])}
-                    />
-                  </label>
-                  <span className="settings-upload-hint">
-                    {logoUploading ? "Uploading…" : "PNG, JPG, or WEBP · max 8 MB"}
-                  </span>
-                  {organizationLogoUrl ? (
-                    <button
-                      type="button"
-                      className="settings-remove-btn"
-                      onClick={() => { setOrganizationLogoUrl(""); setSaved(false); }}
-                    >
-                      Remove logo
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            </section>
-
-            {/* Business details */}
-            <section className="settings-section">
-              <div className="settings-section__head">
-                <div className="settings-section__icon"><FiBriefcase /></div>
-                <div className="settings-section__head-text">
-                  <h3>Business details</h3>
-                  <p>Used in navigation and the compliance footer on campaign email.</p>
                 </div>
               </div>
               <div className="settings-form">
@@ -987,7 +884,6 @@ export default function Settings() {
 
         ) : activeSection === "applications" ? (
           <div className="settings-applications-stack">
-            <ApplicationImageSettings />
             <ApplicationRouting />
             <ApplicationNotificationSettings />
           </div>
