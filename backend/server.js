@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 const { connectDatabase } = require("./config/database");
 const Contact = require("./models/Contact");
@@ -214,6 +215,19 @@ connectDatabase(mongoUri)
         status: "Growth Operator backend running 🚀",
       });
     });
+
+    // Serve the built frontend's hashed JS/CSS/image assets as-is with
+    // long-lived caching (safe: Vite fingerprints the filename on every
+    // content change). index.html is deliberately excluded here — it must
+    // always go through publicHtmlShell below so per-workspace meta tags
+    // get injected, never served as a raw cached file.
+    app.use(
+      express.static(path.join(__dirname, "..", "frontend", "dist"), {
+        index: false,
+        maxAge: "1y",
+        immutable: true,
+      }),
+    );
 
     app.use(require("./middleware/publicHtmlShell").publicHtmlShell);
 
